@@ -13195,14 +13195,12 @@ document.getElementById('dayViewChatBackBtn').addEventListener('click', () => go
 // "스크롤하면 키보드 내리기" 로직이 이때 생기는 스크롤을 사용자 스크롤로 착각한 것이었고(별도로 이미 고침),
 // 이제는 위치(top)만, 그것도 실제로 밀린 만큼만 정확히 되돌려서 헤더가 항상 화면 맨 위에 그대로 있게 함.
 // (높이는 건드리지 않음 - 문제를 일으켰던 부분)
-let fixChatHeaderPositionTimer = null;
+// 지연(디바운스) 없이 매 이벤트마다 즉시 보정함 - 지연이 있으면 그 사이에 헤더가 잠깐 밀렸다가
+// 다시 튕겨 돌아오는 게 눈에 보였음 (키보드가 열리는 애니메이션 도중 "튐" 현상의 원인이었음)
 function fixChatHeaderPosition(){
   const view = document.getElementById('chatRoomView');
   if(!view || !view.classList.contains('active') || !window.visualViewport) return;
-  clearTimeout(fixChatHeaderPositionTimer);
-  fixChatHeaderPositionTimer = setTimeout(() => {
-    view.style.top = window.visualViewport.offsetTop + 'px';
-  }, 60);
+  view.style.top = window.visualViewport.offsetTop + 'px';
 }
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize', fixChatHeaderPosition);
