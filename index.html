@@ -798,6 +798,132 @@
     border-radius:10px;
     overflow:hidden;
   }
+  .feed-rating-picker{
+    display:flex;
+    gap:6px;
+    font-size:28px;
+    line-height:1;
+  }
+  .feed-rating-picker .feed-star{
+    color:var(--line);
+    cursor:pointer;
+    transition:color .1s ease;
+  }
+  .feed-rating-picker .feed-star.on{ color:#F5A623; }
+  .feed-photo-row{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .feed-photo-add-btn{
+    width:64px;height:64px;
+    border-radius:10px;
+    border:1.5px dashed var(--line);
+    background:var(--surface);
+    color:var(--text-dim);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .feed-photo-thumb{
+    position:relative;
+    width:64px;height:64px;
+    border-radius:10px;
+    overflow:hidden;
+    flex-shrink:0;
+  }
+  .feed-photo-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .feed-photo-thumb .feed-photo-remove{
+    position:absolute; top:2px; right:2px;
+    width:18px;height:18px;
+    border-radius:50%;
+    background:rgba(0,0,0,0.6);
+    color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;
+    cursor:pointer;
+    border:none;
+    padding:0;
+  }
+  .feed-review-stars{ color:#F5A623; font-size:13px; letter-spacing:1px; }
+  .feed-review-photos{
+    display:flex;
+    gap:6px;
+    margin:8px 0;
+    overflow-x:auto;
+  }
+  .feed-review-photos img{
+    width:72px;height:72px;
+    border-radius:8px;
+    object-fit:cover;
+    flex-shrink:0;
+    cursor:pointer;
+  }
+  .feed-review-social-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-top:8px;
+  }
+  .feed-social-btn{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    background:none;
+    border:none;
+    color:var(--text-dim);
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    padding:0;
+  }
+  .feed-social-btn svg{ width:16px; height:16px; }
+  .feed-social-btn.liked{ color:#EF4444; }
+  .feed-social-btn.liked svg{ fill:#EF4444; }
+  .feed-comment-section{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px solid var(--line);
+  }
+  .feed-comment-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+    font-size:12.5px;
+  }
+  .feed-comment-row b{ flex-shrink:0; }
+  .feed-comment-input-row{
+    display:flex;
+    gap:6px;
+    margin-top:8px;
+  }
+  .feed-comment-input-row input{
+    flex:1;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--text);
+    font-size:12.5px;
+  }
+  .feed-comment-input-row button{
+    padding:8px 12px;
+    border-radius:8px;
+    border:none;
+    background:var(--accent);
+    color:#fff;
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .feed-place-avg-rating{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    color:#F5A623;
+    font-weight:700;
+    font-size:12.5px;
+  }
   .mp-input-group label{
     font-size:11px;
     color:var(--text-dim);
@@ -991,6 +1117,9 @@
     border-radius:14px;
     padding:14px;
     margin-bottom:10px;
+  }
+  .meetup-card.cancelled{
+    opacity:0.55;
   }
   .meetup-top{
     display:flex;
@@ -1268,6 +1397,21 @@
     justify-content:space-between;
     align-items:center;
     margin-bottom:12px;
+  }
+  .feed-search-sort-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .feed-search-sort-row #feedSearchInput,
+  .feed-search-sort-row #meetupSearchInput{
+    flex:1;
+    margin-bottom:0;
+  }
+  .feed-sort-select{
+    width:auto;
+    flex-shrink:0;
+    margin-bottom:0;
   }
   .meetup-create-view{ display:none; }
   .meetup-create-view.active{ display:block; }
@@ -2846,6 +2990,20 @@
     padding:22px 18px 18px;
     box-shadow:0 12px 32px rgba(0,0,0,0.22);
   }
+  .report-reason-list{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+  }
+  .report-reason-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 4px;
+    font-size:13px;
+    cursor:pointer;
+  }
+  .report-reason-row input{ accent-color:var(--accent); }
   .mini-confirm-close{
     position:absolute;
     top:10px;
@@ -4342,6 +4500,7 @@
         <div class="profile-avatar-lg" id="searchProfileAvatar"></div>
         <div class="profile-name" id="searchProfileName"></div>
         <div class="profile-status" id="searchProfileBio"></div>
+        <div class="feed-sponsored-badge" id="searchProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;">⚠ 노쇼 신고 이력이 있어요</div>
         <div class="person-profile-actions">
           <button class="person-action-btn request" id="searchProfileRequestBtn">친구 요청</button>
           <button class="person-action-btn chat" id="searchProfileChatBtn">채팅</button>
@@ -4571,6 +4730,25 @@
     </div>
   </div>
 
+  <!-- 신고하기 팝업 - 리뷰/모임/사용자 공용 -->
+  <div class="mini-confirm-overlay" id="reportOverlay">
+    <div class="mini-confirm-card" style="text-align:left;">
+      <div class="mini-confirm-title" style="margin-bottom:10px;">신고하기</div>
+      <div class="report-reason-list" id="reportReasonList">
+        <label class="report-reason-row"><input type="radio" name="reportReason" value="스팸/광고" /> 스팸/광고</label>
+        <label class="report-reason-row"><input type="radio" name="reportReason" value="부적절한 내용" /> 부적절한 내용</label>
+        <label class="report-reason-row"><input type="radio" name="reportReason" value="노쇼" /> 노쇼(약속 어김)</label>
+        <label class="report-reason-row"><input type="radio" name="reportReason" value="욕설/괴롭힘" /> 욕설/괴롭힘</label>
+        <label class="report-reason-row"><input type="radio" name="reportReason" value="기타" /> 기타</label>
+      </div>
+      <textarea class="search-input" id="reportDetailInput" rows="3" placeholder="자세한 내용을 적어주세요 (선택)" maxlength="500" style="resize:none;margin-top:8px;"></textarea>
+      <div class="mini-confirm-actions">
+        <button type="button" id="reportSubmitBtn" class="mini-confirm-btn danger">신고하기</button>
+        <button type="button" id="reportCancelBtn" class="mini-confirm-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 일정 삭제 확인 팝업: 반복 일정이면 "전체 삭제"와 "이 날짜만 삭제" 중에 고를 수 있음 -->
   <div class="mini-confirm-overlay" id="deleteConfirmOverlay">
     <div class="mini-confirm-card">
@@ -4773,6 +4951,14 @@
           <div class="meetup-section-title" style="margin-bottom:0;">주변 추천</div>
           <button class="add-friend-btn" id="createFeedPostBtn" title="추천 올리기">+</button>
         </div>
+        <div class="feed-search-sort-row">
+          <input type="text" class="search-input" id="feedSearchInput" placeholder="장소명, 동네 이름으로 검색" />
+          <select class="search-input feed-sort-select" id="feedSortSelect">
+            <option value="recent">최신순</option>
+            <option value="popular">인기순</option>
+            <option value="rating">평점순</option>
+          </select>
+        </div>
         <div id="feedListContainer"></div>
       </div>
 
@@ -4796,8 +4982,20 @@
         <div class="feed-place-map" id="feedPlaceMapWrap" style="display:none;">
           <div id="feedPlaceMap" style="width:100%;height:140px;border-radius:10px;overflow:hidden;"></div>
         </div>
+        <div class="mp-input-group"><label>별점</label>
+          <div class="feed-rating-picker" id="feedRatingPicker">
+            <span class="feed-star" data-star="1">★</span><span class="feed-star" data-star="2">★</span><span class="feed-star" data-star="3">★</span><span class="feed-star" data-star="4">★</span><span class="feed-star" data-star="5">★</span>
+          </div>
+        </div>
         <div class="mp-input-group"><label>한줄 소개</label><input class="search-input" id="feedNoteInput" placeholder="추천 이유를 적어주세요" maxlength="60" /></div>
         <div class="mp-input-group"><label>위치</label><input class="search-input" id="feedLocationInput" placeholder="동네/역 이름 등 (장소 검색하면 자동으로 채워져요)" maxlength="30" /></div>
+        <div class="mp-input-group">
+          <label>사진 <span style="font-weight:400;color:var(--text-dim);">(선택, 최대 3장)</span></label>
+          <div class="feed-photo-row" id="feedPhotoRow">
+            <button type="button" class="feed-photo-add-btn" id="feedPhotoAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
+          </div>
+          <input type="file" id="feedPhotoInput" accept="image/*" style="display:none;" />
+        </div>
         <button class="profile-chat-btn" id="feedCreateSubmitBtn">올리기</button>
       </div>
     </div>
@@ -4808,6 +5006,14 @@
         <div class="meetup-list-header">
           <div class="meetup-section-title" style="margin-bottom:0;">근처 모임</div>
           <button class="add-friend-btn" id="createMeetupBtn" title="모임 만들기">+</button>
+        </div>
+        <div class="feed-search-sort-row">
+          <input type="text" class="search-input" id="meetupSearchInput" placeholder="모임 이름으로 검색" />
+          <select class="search-input feed-sort-select" id="meetupSortSelect">
+            <option value="recent">최신순</option>
+            <option value="deadline">마감임박순</option>
+            <option value="distance">거리순</option>
+          </select>
         </div>
         <div id="meetupListContainer"></div>
       </div>
@@ -4910,6 +5116,7 @@
         <div class="profile-avatar-lg" id="suggestProfileAvatar"></div>
         <div class="profile-name" id="suggestProfileName"></div>
         <div class="profile-status" id="suggestProfileBio"></div>
+        <div class="feed-sponsored-badge" id="suggestProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;">⚠ 노쇼 신고 이력이 있어요</div>
         <div class="person-profile-actions">
           <button class="person-action-btn request" id="suggestProfileRequestBtn">친구 요청</button>
           <button class="person-action-btn chat" id="suggestProfileChatBtn">채팅</button>
@@ -5583,6 +5790,42 @@ function connectRealtimeSocket(){
       if(activeMeetupId === meetup.id && document.getElementById('meetupDetailView').classList.contains('active')) renderMeetupDetail();
     }
     showToast(`"${meetupTitle}" 모임 참여 신청이 거절됐어요.`);
+  });
+  // 다른 사람이 새 모임을 만들었을 때 - 화면을 나갔다 들어오지 않아도 바로 목록에 뜨게 함
+  realtimeSocket.on('meetupCreated', ({ meetup: m }) => {
+    if(!m || MEETUPS.some(x => x.serverId === m.id)) return; // 내가 방금 만든 모임(이미 로컬에 추가됨)이면 중복 방지
+    const cat = MEETUP_CATEGORY_MAP[m.category] || { emoji: ICO.users, label: m.category, color: '#7C6CFF' };
+    const eventDateObj = m.eventDate ? new Date(m.eventDate) : null;
+    const displayDate = eventDateObj
+      ? `${eventDateObj.getMonth()+1}/${eventDateObj.getDate()}(${WEEKDAY_KO[eventDateObj.getDay()]}) ${String(eventDateObj.getHours()).padStart(2,'0')}:${String(eventDateObj.getMinutes()).padStart(2,'0')}`
+      : (m.dateLabel && m.timeLabel ? `${m.dateLabel} ${m.timeLabel}` : '날짜 미정');
+    MEETUPS.unshift({
+      id: 'srv-' + m.id,
+      serverId: m.id,
+      isReal: true,
+      isCreator: false,
+      chatRoomId: m.chatRoomId,
+      category: cat.label,
+      categoryKey: m.category,
+      emoji: cat.emoji,
+      color: cat.color,
+      title: m.title,
+      date: displayDate,
+      eventDate: m.eventDate || null,
+      location: m.location || '',
+      lat: m.lat, lon: m.lon,
+      ageRange: '전연령',
+      desc: m.description || '모임장이 아직 소개글을 작성하지 않았어요.',
+      host: m.creator ? m.creator.name : '',
+      max: m.maxParticipants,
+      reserved: false,
+      myRequestStatus: null,
+      pendingRequestCount: 0,
+      participants: Array.from({ length: m.participantCount }, (_, i) => ({
+        name: i === 0 && m.creator ? m.creator.name : '', color: cat.color, isMe: false,
+      })),
+    });
+    if(document.getElementById('communityView-meetup') && document.getElementById('communityView-meetup').classList.contains('active')) renderMeetups();
   });
 }
 
@@ -6352,6 +6595,9 @@ const MEETUPS = [];
 
 let activeMeetupId = null;
 
+let meetupSearchQuery = '';
+let meetupSortMode = 'recent'; // 'recent' | 'deadline' | 'distance'
+
 function renderMeetups(){
   const container = document.getElementById('meetupListContainer');
   container.innerHTML = '';
@@ -6364,8 +6610,27 @@ function renderMeetups(){
     );
   }
 
+  const q = meetupSearchQuery.trim().toLowerCase();
+  if(q) list = list.filter(m => m.title.toLowerCase().includes(q));
+
+  list = list.slice().sort((a, b) => {
+    if(meetupSortMode === 'deadline'){
+      if(!a.eventDate) return 1;
+      if(!b.eventDate) return -1;
+      return new Date(a.eventDate) - new Date(b.eventDate);
+    }
+    if(meetupSortMode === 'distance' && communityRefLocation){
+      const da = distanceKmClient(communityRefLocation.lat, communityRefLocation.lon, a.lat, a.lon);
+      const db = distanceKmClient(communityRefLocation.lat, communityRefLocation.lon, b.lat, b.lon);
+      return da - db;
+    }
+    return 0; // 최신순은 이미 MEETUPS 배열 자체가 최신순으로 관리되고 있어서 그대로 둠
+  });
+
   if(list.length === 0){
-    container.innerHTML = communityRefLocation
+    container.innerHTML = q
+      ? `<div class="search-empty">"${meetupSearchQuery}"에 대한 검색 결과가 없어요.</div>`
+      : communityRefLocation
       ? `<div class="search-empty">이 근처 ${COMMUNITY_RADIUS_KM}km 안에는 모임이 없어요.</div>`
       : `<div class="search-empty">아직 등록된 모임이 없어요.</div>`;
     return;
@@ -6374,7 +6639,7 @@ function renderMeetups(){
   list.forEach(meetup => {
     const isFull = meetup.participants.length >= meetup.max && !meetup.reserved;
     const card = document.createElement('div');
-    card.className = 'meetup-card';
+    card.className = 'meetup-card' + (meetup.cancelled ? ' cancelled' : '');
     card.style.cursor = 'pointer';
     card.innerHTML = `
       <div class="meetup-top">
@@ -6387,7 +6652,8 @@ function renderMeetups(){
         <span>${ICO.pin} ${escapeHtml(meetup.location)}</span>
         <span>${ICO.users} ${escapeHtml(meetup.ageRange)}</span>
       </div>
-      ${meetup.reserved ? '<div class="meetup-status">참여 완료 ✓</div>'
+      ${meetup.cancelled ? '<div class="meetup-status full">✕ 취소된 모임</div>'
+        : meetup.reserved ? '<div class="meetup-status">참여 완료 ✓</div>'
         : meetup.myRequestStatus === 'PENDING' ? '<div class="meetup-status">신청 완료 · 대기중</div>'
         : (meetup.isCreator && meetup.pendingRequestCount > 0) ? `<div class="meetup-status">참여 신청 ${meetup.pendingRequestCount}건 대기중</div>`
         : (isFull ? '<div class="meetup-status full">마감</div>' : '')}
@@ -6472,6 +6738,12 @@ function closeMeetupDetail(){
   renderMeetups();
 }
 
+// 모임의 실제 일시가 이미 지났는지 확인 (후기를 남길 수 있는 조건)
+function isMeetupPast(meetup){
+  if(!meetup.eventDate) return false;
+  return new Date(meetup.eventDate).getTime() < Date.now();
+}
+
 function renderMeetupDetail(){
   const meetup = MEETUPS.find(m => m.id === activeMeetupId);
   if(!meetup) return;
@@ -6523,6 +6795,23 @@ function renderMeetupDetail(){
       <button class="meetup-reserve-btn" id="meetupCancelBtn" style="background:none;border:1px solid var(--line);color:#EF4444;">모임 취소</button>
     </div>
     ` : ''}
+    ${!meetup.isCreator ? `<button type="button" class="feed-post-btn" id="meetupReportBtn" style="margin-top:8px;">신고하기</button>` : ''}
+    ${isMeetupPast(meetup) && (meetup.isCreator || meetup.reserved) ? `
+    <div class="feed-comment-section" id="meetupReviewSection" style="margin-top:14px;">
+      <div class="meetup-section-title" style="margin-bottom:8px;">모임 후기</div>
+      <div id="meetupReviewList"><div class="search-empty">불러오는 중...</div></div>
+      <div class="mp-input-group" style="margin-top:10px;">
+        <label>내 후기 별점</label>
+        <div class="feed-rating-picker" id="meetupReviewRatingPicker">
+          <span class="feed-star" data-star="1">★</span><span class="feed-star" data-star="2">★</span><span class="feed-star" data-star="3">★</span><span class="feed-star" data-star="4">★</span><span class="feed-star" data-star="5">★</span>
+        </div>
+      </div>
+      <div class="feed-comment-input-row">
+        <input type="text" id="meetupReviewNoteInput" placeholder="후기를 남겨주세요 (선택)" maxlength="200" />
+        <button type="button" id="meetupReviewSubmitBtn">등록</button>
+      </div>
+    </div>
+    ` : ''}
   `;
 
   document.getElementById('meetupShareBtn').addEventListener('click', () => {
@@ -6535,6 +6824,13 @@ function renderMeetupDetail(){
       showToast(shareLink);
     }
   });
+
+  const meetupReportBtn = document.getElementById('meetupReportBtn');
+  if(meetupReportBtn) meetupReportBtn.addEventListener('click', () => openReportModal('MEETUP', meetup.serverId || meetup.id));
+
+  if(isMeetupPast(meetup) && (meetup.isCreator || meetup.reserved) && meetup.isReal && meetup.serverId){
+    loadAndRenderMeetupReviews(meetup);
+  }
 
   const pendingBanner = document.getElementById('meetupPendingBanner');
   if(pendingBanner) pendingBanner.addEventListener('click', () => openMeetupRequests(meetup));
@@ -6592,6 +6888,61 @@ function renderMeetupDetail(){
 }
 
 // ---------- 참여 신청 목록 (방장 전용 - 수락/거절) ----------
+// ---------- 모임 후기 (모임이 끝난 뒤 참여자가 남기는 별점+한줄평) ----------
+let meetupReviewSelectedRating = 0;
+async function loadAndRenderMeetupReviews(meetup){
+  const listEl = document.getElementById('meetupReviewList');
+  if(!listEl) return;
+  try {
+    const data = await apiRequest(`/meetups/${meetup.serverId}/reviews`);
+    const reviews = data.reviews || [];
+    const myReview = currentUser ? reviews.find(r => r.author && r.author.id === currentUser.id) : null;
+    listEl.innerHTML = reviews.length === 0
+      ? `<div class="search-empty">아직 후기가 없어요.</div>`
+      : `
+        ${typeof data.avgRating === 'number' ? `<div class="feed-place-avg-rating" style="margin-bottom:8px;">${renderStarsHtml(data.avgRating)} ${data.avgRating.toFixed(1)}</div>` : ''}
+        ${reviews.map(r => `
+          <div class="feed-comment-row">
+            <b>${escapeHtml(r.author ? r.author.name : '')}</b>
+            <span style="flex:1;">${renderStarsHtml(r.rating)} ${escapeHtml(r.note || '')}</span>
+          </div>
+        `).join('')}
+      `;
+    meetupReviewSelectedRating = myReview ? myReview.rating : 0;
+    document.querySelectorAll('#meetupReviewRatingPicker .feed-star').forEach(star => {
+      star.classList.toggle('on', parseInt(star.dataset.star, 10) <= meetupReviewSelectedRating);
+    });
+    if(myReview) document.getElementById('meetupReviewNoteInput').value = myReview.note || '';
+  } catch(err){
+    listEl.innerHTML = `<div class="search-empty">후기를 불러오지 못했어요.</div>`;
+  }
+}
+document.addEventListener('click', (e) => {
+  const star = e.target.closest('#meetupReviewRatingPicker .feed-star');
+  if(!star) return;
+  meetupReviewSelectedRating = parseInt(star.dataset.star, 10);
+  document.querySelectorAll('#meetupReviewRatingPicker .feed-star').forEach(s => {
+    s.classList.toggle('on', parseInt(s.dataset.star, 10) <= meetupReviewSelectedRating);
+  });
+});
+document.addEventListener('click', async (e) => {
+  if(e.target.id !== 'meetupReviewSubmitBtn') return;
+  const meetup = MEETUPS.find(m => m.id === activeMeetupId);
+  if(!meetup || !meetup.serverId) return;
+  if(meetupReviewSelectedRating < 1){
+    showToast('별점을 골라주세요.');
+    return;
+  }
+  const note = document.getElementById('meetupReviewNoteInput').value.trim();
+  try {
+    await apiRequest(`/meetups/${meetup.serverId}/reviews`, { method: 'POST', body: JSON.stringify({ rating: meetupReviewSelectedRating, note: note || null }) });
+    showToast('후기를 남겼어요!');
+    loadAndRenderMeetupReviews(meetup);
+  } catch(err){
+    showToast(err.message);
+  }
+});
+
 function openMeetupRequests(meetup){
   activeMeetupId = meetup.id;
   document.getElementById('meetupDetailView').classList.remove('active');
@@ -6778,24 +7129,39 @@ let activeFeedCategory = 'food';
 let activeFeedPlaceId = null; // 상세화면에서 보고 있는 장소의 serverId
 
 // 광고(스폰서) 장소가 항상 맨 위, 그 다음 최근에 리뷰가 달린 순 - 서버 정렬 기준과 동일하게 맞춤
+let feedSortMode = 'recent'; // 'recent' | 'popular' | 'rating'
+let feedSearchQuery = '';
+
 function sortFeedPlaces(category){
   FEED_PLACES[category].sort((a, b) => {
     if(a.isSponsored !== b.isSponsored) return a.isSponsored ? -1 : 1;
+    if(feedSortMode === 'popular') return (b.totalLikes || 0) - (a.totalLikes || 0);
+    if(feedSortMode === 'rating') return (b.avgRating || 0) - (a.avgRating || 0);
     const aTime = new Date(a.latestReview ? a.latestReview.createdAt : 0);
     const bTime = new Date(b.latestReview ? b.latestReview.createdAt : 0);
     return bTime - aTime;
   });
 }
 
+// 별점을 채워진/빈 별로 표시 (예: 4점이면 ★★★★☆)
+function renderStarsHtml(rating){
+  if(typeof rating !== 'number') return '';
+  const full = Math.round(rating);
+  return '★'.repeat(full) + '☆'.repeat(5 - full);
+}
+
 function renderFeedPosts(){
   const container = document.getElementById('feedListContainer');
   container.innerHTML = '';
 
-  const places = FEED_PLACES[activeFeedCategory];
+  const q = feedSearchQuery.trim().toLowerCase();
+  const places = FEED_PLACES[activeFeedCategory].filter(p =>
+    !q || p.name.toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q)
+  );
   if(places.length === 0){
     const empty = document.createElement('div');
     empty.className = 'search-empty';
-    empty.textContent = '아직 등록된 추천이 없어요.';
+    empty.textContent = q ? `"${feedSearchQuery}"에 대한 검색 결과가 없어요.` : '아직 등록된 추천이 없어요.';
     container.appendChild(empty);
     return;
   }
@@ -6805,11 +7171,14 @@ function renderFeedPosts(){
     card.className = 'feed-post-card' + (place.isSponsored ? ' sponsored' : '');
     card.style.cursor = 'pointer';
     const latest = place.latestReview;
+    const photo = latest && latest.photos && latest.photos[0];
     card.innerHTML = `
       <div class="feed-post-top">
         <span class="feed-post-place">${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}${escapeHtml(place.name)}</span>
         <span class="feed-post-location">${ICO.pin} ${escapeHtml(place.location || '')}</span>
       </div>
+      ${typeof place.avgRating === 'number' ? `<div class="feed-place-avg-rating">${renderStarsHtml(place.avgRating)} ${place.avgRating.toFixed(1)}</div>` : ''}
+      ${photo ? `<div class="feed-review-photos"><img src="${photo}" /></div>` : ''}
       ${latest ? `
         <div class="feed-post-note">${escapeHtml(latest.note || '')}</div>
         <div class="feed-post-bottom-row">
@@ -6841,6 +7210,7 @@ async function openFeedPlaceDetail(place){
     <div class="feed-place-detail-header">
       <div class="feed-place-detail-name">${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}${escapeHtml(place.name)}</div>
       <div class="feed-post-location">${ICO.pin} ${escapeHtml(place.location || '')}</div>
+      ${typeof place.avgRating === 'number' ? `<div class="feed-place-avg-rating" style="margin-top:6px;">${renderStarsHtml(place.avgRating)} ${place.avgRating.toFixed(1)} (${place.reviewCount}개 리뷰)</div>` : ''}
     </div>
   `;
 
@@ -6871,10 +7241,13 @@ function renderFeedReviews(reviews){
   }
   reviews.forEach(review => {
     const isMine = currentUser && review.author && review.author.id === currentUser.id;
+    const photos = review.photos || [];
     const card = document.createElement('div');
     card.className = 'feed-post-card';
     card.innerHTML = `
+      ${typeof review.rating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(review.rating)}</div>` : ''}
       <div class="feed-post-note">${escapeHtml(review.note || '')}</div>
+      ${photos.length > 0 ? `<div class="feed-review-photos">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
       <div class="feed-post-bottom-row">
         <div class="feed-post-author">${escapeHtml(review.author ? review.author.name : '')} 님의 리뷰</div>
         ${isMine ? `
@@ -6882,7 +7255,26 @@ function renderFeedReviews(reviews){
             <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
             <button type="button" class="feed-post-btn feed-review-delete-btn">삭제</button>
           </div>
-        ` : ''}
+        ` : `
+          <button type="button" class="feed-post-btn feed-review-report-btn">신고</button>
+        `}
+      </div>
+      <div class="feed-review-social-row">
+        <button type="button" class="feed-social-btn feed-like-btn${review.likedByMe ? ' liked' : ''}">
+          <svg viewBox="0 0 24 24" fill="${review.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+          <span class="feed-like-count">${review.likeCount || 0}</span>
+        </button>
+        <button type="button" class="feed-social-btn feed-comment-toggle-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          <span class="feed-comment-count">댓글 ${typeof review.commentCount === 'number' ? review.commentCount : 0}개</span>
+        </button>
+      </div>
+      <div class="feed-comment-section" style="display:none;">
+        <div class="feed-comment-list"></div>
+        <div class="feed-comment-input-row">
+          <input type="text" class="feed-comment-input" placeholder="댓글을 입력하세요" maxlength="200" />
+          <button type="button" class="feed-comment-submit-btn">등록</button>
+        </div>
       </div>
     `;
     if(isMine){
@@ -6904,7 +7296,97 @@ function renderFeedReviews(reviews){
           showToast(err.message);
         }
       });
+    } else {
+      const reportBtn = card.querySelector('.feed-review-report-btn');
+      if(reportBtn) reportBtn.addEventListener('click', () => openReportModal('FEED_POST', review.id));
     }
+
+    // 좋아요 토글
+    const likeBtn = card.querySelector('.feed-like-btn');
+    likeBtn.addEventListener('click', async () => {
+      likeBtn.disabled = true;
+      try {
+        const data = await apiRequest(`/feed/${review.id}/like`, { method: 'POST' });
+        likeBtn.classList.toggle('liked', data.liked);
+        likeBtn.querySelector('svg').setAttribute('fill', data.liked ? 'currentColor' : 'none');
+        likeBtn.querySelector('.feed-like-count').textContent = data.likeCount;
+      } catch(err){
+        showToast(err.message);
+      } finally {
+        likeBtn.disabled = false;
+      }
+    });
+
+    // 댓글 펼치기/접기 - 처음 펼칠 때만 서버에서 불러옴
+    const commentSection = card.querySelector('.feed-comment-section');
+    const commentList = card.querySelector('.feed-comment-list');
+    let commentsLoaded = false;
+    async function loadAndRenderComments(){
+      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">불러오는 중...</div>`;
+      try {
+        const data = await apiRequest(`/feed/${review.id}/comments`);
+        renderCommentList(data.comments || []);
+      } catch(err){
+        commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">댓글을 불러오지 못했어요.</div>`;
+      }
+    }
+    function renderCommentList(comments){
+      if(comments.length === 0){
+        commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
+        return;
+      }
+      commentList.innerHTML = comments.map(c => `
+        <div class="feed-comment-row" data-comment-id="${c.id}">
+          <b>${escapeHtml(c.author ? c.author.name : '')}</b>
+          <span style="flex:1;">${escapeHtml(c.text)}</span>
+          ${currentUser && c.author && c.author.id === currentUser.id ? '<button type="button" class="feed-comment-delete-btn" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:0;">삭제</button>' : ''}
+        </div>
+      `).join('');
+      commentList.querySelectorAll('.feed-comment-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const row = btn.closest('.feed-comment-row');
+          const commentId = row.dataset.commentId;
+          try {
+            await apiRequest(`/feed/comments/${commentId}`, { method: 'DELETE' });
+            row.remove();
+            const countEl = card.querySelector('.feed-comment-count');
+            const n = Math.max(0, parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) - 1);
+            countEl.textContent = `댓글 ${n}개`;
+            if(!commentList.querySelector('.feed-comment-row')){
+              commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
+            }
+          } catch(err){
+            showToast(err.message);
+          }
+        });
+      });
+    }
+    card.querySelector('.feed-comment-toggle-btn').addEventListener('click', () => {
+      const nowHidden = commentSection.style.display === 'none';
+      commentSection.style.display = nowHidden ? 'block' : 'none';
+      if(nowHidden && !commentsLoaded){
+        commentsLoaded = true;
+        loadAndRenderComments();
+      }
+    });
+    const commentInput = card.querySelector('.feed-comment-input');
+    const submitComment = async () => {
+      const text = commentInput.value.trim();
+      if(!text) return;
+      try {
+        await apiRequest(`/feed/${review.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+        commentInput.value = '';
+        const countEl = card.querySelector('.feed-comment-count');
+        const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
+        countEl.textContent = `댓글 ${n}개`;
+        await loadAndRenderComments();
+      } catch(err){
+        showToast(err.message);
+      }
+    };
+    card.querySelector('.feed-comment-submit-btn').addEventListener('click', submitComment);
+    commentInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.isComposing) submitComment(); });
+
     container.appendChild(card);
   });
 }
@@ -6925,6 +7407,8 @@ async function loadFeedPostsFromServer(){
         lat: p.lat, lon: p.lon,
         isSponsored: !!p.isSponsored,
         reviewCount: p.reviewCount || 0,
+        avgRating: typeof p.avgRating === 'number' ? p.avgRating : null,
+        totalLikes: p.totalLikes || 0,
         latestReview: p.latestReview || null,
       });
     });
@@ -6946,22 +7430,100 @@ document.querySelectorAll('#feedSegment .feed-chip').forEach(btn => {
 // 초기 활성 칩(맛집) 표시
 document.querySelector('#feedSegment .feed-chip[data-cat="food"]').classList.add('active');
 
+document.getElementById('feedSearchInput').addEventListener('input', (e) => {
+  feedSearchQuery = e.target.value;
+  renderFeedPosts();
+});
+document.getElementById('feedSortSelect').addEventListener('change', (e) => {
+  feedSortMode = e.target.value;
+  Object.keys(FEED_PLACES).forEach(cat => sortFeedPlaces(cat));
+  renderFeedPosts();
+});
+
 let editingFeedReviewId = null; // 수정 중인 "리뷰" serverId (null이면 새로 작성 중)
 let feedFormMode = 'create'; // 'create'(새 장소 검색해서 리뷰 남기기) | 'addReview'(이미 아는 장소에 리뷰만 추가) | 'editReview'(내 리뷰 문구만 수정)
 let feedAddReviewTarget = null; // addReview 모드일 때 대상 장소 객체
 let feedPlacePicked = null; // { lat, lon } - 검색해서 실제로 고른 장소면 좌표까지 저장됨
 let feedPlaceMapInstance = null;
+let feedSelectedRating = 0; // 지금 폼에서 고른 별점 (1~5, 0이면 아직 안 고름)
+let feedSelectedPhotos = []; // 지금 폼에 첨부된 사진들 (base64 문자열 배열, 최대 3장)
 
 function setFeedPlaceFieldsLocked(locked){
   document.getElementById('feedPlaceInput').disabled = locked;
   document.getElementById('feedLocationInput').disabled = locked;
 }
 
+function renderFeedRatingPicker(){
+  document.querySelectorAll('#feedRatingPicker .feed-star').forEach(star => {
+    star.classList.toggle('on', parseInt(star.dataset.star, 10) <= feedSelectedRating);
+  });
+}
+document.querySelectorAll('#feedRatingPicker .feed-star').forEach(star => {
+  star.addEventListener('click', () => {
+    feedSelectedRating = parseInt(star.dataset.star, 10);
+    renderFeedRatingPicker();
+  });
+});
+
+function renderFeedPhotoRow(){
+  const row = document.getElementById('feedPhotoRow');
+  const addBtn = document.getElementById('feedPhotoAddBtn');
+  row.querySelectorAll('.feed-photo-thumb').forEach(el => el.remove());
+  feedSelectedPhotos.forEach((dataUrl, idx) => {
+    const thumb = document.createElement('div');
+    thumb.className = 'feed-photo-thumb';
+    thumb.innerHTML = `<img src="${dataUrl}" /><button type="button" class="feed-photo-remove">×</button>`;
+    thumb.querySelector('.feed-photo-remove').addEventListener('click', () => {
+      feedSelectedPhotos.splice(idx, 1);
+      renderFeedPhotoRow();
+    });
+    row.insertBefore(thumb, addBtn);
+  });
+  addBtn.style.display = feedSelectedPhotos.length >= 3 ? 'none' : 'flex';
+}
+document.getElementById('feedPhotoAddBtn').addEventListener('click', () => document.getElementById('feedPhotoInput').click());
+document.getElementById('feedPhotoInput').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!file || feedSelectedPhotos.length >= 3) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1000;
+      let { width, height } = img;
+      if(width > maxDim || height > maxDim){
+        if(width > height){ height = Math.round(height * maxDim / width); width = maxDim; }
+        else { width = Math.round(width * maxDim / height); height = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      let quality = 0.82;
+      let dataUrl = canvas.toDataURL('image/jpeg', quality);
+      while(dataUrl.length > 650000 && quality > 0.3){
+        quality -= 0.15;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+      }
+      if(dataUrl.length > 700000){
+        showToast('사진 용량이 너무 커요. 더 작은 사진을 선택해주세요.');
+        return;
+      }
+      feedSelectedPhotos.push(dataUrl);
+      renderFeedPhotoRow();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
 function openFeedCreate(){
   feedFormMode = 'create';
   editingFeedReviewId = null;
   feedAddReviewTarget = null;
   feedPlacePicked = null;
+  feedSelectedRating = 0;
+  feedSelectedPhotos = [];
   setFeedPlaceFieldsLocked(false);
   document.getElementById('feedCreateHeaderTitle').textContent = FEED_CATEGORY_LABELS[activeFeedCategory] + ' 추천하기';
   document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
@@ -6970,6 +7532,8 @@ function openFeedCreate(){
   document.getElementById('feedNoteInput').value = '';
   document.getElementById('feedLocationInput').value = '';
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
+  renderFeedRatingPicker();
+  renderFeedPhotoRow();
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedCreateView').classList.add('active');
   pushViewState(closeFeedCreate);
@@ -6980,6 +7544,8 @@ function openFeedAddReview(place){
   editingFeedReviewId = null;
   feedAddReviewTarget = place;
   feedPlacePicked = (typeof place.lat === 'number' && typeof place.lon === 'number') ? { lat: place.lat, lon: place.lon } : null;
+  feedSelectedRating = 0;
+  feedSelectedPhotos = [];
   setFeedPlaceFieldsLocked(true);
   document.getElementById('feedCreateHeaderTitle').textContent = '리뷰 남기기';
   document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
@@ -6988,6 +7554,8 @@ function openFeedAddReview(place){
   document.getElementById('feedNoteInput').value = '';
   document.getElementById('feedLocationInput').value = place.location || '';
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
+  renderFeedRatingPicker();
+  renderFeedPhotoRow();
   document.getElementById('feedPlaceDetailView').classList.remove('active');
   document.getElementById('feedCreateView').classList.add('active');
   pushViewState(closeFeedCreate);
@@ -6999,6 +7567,8 @@ function openFeedReviewEdit(review){
   const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
   feedAddReviewTarget = place || null;
   feedPlacePicked = null;
+  feedSelectedRating = review.rating || 0;
+  feedSelectedPhotos = (review.photos || []).slice();
   setFeedPlaceFieldsLocked(true);
   document.getElementById('feedCreateHeaderTitle').textContent = '리뷰 수정';
   document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
@@ -7007,6 +7577,8 @@ function openFeedReviewEdit(review){
   document.getElementById('feedNoteInput').value = review.note || '';
   document.getElementById('feedLocationInput').value = place ? (place.location || '') : '';
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
+  renderFeedRatingPicker();
+  renderFeedPhotoRow();
   document.getElementById('feedPlaceDetailView').classList.remove('active');
   document.getElementById('feedCreateView').classList.add('active');
   pushViewState(closeFeedCreate);
@@ -7108,12 +7680,19 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
     showToast('장소명과 한줄 소개를 입력해주세요.');
     return;
   }
+  if(feedSelectedRating < 1 && feedFormMode !== 'editReview'){
+    showToast('별점을 골라주세요.');
+    return;
+  }
 
-  // ---------- 내 리뷰 문구만 수정 ----------
+  // ---------- 내 리뷰 문구/별점/사진 수정 ----------
   if(feedFormMode === 'editReview'){
     if(!editingFeedReviewId) return;
     try {
-      await apiRequest(`/feed/${editingFeedReviewId}`, { method: 'PATCH', body: JSON.stringify({ note }) });
+      await apiRequest(`/feed/${editingFeedReviewId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ note, rating: feedSelectedRating || null, photos: feedSelectedPhotos }),
+      });
       closeFeedCreate();
       if(activeFeedPlaceId) openFeedPlaceDetail(FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId));
       showToast('수정했어요.');
@@ -7131,7 +7710,7 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
   try {
     const data = await apiRequest('/feed', {
       method: 'POST',
-      body: JSON.stringify({ category: activeFeedCategory, place, note, location, lat: feedLat, lon: feedLon }),
+      body: JSON.stringify({ category: activeFeedCategory, place, note, rating: feedSelectedRating, photos: feedSelectedPhotos, location, lat: feedLat, lon: feedLon }),
     });
     if(data.placeCreated){
       // 완전히 새로운 장소면 새 카드로 추가하고 다시 정렬 (스폰서 우선순위 지키면서 맨 위 근처로 옴)
@@ -7142,14 +7721,19 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
         lat: data.place.lat, lon: data.place.lon,
         isSponsored: false,
         reviewCount: 1,
+        avgRating: data.post.rating,
         latestReview: data.post,
       });
     } else {
-      // 이미 있던 장소면 그 장소의 리뷰 수/최신 리뷰를 갱신 - 방금 리뷰가 달렸으니 다시 정렬하면 위쪽으로 올라감
+      // 이미 있던 장소면 그 장소의 리뷰 수/최신 리뷰/평균 별점을 갱신 - 방금 리뷰가 달렸으니 다시 정렬하면 위쪽으로 올라감
       const existing = FEED_PLACES[activeFeedCategory].find(p => p.serverId === data.place.id);
       if(existing){
         existing.reviewCount += 1;
         existing.latestReview = data.post;
+        if(typeof data.post.rating === 'number'){
+          const prevTotal = (existing.avgRating || 0) * (existing.reviewCount - 1);
+          existing.avgRating = Math.round(((prevTotal + data.post.rating) / existing.reviewCount) * 10) / 10;
+        }
       }
     }
     sortFeedPlaces(activeFeedCategory);
@@ -7284,6 +7868,14 @@ function closeMeetupCreate(){
 }
 
 document.getElementById('createMeetupBtn').addEventListener('click', openMeetupCreate);
+document.getElementById('meetupSearchInput').addEventListener('input', (e) => {
+  meetupSearchQuery = e.target.value;
+  renderMeetups();
+});
+document.getElementById('meetupSortSelect').addEventListener('change', (e) => {
+  meetupSortMode = e.target.value;
+  renderMeetups();
+});
 document.getElementById('meetupCreateBackBtn').addEventListener('click', () => goBackOrClose(closeMeetupCreate));
 
 document.getElementById('meetupCreateSubmitBtn').addEventListener('click', async () => {
@@ -11765,6 +12357,17 @@ function openPersonProfile(user, context, viewPrefix){
   document.getElementById(prefix + 'ProfileName').textContent = user.name;
   document.getElementById(prefix + 'ProfileBio').textContent = user.bio || '';
 
+  // 노쇼 신고 이력이 있으면 살짝 경고 배지를 보여줌 (실제 서버에 있는 사람일 때만 조회)
+  const trustBadge = document.getElementById(prefix + 'ProfileTrustBadge');
+  if(trustBadge){
+    trustBadge.style.display = 'none';
+    if(user.id && authToken){
+      apiRequest(`/reports/trust/${user.id}`).then(data => {
+        trustBadge.style.display = data.hasNoShowHistory ? 'inline-flex' : 'none';
+      }).catch(() => {});
+    }
+  }
+
   const already = FRIENDS.some(f => f.id === user.id);
   const alreadyRequested = OUTGOING_FRIEND_REQUESTS.some(f => f.id === user.id);
 
@@ -12624,6 +13227,42 @@ function cancelGroupTimeOption(roomId, msg){
 
 // 취소/나가기 확인 팝업 - 콜백만 넘겨서 여러 상황에서 재사용
 let pendingCancelAction = null;
+// ---------- 신고하기 (공용) ----------
+let pendingReportTarget = null; // { targetType, targetId }
+function openReportModal(targetType, targetId){
+  pendingReportTarget = { targetType, targetId };
+  document.querySelectorAll('#reportReasonList input[name="reportReason"]').forEach(r => r.checked = false);
+  document.getElementById('reportDetailInput').value = '';
+  document.getElementById('reportOverlay').classList.add('show');
+}
+function closeReportModal(){
+  pendingReportTarget = null;
+  document.getElementById('reportOverlay').classList.remove('show');
+}
+document.getElementById('reportCancelBtn').addEventListener('click', closeReportModal);
+document.getElementById('reportOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'reportOverlay') closeReportModal();
+});
+document.getElementById('reportSubmitBtn').addEventListener('click', async () => {
+  if(!pendingReportTarget) return;
+  const checked = document.querySelector('#reportReasonList input[name="reportReason"]:checked');
+  if(!checked){
+    showToast('신고 사유를 선택해주세요.');
+    return;
+  }
+  const detail = document.getElementById('reportDetailInput').value.trim();
+  try {
+    await apiRequest('/reports', {
+      method: 'POST',
+      body: JSON.stringify({ targetType: pendingReportTarget.targetType, targetId: pendingReportTarget.targetId, reason: checked.value, detail: detail || null }),
+    });
+    closeReportModal();
+    showToast('신고가 접수됐어요. 검토 후 조치할게요.');
+  } catch(err){
+    showToast(err.message);
+  }
+});
+
 function openCancelConfirm(action, title){
   pendingCancelAction = action;
   document.getElementById('reservationCancelConfirmTitle').textContent = title || '예약을 취소하시겠습니까?';
