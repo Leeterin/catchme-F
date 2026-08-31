@@ -13851,17 +13851,35 @@ document.getElementById('dayViewChatBackBtn').addEventListener('click', () => go
 // "스크롤하면 키보드 내리기" 로직이 이때 생기는 스크롤을 사용자 스크롤로 착각한 것이었고(별도로 이미 고침),
 // 이제는 위치(top)만, 그것도 실제로 밀린 만큼만 정확히 되돌려서 헤더가 항상 화면 맨 위에 그대로 있게 함.
 // (높이는 건드리지 않음 - 문제를 일으켰던 부분)
-// 지연(디바운스) 없이 매 이벤트마다 즉시 보정함 - 지연이 있으면 그 사이에 헤더가 잠깐 밀렸다가
-// 다시 튕겨 돌아오는 게 눈에 보였음 (키보드가 열리는 애니메이션 도중 "튐" 현상의 원인이었음)
+//
+// resize/scroll 이벤트에서만 보정하면, 키보드가 올라오는 애니메이션 도중에는 그 이벤트들이 실제
+// 화면이 밀린 시점보다 한 박자 늦게(또는 최종 값이 아닌 중간 값으로) 들어와서, 헤더가 잠깐 위로
+// 튀었다가 다시 제자리로 튕겨 돌아오는 게 눈에 보이는 문제가 있었음. 그래서 이벤트를 기다리지 않고
+// 포커스가 가는 즉시(그리고 이벤트가 올 때마다) 짧은 시간 동안 매 프레임(requestAnimationFrame)
+// 계속 위치를 다시 맞춰서, 애니메이션 중간의 어느 프레임에도 헤더가 어긋난 채로 그려지지 않게 함.
 function fixChatHeaderPosition(){
   const view = document.getElementById('chatRoomView');
   if(!view || !view.classList.contains('active') || !window.visualViewport) return;
   view.style.top = window.visualViewport.offsetTop + 'px';
 }
-if(window.visualViewport){
-  window.visualViewport.addEventListener('resize', fixChatHeaderPosition);
-  window.visualViewport.addEventListener('scroll', fixChatHeaderPosition);
+let chatHeaderSyncRafId = null;
+function runChatHeaderSync(deadline){
+  fixChatHeaderPosition();
+  chatHeaderSyncRafId = Date.now() < deadline ? requestAnimationFrame(() => runChatHeaderSync(deadline)) : null;
 }
+// 키보드가 열리고 닫히는 애니메이션은 보통 300~400ms 안에 끝나니, 여유 있게 600ms 동안 매 프레임 보정함
+function startChatHeaderSync(){
+  if(chatHeaderSyncRafId) cancelAnimationFrame(chatHeaderSyncRafId);
+  runChatHeaderSync(Date.now() + 600);
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', startChatHeaderSync);
+  window.visualViewport.addEventListener('scroll', startChatHeaderSync);
+}
+// 키보드가 실제로 뜨기 시작하는 시점(포커스가 생기는 순간)부터 바로 보정을 시작함 - resize 이벤트가
+// 오기 전인 애니메이션 첫 프레임부터 이미 헤더가 튀는 걸 막기 위함
+document.getElementById('chatRoomView').addEventListener('focusin', startChatHeaderSync);
+document.getElementById('chatRoomView').addEventListener('focusout', startChatHeaderSync);
 
 
 // 채팅 내역을 스크롤하면(예전 대화 보려고 위로 올리면) 폰 키보드를 자동으로 내려서 화면을 더 넓게 씀.
