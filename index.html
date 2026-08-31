@@ -13888,25 +13888,9 @@ document.getElementById('chatRoomView').addEventListener('focusin', startChatHea
 document.getElementById('chatRoomView').addEventListener('focusout', startChatHeaderSync);
 
 
-// 채팅 내역을 스크롤하면(예전 대화 보려고 위로 올리면) 폰 키보드를 자동으로 내려서 화면을 더 넓게 씀.
-// 단, "scroll" 이벤트는 사용자가 실제로 손가락으로 밀 때뿐 아니라, 키보드가 뜨면서 화면 크기가 바뀔 때도
-// (레이아웃 재계산으로) 발생할 수 있어서, 그걸 구분 안 하고 무조건 블러시키면 키보드가 뜨자마자 바로
-// 닫혀버려서 열렸다닫혔다를 반복하는 것처럼 보이는 문제가 있었음. 그래서 진짜 손가락으로 미는 제스처
-// (touchmove)가 있었을 때만 스크롤로 인한 키보드 내림을 적용함.
-let chatMessagesUserScrolling = false;
-document.getElementById('chatMessages').addEventListener('touchmove', () => {
-  chatMessagesUserScrolling = true;
-}, { passive: true });
-document.getElementById('chatMessages').addEventListener('scroll', () => {
-  if(!chatMessagesUserScrolling) return;
-  const input = document.getElementById('chatInput');
-  if(document.activeElement === input){
-    input.blur();
-  }
-}, { passive: true });
-document.getElementById('chatMessages').addEventListener('touchend', () => {
-  setTimeout(() => { chatMessagesUserScrolling = false; }, 300);
-}, { passive: true });
+// 예전엔 채팅 내역을 스크롤하면(예전 대화 보려고 위로 올리면) 키보드를 자동으로 닫았는데,
+// 스크롤하는 도중에도 키보드는 그대로 열려있고, 키보드 자체를 직접 내리는 제스처(키보드를 아래로
+// 드래그하는 등 기기 자체의 키보드 숨기기 동작)를 했을 때만 닫히길 원해서 이 자동 닫힘 로직은 제거함.
 
 function openChatRoom(id){
   const room = CHAT_ROOMS[id];
