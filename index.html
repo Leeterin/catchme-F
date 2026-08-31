@@ -11301,6 +11301,19 @@ const friendScheduleData = {};
 // 실제 서버에서 불러온 친구 일정 캐시: "username::dateKey" -> { hours, busy, bookable }
 const friendRealScheduleCache = {};
 
+// 이 친구에 대해 캐싱해둔 하루/한달 일정 데이터를 전부 지움 - 캘린더를 새로 열 때뿐 아니라
+// 하루/일주일/한달 탭을 다시 눌러 들어올 때도 호출해서, 그 사이에 상대가 일정을 바꿨어도
+// (다른 탭에서는 새로 받아왔는데 이 탭만 예전 캐시를 계속 보여주는) 탭 간 불일치가 안 생기게 함
+function clearFriendScheduleCache(friend){
+  if(!friend || !friend.username) return;
+  Object.keys(friendRealScheduleCache).forEach(k => {
+    if(k.startsWith(friend.username + '::')) delete friendRealScheduleCache[k];
+  });
+  Object.keys(friendMonthDataCache).forEach(k => {
+    if(k.startsWith(friend.username + '::')) delete friendMonthDataCache[k];
+  });
+}
+
 // 진짜 친구(데모 친구 제외)의 특정 날짜 시간대별 바쁨/가능 여부를 서버에서 불러옴 (일정 제목은 절대 안 옴 - 프라이버시)
 async function ensureFriendScheduleLoaded(friend, dateObj){
   if(!friend || !friend.username || friend.id === DEMO_FRIEND.id || !authToken) return null;
@@ -11354,12 +11367,7 @@ function openFriendCalendar(friendId, mode){
 
   // 친구의 이전 조회 결과 캐시를 지워서, 캘린더를 열 때마다 항상 최신 데이터를 새로 받아오게 함
   // (친구가 방금 "예약 가능" 시간을 바꿨는데 예전 캐시 때문에 안 보이는 문제 방지)
-  if(friend.username){
-    Object.keys(friendRealScheduleCache).forEach(k => {
-      if(k.startsWith(friend.username + '::')) delete friendRealScheduleCache[k];
-    });
-    friendMonthDataCache = {};
-  }
+  clearFriendScheduleCache(friend);
 
   document.getElementById('friendCalendarTitle').textContent = friendCalendarMode === 'reserve'
     ? `${friend.name}님에게 예약하기`
@@ -12182,6 +12190,12 @@ document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(btn => 
     document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(b => b.classList.toggle('active', b === btn));
     document.querySelectorAll('#friendCalendarView .friend-cal-view').forEach(v => v.classList.remove('active'));
     document.getElementById('friendCalView-' + btn.dataset.view).classList.add('active');
+
+    // 탭을 눌러 들어올 때마다 캐시를 지우고 새로 받아옴 - 안 그러면 다른 탭(예: 한달)에서는
+    // 방금 바뀐 상대 일정이 반영되는데 이 탭만 예전 캐시를 그대로 보여주는 불일치가 생김
+    const friend = FRIENDS.find(f => f.id === activeFriendCalendarId);
+    clearFriendScheduleCache(friend);
+
     if(btn.dataset.view === 'week'){
       // 일주일 탭에 들어갈 때마다 항상 이번주부터 다시 보여줌 (이전에 다른 주로 이동해뒀어도 초기화)
       friendWeekFocusDate = getWeekStart(TODAY);
@@ -12193,6 +12207,9 @@ document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(btn => 
       friendMonthFocusMonth = TODAY.getMonth() + 1;
       friendMonthSelectedDate = new Date(TODAY);
       renderFriendMonthView();
+      loadFriendScheduleForFocusWindow();
+    } else {
+      renderFriendToday();
       loadFriendScheduleForFocusWindow();
     }
     renderFriendCalDateNav();
