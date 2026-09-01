@@ -13874,9 +13874,12 @@ function fixChatHeaderPosition(){
   // 키보드가 뜨면 화면 아래쪽이 키보드에 가려지는 만큼(gap)을 계산해서 그만큼 bottom을 끌어올림 -
   // 이 컨테이너가 position:fixed; bottom:0 이라서, 이걸 안 해주면 키보드가 떠도 입력창(맨 아래 요소)이
   // 화면 하단에 그대로 남아 키보드 뒤에 가려짐. viewport 메타 태그의 resizes-content가 정상 동작하는
-  // 브라우저에서는 window.innerHeight 자체가 이미 줄어들어서 gap이 0에 가까우니 사실상 영향 없음 -
+  // 브라우저에서는 documentElement.clientHeight 자체가 이미 줄어들어서 gap이 0에 가까우니 사실상 영향 없음 -
   // resizes-content가 안 먹히는 환경(레이아웃 뷰포트는 안 줄고 visualViewport만 줄어드는 경우)을 위한 보정.
-  const gap = window.innerHeight - (window.visualViewport.height + window.visualViewport.offsetTop);
+  // (window.innerHeight가 아니라 documentElement.clientHeight를 기준으로 삼음 - bottom:0이 실제로
+  // 계산되는 기준이 이쪽이라서, window.innerHeight와의 미세한 차이 때문에 입력창이 키보드보다 살짝
+  // 위로 뜨던 오차를 없앰)
+  const gap = document.documentElement.clientHeight - (window.visualViewport.height + window.visualViewport.offsetTop);
   view.style.bottom = Math.max(0, gap) + 'px';
 }
 let chatHeaderSyncRafId = null;
