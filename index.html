@@ -13895,6 +13895,27 @@ if(window.visualViewport){
 document.getElementById('chatRoomView').addEventListener('focusin', startChatHeaderSync);
 document.getElementById('chatRoomView').addEventListener('focusout', startChatHeaderSync);
 
+// body에 position:fixed; overflow:hidden을 걸어서 배경 스크롤을 막아뒀는데도, 입력창 주변처럼
+// "실제로 스크롤되는 영역이 아닌 곳"을 손가락으로 끌면 iOS 특유의 고무줄(rubber-band) 스크롤이 걸려서
+// 뒤에 있는 배경 화면까지 같이 움직여 보이는 문제가 있었음. 그래서 터치가 실제로 스크롤 가능한 요소
+// (채팅 메시지 목록, 각종 드롭다운/모달 안쪽 등 overflow-y:auto/scroll이면서 내용이 넘치는 곳) 위에서
+// 시작한 게 아니면, 그 터치가 만드는 스크롤 자체를 막아버림 - 스크롤 가능한 곳은 그대로 잘 움직임.
+function isInsideScrollableArea(el){
+  let node = el;
+  while(node && node !== document.body){
+    const style = window.getComputedStyle(node);
+    const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight;
+    if(canScrollY) return true;
+    node = node.parentElement;
+  }
+  return false;
+}
+document.addEventListener('touchmove', (e) => {
+  if(!document.body.classList.contains('chat-open')) return;
+  if(isInsideScrollableArea(e.target)) return;
+  e.preventDefault();
+}, { passive: false });
+
 
 // 예전엔 채팅 내역을 스크롤하면(예전 대화 보려고 위로 올리면) 키보드를 자동으로 닫았는데,
 // 스크롤하는 도중에도 키보드는 그대로 열려있고, 키보드 자체를 직접 내리는 제스처(키보드를 아래로
