@@ -13870,6 +13870,14 @@ function fixChatHeaderPosition(){
   const view = document.getElementById('chatRoomView');
   if(!view || !view.classList.contains('active') || !window.visualViewport) return;
   view.style.top = window.visualViewport.offsetTop + 'px';
+
+  // 키보드가 뜨면 화면 아래쪽이 키보드에 가려지는 만큼(gap)을 계산해서 그만큼 bottom을 끌어올림 -
+  // 이 컨테이너가 position:fixed; bottom:0 이라서, 이걸 안 해주면 키보드가 떠도 입력창(맨 아래 요소)이
+  // 화면 하단에 그대로 남아 키보드 뒤에 가려짐. viewport 메타 태그의 resizes-content가 정상 동작하는
+  // 브라우저에서는 window.innerHeight 자체가 이미 줄어들어서 gap이 0에 가까우니 사실상 영향 없음 -
+  // resizes-content가 안 먹히는 환경(레이아웃 뷰포트는 안 줄고 visualViewport만 줄어드는 경우)을 위한 보정.
+  const gap = window.innerHeight - (window.visualViewport.height + window.visualViewport.offsetTop);
+  view.style.bottom = Math.max(0, gap) + 'px';
 }
 let chatHeaderSyncRafId = null;
 function runChatHeaderSync(deadline){
@@ -13899,6 +13907,7 @@ function openChatRoom(id){
   markRoomRead(id);
   document.body.classList.add('chat-open');
   document.getElementById('chatRoomView').style.top = ''; // 이전에 남아있을 수 있는 값을 지우고 깨끗하게 시작
+  document.getElementById('chatRoomView').style.bottom = ''; // top과 같은 이유로 bottom(키보드 보정값)도 초기화
 
   const avatarEl = document.getElementById('chatRoomAvatar');
   if(room.avatar){
