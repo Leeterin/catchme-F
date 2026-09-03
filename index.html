@@ -6953,6 +6953,7 @@ function openMeetupRequests(meetup){
 function closeMeetupRequests(){
   document.getElementById('meetupRequestsView').classList.remove('active');
   document.getElementById('meetupDetailView').classList.add('active');
+  renderMeetupDetail(); // 신청 목록에서 방금 수락/거절했을 수 있으니, 뒤로 돌아왔을 때 참가자 수/목록을 최신 상태로 다시 그림
 }
 document.getElementById('meetupRequestsBackBtn').addEventListener('click', () => goBackOrClose(closeMeetupRequests));
 
@@ -6993,14 +6994,14 @@ async function renderMeetupRequests(){
   }
 }
 
-async function respondToMeetupRequest(meetup, userId, approve, row){
+async function respondToMeetupRequest(meetup, userId, approve, row, reqName){
   row.querySelectorAll('button').forEach(b => b.disabled = true);
   try {
     await apiRequest(`/meetups/${meetup.serverId}/requests/${userId}/${approve ? 'approve' : 'decline'}`, { method: 'POST' });
     row.remove();
     meetup.pendingRequestCount = Math.max(0, (meetup.pendingRequestCount || 1) - 1);
     if(approve){
-      meetup.participants.push({ name: '', color: meetup.color, isMe: false });
+      meetup.participants.push({ name: reqName || '', color: meetup.color, isMe: false });
       renderMeetups();
     }
     showToast(approve ? '참여를 수락했어요.' : '참여를 거절했어요.');
