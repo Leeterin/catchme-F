@@ -1279,10 +1279,11 @@
     align-items:center;
     margin-bottom:6px;
   }
+  .feed-post-title-row{ margin-bottom:4px; }
   .feed-post-place{
     font-family:'Space Grotesk',sans-serif;
-    font-weight:600;
-    font-size:13.5px;
+    font-weight:700;
+    font-size:15px;
   }
   .feed-post-location{
     font-family:'Roboto Mono',monospace;
@@ -1290,6 +1291,18 @@
     font-size:10.5px;
     color:var(--text-dim);
   }
+  .feed-post-location-link{
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+    font-family:'Roboto Mono',monospace;
+    font-weight:500;
+    font-size:11px;
+    color:var(--accent);
+    text-decoration:none;
+    margin-bottom:8px;
+  }
+  .feed-post-location-link:hover{ text-decoration:underline; }
   .feed-post-note{
     font-size:12px;
     color:var(--text);
@@ -7179,6 +7192,16 @@ function renderStarsHtml(rating){
   return '★'.repeat(full) + '☆'.repeat(5 - full);
 }
 
+// 추천 게시물의 "위치"를 누르면 카카오맵으로 이동하는 링크 - 좌표가 있으면 그 지점 지도로,
+// 없으면(구버전 데이터 등) 이름+동네로 검색한 결과로 감
+function feedPlaceMapLinkUrl(name, location, lat, lon){
+  if(typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon)){
+    return `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lon}`;
+  }
+  const query = location ? `${name} ${location}` : name;
+  return `https://map.kakao.com/link/search/${encodeURIComponent(query)}`;
+}
+
 function renderFeedPosts(){
   const container = document.getElementById('feedListContainer');
   container.innerHTML = '';
@@ -7200,16 +7223,19 @@ function renderFeedPosts(){
     card.className = 'feed-post-card' + (place.isSponsored ? ' sponsored' : '');
     card.style.cursor = 'pointer';
     const latest = place.latestReview;
-    const photo = latest && latest.photos && latest.photos[0];
+    const photos = (latest && latest.photos) || [];
+    // 실제 게시물처럼 제목(장소명) - 위치(지도 연동) - 한줄 소개 - 사진 순으로 보이게 함.
+    // 위치는 좌표가 있으면 그 지점으로, 없으면 이름으로 카카오맵 검색을 열어줌 (새 탭).
+    const mapUrl = feedPlaceMapLinkUrl(place.name, place.location, place.lat, place.lon);
     card.innerHTML = `
-      <div class="feed-post-top">
-        <span class="feed-post-place">${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}${escapeHtml(place.name)}</span>
-        <span class="feed-post-location">${ICO.pin} ${escapeHtml(place.location || '')}</span>
+      <div class="feed-post-title-row">
+        ${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}<span class="feed-post-place">${escapeHtml(place.name)}</span>
       </div>
+      ${place.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICO.pin} ${escapeHtml(place.location)}</a>` : ''}
       ${typeof place.avgRating === 'number' ? `<div class="feed-place-avg-rating">${renderStarsHtml(place.avgRating)} ${place.avgRating.toFixed(1)}</div>` : ''}
-      ${photo ? `<div class="feed-review-photos"><img src="${photo}" /></div>` : ''}
       ${latest ? `
         <div class="feed-post-note">${escapeHtml(latest.note || '')}</div>
+        ${photos.length > 0 ? `<div class="feed-review-photos">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
         <div class="feed-post-bottom-row">
           <div class="feed-post-author">${escapeHtml(latest.author ? latest.author.name : '')} 님의 리뷰</div>
           <span class="feed-review-count">리뷰 ${place.reviewCount}개 ${ICO.chevronRight || '›'}</span>
@@ -7238,7 +7264,7 @@ async function openFeedPlaceDetail(place){
   headerEl.innerHTML = `
     <div class="feed-place-detail-header">
       <div class="feed-place-detail-name">${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}${escapeHtml(place.name)}</div>
-      <div class="feed-post-location">${ICO.pin} ${escapeHtml(place.location || '')}</div>
+      ${place.location ? `<a class="feed-post-location-link" href="${feedPlaceMapLinkUrl(place.name, place.location, place.lat, place.lon)}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(place.location)}</a>` : ''}
       ${typeof place.avgRating === 'number' ? `<div class="feed-place-avg-rating" style="margin-top:6px;">${renderStarsHtml(place.avgRating)} ${place.avgRating.toFixed(1)} (${place.reviewCount}개 리뷰)</div>` : ''}
     </div>
   `;
