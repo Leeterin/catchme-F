@@ -924,6 +924,56 @@
     font-weight:700;
     font-size:12.5px;
   }
+  /* 대표 게시물(장소당 첫 리뷰) - 인스타그램 게시물처럼 사진을 크게 보여줌 */
+  .feed-review-photos-hero img{
+    width:calc(100% - 6px);
+    max-width:280px;
+    height:260px;
+  }
+  .feed-post-hero .feed-post-note{ font-size:13.5px; line-height:1.6; }
+  /* 다른 사람들의 리뷰 - 댓글처럼 작은 한 줄로 보여줌 */
+  .feed-secondary-review-title{
+    font-size:11px;
+    font-weight:700;
+    color:var(--text-dim);
+    margin:16px 2px 6px;
+  }
+  .feed-secondary-reviews{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+  }
+  .feed-secondary-review{
+    padding:10px 14px;
+    border-bottom:1px solid var(--line);
+  }
+  .feed-secondary-review:last-child{ border-bottom:none; }
+  .feed-secondary-review-main{
+    font-size:12.5px;
+    line-height:1.5;
+  }
+  .feed-secondary-review-main b{ margin-right:5px; }
+  .feed-secondary-review-stars{ color:#F5A623; font-size:10.5px; letter-spacing:1px; margin-right:5px; }
+  .feed-secondary-review-photos{ display:flex; gap:5px; margin-top:6px; }
+  .feed-secondary-review-photos img{ width:44px; height:44px; border-radius:6px; object-fit:cover; cursor:pointer; }
+  .feed-secondary-review-meta{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-top:6px;
+  }
+  .feed-secondary-review-meta .feed-social-btn{ font-size:11px; }
+  .feed-secondary-review-meta .feed-social-btn svg{ width:13px; height:13px; }
+  .feed-secondary-review-meta .feed-post-btn{
+    flex:none;
+    padding:0;
+    border:none;
+    background:none;
+    font-size:11px;
+    font-weight:600;
+    text-decoration:underline;
+  }
   .mp-input-group label{
     font-size:11px;
     color:var(--text-dim);
@@ -7222,8 +7272,10 @@ function renderFeedPosts(){
     const card = document.createElement('div');
     card.className = 'feed-post-card' + (place.isSponsored ? ' sponsored' : '');
     card.style.cursor = 'pointer';
-    const latest = place.latestReview;
-    const photos = (latest && latest.photos) || [];
+    // 이 장소에 가장 먼저 리뷰를 남긴 사람의 글을 대표 게시물로 크게 보여줌 (인스타 게시물처럼).
+    // 다른 사람들의 리뷰는 상세화면에서 그 밑에 댓글처럼 작게 보임.
+    const primary = place.primaryReview || place.latestReview;
+    const photos = (primary && primary.photos) || [];
     // 실제 게시물처럼 제목(장소명) - 위치(지도 연동) - 한줄 소개 - 사진 순으로 보이게 함.
     // 위치는 좌표가 있으면 그 지점으로, 없으면 이름으로 카카오맵 검색을 열어줌 (새 탭).
     const mapUrl = feedPlaceMapLinkUrl(place.name, place.location, place.lat, place.lon);
@@ -7233,11 +7285,11 @@ function renderFeedPosts(){
       </div>
       ${place.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICO.pin} ${escapeHtml(place.location)}</a>` : ''}
       ${typeof place.avgRating === 'number' ? `<div class="feed-place-avg-rating">${renderStarsHtml(place.avgRating)} ${place.avgRating.toFixed(1)}</div>` : ''}
-      ${latest ? `
-        <div class="feed-post-note">${escapeHtml(latest.note || '')}</div>
-        ${photos.length > 0 ? `<div class="feed-review-photos">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
+      ${primary ? `
+        <div class="feed-post-note">${escapeHtml(primary.note || '')}</div>
+        ${photos.length > 0 ? `<div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
         <div class="feed-post-bottom-row">
-          <div class="feed-post-author">${escapeHtml(latest.author ? latest.author.name : '')} 님의 리뷰</div>
+          <div class="feed-post-author">${escapeHtml(primary.author ? primary.author.name : '')}</div>
           <span class="feed-review-count">리뷰 ${place.reviewCount}개 ${ICO.chevronRight || '›'}</span>
         </div>
       ` : `
@@ -7287,6 +7339,7 @@ function closeFeedPlaceDetail(){
 }
 document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceDetail));
 
+// 장소당 리뷰들을 "대표 게시물(가장 먼저 올린 사람) + 다른 사람들의 리뷰(댓글처럼 작게)"로 나눠서 보여줌.
 function renderFeedReviews(reviews){
   const container = document.getElementById('feedPlaceReviewContainer');
   container.innerHTML = '';
@@ -7294,156 +7347,236 @@ function renderFeedReviews(reviews){
     container.innerHTML = `<div class="search-empty">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요!</div>`;
     return;
   }
-  reviews.forEach(review => {
-    const isMine = currentUser && review.author && review.author.id === currentUser.id;
-    const photos = review.photos || [];
-    const card = document.createElement('div');
-    card.className = 'feed-post-card';
-    card.innerHTML = `
-      ${typeof review.rating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(review.rating)}</div>` : ''}
-      <div class="feed-post-note">${escapeHtml(review.note || '')}</div>
-      ${photos.length > 0 ? `<div class="feed-review-photos">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
-      <div class="feed-post-bottom-row">
-        <div class="feed-post-author">${escapeHtml(review.author ? review.author.name : '')} 님의 리뷰</div>
-        ${isMine ? `
-          <div class="feed-post-owner-actions">
-            <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
-            <button type="button" class="feed-post-btn feed-review-delete-btn">삭제</button>
-          </div>
-        ` : `
-          <button type="button" class="feed-post-btn feed-review-report-btn">신고</button>
-        `}
-      </div>
-      <div class="feed-review-social-row">
-        <button type="button" class="feed-social-btn feed-like-btn${review.likedByMe ? ' liked' : ''}">
-          <svg viewBox="0 0 24 24" fill="${review.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-          <span class="feed-like-count">${review.likeCount || 0}</span>
-        </button>
-        <button type="button" class="feed-social-btn feed-comment-toggle-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-          <span class="feed-comment-count">댓글 ${typeof review.commentCount === 'number' ? review.commentCount : 0}개</span>
-        </button>
-      </div>
-      <div class="feed-comment-section" style="display:none;">
-        <div class="feed-comment-list"></div>
-        <div class="feed-comment-input-row">
-          <input type="text" class="feed-comment-input" placeholder="댓글을 입력하세요" maxlength="200" />
-          <button type="button" class="feed-comment-submit-btn">등록</button>
+  let primaryIdx = 0;
+  reviews.forEach((r, i) => {
+    if(new Date(r.createdAt) < new Date(reviews[primaryIdx].createdAt)) primaryIdx = i;
+  });
+  const primary = reviews[primaryIdx];
+  const others = reviews.filter((_, i) => i !== primaryIdx);
+
+  renderPrimaryFeedReview(primary, container);
+
+  if(others.length > 0){
+    const title = document.createElement('div');
+    title.className = 'feed-secondary-review-title';
+    title.textContent = `다른 사람들의 리뷰 ${others.length}개`;
+    container.appendChild(title);
+    const wrap = document.createElement('div');
+    wrap.className = 'feed-secondary-reviews';
+    container.appendChild(wrap);
+    others.forEach(review => renderSecondaryFeedReview(review, wrap));
+  }
+}
+
+// 대표 게시물 - 이 장소에 가장 먼저 리뷰를 남긴 사람의 글을 인스타그램 게시물처럼 크게 보여줌
+function renderPrimaryFeedReview(review, container){
+  const isMine = currentUser && review.author && review.author.id === currentUser.id;
+  const photos = review.photos || [];
+  const card = document.createElement('div');
+  card.className = 'feed-post-card feed-post-hero feed-review-card';
+  card.innerHTML = `
+    ${typeof review.rating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(review.rating)}</div>` : ''}
+    <div class="feed-post-note">${escapeHtml(review.note || '')}</div>
+    ${photos.length > 0 ? `<div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
+    <div class="feed-post-bottom-row">
+      <div class="feed-post-author">${escapeHtml(review.author ? review.author.name : '')}</div>
+      ${isMine ? `
+        <div class="feed-post-owner-actions">
+          <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
+          <button type="button" class="feed-post-btn feed-review-delete-btn">삭제</button>
         </div>
+      ` : `
+        <button type="button" class="feed-post-btn feed-review-report-btn">신고</button>
+      `}
+    </div>
+    <div class="feed-review-social-row">
+      <button type="button" class="feed-social-btn feed-like-btn${review.likedByMe ? ' liked' : ''}">
+        <svg viewBox="0 0 24 24" fill="${review.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+        <span class="feed-like-count">${review.likeCount || 0}</span>
+      </button>
+      <button type="button" class="feed-social-btn feed-comment-toggle-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span class="feed-comment-count">댓글 ${typeof review.commentCount === 'number' ? review.commentCount : 0}개</span>
+      </button>
+    </div>
+    <div class="feed-comment-section" style="display:none;">
+      <div class="feed-comment-list"></div>
+      <div class="feed-comment-input-row">
+        <input type="text" class="feed-comment-input" placeholder="댓글을 입력하세요" maxlength="200" />
+        <button type="button" class="feed-comment-submit-btn">등록</button>
       </div>
-    `;
-    if(isMine){
-      card.querySelector('.feed-review-edit-btn').addEventListener('click', () => openFeedReviewEdit(review));
-      card.querySelector('.feed-review-delete-btn').addEventListener('click', async () => {
+    </div>
+  `;
+  container.appendChild(card);
+  wireFeedReviewCard(card, review);
+}
+
+// 다른 사람들의 리뷰 - 댓글처럼 작은 한 줄로 보여줌 (좋아요/댓글/수정/삭제/신고는 동일하게 동작함)
+function renderSecondaryFeedReview(review, container){
+  const isMine = currentUser && review.author && review.author.id === currentUser.id;
+  const photos = review.photos || [];
+  const row = document.createElement('div');
+  row.className = 'feed-secondary-review feed-review-card';
+  row.innerHTML = `
+    <div class="feed-secondary-review-main">
+      <b>${escapeHtml(review.author ? review.author.name : '')}</b>
+      ${typeof review.rating === 'number' ? `<span class="feed-secondary-review-stars">${renderStarsHtml(review.rating)}</span>` : ''}
+      <span>${escapeHtml(review.note || '')}</span>
+    </div>
+    ${photos.length > 0 ? `<div class="feed-secondary-review-photos">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
+    <div class="feed-secondary-review-meta">
+      <button type="button" class="feed-social-btn feed-like-btn${review.likedByMe ? ' liked' : ''}">
+        <svg viewBox="0 0 24 24" fill="${review.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+        <span class="feed-like-count">${review.likeCount || 0}</span>
+      </button>
+      <button type="button" class="feed-social-btn feed-comment-toggle-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        <span class="feed-comment-count">댓글 ${typeof review.commentCount === 'number' ? review.commentCount : 0}개</span>
+      </button>
+      ${isMine ? `
+        <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
+        <button type="button" class="feed-post-btn feed-review-delete-btn">삭제</button>
+      ` : `
+        <button type="button" class="feed-post-btn feed-review-report-btn">신고</button>
+      `}
+    </div>
+    <div class="feed-comment-section" style="display:none;">
+      <div class="feed-comment-list"></div>
+      <div class="feed-comment-input-row">
+        <input type="text" class="feed-comment-input" placeholder="댓글을 입력하세요" maxlength="200" />
+        <button type="button" class="feed-comment-submit-btn">등록</button>
+      </div>
+    </div>
+  `;
+  container.appendChild(row);
+  wireFeedReviewCard(row, review);
+}
+
+// 대표 게시물/일반 리뷰 공통 동작(좋아요·댓글·수정·삭제·신고) - 삭제 후에는 대표 리뷰가 바뀔 수 있으므로
+// DOM만 지우지 않고 장소 상세를 서버에서 다시 불러와 대표/일반 리뷰 구성을 새로 계산함.
+function wireFeedReviewCard(card, review){
+  const isMine = currentUser && review.author && review.author.id === currentUser.id;
+  if(isMine){
+    const editBtn = card.querySelector('.feed-review-edit-btn');
+    if(editBtn) editBtn.addEventListener('click', () => openFeedReviewEdit(review));
+    const deleteBtn = card.querySelector('.feed-review-delete-btn');
+    if(deleteBtn) deleteBtn.addEventListener('click', async () => {
+      try {
+        await apiRequest(`/feed/${review.id}`, { method: 'DELETE' });
+        const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
+        if(place){
+          place.reviewCount = Math.max(0, place.reviewCount - 1);
+          if(place.latestReview && place.latestReview.id === review.id) place.latestReview = null;
+          if(place.primaryReview && place.primaryReview.id === review.id) place.primaryReview = null;
+        }
+        showToast('삭제했어요.');
+        await refreshFeedPlaceDetail();
+      } catch(err){
+        showToast(err.message);
+      }
+    });
+  } else {
+    const reportBtn = card.querySelector('.feed-review-report-btn');
+    if(reportBtn) reportBtn.addEventListener('click', () => openReportModal('FEED_POST', review.id));
+  }
+
+  // 좋아요 토글
+  const likeBtn = card.querySelector('.feed-like-btn');
+  likeBtn.addEventListener('click', async () => {
+    likeBtn.disabled = true;
+    try {
+      const data = await apiRequest(`/feed/${review.id}/like`, { method: 'POST' });
+      likeBtn.classList.toggle('liked', data.liked);
+      likeBtn.querySelector('svg').setAttribute('fill', data.liked ? 'currentColor' : 'none');
+      likeBtn.querySelector('.feed-like-count').textContent = data.likeCount;
+    } catch(err){
+      showToast(err.message);
+    } finally {
+      likeBtn.disabled = false;
+    }
+  });
+
+  // 댓글 펼치기/접기 - 처음 펼칠 때만 서버에서 불러옴
+  const commentSection = card.querySelector('.feed-comment-section');
+  const commentList = card.querySelector('.feed-comment-list');
+  let commentsLoaded = false;
+  async function loadAndRenderComments(){
+    commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">불러오는 중...</div>`;
+    try {
+      const data = await apiRequest(`/feed/${review.id}/comments`);
+      renderCommentList(data.comments || []);
+    } catch(err){
+      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">댓글을 불러오지 못했어요.</div>`;
+    }
+  }
+  function renderCommentList(comments){
+    if(comments.length === 0){
+      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
+      return;
+    }
+    commentList.innerHTML = comments.map(c => `
+      <div class="feed-comment-row" data-comment-id="${c.id}">
+        <b>${escapeHtml(c.author ? c.author.name : '')}</b>
+        <span style="flex:1;">${escapeHtml(c.text)}</span>
+        ${currentUser && c.author && c.author.id === currentUser.id ? '<button type="button" class="feed-comment-delete-btn" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:0;">삭제</button>' : ''}
+      </div>
+    `).join('');
+    commentList.querySelectorAll('.feed-comment-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row = btn.closest('.feed-comment-row');
+        const commentId = row.dataset.commentId;
         try {
-          await apiRequest(`/feed/${review.id}`, { method: 'DELETE' });
-          card.remove();
-          const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
-          if(place){
-            place.reviewCount = Math.max(0, place.reviewCount - 1);
-            if(place.latestReview && place.latestReview.id === review.id) place.latestReview = null;
-          }
-          showToast('삭제했어요.');
-          if(!document.querySelector('#feedPlaceReviewContainer .feed-post-card')){
-            document.getElementById('feedPlaceReviewContainer').innerHTML = `<div class="search-empty">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요!</div>`;
+          await apiRequest(`/feed/comments/${commentId}`, { method: 'DELETE' });
+          row.remove();
+          const countEl = card.querySelector('.feed-comment-count');
+          const n = Math.max(0, parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) - 1);
+          countEl.textContent = `댓글 ${n}개`;
+          if(!commentList.querySelector('.feed-comment-row')){
+            commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
           }
         } catch(err){
           showToast(err.message);
         }
       });
-    } else {
-      const reportBtn = card.querySelector('.feed-review-report-btn');
-      if(reportBtn) reportBtn.addEventListener('click', () => openReportModal('FEED_POST', review.id));
-    }
-
-    // 좋아요 토글
-    const likeBtn = card.querySelector('.feed-like-btn');
-    likeBtn.addEventListener('click', async () => {
-      likeBtn.disabled = true;
-      try {
-        const data = await apiRequest(`/feed/${review.id}/like`, { method: 'POST' });
-        likeBtn.classList.toggle('liked', data.liked);
-        likeBtn.querySelector('svg').setAttribute('fill', data.liked ? 'currentColor' : 'none');
-        likeBtn.querySelector('.feed-like-count').textContent = data.likeCount;
-      } catch(err){
-        showToast(err.message);
-      } finally {
-        likeBtn.disabled = false;
-      }
     });
-
-    // 댓글 펼치기/접기 - 처음 펼칠 때만 서버에서 불러옴
-    const commentSection = card.querySelector('.feed-comment-section');
-    const commentList = card.querySelector('.feed-comment-list');
-    let commentsLoaded = false;
-    async function loadAndRenderComments(){
-      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">불러오는 중...</div>`;
-      try {
-        const data = await apiRequest(`/feed/${review.id}/comments`);
-        renderCommentList(data.comments || []);
-      } catch(err){
-        commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">댓글을 불러오지 못했어요.</div>`;
-      }
+  }
+  card.querySelector('.feed-comment-toggle-btn').addEventListener('click', () => {
+    const nowHidden = commentSection.style.display === 'none';
+    commentSection.style.display = nowHidden ? 'block' : 'none';
+    if(nowHidden && !commentsLoaded){
+      commentsLoaded = true;
+      loadAndRenderComments();
     }
-    function renderCommentList(comments){
-      if(comments.length === 0){
-        commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
-        return;
-      }
-      commentList.innerHTML = comments.map(c => `
-        <div class="feed-comment-row" data-comment-id="${c.id}">
-          <b>${escapeHtml(c.author ? c.author.name : '')}</b>
-          <span style="flex:1;">${escapeHtml(c.text)}</span>
-          ${currentUser && c.author && c.author.id === currentUser.id ? '<button type="button" class="feed-comment-delete-btn" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:0;">삭제</button>' : ''}
-        </div>
-      `).join('');
-      commentList.querySelectorAll('.feed-comment-delete-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const row = btn.closest('.feed-comment-row');
-          const commentId = row.dataset.commentId;
-          try {
-            await apiRequest(`/feed/comments/${commentId}`, { method: 'DELETE' });
-            row.remove();
-            const countEl = card.querySelector('.feed-comment-count');
-            const n = Math.max(0, parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) - 1);
-            countEl.textContent = `댓글 ${n}개`;
-            if(!commentList.querySelector('.feed-comment-row')){
-              commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
-            }
-          } catch(err){
-            showToast(err.message);
-          }
-        });
-      });
-    }
-    card.querySelector('.feed-comment-toggle-btn').addEventListener('click', () => {
-      const nowHidden = commentSection.style.display === 'none';
-      commentSection.style.display = nowHidden ? 'block' : 'none';
-      if(nowHidden && !commentsLoaded){
-        commentsLoaded = true;
-        loadAndRenderComments();
-      }
-    });
-    const commentInput = card.querySelector('.feed-comment-input');
-    const submitComment = async () => {
-      const text = commentInput.value.trim();
-      if(!text) return;
-      try {
-        await apiRequest(`/feed/${review.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
-        commentInput.value = '';
-        const countEl = card.querySelector('.feed-comment-count');
-        const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
-        countEl.textContent = `댓글 ${n}개`;
-        await loadAndRenderComments();
-      } catch(err){
-        showToast(err.message);
-      }
-    };
-    card.querySelector('.feed-comment-submit-btn').addEventListener('click', submitComment);
-    commentInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.isComposing) submitComment(); });
-
-    container.appendChild(card);
   });
+  const commentInput = card.querySelector('.feed-comment-input');
+  const submitComment = async () => {
+    const text = commentInput.value.trim();
+    if(!text) return;
+    try {
+      await apiRequest(`/feed/${review.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+      commentInput.value = '';
+      const countEl = card.querySelector('.feed-comment-count');
+      const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
+      countEl.textContent = `댓글 ${n}개`;
+      await loadAndRenderComments();
+    } catch(err){
+      showToast(err.message);
+    }
+  };
+  card.querySelector('.feed-comment-submit-btn').addEventListener('click', submitComment);
+  commentInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.isComposing) submitComment(); });
+}
+
+// 리뷰 삭제 등으로 대표/일반 구성이 바뀔 수 있어서, 장소 상세를 서버에서 통째로 다시 불러와 다시 그림
+async function refreshFeedPlaceDetail(){
+  if(!activeFeedPlaceId) return;
+  const container = document.getElementById('feedPlaceReviewContainer');
+  try {
+    const data = await apiRequest(`/feed/places/${activeFeedPlaceId}`);
+    renderFeedReviews(data.reviews || []);
+  } catch(err){
+    container.innerHTML = `<div class="search-empty">불러오지 못했어요: ${escapeHtml(err.message)}</div>`;
+  }
 }
 
 // 서버에 저장된 장소/리뷰 목록을 불러와서 로컬 목록에 합침
@@ -7465,6 +7598,7 @@ async function loadFeedPostsFromServer(){
         avgRating: typeof p.avgRating === 'number' ? p.avgRating : null,
         totalLikes: p.totalLikes || 0,
         latestReview: p.latestReview || null,
+        primaryReview: p.primaryReview || null,
       });
     });
     Object.keys(FEED_PLACES).forEach(cat => sortFeedPlaces(cat));
@@ -7778,6 +7912,7 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
         reviewCount: 1,
         avgRating: data.post.rating,
         latestReview: data.post,
+        primaryReview: data.post,
       });
     } else {
       // 이미 있던 장소면 그 장소의 리뷰 수/최신 리뷰/평균 별점을 갱신 - 방금 리뷰가 달렸으니 다시 정렬하면 위쪽으로 올라감
