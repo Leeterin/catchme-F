@@ -7352,7 +7352,14 @@ function renderFeedReviews(reviews){
     if(new Date(r.createdAt) < new Date(reviews[primaryIdx].createdAt)) primaryIdx = i;
   });
   const primary = reviews[primaryIdx];
-  const others = reviews.filter((_, i) => i !== primaryIdx);
+  // 대표 게시물 작성자가 같은 장소에 리뷰를 여러 개 남긴 경우, 그 사람 글은 전부 "게시물"로 취급하고
+  // 아래 "다른 사람들의 리뷰"에는 다른 사람이 쓴 것만 보이게 함 (본인 글이 리뷰로 또 뜨는 걸 방지).
+  const primaryAuthorId = primary.author ? primary.author.id : null;
+  const others = reviews.filter((r, i) => {
+    if(i === primaryIdx) return false;
+    if(primaryAuthorId && r.author && r.author.id === primaryAuthorId) return false;
+    return true;
+  });
 
   renderPrimaryFeedReview(primary, container);
 
