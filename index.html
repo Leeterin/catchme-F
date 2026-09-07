@@ -7442,21 +7442,34 @@ function renderSecondaryFeedReview(review, container){
 }
 
 // 다른 사람들의 리뷰(댓글 형태)에서는 수정/삭제/신고만 가능함 - 좋아요·별도 댓글창은 없앰
+// 리뷰 삭제 공통 처리 - 지운 리뷰가 그 장소의 마지막 리뷰였으면 서버가 장소 자체도 같이 지워주므로,
+// 그 경우엔 소식 목록에서도 이 장소 카드를 없애고 상세화면을 닫음 (빈 게시물이 남지 않게).
+async function deleteFeedReview(review){
+  const data = await apiRequest(`/feed/${review.id}`, { method: 'DELETE' });
+  const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
+  if(data.placeDeleted){
+    FEED_PLACES[activeFeedCategory] = FEED_PLACES[activeFeedCategory].filter(p => p.serverId !== activeFeedPlaceId);
+    renderFeedPosts();
+    showToast('삭제했어요.');
+    goBackOrClose(closeFeedPlaceDetail);
+    return;
+  }
+  if(place){
+    place.reviewCount = Math.max(0, place.reviewCount - 1);
+    if(place.latestReview && place.latestReview.id === review.id) place.latestReview = null;
+    if(place.primaryReview && place.primaryReview.id === review.id) place.primaryReview = null;
+  }
+  showToast('삭제했어요.');
+  await refreshFeedPlaceDetail();
+}
+
 function wireSecondaryFeedReviewCard(card, review){
   const isMine = currentUser && review.author && review.author.id === currentUser.id;
   if(isMine){
     card.querySelector('.feed-review-edit-btn').addEventListener('click', () => openFeedReviewEdit(review));
     card.querySelector('.feed-review-delete-btn').addEventListener('click', async () => {
       try {
-        await apiRequest(`/feed/${review.id}`, { method: 'DELETE' });
-        const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
-        if(place){
-          place.reviewCount = Math.max(0, place.reviewCount - 1);
-          if(place.latestReview && place.latestReview.id === review.id) place.latestReview = null;
-          if(place.primaryReview && place.primaryReview.id === review.id) place.primaryReview = null;
-        }
-        showToast('삭제했어요.');
-        await refreshFeedPlaceDetail();
+        await deleteFeedReview(review);
       } catch(err){
         showToast(err.message);
       }
@@ -7476,15 +7489,7 @@ function wireFeedReviewCard(card, review){
     const deleteBtn = card.querySelector('.feed-review-delete-btn');
     if(deleteBtn) deleteBtn.addEventListener('click', async () => {
       try {
-        await apiRequest(`/feed/${review.id}`, { method: 'DELETE' });
-        const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
-        if(place){
-          place.reviewCount = Math.max(0, place.reviewCount - 1);
-          if(place.latestReview && place.latestReview.id === review.id) place.latestReview = null;
-          if(place.primaryReview && place.primaryReview.id === review.id) place.primaryReview = null;
-        }
-        showToast('삭제했어요.');
-        await refreshFeedPlaceDetail();
+        await deleteFeedReview(review);
       } catch(err){
         showToast(err.message);
       }
