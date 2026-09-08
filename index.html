@@ -1377,6 +1377,11 @@
     padding:4px 10px;
     font-size:11px;
   }
+  .feed-post-bottom-row .feed-review-report-btn{
+    flex:none;
+    padding:4px 10px;
+    font-size:11px;
+  }
   .feed-post-actions{
     display:flex;
     gap:6px;
@@ -6727,7 +6732,31 @@ function renderMeetups(){
     return;
   }
 
-  list.forEach(meetup => {
+  // 내가 참여중이거나(방장 포함), 신청해두고 답을 기다리는 모임은 맨 위에 따로 묶어서 보여줌.
+  // 그래야 "나랑 관련 있는 모임"이랑 "그냥 둘러보는 모임"이 한눈에 구분됨.
+  const mine = list.filter(m => m.reserved || m.isCreator || m.myRequestStatus === 'PENDING');
+  const others = list.filter(m => !mine.includes(m));
+
+  if(mine.length > 0){
+    const mineTitle = document.createElement('div');
+    mineTitle.className = 'meetup-section-title';
+    mineTitle.textContent = `내가 참여중인 모임 (${mine.length})`;
+    container.appendChild(mineTitle);
+    mine.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
+
+    if(others.length > 0){
+      const othersTitle = document.createElement('div');
+      othersTitle.className = 'meetup-section-title';
+      othersTitle.style.marginTop = '18px';
+      othersTitle.textContent = '둘러보기';
+      container.appendChild(othersTitle);
+    }
+  }
+  others.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
+}
+
+// 모임 카드 하나를 만듦 (참여중 섹션/둘러보기 섹션 공용)
+function buildMeetupCard(meetup){
     const isFull = meetup.participants.length >= meetup.max && !meetup.reserved;
     const card = document.createElement('div');
     card.className = 'meetup-card' + (meetup.cancelled ? ' cancelled' : '');
@@ -6751,9 +6780,7 @@ function renderMeetups(){
     `;
 
     card.addEventListener('click', () => openMeetupDetail(meetup.id));
-
-    container.appendChild(card);
-  });
+    return card;
 }
 renderMeetups();
 
@@ -7207,31 +7234,25 @@ document.querySelectorAll('#communitySegment .segment-btn').forEach(btn => {
 });
 
 // ============================================================
-// 소식: 맛집 / 카페 / 체험 추천
+// 소식: 맛집 / 카페 / 체험 추천 (각자 올린 글이 독립적인 게시물로 따로 뜸 - 더 이상 장소로 안 묶음)
 // ============================================================
 const FEED_CATEGORY_LABELS = { food: '맛집', cafe: '카페', experience: '체험' };
-// 장소(Place) 단위로 관리함 - 한 장소에 여러 사람의 리뷰(reviews)가 달릴 수 있음
-const FEED_PLACES = {
+const FEED_POSTS = {
   food: [],
   cafe: [],
   experience: [],
 };
 
 let activeFeedCategory = 'food';
-let activeFeedPlaceId = null; // 상세화면에서 보고 있는 장소의 serverId
 
-// 광고(스폰서) 장소가 항상 맨 위, 그 다음 최근에 리뷰가 달린 순 - 서버 정렬 기준과 동일하게 맞춤
 let feedSortMode = 'recent'; // 'recent' | 'popular' | 'rating'
 let feedSearchQuery = '';
 
-function sortFeedPlaces(category){
-  FEED_PLACES[category].sort((a, b) => {
-    if(a.isSponsored !== b.isSponsored) return a.isSponsored ? -1 : 1;
-    if(feedSortMode === 'popular') return (b.totalLikes || 0) - (a.totalLikes || 0);
-    if(feedSortMode === 'rating') return (b.avgRating || 0) - (a.avgRating || 0);
-    const aTime = new Date(a.latestReview ? a.latestReview.createdAt : 0);
-    const bTime = new Date(b.latestReview ? b.latestReview.createdAt : 0);
-    return bTime - aTime;
+function sortFeedPosts(category){
+  FEED_POSTS[category].sort((a, b) => {
+    if(feedSortMode === 'popular') return (b.likeCount || 0) - (a.likeCount || 0);
+    if(feedSortMode === 'rating') return (b.rating || 0) - (a.rating || 0);
+    return new Date(b.createdAt) - new Date(a.createdAt);
   });
 }
 
@@ -7242,7 +7263,7 @@ function renderStarsHtml(rating){
   return '★'.repeat(full) + '☆'.repeat(5 - full);
 }
 
-// 추천 게시물의 "위치"를 누르면 카카오맵으로 이동하는 링크 - 좌표가 있으면 그 지점 지도로,
+// 게시물의 "위치"를 누르면 카카오맵으로 이동하는 링크 - 좌표가 있으면 그 지점 지도로,
 // 없으면(구버전 데이터 등) 이름+동네로 검색한 결과로 감
 function feedPlaceMapLinkUrl(name, location, lat, lon){
   if(typeof lat === 'number' && typeof lon === 'number' && !isNaN(lat) && !isNaN(lon)){
@@ -7257,10 +7278,10 @@ function renderFeedPosts(){
   container.innerHTML = '';
 
   const q = feedSearchQuery.trim().toLowerCase();
-  const places = FEED_PLACES[activeFeedCategory].filter(p =>
-    !q || p.name.toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q)
+  const posts = FEED_POSTS[activeFeedCategory].filter(p =>
+    !q || (p.title || '').toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q)
   );
-  if(places.length === 0){
+  if(posts.length === 0){
     const empty = document.createElement('div');
     empty.className = 'search-empty';
     empty.textContent = q ? `"${feedSearchQuery}"에 대한 검색 결과가 없어요.` : '아직 등록된 추천이 없어요.';
@@ -7268,125 +7289,27 @@ function renderFeedPosts(){
     return;
   }
 
-  places.forEach(place => {
-    const card = document.createElement('div');
-    card.className = 'feed-post-card' + (place.isSponsored ? ' sponsored' : '');
-    card.style.cursor = 'pointer';
-    // 이 장소에 가장 먼저 리뷰를 남긴 사람의 글을 대표 게시물로 크게 보여줌 (인스타 게시물처럼).
-    // 다른 사람들의 리뷰는 상세화면에서 그 밑에 댓글처럼 작게 보임.
-    const primary = place.primaryReview || place.latestReview;
-    const photos = (primary && primary.photos) || [];
-    // 실제 게시물처럼 제목(장소명) - 위치(지도 연동) - 한줄 소개 - 사진 순으로 보이게 함.
-    // 위치는 좌표가 있으면 그 지점으로, 없으면 이름으로 카카오맵 검색을 열어줌 (새 탭).
-    const mapUrl = feedPlaceMapLinkUrl(place.name, place.location, place.lat, place.lon);
-    card.innerHTML = `
-      <div class="feed-post-title-row">
-        ${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}<span class="feed-post-place">${escapeHtml(place.name)}</span>
-      </div>
-      ${place.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${ICO.pin} ${escapeHtml(place.location)}</a>` : ''}
-      ${typeof place.avgRating === 'number' ? `<div class="feed-place-avg-rating">${renderStarsHtml(place.avgRating)} ${place.avgRating.toFixed(1)}</div>` : ''}
-      ${primary ? `
-        <div class="feed-post-note">${escapeHtml(primary.note || '')}</div>
-        ${photos.length > 0 ? `<div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
-        <div class="feed-post-bottom-row">
-          <div class="feed-post-author">${escapeHtml(primary.author ? primary.author.name : '')}</div>
-          <span class="feed-review-count">리뷰 ${place.reviewCount}개 ${ICO.chevronRight || '›'}</span>
-        </div>
-      ` : `
-        <div class="feed-post-bottom-row">
-          <div class="feed-post-author">아직 리뷰가 없어요</div>
-        </div>
-      `}
-    `;
-    card.addEventListener('click', () => openFeedPlaceDetail(place));
-    container.appendChild(card);
-  });
+  posts.forEach(post => renderFeedPostCard(post, container));
 }
 renderFeedPosts();
 
-// ---------- 장소 상세 (한 장소의 모든 리뷰) ----------
-async function openFeedPlaceDetail(place){
-  activeFeedPlaceId = place.serverId || null;
-  document.getElementById('feedListView').classList.remove('active');
-  document.getElementById('feedPlaceDetailView').classList.add('active');
-  pushViewState(closeFeedPlaceDetail);
-
-  const headerEl = document.getElementById('feedPlaceDetailHeader');
-  const reviewContainer = document.getElementById('feedPlaceReviewContainer');
-  headerEl.innerHTML = `
-    <div class="feed-place-detail-header">
-      <div class="feed-place-detail-name">${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}${escapeHtml(place.name)}</div>
-      ${place.location ? `<a class="feed-post-location-link" href="${feedPlaceMapLinkUrl(place.name, place.location, place.lat, place.lon)}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(place.location)}</a>` : ''}
-      ${typeof place.avgRating === 'number' ? `<div class="feed-place-avg-rating" style="margin-top:6px;">${renderStarsHtml(place.avgRating)} ${place.avgRating.toFixed(1)} (${place.reviewCount}개 리뷰)</div>` : ''}
-    </div>
-  `;
-
-  if(!place.serverId){
-    reviewContainer.innerHTML = `<div class="search-empty">리뷰를 불러올 수 없어요.</div>`;
-    return;
-  }
-  reviewContainer.innerHTML = `<div class="search-empty">불러오는 중...</div>`;
-  try {
-    const data = await apiRequest(`/feed/places/${place.serverId}`);
-    renderFeedReviews(data.reviews || []);
-  } catch(err){
-    reviewContainer.innerHTML = `<div class="search-empty">불러오지 못했어요: ${escapeHtml(err.message)}</div>`;
-  }
-}
-function closeFeedPlaceDetail(){
-  document.getElementById('feedPlaceDetailView').classList.remove('active');
-  document.getElementById('feedListView').classList.add('active');
-}
-document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceDetail));
-
-// 장소당 리뷰들을 "대표 게시물(가장 먼저 올린 사람) + 다른 사람들의 리뷰(댓글처럼 작게)"로 나눠서 보여줌.
-function renderFeedReviews(reviews){
-  const container = document.getElementById('feedPlaceReviewContainer');
-  container.innerHTML = '';
-  if(reviews.length === 0){
-    container.innerHTML = `<div class="search-empty">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요!</div>`;
-    return;
-  }
-  let primaryIdx = 0;
-  reviews.forEach((r, i) => {
-    if(new Date(r.createdAt) < new Date(reviews[primaryIdx].createdAt)) primaryIdx = i;
-  });
-  const primary = reviews[primaryIdx];
-  // 대표 게시물 작성자가 같은 장소에 리뷰를 여러 개 남긴 경우, 그 사람 글은 전부 "게시물"로 취급하고
-  // 아래 "다른 사람들의 리뷰"에는 다른 사람이 쓴 것만 보이게 함 (본인 글이 리뷰로 또 뜨는 걸 방지).
-  const primaryAuthorId = primary.author ? primary.author.id : null;
-  const others = reviews.filter((r, i) => {
-    if(i === primaryIdx) return false;
-    if(primaryAuthorId && r.author && r.author.id === primaryAuthorId) return false;
-    return true;
-  });
-
-  renderPrimaryFeedReview(primary, container);
-
-  if(others.length > 0){
-    const title = document.createElement('div');
-    title.className = 'feed-secondary-review-title';
-    title.textContent = `다른 사람들의 리뷰 ${others.length}개`;
-    container.appendChild(title);
-    const wrap = document.createElement('div');
-    wrap.className = 'feed-secondary-reviews';
-    container.appendChild(wrap);
-    others.forEach(review => renderSecondaryFeedReview(review, wrap));
-  }
-}
-
-// 대표 게시물 - 이 장소에 가장 먼저 리뷰를 남긴 사람의 글을 인스타그램 게시물처럼 크게 보여줌
-function renderPrimaryFeedReview(review, container){
-  const isMine = currentUser && review.author && review.author.id === currentUser.id;
-  const photos = review.photos || [];
+// 게시물 하나를 카드로 그림 - 제목(상호명) - 위치(지도 연동) - 별점 - 한줄소개 - 사진 - 작성자/좋아요/댓글 순
+function renderFeedPostCard(post, container){
+  const isMine = currentUser && post.author && post.author.id === currentUser.id;
+  const photos = post.photos || [];
+  const mapUrl = feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon);
   const card = document.createElement('div');
   card.className = 'feed-post-card feed-post-hero feed-review-card';
   card.innerHTML = `
-    ${typeof review.rating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(review.rating)}</div>` : ''}
-    <div class="feed-post-note">${escapeHtml(review.note || '')}</div>
+    <div class="feed-post-title-row">
+      <span class="feed-post-place">${escapeHtml(post.title || '')}</span>
+    </div>
+    ${post.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(post.location)}</a>` : ''}
+    ${typeof post.rating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(post.rating)}</div>` : ''}
+    <div class="feed-post-note">${escapeHtml(post.note || '')}</div>
     ${photos.length > 0 ? `<div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
     <div class="feed-post-bottom-row">
-      <div class="feed-post-author">${escapeHtml(review.author ? review.author.name : '')}</div>
+      <div class="feed-post-author">${escapeHtml(post.author ? post.author.name : '')}</div>
       ${isMine ? `
         <div class="feed-post-owner-actions">
           <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
@@ -7397,13 +7320,13 @@ function renderPrimaryFeedReview(review, container){
       `}
     </div>
     <div class="feed-review-social-row">
-      <button type="button" class="feed-social-btn feed-like-btn${review.likedByMe ? ' liked' : ''}">
-        <svg viewBox="0 0 24 24" fill="${review.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-        <span class="feed-like-count">${review.likeCount || 0}</span>
+      <button type="button" class="feed-social-btn feed-like-btn${post.likedByMe ? ' liked' : ''}">
+        <svg viewBox="0 0 24 24" fill="${post.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
+        <span class="feed-like-count">${post.likeCount || 0}</span>
       </button>
       <button type="button" class="feed-social-btn feed-comment-toggle-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-        <span class="feed-comment-count">댓글 ${typeof review.commentCount === 'number' ? review.commentCount : 0}개</span>
+        <span class="feed-comment-count">댓글 ${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span>
       </button>
     </div>
     <div class="feed-comment-section" style="display:none;">
@@ -7415,88 +7338,34 @@ function renderPrimaryFeedReview(review, container){
     </div>
   `;
   container.appendChild(card);
-  wireFeedReviewCard(card, review);
+  wireFeedPostCard(card, post);
 }
 
-// 다른 사람들의 리뷰 - 진짜 댓글처럼 이름+글 한 줄로만 보여줌 (사진/좋아요/별도 댓글창 없음 -
-// 대표 게시물처럼 "또 하나의 게시물"로 보이지 않게, 순수하게 댓글 느낌만 나게 함)
-function renderSecondaryFeedReview(review, container){
-  const isMine = currentUser && review.author && review.author.id === currentUser.id;
-  const row = document.createElement('div');
-  row.className = 'feed-secondary-review feed-review-card';
-  row.innerHTML = `
-    <div class="feed-secondary-review-main">
-      <b>${escapeHtml(review.author ? review.author.name : '')}</b>
-      ${typeof review.rating === 'number' ? `<span class="feed-secondary-review-stars">${renderStarsHtml(review.rating)}</span>` : ''}
-      <span>${escapeHtml(review.note || '')}</span>
-      ${isMine ? `
-        <button type="button" class="feed-secondary-review-link feed-review-edit-btn">수정</button>
-        <button type="button" class="feed-secondary-review-link feed-review-delete-btn">삭제</button>
-      ` : `
-        <button type="button" class="feed-secondary-review-link feed-review-report-btn">신고</button>
-      `}
-    </div>
-  `;
-  container.appendChild(row);
-  wireSecondaryFeedReviewCard(row, review);
-}
-
-// 다른 사람들의 리뷰(댓글 형태)에서는 수정/삭제/신고만 가능함 - 좋아요·별도 댓글창은 없앰
-// 리뷰 삭제 공통 처리 - 지운 리뷰가 그 장소의 마지막 리뷰였으면 서버가 장소 자체도 같이 지워주므로,
-// 그 경우엔 소식 목록에서도 이 장소 카드를 없애고 상세화면을 닫음 (빈 게시물이 남지 않게).
-async function deleteFeedReview(review){
-  const data = await apiRequest(`/feed/${review.id}`, { method: 'DELETE' });
-  const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
-  if(data.placeDeleted){
-    FEED_PLACES[activeFeedCategory] = FEED_PLACES[activeFeedCategory].filter(p => p.serverId !== activeFeedPlaceId);
-    renderFeedPosts();
-    showToast('삭제했어요.');
-    goBackOrClose(closeFeedPlaceDetail);
-    return;
-  }
-  if(place){
-    place.reviewCount = Math.max(0, place.reviewCount - 1);
-    if(place.latestReview && place.latestReview.id === review.id) place.latestReview = null;
-    if(place.primaryReview && place.primaryReview.id === review.id) place.primaryReview = null;
-  }
+// 게시물 삭제 공통 처리
+async function deleteFeedPostItem(post){
+  await apiRequest(`/feed/${post.id}`, { method: 'DELETE' });
+  FEED_POSTS[activeFeedCategory] = FEED_POSTS[activeFeedCategory].filter(p => p.id !== post.id);
+  renderFeedPosts();
   showToast('삭제했어요.');
-  await refreshFeedPlaceDetail();
 }
 
-function wireSecondaryFeedReviewCard(card, review){
-  const isMine = currentUser && review.author && review.author.id === currentUser.id;
-  if(isMine){
-    card.querySelector('.feed-review-edit-btn').addEventListener('click', () => openFeedReviewEdit(review));
-    card.querySelector('.feed-review-delete-btn').addEventListener('click', async () => {
-      try {
-        await deleteFeedReview(review);
-      } catch(err){
-        showToast(err.message);
-      }
-    });
-  } else {
-    card.querySelector('.feed-review-report-btn').addEventListener('click', () => openReportModal('FEED_POST', review.id));
-  }
-}
-
-// 대표 게시물/일반 리뷰 공통 동작(좋아요·댓글·수정·삭제·신고) - 삭제 후에는 대표 리뷰가 바뀔 수 있으므로
-// DOM만 지우지 않고 장소 상세를 서버에서 다시 불러와 대표/일반 리뷰 구성을 새로 계산함.
-function wireFeedReviewCard(card, review){
-  const isMine = currentUser && review.author && review.author.id === currentUser.id;
+// 게시물 카드의 동작(좋아요·댓글·수정·삭제·신고) 연결
+function wireFeedPostCard(card, post){
+  const isMine = currentUser && post.author && post.author.id === currentUser.id;
   if(isMine){
     const editBtn = card.querySelector('.feed-review-edit-btn');
-    if(editBtn) editBtn.addEventListener('click', () => openFeedReviewEdit(review));
+    if(editBtn) editBtn.addEventListener('click', () => openFeedReviewEdit(post));
     const deleteBtn = card.querySelector('.feed-review-delete-btn');
     if(deleteBtn) deleteBtn.addEventListener('click', async () => {
       try {
-        await deleteFeedReview(review);
+        await deleteFeedPostItem(post);
       } catch(err){
         showToast(err.message);
       }
     });
   } else {
     const reportBtn = card.querySelector('.feed-review-report-btn');
-    if(reportBtn) reportBtn.addEventListener('click', () => openReportModal('FEED_POST', review.id));
+    if(reportBtn) reportBtn.addEventListener('click', () => openReportModal('FEED_POST', post.id));
   }
 
   // 좋아요 토글
@@ -7504,7 +7373,9 @@ function wireFeedReviewCard(card, review){
   likeBtn.addEventListener('click', async () => {
     likeBtn.disabled = true;
     try {
-      const data = await apiRequest(`/feed/${review.id}/like`, { method: 'POST' });
+      const data = await apiRequest(`/feed/${post.id}/like`, { method: 'POST' });
+      post.likedByMe = data.liked;
+      post.likeCount = data.likeCount;
       likeBtn.classList.toggle('liked', data.liked);
       likeBtn.querySelector('svg').setAttribute('fill', data.liked ? 'currentColor' : 'none');
       likeBtn.querySelector('.feed-like-count').textContent = data.likeCount;
@@ -7522,7 +7393,7 @@ function wireFeedReviewCard(card, review){
   async function loadAndRenderComments(){
     commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">불러오는 중...</div>`;
     try {
-      const data = await apiRequest(`/feed/${review.id}/comments`);
+      const data = await apiRequest(`/feed/${post.id}/comments`);
       renderCommentList(data.comments || []);
     } catch(err){
       commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">댓글을 불러오지 못했어요.</div>`;
@@ -7550,6 +7421,7 @@ function wireFeedReviewCard(card, review){
           const countEl = card.querySelector('.feed-comment-count');
           const n = Math.max(0, parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) - 1);
           countEl.textContent = `댓글 ${n}개`;
+          post.commentCount = n;
           if(!commentList.querySelector('.feed-comment-row')){
             commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
           }
@@ -7572,11 +7444,12 @@ function wireFeedReviewCard(card, review){
     const text = commentInput.value.trim();
     if(!text) return;
     try {
-      await apiRequest(`/feed/${review.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
       commentInput.value = '';
       const countEl = card.querySelector('.feed-comment-count');
       const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
       countEl.textContent = `댓글 ${n}개`;
+      post.commentCount = n;
       await loadAndRenderComments();
     } catch(err){
       showToast(err.message);
@@ -7586,41 +7459,30 @@ function wireFeedReviewCard(card, review){
   commentInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.isComposing) submitComment(); });
 }
 
-// 리뷰 삭제 등으로 대표/일반 구성이 바뀔 수 있어서, 장소 상세를 서버에서 통째로 다시 불러와 다시 그림
-async function refreshFeedPlaceDetail(){
-  if(!activeFeedPlaceId) return;
-  const container = document.getElementById('feedPlaceReviewContainer');
-  try {
-    const data = await apiRequest(`/feed/places/${activeFeedPlaceId}`);
-    renderFeedReviews(data.reviews || []);
-  } catch(err){
-    container.innerHTML = `<div class="search-empty">불러오지 못했어요: ${escapeHtml(err.message)}</div>`;
-  }
-}
-
-// 서버에 저장된 장소/리뷰 목록을 불러와서 로컬 목록에 합침
+// 서버에 저장된 게시물 목록을 불러와서 로컬 목록에 합침
 async function loadFeedPostsFromServer(){
   if(!authToken) return;
   try {
     const data = await apiRequest('/feed');
-    // 카테고리별로 다시 나눠 담음 (서버는 카테고리 구분 없이 한 번에 다 줄 수도 있어서)
-    Object.keys(FEED_PLACES).forEach(cat => { FEED_PLACES[cat] = []; });
-    (data.places || []).forEach(p => {
-      if(!FEED_PLACES[p.category]) return; // 알 수 없는 카테고리는 무시
-      FEED_PLACES[p.category].push({
-        serverId: p.id,
-        name: p.name,
+    Object.keys(FEED_POSTS).forEach(cat => { FEED_POSTS[cat] = []; });
+    (data.posts || []).forEach(p => {
+      if(!FEED_POSTS[p.category]) return; // 알 수 없는 카테고리는 무시
+      FEED_POSTS[p.category].push({
+        id: p.id,
+        title: p.title,
         location: p.location || '',
         lat: p.lat, lon: p.lon,
-        isSponsored: !!p.isSponsored,
-        reviewCount: p.reviewCount || 0,
-        avgRating: typeof p.avgRating === 'number' ? p.avgRating : null,
-        totalLikes: p.totalLikes || 0,
-        latestReview: p.latestReview || null,
-        primaryReview: p.primaryReview || null,
+        note: p.note || '',
+        rating: typeof p.rating === 'number' ? p.rating : null,
+        photos: p.photos || [],
+        author: p.author,
+        likeCount: p.likeCount || 0,
+        commentCount: p.commentCount || 0,
+        likedByMe: !!p.likedByMe,
+        createdAt: p.createdAt,
       });
     });
-    Object.keys(FEED_PLACES).forEach(cat => sortFeedPlaces(cat));
+    Object.keys(FEED_POSTS).forEach(cat => sortFeedPosts(cat));
     renderFeedPosts();
   } catch(err){
     console.error('[feed] load failed:', err);
@@ -7644,13 +7506,12 @@ document.getElementById('feedSearchInput').addEventListener('input', (e) => {
 });
 document.getElementById('feedSortSelect').addEventListener('change', (e) => {
   feedSortMode = e.target.value;
-  Object.keys(FEED_PLACES).forEach(cat => sortFeedPlaces(cat));
+  Object.keys(FEED_POSTS).forEach(cat => sortFeedPosts(cat));
   renderFeedPosts();
 });
 
-let editingFeedReviewId = null; // 수정 중인 "리뷰" serverId (null이면 새로 작성 중)
-let feedFormMode = 'create'; // 'create'(새 장소 검색해서 리뷰 남기기) | 'addReview'(이미 아는 장소에 리뷰만 추가) | 'editReview'(내 리뷰 문구만 수정)
-let feedAddReviewTarget = null; // addReview 모드일 때 대상 장소 객체
+let editingFeedPostId = null; // 수정 중인 게시물 id (null이면 새로 작성 중)
+let feedFormMode = 'create'; // 'create'(새 게시물 작성) | 'editReview'(내 게시물 수정)
 let feedPlacePicked = null; // { lat, lon } - 검색해서 실제로 고른 장소면 좌표까지 저장됨
 let feedPlaceMapInstance = null;
 let feedSelectedRating = 0; // 지금 폼에서 고른 별점 (1~5, 0이면 아직 안 고름)
@@ -7658,7 +7519,6 @@ let feedSelectedPhotos = []; // 지금 폼에 첨부된 사진들 (base64 문자
 
 function setFeedPlaceFieldsLocked(locked){
   document.getElementById('feedPlaceInput').disabled = locked;
-  document.getElementById('feedLocationInput').disabled = locked;
 }
 
 function renderFeedRatingPicker(){
@@ -7727,15 +7587,14 @@ document.getElementById('feedPhotoInput').addEventListener('change', (e) => {
 
 function openFeedCreate(){
   feedFormMode = 'create';
-  editingFeedReviewId = null;
-  feedAddReviewTarget = null;
+  editingFeedPostId = null;
   feedPlacePicked = null;
   feedSelectedRating = 0;
   feedSelectedPhotos = [];
   setFeedPlaceFieldsLocked(false);
   document.getElementById('feedCreateHeaderTitle').textContent = FEED_CATEGORY_LABELS[activeFeedCategory] + ' 추천하기';
   document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
-  document.getElementById('feedCreateSubmitBtn').textContent = '등록하기';
+  document.getElementById('feedCreateSubmitBtn').textContent = '올리기';
   document.getElementById('feedPlaceInput').value = '';
   document.getElementById('feedNoteInput').value = '';
   document.getElementById('feedLocationInput').value = '';
@@ -7746,59 +7605,31 @@ function openFeedCreate(){
   document.getElementById('feedCreateView').classList.add('active');
   pushViewState(closeFeedCreate);
 }
-// 장소 상세화면에서 "이 장소에 리뷰 남기기" - 장소는 이미 정해져 있으니 이름/위치는 잠그고 리뷰만 씀
-function openFeedAddReview(place){
-  feedFormMode = 'addReview';
-  editingFeedReviewId = null;
-  feedAddReviewTarget = place;
-  feedPlacePicked = (typeof place.lat === 'number' && typeof place.lon === 'number') ? { lat: place.lat, lon: place.lon } : null;
-  feedSelectedRating = 0;
-  feedSelectedPhotos = [];
-  setFeedPlaceFieldsLocked(true);
-  document.getElementById('feedCreateHeaderTitle').textContent = '리뷰 남기기';
-  document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
-  document.getElementById('feedCreateSubmitBtn').textContent = '리뷰 남기기';
-  document.getElementById('feedPlaceInput').value = place.name;
-  document.getElementById('feedNoteInput').value = '';
-  document.getElementById('feedLocationInput').value = place.location || '';
-  document.getElementById('feedPlaceMapWrap').style.display = 'none';
-  renderFeedRatingPicker();
-  renderFeedPhotoRow();
-  document.getElementById('feedPlaceDetailView').classList.remove('active');
-  document.getElementById('feedCreateView').classList.add('active');
-  pushViewState(closeFeedCreate);
-}
-// 내가 쓴 리뷰를 수정할 때 - 장소는 안 바꾸고 리뷰 문구만 수정
-function openFeedReviewEdit(review){
+// 내가 쓴 게시물을 수정할 때 - 목록 카드에서 바로 열림 (제목/위치는 검색으로 다시 바꿀 수 있게 그대로 열어둠)
+function openFeedReviewEdit(post){
   feedFormMode = 'editReview';
-  editingFeedReviewId = review.id;
-  const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
-  feedAddReviewTarget = place || null;
-  feedPlacePicked = null;
-  feedSelectedRating = review.rating || 0;
-  feedSelectedPhotos = (review.photos || []).slice();
-  setFeedPlaceFieldsLocked(true);
-  document.getElementById('feedCreateHeaderTitle').textContent = '리뷰 수정';
+  editingFeedPostId = post.id;
+  feedPlacePicked = (typeof post.lat === 'number' && typeof post.lon === 'number') ? { lat: post.lat, lon: post.lon } : null;
+  feedSelectedRating = post.rating || 0;
+  feedSelectedPhotos = (post.photos || []).slice();
+  setFeedPlaceFieldsLocked(false);
+  document.getElementById('feedCreateHeaderTitle').textContent = '게시물 수정';
   document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
   document.getElementById('feedCreateSubmitBtn').textContent = '수정하기';
-  document.getElementById('feedPlaceInput').value = place ? place.name : '';
-  document.getElementById('feedNoteInput').value = review.note || '';
-  document.getElementById('feedLocationInput').value = place ? (place.location || '') : '';
+  document.getElementById('feedPlaceInput').value = post.title || '';
+  document.getElementById('feedNoteInput').value = post.note || '';
+  document.getElementById('feedLocationInput').value = post.location || '';
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
   renderFeedRatingPicker();
   renderFeedPhotoRow();
-  document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedCreateView').classList.add('active');
   pushViewState(closeFeedCreate);
 }
 function closeFeedCreate(){
   document.getElementById('feedCreateView').classList.remove('active');
   setFeedPlaceFieldsLocked(false);
-  if(feedFormMode === 'create'){
-    document.getElementById('feedListView').classList.add('active');
-  } else {
-    document.getElementById('feedPlaceDetailView').classList.add('active');
-  }
+  document.getElementById('feedListView').classList.add('active');
 }
 
 function showFeedPlaceMap(lat, lon, name){
@@ -7816,11 +7647,9 @@ function showFeedPlaceMap(lat, lon, name){
   });
 }
 
-// 상호명 입력창에 타이핑하면 카카오 장소 검색 결과를 보여주고, 고르면 지도에 표시 + 좌표/위치 자동입력
-// (장소가 이미 정해진 addReview/editReview 모드에서는 이 입력창 자체가 잠겨있어서 검색이 발동 안 됨)
+// 제목(상호명) 입력창에 타이핑하면 카카오 장소 검색 결과를 보여주고, 고르면 지도에 표시 + 좌표/위치 자동입력
 let feedPlaceSearchTimer = null;
 document.getElementById('feedPlaceInput').addEventListener('input', () => {
-  if(feedFormMode !== 'create') return;
   feedPlacePicked = null;
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
   const val = document.getElementById('feedPlaceInput').value.trim();
@@ -7871,38 +7700,40 @@ document.addEventListener('click', (e) => {
 });
 
 document.getElementById('createFeedPostBtn').addEventListener('click', openFeedCreate);
-document.getElementById('feedAddReviewBtn').addEventListener('click', () => {
-  const place = FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId);
-  if(place) openFeedAddReview(place);
-});
 document.getElementById('feedCreateBackBtn').addEventListener('click', () => goBackOrClose(closeFeedCreate));
 
 document.getElementById('feedCreateSubmitBtn').addEventListener('click', async () => {
-  const place = document.getElementById('feedPlaceInput').value.trim();
+  const title = document.getElementById('feedPlaceInput').value.trim();
   const note = document.getElementById('feedNoteInput').value.trim();
   const location = document.getElementById('feedLocationInput').value.trim();
   const feedLat = feedPlacePicked ? feedPlacePicked.lat : null;
   const feedLon = feedPlacePicked ? feedPlacePicked.lon : null;
 
-  if(!place || !note){
-    showToast('장소명과 한줄 소개를 입력해주세요.');
+  if(!title || !note){
+    showToast('제목(장소명)과 한줄 소개를 입력해주세요.');
     return;
   }
-  if(feedSelectedRating < 1 && feedFormMode !== 'editReview'){
+  if(feedSelectedRating < 1){
     showToast('별점을 골라주세요.');
     return;
   }
+  if(!authToken){
+    showToast('로그인 후 이용할 수 있어요.');
+    return;
+  }
 
-  // ---------- 내 리뷰 문구/별점/사진 수정 ----------
+  // ---------- 내 게시물 수정 ----------
   if(feedFormMode === 'editReview'){
-    if(!editingFeedReviewId) return;
+    if(!editingFeedPostId) return;
     try {
-      await apiRequest(`/feed/${editingFeedReviewId}`, {
+      const data = await apiRequest(`/feed/${editingFeedPostId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ note, rating: feedSelectedRating || null, photos: feedSelectedPhotos }),
+        body: JSON.stringify({ title, note, location, rating: feedSelectedRating, photos: feedSelectedPhotos }),
       });
+      const existing = FEED_POSTS[activeFeedCategory].find(p => p.id === editingFeedPostId);
+      if(existing) Object.assign(existing, data.post);
+      renderFeedPosts();
       closeFeedCreate();
-      if(activeFeedPlaceId) openFeedPlaceDetail(FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId));
       showToast('수정했어요.');
     } catch(err){
       showToast(err.message);
@@ -7910,48 +7741,17 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
     return;
   }
 
-  // ---------- 새 리뷰 작성 (새 장소 or 이미 아는 장소에 추가) ----------
-  if(!authToken){
-    showToast('로그인 후 이용할 수 있어요.');
-    return;
-  }
+  // ---------- 새 게시물 작성 ----------
   try {
     const data = await apiRequest('/feed', {
       method: 'POST',
-      body: JSON.stringify({ category: activeFeedCategory, place, note, rating: feedSelectedRating, photos: feedSelectedPhotos, location, lat: feedLat, lon: feedLon }),
+      body: JSON.stringify({ category: activeFeedCategory, title, note, rating: feedSelectedRating, photos: feedSelectedPhotos, location, lat: feedLat, lon: feedLon }),
     });
-    if(data.placeCreated){
-      // 완전히 새로운 장소면 새 카드로 추가하고 다시 정렬 (스폰서 우선순위 지키면서 맨 위 근처로 옴)
-      FEED_PLACES[activeFeedCategory].push({
-        serverId: data.place.id,
-        name: data.place.name,
-        location: data.place.location || '',
-        lat: data.place.lat, lon: data.place.lon,
-        isSponsored: false,
-        reviewCount: 1,
-        avgRating: data.post.rating,
-        latestReview: data.post,
-        primaryReview: data.post,
-      });
-    } else {
-      // 이미 있던 장소면 그 장소의 리뷰 수/최신 리뷰/평균 별점을 갱신 - 방금 리뷰가 달렸으니 다시 정렬하면 위쪽으로 올라감
-      const existing = FEED_PLACES[activeFeedCategory].find(p => p.serverId === data.place.id);
-      if(existing){
-        existing.reviewCount += 1;
-        existing.latestReview = data.post;
-        if(typeof data.post.rating === 'number'){
-          const prevTotal = (existing.avgRating || 0) * (existing.reviewCount - 1);
-          existing.avgRating = Math.round(((prevTotal + data.post.rating) / existing.reviewCount) * 10) / 10;
-        }
-      }
-    }
-    sortFeedPlaces(activeFeedCategory);
+    FEED_POSTS[activeFeedCategory].unshift(data.post);
+    sortFeedPosts(activeFeedCategory);
     renderFeedPosts();
     closeFeedCreate();
-    if(feedFormMode === 'addReview' && activeFeedPlaceId){
-      openFeedPlaceDetail(FEED_PLACES[activeFeedCategory].find(p => p.serverId === activeFeedPlaceId));
-    }
-    showToast(data.placeCreated ? '새 장소를 추천했어요!' : '리뷰를 남겼어요!');
+    showToast('게시물을 올렸어요!');
   } catch(err){
     showToast(err.message);
   }
@@ -12942,21 +12742,19 @@ function extractLocationKeywords(text){
 }
 // 핫플 카드 하나를 만드는 공용 함수 (밥집/카페/액티비티 목록과 ⭐저장 목록에서 함께 사용).
 // place는 이제 "장소" 객체(name/location/lat/lon/reviewCount/latestReview)를 받음.
-function buildFeedPostCard(place, category, isNearby){
-  const saved = isPlaceSaved(category, place);
-  const latestNote = place.latestReview ? place.latestReview.note : '';
-  const latestAuthor = place.latestReview && place.latestReview.author ? place.latestReview.author.name : '';
+function buildFeedPostCard(post, category, isNearby){
+  const saved = isPlaceSaved(category, post);
   // 아래 액션 함수들(제안하기/장소픽스)은 예전 "게시물" 모양을 기대하므로, 호환되는 임시 객체로 감싸서 넘겨줌
-  const compat = { place: place.name, note: latestNote, location: place.location, lat: place.lat, lon: place.lon };
+  const compat = { place: post.title, note: post.note, location: post.location, lat: post.lat, lon: post.lon };
   const card = document.createElement('div');
-  card.className = 'feed-post-card' + (place.isSponsored ? ' sponsored' : '');
+  card.className = 'feed-post-card';
   card.innerHTML = `
     <div class="feed-post-top">
-      <span class="feed-post-place">${place.isSponsored ? '<span class="feed-sponsored-badge">★ 광고</span>' : ''}${escapeHtml(place.name)}${isNearby ? ' <span style="color:var(--accent);font-size:10.5px;font-weight:700;">· 근처</span>' : ''}</span>
-      <span class="feed-post-location">${ICO.pin} ${escapeHtml(place.location || '')}</span>
+      <span class="feed-post-place">${escapeHtml(post.title)}${isNearby ? ' <span style="color:var(--accent);font-size:10.5px;font-weight:700;">· 근처</span>' : ''}</span>
+      <span class="feed-post-location">${ICO.pin} ${escapeHtml(post.location || '')}</span>
     </div>
-    ${latestNote ? `<div class="feed-post-note">${escapeHtml(latestNote)}</div>` : ''}
-    <div class="feed-post-author">${latestAuthor ? `${escapeHtml(latestAuthor)} 님의 리뷰 · ` : ''}리뷰 ${place.reviewCount || 0}개</div>
+    ${post.note ? `<div class="feed-post-note">${escapeHtml(post.note)}</div>` : ''}
+    <div class="feed-post-author">${post.author ? `${escapeHtml(post.author.name)} 님의 추천` : ''}</div>
     <div class="feed-post-actions">
       <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
       <button type="button" class="feed-post-btn suggest">여기 어때요?</button>
@@ -12966,7 +12764,7 @@ function buildFeedPostCard(place, category, isNearby){
   card.querySelector('.feed-post-btn.suggest').addEventListener('click', () => suggestHotplaceToChat(compat));
   card.querySelector('.feed-post-btn.fix').addEventListener('click', () => fixHotplaceLocation(compat));
   card.querySelector('.feed-post-btn.star').addEventListener('click', () => {
-    toggleSavedPlace(category, place);
+    toggleSavedPlace(category, post);
     renderHotplaceList('food', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
     renderHotplaceList('cafe', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
     renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
@@ -12987,9 +12785,9 @@ function distanceKm(lat1, lon1, lat2, lon2){
 function renderHotplaceList(category, locationHint, hintLat, hintLon){
   const container = document.getElementById('hotplaceList-' + category);
   if(!container) return;
-  const places = FEED_PLACES[category] || [];
+  const posts = FEED_POSTS[category] || [];
 
-  if(places.length === 0){
+  if(posts.length === 0){
     container.innerHTML = `<div class="search-empty">아직 커뮤니티에 등록된 추천이 없어요.</div>`;
     return;
   }
@@ -12997,26 +12795,23 @@ function renderHotplaceList(category, locationHint, hintLat, hintLon){
   const hasCoords = typeof hintLat === 'number' && typeof hintLon === 'number' && !isNaN(hintLat) && !isNaN(hintLon);
   const keywords = extractLocationKeywords(locationHint);
 
-  const scored = places.map(place => {
-    if(hasCoords && typeof place.lat === 'number' && typeof place.lon === 'number'){
+  const scored = posts.map(post => {
+    if(hasCoords && typeof post.lat === 'number' && typeof post.lon === 'number'){
       // 실제 좌표가 둘 다 있으면 거리로 정확히 판정 (5km 이내를 "근처"로 봄)
-      const km = distanceKm(hintLat, hintLon, place.lat, place.lon);
-      return { place, isNearby: km <= 5, dist: km };
+      const km = distanceKm(hintLat, hintLon, post.lat, post.lon);
+      return { post, isNearby: km <= 5, dist: km };
     }
     // 좌표가 없으면(직접 입력한 주소 등) 이름이 겹치는지로 대략 판정
-    const haystack = `${place.location} ${place.name}`;
+    const haystack = `${post.location} ${post.title}`;
     const isNearby = keywords.some(k => haystack.includes(k));
-    return { place, isNearby, dist: isNearby ? 0 : Infinity };
+    return { post, isNearby, dist: isNearby ? 0 : Infinity };
   });
-  // 광고(스폰서) 노출 중인 장소를 항상 맨 위로, 그 다음 가까운(또는 이름이 겹치는) 순으로
-  scored.sort((a, b) => {
-    if(a.place.isSponsored !== b.place.isSponsored) return a.place.isSponsored ? -1 : 1;
-    return a.dist - b.dist;
-  });
+  // 가까운(또는 이름이 겹치는) 추천을 먼저 보여주고, 나머지는 그 아래로
+  scored.sort((a, b) => a.dist - b.dist);
 
   container.innerHTML = '';
-  scored.forEach(({ place, isNearby }) => {
-    container.appendChild(buildFeedPostCard(place, category, isNearby));
+  scored.forEach(({ post, isNearby }) => {
+    container.appendChild(buildFeedPostCard(post, category, isNearby));
   });
 }
 
