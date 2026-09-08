@@ -1470,11 +1470,38 @@
     display:flex;
     gap:8px;
     margin-bottom:12px;
+    align-items:center;
   }
   .feed-search-sort-row #feedSearchInput,
   .feed-search-sort-row #meetupSearchInput{
     flex:1;
     margin-bottom:0;
+  }
+  .meetup-sort-toggle{
+    flex:none;
+    display:flex;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:2px;
+  }
+  .meetup-sort-btn{
+    flex:none;
+    border:none;
+    background:transparent;
+    color:var(--text-dim);
+    font-family:'Inter',sans-serif;
+    font-size:11.5px;
+    font-weight:600;
+    padding:6px 11px;
+    border-radius:999px;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:all .15s ease;
+  }
+  .meetup-sort-btn.active{
+    background:var(--accent);
+    color:#fff;
   }
   .feed-sort-select{
     width:auto;
@@ -2037,6 +2064,13 @@
     margin:0 -18px;
     padding:8px 18px calc(16px + env(safe-area-inset-bottom));
     border-top:1px solid var(--line);
+  }
+  .chat-date-divider{
+    text-align:center;
+    color:var(--text-dim);
+    font-size:11.5px;
+    font-weight:500;
+    margin:14px 0 10px;
   }
   .msg-row{
     display:flex;
@@ -5131,10 +5165,10 @@
         </div>
         <div class="feed-search-sort-row">
           <input type="text" class="search-input" id="meetupSearchInput" placeholder="모임 이름으로 검색" />
-          <select class="search-input feed-sort-select" id="meetupSortSelect">
-            <option value="recent">최신순</option>
-            <option value="popular">추천순</option>
-          </select>
+          <div class="meetup-sort-toggle" id="meetupSortToggle">
+            <button type="button" class="meetup-sort-btn active" data-sort="recent">최신순</button>
+            <button type="button" class="meetup-sort-btn" data-sort="popular">추천순</button>
+          </div>
         </div>
         <div id="meetupListContainer"></div>
       </div>
@@ -7933,9 +7967,12 @@ document.querySelectorAll('#meetupChipRow .meetup-chip').forEach(chip => {
     renderMeetups();
   });
 });
-document.getElementById('meetupSortSelect').addEventListener('change', (e) => {
-  meetupSortMode = e.target.value;
-  renderMeetups();
+document.querySelectorAll('#meetupSortToggle .meetup-sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#meetupSortToggle .meetup-sort-btn').forEach(b => b.classList.toggle('active', b === btn));
+    meetupSortMode = btn.dataset.sort;
+    renderMeetups();
+  });
 });
 document.getElementById('meetupCreateBackBtn').addEventListener('click', () => goBackOrClose(closeMeetupCreate));
 
@@ -14106,6 +14143,16 @@ function formatMessageTime(time){
   if(h === 0) h = 12;
   return `${ampm} ${h}:${String(m).padStart(2,'0')}`;
 }
+// 날짜가 바뀔 때 채팅 중간에 뜨는 구분선 문구 (예: "8월 18일 오후 9:20")
+function formatChatDateDividerLabel(time){
+  const d = (time instanceof Date) ? time : new Date(time);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${formatMessageTime(d)}`;
+}
+// 같은 날인지 비교용 키 (연-월-일)
+function chatDateKey(time){
+  const d = (time instanceof Date) ? time : new Date(time);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
 // 그룹 채팅에서 "다른 사람"이 보낸 메시지의 발신자 이름을 알아냄 (1:1이거나 내가 보낸 거면 null)
 function getGroupSenderName(room, m){
   if(!room || !room.isGroup || m.who !== 'other') return null;
@@ -14131,6 +14178,7 @@ function renderChatMessages(){
   const box = document.getElementById('chatMessages');
   box.innerHTML = '';
   const q = chatSearchQuery.trim().toLowerCase();
+  let lastDateKey = null;
 
   room.messages.forEach(m => {
     if(q){
@@ -14143,6 +14191,17 @@ function renderChatMessages(){
             : (m.text || '')
       ).toLowerCase();
       if(!haystack.includes(q)) return;
+    }
+
+    // 이전 메시지랑 날짜(일자)가 다르면, 그 사이에 날짜 구분선을 넣어줌
+    const msgTime = m.time || Date.now();
+    const dateKey = chatDateKey(msgTime);
+    if(dateKey !== lastDateKey){
+      const divider = document.createElement('div');
+      divider.className = 'chat-date-divider';
+      divider.textContent = formatChatDateDividerLabel(msgTime);
+      box.appendChild(divider);
+      lastDateKey = dateKey;
     }
 
     const row = document.createElement('div');
