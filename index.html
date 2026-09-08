@@ -1031,13 +1031,15 @@
     border-radius:50%;
     border:1px solid var(--line);
     background:var(--surface-2);
+    color:var(--text);
     font-size:15px;
     display:flex;
     align-items:center;
     justify-content:center;
     cursor:pointer;
   }
-  .feed-detail-mini-btn.active{ border-color:#F5A623; }
+  .feed-detail-mini-btn svg{ width:16px; height:16px; }
+  .feed-detail-mini-btn.active{ border-color:#F5A623; color:#F5A623; }
   .feed-detail-rating{
     display:flex;
     align-items:center;
@@ -6256,6 +6258,7 @@ const ICO = {
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M12 5c-2-1.5-5-2-8-1v14c3-1 6-.5 8 1c2-1.5 5-2 8-1V4c-3-1-6-.5-8 1z"/><path d="M12 5v14"/></svg>',
   image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><rect x="3" y="3" width="18" height="14" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 13l-5-5-9 9"/></svg>',
   heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M20.8 8.6c0 4-4.4 7-8.8 10.4C7.6 15.6 3.2 12.6 3.2 8.6a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8z"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>',
   briefcase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M2 13h20"/></svg>',
   users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.5-1.5"/></svg>',
@@ -7712,8 +7715,8 @@ function feedPostDetailHtml(post){
       <div class="feed-detail-note">${escapeHtml(post.note || '')}</div>
 
       <div class="feed-detail-mini-actions">
-        <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="저장">${saved ? '🔖' : '📑'}</button>
-        <button type="button" class="feed-detail-mini-btn feed-share-btn" title="메시지 전송">✉️</button>
+        <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
+        <button type="button" class="feed-detail-mini-btn feed-share-btn" title="메시지 전송">${ICO.send}</button>
       </div>
 
       <div class="feed-detail-owner-row">
@@ -7775,7 +7778,7 @@ function wireFeedPostDetail(container, post){
     toggleSavedPlace(activeFeedCategory, post);
     const nowSaved = isPlaceSaved(activeFeedCategory, post);
     saveBtn.classList.toggle('active', nowSaved);
-    saveBtn.textContent = nowSaved ? '🔖' : '📑';
+    saveBtn.innerHTML = nowSaved ? ICO.starFilled : ICO.starOutline;
     showToast(nowSaved ? '저장했어요.' : '저장을 취소했어요.');
   });
 
