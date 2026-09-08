@@ -5111,8 +5111,6 @@
       <div class="feed-list-view" id="feedPlaceDetailView">
         <button class="profile-back" id="feedPlaceDetailBackBtn">&#8249; 뒤로</button>
         <div id="feedPlaceDetailHeader"></div>
-        <button class="profile-chat-btn" id="feedAddReviewBtn" style="margin:10px 0 14px;">이 장소에 리뷰 남기기</button>
-        <div id="feedPlaceReviewContainer"></div>
       </div>
 
       <div class="feed-create-view" id="feedCreateView">
@@ -7373,13 +7371,12 @@ function renderFeedPosts(){
 renderFeedPosts();
 
 // 게시물 하나를 카드로 그림 - 제목(상호명) - 위치(지도 연동) - 별점 - 한줄소개 - 사진 - 작성자/좋아요/댓글 순
-function renderFeedPostCard(post, container){
+// 게시물 카드 하나의 HTML을 만듦 (목록/상세보기 화면 공용)
+function feedPostCardHtml(post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const photos = post.photos || [];
   const mapUrl = feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon);
-  const card = document.createElement('div');
-  card.className = 'feed-post-card feed-post-hero feed-review-card';
-  card.innerHTML = `
+  return `
     <div class="feed-post-title-row">
       <span class="feed-post-place">${escapeHtml(post.title || '')}</span>
     </div>
@@ -7416,9 +7413,40 @@ function renderFeedPostCard(post, container){
       </div>
     </div>
   `;
+}
+
+function renderFeedPostCard(post, container){
+  const card = document.createElement('div');
+  card.className = 'feed-post-card feed-post-hero feed-review-card';
+  card.style.cursor = 'pointer';
+  card.innerHTML = feedPostCardHtml(post);
   container.appendChild(card);
   wireFeedPostCard(card, post);
+  // 좋아요/댓글/수정/삭제/신고 버튼이 아닌, 카드의 나머지 부분을 누르면 상세보기로 들어감
+  card.addEventListener('click', (e) => {
+    if(e.target.closest('button, a, input')) return;
+    openFeedPostDetail(post);
+  });
 }
+
+// 게시물 하나를 상세화면(뒤로가기 있는 화면)으로 열어서 크게 봄
+function openFeedPostDetail(post){
+  const header = document.getElementById('feedPlaceDetailHeader');
+  header.innerHTML = '';
+  const card = document.createElement('div');
+  card.className = 'feed-post-card feed-post-hero feed-review-card';
+  card.innerHTML = feedPostCardHtml(post);
+  header.appendChild(card);
+  wireFeedPostCard(card, post);
+  document.getElementById('feedListView').classList.remove('active');
+  document.getElementById('feedPlaceDetailView').classList.add('active');
+  pushViewState(closeFeedPostDetail);
+}
+function closeFeedPostDetail(){
+  document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('feedListView').classList.add('active');
+}
+document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPostDetail));
 
 // 게시물 삭제 공통 처리
 async function deleteFeedPostItem(post){
