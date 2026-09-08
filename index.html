@@ -2529,6 +2529,49 @@
     cursor:pointer;
     transition:background .15s ease, color .15s ease;
   }
+  .meetup-chip-row{
+    display:flex;
+    gap:7px;
+    overflow-x:auto;
+    padding-bottom:4px;
+    margin-bottom:12px;
+    -ms-overflow-style:none;
+    scrollbar-width:none;
+  }
+  .meetup-chip-row::-webkit-scrollbar{ display:none; }
+  .meetup-chip{
+    flex:none;
+    padding:7px 13px;
+    border-radius:999px;
+    border:1.5px solid var(--line);
+    background:transparent;
+    color:var(--text-dim);
+    font-size:12.5px;
+    font-weight:600;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    white-space:nowrap;
+    transition:all .15s ease;
+  }
+  .meetup-chip.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+  }
+  .meetup-chip-mine{
+    border-style:dashed;
+  }
+  .meetup-chip-mine.active{ border-style:solid; }
+  .meetup-chip-mine .meetup-my-count{
+    display:inline-block;
+    margin-left:4px;
+    padding:1px 6px;
+    border-radius:8px;
+    background:rgba(255,255,255,0.25);
+    font-size:10px;
+    font-weight:700;
+  }
+  .meetup-chip.active .meetup-my-count{ background:rgba(255,255,255,0.3); }
   .segment-btn.active{
     background:var(--surface);
     color:var(--accent);
@@ -5075,12 +5118,22 @@
           <div class="meetup-section-title" style="margin-bottom:0;">근처 모임</div>
           <button class="add-friend-btn" id="createMeetupBtn" title="모임 만들기">+</button>
         </div>
+        <div class="meetup-chip-row" id="meetupChipRow">
+          <button class="meetup-chip active" data-cat="all">전체</button>
+          <button class="meetup-chip" data-cat="exercise">운동</button>
+          <button class="meetup-chip" data-cat="hobby">취미</button>
+          <button class="meetup-chip" data-cat="selfdev">자기계발</button>
+          <button class="meetup-chip" data-cat="culture">문화/예술</button>
+          <button class="meetup-chip" data-cat="volunteer">봉사</button>
+          <button class="meetup-chip" data-cat="business">비즈니스/네트워킹</button>
+          <button class="meetup-chip" data-cat="social">친목</button>
+          <button class="meetup-chip meetup-chip-mine" data-cat="mine">my모임<span class="meetup-my-count" id="meetupMyCountBadge" style="display:none;"></span></button>
+        </div>
         <div class="feed-search-sort-row">
           <input type="text" class="search-input" id="meetupSearchInput" placeholder="모임 이름으로 검색" />
           <select class="search-input feed-sort-select" id="meetupSortSelect">
             <option value="recent">최신순</option>
-            <option value="deadline">마감임박순</option>
-            <option value="distance">거리순</option>
+            <option value="popular">추천순</option>
           </select>
         </div>
         <div id="meetupListContainer"></div>
@@ -6692,7 +6745,8 @@ const MEETUPS = [];
 let activeMeetupId = null;
 
 let meetupSearchQuery = '';
-let meetupSortMode = 'recent'; // 'recent' | 'deadline' | 'distance'
+let activeMeetupCategory = 'all'; // 'all' | 'exercise' | 'hobby' | ... | 'mine'(내가 참여중인 모임만)
+let meetupSortMode = 'recent'; // 'recent' | 'popular'(추천순 - 참여인원 많은 순)
 
 function renderMeetups(){
   const container = document.getElementById('meetupListContainer');
@@ -6706,56 +6760,47 @@ function renderMeetups(){
     );
   }
 
+  // "내가 참여중"인 모임(방장이거나, 참여 완료했거나, 신청해두고 답 기다리는 중) 개수를 my모임 칩에 배지로 표시
+  const mineAll = list.filter(m => m.reserved || m.isCreator || m.myRequestStatus === 'PENDING');
+  const myCountBadge = document.getElementById('meetupMyCountBadge');
+  if(mineAll.length > 0){
+    myCountBadge.textContent = mineAll.length;
+    myCountBadge.style.display = 'inline-block';
+  } else {
+    myCountBadge.style.display = 'none';
+  }
+
+  if(activeMeetupCategory === 'mine'){
+    list = mineAll;
+  } else {
+    // my모임이 아닌 카테고리를 볼 때는, 내가 이미 참여중인 모임은 안 섞이게 빼고 보여줌 (my모임 탭에서만 보임)
+    list = list.filter(m => !mineAll.includes(m));
+    if(activeMeetupCategory !== 'all') list = list.filter(m => m.categoryKey === activeMeetupCategory);
+  }
+
   const q = meetupSearchQuery.trim().toLowerCase();
   if(q) list = list.filter(m => m.title.toLowerCase().includes(q));
 
   list = list.slice().sort((a, b) => {
-    if(meetupSortMode === 'deadline'){
-      if(!a.eventDate) return 1;
-      if(!b.eventDate) return -1;
-      return new Date(a.eventDate) - new Date(b.eventDate);
-    }
-    if(meetupSortMode === 'distance' && communityRefLocation){
-      const da = distanceKmClient(communityRefLocation.lat, communityRefLocation.lon, a.lat, a.lon);
-      const db = distanceKmClient(communityRefLocation.lat, communityRefLocation.lon, b.lat, b.lon);
-      return da - db;
-    }
+    if(meetupSortMode === 'popular') return b.participants.length - a.participants.length;
     return 0; // 최신순은 이미 MEETUPS 배열 자체가 최신순으로 관리되고 있어서 그대로 둠
   });
 
   if(list.length === 0){
     container.innerHTML = q
       ? `<div class="search-empty">"${meetupSearchQuery}"에 대한 검색 결과가 없어요.</div>`
+      : activeMeetupCategory === 'mine'
+      ? `<div class="search-empty">아직 참여중인 모임이 없어요.</div>`
       : communityRefLocation
       ? `<div class="search-empty">이 근처 ${COMMUNITY_RADIUS_KM}km 안에는 모임이 없어요.</div>`
       : `<div class="search-empty">아직 등록된 모임이 없어요.</div>`;
     return;
   }
 
-  // 내가 참여중이거나(방장 포함), 신청해두고 답을 기다리는 모임은 맨 위에 따로 묶어서 보여줌.
-  // 그래야 "나랑 관련 있는 모임"이랑 "그냥 둘러보는 모임"이 한눈에 구분됨.
-  const mine = list.filter(m => m.reserved || m.isCreator || m.myRequestStatus === 'PENDING');
-  const others = list.filter(m => !mine.includes(m));
-
-  if(mine.length > 0){
-    const mineTitle = document.createElement('div');
-    mineTitle.className = 'meetup-section-title';
-    mineTitle.textContent = `내가 참여중인 모임 (${mine.length})`;
-    container.appendChild(mineTitle);
-    mine.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
-
-    if(others.length > 0){
-      const othersTitle = document.createElement('div');
-      othersTitle.className = 'meetup-section-title';
-      othersTitle.style.marginTop = '18px';
-      othersTitle.textContent = '둘러보기';
-      container.appendChild(othersTitle);
-    }
-  }
-  others.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
+  list.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
 }
 
-// 모임 카드 하나를 만듦 (참여중 섹션/둘러보기 섹션 공용)
+// 모임 카드 하나를 만듦 (둘러보기/내 모임 탭 공용)
 function buildMeetupCard(meetup){
     const isFull = meetup.participants.length >= meetup.max && !meetup.reserved;
     const card = document.createElement('div');
@@ -7880,6 +7925,13 @@ document.getElementById('createMeetupBtn').addEventListener('click', openMeetupC
 document.getElementById('meetupSearchInput').addEventListener('input', (e) => {
   meetupSearchQuery = e.target.value;
   renderMeetups();
+});
+document.querySelectorAll('#meetupChipRow .meetup-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#meetupChipRow .meetup-chip').forEach(c => c.classList.toggle('active', c === chip));
+    activeMeetupCategory = chip.dataset.cat;
+    renderMeetups();
+  });
 });
 document.getElementById('meetupSortSelect').addEventListener('change', (e) => {
   meetupSortMode = e.target.value;
