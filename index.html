@@ -970,12 +970,74 @@
     scroll-snap-align:start;
   }
   .feed-detail-photos{ scroll-snap-type:x mandatory; }
+  .feed-detail-title-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:6px;
+  }
   .feed-detail-title{
     font-size:20px;
     font-weight:800;
     color:var(--text);
+  }
+  .feed-detail-kebab-wrap{ position:relative; flex-shrink:0; }
+  .feed-detail-kebab-btn{
+    border:none;
+    background:none;
+    color:var(--text-dim);
+    font-size:19px;
+    line-height:1;
+    padding:2px 6px;
+    cursor:pointer;
+  }
+  .feed-detail-kebab-menu{
+    display:none;
+    position:absolute;
+    top:26px;
+    right:0;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.18);
+    overflow:hidden;
+    z-index:5;
+    min-width:88px;
+  }
+  .feed-detail-kebab-menu.open{ display:block; }
+  .feed-detail-kebab-item{
+    display:block;
+    width:100%;
+    padding:10px 14px;
+    border:none;
+    background:none;
+    text-align:left;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .feed-detail-kebab-item:hover{ background:var(--surface-2); }
+  .feed-detail-mini-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap:6px;
     margin-bottom:6px;
   }
+  .feed-detail-mini-btn{
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--surface-2);
+    font-size:15px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+  }
+  .feed-detail-mini-btn.active{ border-color:#F5A623; }
   .feed-detail-rating{
     display:flex;
     align-items:center;
@@ -986,6 +1048,8 @@
     margin-bottom:8px;
   }
   .feed-detail-rating span{ color:var(--text-dim); font-weight:600; font-size:12.5px; }
+  .feed-detail-rating-num{ color:var(--text); font-size:15px; font-weight:800; }
+  .feed-rating-count{ color:var(--text-dim); font-weight:600; font-size:11.5px; }
   .feed-detail-location{
     display:block;
     color:var(--text-dim);
@@ -7548,7 +7612,7 @@ function feedPostCardHtml(post){
       <span class="feed-post-place">${escapeHtml(post.title || '')}</span>
     </div>
     ${post.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(post.location)}</a>` : ''}
-    ${typeof post.rating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(post.rating)}</div>` : ''}
+    ${typeof post.avgRating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(post.avgRating)} <span class="feed-rating-count">${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</span></div>` : ''}
     <div class="feed-post-note">${escapeHtml(post.note || '')}</div>
     ${photos.length > 0 ? `<div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
     <div class="feed-post-bottom-row">
@@ -7563,13 +7627,9 @@ function feedPostCardHtml(post){
       `}
     </div>
     <div class="feed-review-social-row">
-      <button type="button" class="feed-social-btn feed-like-btn${post.likedByMe ? ' liked' : ''}">
-        <svg viewBox="0 0 24 24" fill="${post.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-        <span class="feed-like-count">${post.likeCount || 0}</span>
-      </button>
       <button type="button" class="feed-social-btn feed-comment-toggle-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-        <span class="feed-comment-count">댓글 ${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span>
+        <span class="feed-comment-count">리뷰 ${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span>
       </button>
     </div>
     <div class="feed-comment-section" style="display:none;">
@@ -7601,6 +7661,25 @@ function renderFeedPostCard(post, container){
 }
 
 // 게시물 하나를 상세화면(뒤로가기 있는 화면)으로 열어서 크게 봄
+// 상세보기 화면에서 리뷰가 추가/삭제된 뒤, 위쪽의 평균 별점 표시를 다시 그림
+function updateFeedDetailRatingDisplay(container, post){
+  const body = container.querySelector('.feed-detail-body');
+  let ratingEl = container.querySelector('.feed-detail-rating');
+  if(typeof post.avgRating !== 'number'){
+    if(ratingEl) ratingEl.remove();
+    return;
+  }
+  const html = `<span class="feed-detail-rating-num">${post.avgRating.toFixed(1)}</span> ${renderStarsHtml(post.avgRating)} ${post.ratingCount > 1 ? `<span>(${post.ratingCount})</span>` : ''}`;
+  if(ratingEl){
+    ratingEl.innerHTML = html;
+  } else {
+    ratingEl = document.createElement('div');
+    ratingEl.className = 'feed-detail-rating';
+    ratingEl.innerHTML = html;
+    container.querySelector('.feed-detail-title-row').insertAdjacentElement('afterend', ratingEl);
+  }
+}
+
 // 게시물 상세보기 화면 HTML (사진 -> 제목 -> 별점 -> 위치 -> 한줄소개 -> 저장/공유 -> 리뷰 순서)
 function feedPostDetailHtml(post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
@@ -7614,32 +7693,31 @@ function feedPostDetailHtml(post){
       </div>
     ` : ''}
     <div class="feed-detail-body">
-      <div class="feed-detail-title">${escapeHtml(post.title || '')}</div>
-      ${typeof post.rating === 'number' ? `<div class="feed-detail-rating">${renderStarsHtml(post.rating)} <span>${post.rating.toFixed ? post.rating.toFixed(1) : post.rating}</span></div>` : ''}
+      <div class="feed-detail-title-row">
+        <div class="feed-detail-title">${escapeHtml(post.title || '')}</div>
+        <div class="feed-detail-kebab-wrap">
+          <button type="button" class="feed-detail-kebab-btn">⋮</button>
+          <div class="feed-detail-kebab-menu">
+            ${isMine ? `
+              <button type="button" class="feed-detail-kebab-item feed-review-edit-btn">수정</button>
+              <button type="button" class="feed-detail-kebab-item feed-review-delete-btn">삭제</button>
+            ` : `
+              <button type="button" class="feed-detail-kebab-item feed-review-report-btn">신고</button>
+            `}
+          </div>
+        </div>
+      </div>
+      ${typeof post.avgRating === 'number' ? `<div class="feed-detail-rating"><span class="feed-detail-rating-num">${post.avgRating.toFixed(1)}</span> ${renderStarsHtml(post.avgRating)} ${post.ratingCount > 1 ? `<span>(${post.ratingCount})</span>` : ''}</div>` : ''}
       ${post.location ? `<a class="feed-detail-location" href="${mapUrl}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(post.location)}</a>` : ''}
       <div class="feed-detail-note">${escapeHtml(post.note || '')}</div>
 
-      <div class="feed-detail-actions">
-        <button type="button" class="feed-detail-action-btn feed-save-btn${saved ? ' active' : ''}">${saved ? ICO.starFilled : ICO.starOutline} 저장</button>
-        <button type="button" class="feed-detail-action-btn feed-share-btn">${ICO.heart} 메시지 전송</button>
+      <div class="feed-detail-mini-actions">
+        <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="저장">${saved ? '🔖' : '📑'}</button>
+        <button type="button" class="feed-detail-mini-btn feed-share-btn" title="메시지 전송">✉️</button>
       </div>
 
       <div class="feed-detail-owner-row">
         <div class="feed-post-author">${escapeHtml(post.author ? post.author.name : '')}</div>
-        <div style="display:flex;align-items:center;gap:10px;">
-          <button type="button" class="feed-social-btn feed-like-btn${post.likedByMe ? ' liked' : ''}">
-            <svg viewBox="0 0 24 24" fill="${post.likedByMe ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-            <span class="feed-like-count">${post.likeCount || 0}</span>
-          </button>
-          ${isMine ? `
-            <div class="feed-post-owner-actions">
-              <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
-              <button type="button" class="feed-post-btn feed-review-delete-btn">삭제</button>
-            </div>
-          ` : `
-            <button type="button" class="feed-post-btn feed-review-report-btn">신고</button>
-          `}
-        </div>
       </div>
 
       <div class="feed-detail-review-section">
@@ -7658,14 +7736,15 @@ function feedPostDetailHtml(post){
   `;
 }
 
-// 상세보기 화면의 좋아요/리뷰(댓글)/수정/삭제/신고/저장/공유 동작을 전부 연결함
+// 상세보기 화면의 리뷰(댓글)/수정/삭제/신고/저장/공유 동작을 전부 연결함
 function wireFeedPostDetail(container, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   if(isMine){
     const editBtn = container.querySelector('.feed-review-edit-btn');
-    if(editBtn) editBtn.addEventListener('click', () => openFeedReviewEdit(post));
+    if(editBtn) editBtn.addEventListener('click', () => { container.querySelector('.feed-detail-kebab-menu').classList.remove('open'); openFeedReviewEdit(post); });
     const deleteBtn = container.querySelector('.feed-review-delete-btn');
     if(deleteBtn) deleteBtn.addEventListener('click', async () => {
+      container.querySelector('.feed-detail-kebab-menu').classList.remove('open');
       try {
         await deleteFeedPostItem(post);
         closeFeedPostDetail();
@@ -7675,8 +7754,20 @@ function wireFeedPostDetail(container, post){
     });
   } else {
     const reportBtn = container.querySelector('.feed-review-report-btn');
-    if(reportBtn) reportBtn.addEventListener('click', () => openReportModal('FEED_POST', post.id));
+    if(reportBtn) reportBtn.addEventListener('click', () => { container.querySelector('.feed-detail-kebab-menu').classList.remove('open'); openReportModal('FEED_POST', post.id); });
   }
+
+  // 오른쪽 위 점 3개(⋮) 메뉴 - 누르면 수정/삭제(또는 신고) 목록이 펼쳐짐
+  const kebabBtn = container.querySelector('.feed-detail-kebab-btn');
+  const kebabMenu = container.querySelector('.feed-detail-kebab-menu');
+  kebabBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    kebabMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', () => {
+    if(!document.body.contains(kebabMenu)) return; // 이미 다른 게시물 상세보기로 교체돼서 사라진 메뉴면 무시
+    kebabMenu.classList.remove('open');
+  });
 
   // 저장(나중에 가볼 곳) 토글
   const saveBtn = container.querySelector('.feed-save-btn');
@@ -7684,31 +7775,13 @@ function wireFeedPostDetail(container, post){
     toggleSavedPlace(activeFeedCategory, post);
     const nowSaved = isPlaceSaved(activeFeedCategory, post);
     saveBtn.classList.toggle('active', nowSaved);
-    saveBtn.innerHTML = (nowSaved ? ICO.starFilled : ICO.starOutline) + ' 저장';
+    saveBtn.textContent = nowSaved ? '🔖' : '📑';
     showToast(nowSaved ? '저장했어요.' : '저장을 취소했어요.');
   });
 
   // 친구한테 메시지로 전송
   const shareBtn = container.querySelector('.feed-share-btn');
   shareBtn.addEventListener('click', () => openFeedShareFriendPicker(post));
-
-  // 좋아요 토글
-  const likeBtn = container.querySelector('.feed-like-btn');
-  likeBtn.addEventListener('click', async () => {
-    likeBtn.disabled = true;
-    try {
-      const data = await apiRequest(`/feed/${post.id}/like`, { method: 'POST' });
-      post.likedByMe = data.liked;
-      post.likeCount = data.likeCount;
-      likeBtn.classList.toggle('liked', data.liked);
-      likeBtn.querySelector('svg').setAttribute('fill', data.liked ? 'currentColor' : 'none');
-      likeBtn.querySelector('.feed-like-count').textContent = data.likeCount;
-    } catch(err){
-      showToast(err.message);
-    } finally {
-      likeBtn.disabled = false;
-    }
-  });
 
   // 리뷰(댓글) 목록은 상세보기에서는 항상 펼쳐진 채로 바로 불러옴
   const commentList = container.querySelector('.feed-comment-list');
@@ -7718,7 +7791,7 @@ function wireFeedPostDetail(container, post){
       return;
     }
     commentList.innerHTML = comments.map(c => `
-      <div class="feed-comment-row" data-comment-id="${c.id}">
+      <div class="feed-comment-row" data-comment-id="${c.id}" data-rating="${typeof c.rating === 'number' ? c.rating : ''}">
         <b>${escapeHtml(c.author ? c.author.name : '')}</b>
         <span style="flex:1;">${typeof c.rating === 'number' ? `<span class="feed-comment-rating-badge">${renderStarsHtml(c.rating)}</span>` : ''}${escapeHtml(c.text)}</span>
         ${currentUser && c.author && c.author.id === currentUser.id ? '<button type="button" class="feed-comment-delete-btn" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:0;">삭제</button>' : ''}
@@ -7728,6 +7801,7 @@ function wireFeedPostDetail(container, post){
       btn.addEventListener('click', async () => {
         const row = btn.closest('.feed-comment-row');
         const commentId = row.dataset.commentId;
+        const deletedRating = row.dataset.rating ? parseInt(row.dataset.rating, 10) : null;
         try {
           await apiRequest(`/feed/comments/${commentId}`, { method: 'DELETE' });
           row.remove();
@@ -7735,6 +7809,12 @@ function wireFeedPostDetail(container, post){
           const n = Math.max(0, parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) - 1);
           countEl.textContent = `${n}개`;
           post.commentCount = n;
+          if(deletedRating){
+            const total = (post.avgRating || 0) * post.ratingCount - deletedRating;
+            post.ratingCount = Math.max(0, post.ratingCount - 1);
+            post.avgRating = post.ratingCount > 0 ? Math.round((total / post.ratingCount) * 10) / 10 : null;
+            updateFeedDetailRatingDisplay(container, post);
+          }
           if(!commentList.querySelector('.feed-comment-row')){
             commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요!</div>`;
           }
@@ -7768,8 +7848,9 @@ function wireFeedPostDetail(container, post){
   const submitComment = async () => {
     const text = commentInput.value.trim();
     if(!text) return;
+    const ratingToSubmit = commentSelectedRating; // 아래에서 폼을 리셋하기 전에 미리 값을 챙겨둠
     try {
-      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text, rating: commentSelectedRating || null }) });
+      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text, rating: ratingToSubmit || null }) });
       commentInput.value = '';
       commentSelectedRating = 0;
       commentStars.forEach(s => s.classList.remove('on'));
@@ -7777,6 +7858,12 @@ function wireFeedPostDetail(container, post){
       const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
       countEl.textContent = `${n}개`;
       post.commentCount = n;
+      if(ratingToSubmit > 0){
+        const total = (post.avgRating || 0) * post.ratingCount + ratingToSubmit;
+        post.ratingCount += 1;
+        post.avgRating = Math.round((total / post.ratingCount) * 10) / 10;
+        updateFeedDetailRatingDisplay(container, post);
+      }
       await loadAndRenderComments();
     } catch(err){
       showToast(err.message);
@@ -7869,22 +7956,6 @@ function wireFeedPostCard(card, post){
   }
 
   // 좋아요 토글
-  const likeBtn = card.querySelector('.feed-like-btn');
-  likeBtn.addEventListener('click', async () => {
-    likeBtn.disabled = true;
-    try {
-      const data = await apiRequest(`/feed/${post.id}/like`, { method: 'POST' });
-      post.likedByMe = data.liked;
-      post.likeCount = data.likeCount;
-      likeBtn.classList.toggle('liked', data.liked);
-      likeBtn.querySelector('svg').setAttribute('fill', data.liked ? 'currentColor' : 'none');
-      likeBtn.querySelector('.feed-like-count').textContent = data.likeCount;
-    } catch(err){
-      showToast(err.message);
-    } finally {
-      likeBtn.disabled = false;
-    }
-  });
 
   // 댓글 펼치기/접기 - 처음 펼칠 때만 서버에서 불러옴
   const commentSection = card.querySelector('.feed-comment-section');
@@ -7985,6 +8056,8 @@ async function loadFeedPostsFromServer(){
         lat: p.lat, lon: p.lon,
         note: p.note || '',
         rating: typeof p.rating === 'number' ? p.rating : null,
+        avgRating: typeof p.avgRating === 'number' ? p.avgRating : null,
+        ratingCount: p.ratingCount || 0,
         photos: p.photos || [],
         author: p.author,
         likeCount: p.likeCount || 0,
