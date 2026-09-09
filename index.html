@@ -1505,6 +1505,63 @@
     font-size:13.5px;
     color:var(--accent);
   }
+  .feed-create-category-row{
+    display:flex;
+    gap:8px;
+    margin:2px 0 20px;
+  }
+  .feed-create-category-chip{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:5px;
+    padding:12px 4px 10px;
+    border-radius:13px;
+    border:1.5px solid var(--line);
+    background:var(--surface-2);
+    color:var(--text-dim);
+    cursor:pointer;
+    transition:all .15s ease;
+  }
+  .feed-create-category-chip svg{ width:19px; height:19px; }
+  .feed-create-category-chip span{
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    font-weight:600;
+  }
+  .feed-create-category-chip.active{
+    border-color:var(--accent);
+    background:var(--accent-soft);
+    color:var(--accent);
+  }
+  .feed-create-category-chip.locked{
+    cursor:default;
+    opacity:0.55;
+  }
+  .feed-create-section{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 14px 16px;
+    margin-bottom:12px;
+  }
+  .feed-create-section-label{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:12.5px;
+    color:var(--text);
+    margin-bottom:9px;
+  }
+  .feed-create-section-hint{
+    font-family:'Inter',sans-serif;
+    font-weight:400;
+    font-size:11px;
+    color:var(--text-dim);
+    margin-left:4px;
+  }
+  .feed-create-section .search-input{ margin-bottom:0; }
+  .feed-create-section .feed-rating-picker{ font-size:30px; }
   .feed-post-card{
     background:var(--surface-2);
     border:1px solid var(--line);
@@ -5395,29 +5452,56 @@
       <div class="feed-create-view" id="feedCreateView">
         <button class="profile-back" id="feedCreateBackBtn">&#8249; 뒤로</button>
         <div class="friend-calendar-title" id="feedCreateHeaderTitle">추천하기</div>
-        <div class="mp-input-group"><label>카테고리</label><div class="feed-create-category" id="feedCreateCategoryLabel"></div></div>
-        <div class="mp-input-group" style="position:relative;">
-          <label>장소명</label>
-          <input class="search-input" id="feedPlaceInput" placeholder="상호명을 검색하세요 (예: 빽다방 잠실새내점)" maxlength="30" autocomplete="off" />
-          <div class="location-search-results" id="feedPlaceResults" style="display:none;"></div>
+
+        <div class="feed-create-category-row" id="feedCreateCategoryRow">
+          <button type="button" class="feed-create-category-chip" data-cat="food">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg>
+            <span>맛집</span>
+          </button>
+          <button type="button" class="feed-create-category-chip" data-cat="cafe">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+            <span>카페</span>
+          </button>
+          <button type="button" class="feed-create-category-chip" data-cat="experience">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>
+            <span>체험</span>
+          </button>
         </div>
-        <div class="feed-place-map" id="feedPlaceMapWrap" style="display:none;">
-          <div id="feedPlaceMap" style="width:100%;height:140px;border-radius:10px;overflow:hidden;"></div>
+
+        <div class="feed-create-section">
+          <div class="feed-create-section-label">장소</div>
+          <div class="mp-input-group" style="position:relative;margin-bottom:10px;">
+            <input class="search-input" id="feedPlaceInput" placeholder="상호명을 검색하세요 (예: 빽다방 잠실새내점)" maxlength="30" autocomplete="off" />
+            <div class="location-search-results" id="feedPlaceResults" style="display:none;"></div>
+          </div>
+          <div class="feed-place-map" id="feedPlaceMapWrap" style="display:none;">
+            <div id="feedPlaceMap" style="width:100%;height:140px;border-radius:10px;overflow:hidden;"></div>
+          </div>
+          <div class="mp-input-group" style="margin-bottom:0;">
+            <input class="search-input" id="feedLocationInput" placeholder="동네/역 이름 (장소 검색하면 자동으로 채워져요)" maxlength="30" />
+          </div>
         </div>
-        <div class="mp-input-group"><label>별점</label>
+
+        <div class="feed-create-section">
+          <div class="feed-create-section-label">별점</div>
           <div class="feed-rating-picker" id="feedRatingPicker">
             <span class="feed-star" data-star="1">★</span><span class="feed-star" data-star="2">★</span><span class="feed-star" data-star="3">★</span><span class="feed-star" data-star="4">★</span><span class="feed-star" data-star="5">★</span>
           </div>
         </div>
-        <div class="mp-input-group"><label>한줄 소개</label><input class="search-input" id="feedNoteInput" placeholder="추천 이유를 적어주세요" maxlength="60" /></div>
-        <div class="mp-input-group"><label>위치</label><input class="search-input" id="feedLocationInput" placeholder="동네/역 이름 등 (장소 검색하면 자동으로 채워져요)" maxlength="30" /></div>
-        <div class="mp-input-group">
-          <label>사진 <span style="font-weight:400;color:var(--text-dim);">(선택, 최대 3장)</span></label>
+
+        <div class="feed-create-section">
+          <div class="feed-create-section-label">한줄 소개</div>
+          <input class="search-input" id="feedNoteInput" placeholder="추천 이유를 적어주세요" maxlength="60" />
+        </div>
+
+        <div class="feed-create-section">
+          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">선택 · 최대 3장</span></div>
           <div class="feed-photo-row" id="feedPhotoRow">
             <button type="button" class="feed-photo-add-btn" id="feedPhotoAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           </div>
           <input type="file" id="feedPhotoInput" accept="image/*" style="display:none;" />
         </div>
+
         <button class="profile-chat-btn" id="feedCreateSubmitBtn">올리기</button>
       </div>
     </div>
@@ -8220,6 +8304,22 @@ document.getElementById('feedPhotoInput').addEventListener('change', (e) => {
   reader.readAsDataURL(file);
 });
 
+let feedCreateSelectedCategory = 'food';
+function setFeedCreateCategoryChips(category, locked){
+  feedCreateSelectedCategory = category;
+  document.querySelectorAll('#feedCreateCategoryRow .feed-create-category-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.cat === category);
+    chip.classList.toggle('locked', locked);
+  });
+}
+document.querySelectorAll('#feedCreateCategoryRow .feed-create-category-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if(feedFormMode === 'editReview') return; // 수정할 때는 카테고리를 못 바꿈
+    setFeedCreateCategoryChips(chip.dataset.cat, false);
+    document.getElementById('feedCreateHeaderTitle').textContent = FEED_CATEGORY_LABELS[chip.dataset.cat] + ' 추천하기';
+  });
+});
+
 function openFeedCreate(){
   feedFormMode = 'create';
   editingFeedPostId = null;
@@ -8227,8 +8327,8 @@ function openFeedCreate(){
   feedSelectedRating = 0;
   feedSelectedPhotos = [];
   setFeedPlaceFieldsLocked(false);
+  setFeedCreateCategoryChips(activeFeedCategory, false);
   document.getElementById('feedCreateHeaderTitle').textContent = FEED_CATEGORY_LABELS[activeFeedCategory] + ' 추천하기';
-  document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
   document.getElementById('feedCreateSubmitBtn').textContent = '올리기';
   document.getElementById('feedPlaceInput').value = '';
   document.getElementById('feedNoteInput').value = '';
@@ -8240,7 +8340,7 @@ function openFeedCreate(){
   document.getElementById('feedCreateView').classList.add('active');
   pushViewState(closeFeedCreate);
 }
-// 내가 쓴 게시물을 수정할 때 - 목록 카드에서 바로 열림 (제목/위치는 검색으로 다시 바꿀 수 있게 그대로 열어둠)
+// 내가 쓴 게시물을 수정할 때 - 목록 카드에서 바로 열림 (제목/위치는 검색으로 다시 바꿀 수 있게 그대로 열어둠, 카테고리는 고정)
 function openFeedReviewEdit(post){
   feedFormMode = 'editReview';
   editingFeedPostId = post.id;
@@ -8248,8 +8348,8 @@ function openFeedReviewEdit(post){
   feedSelectedRating = post.rating || 0;
   feedSelectedPhotos = (post.photos || []).slice();
   setFeedPlaceFieldsLocked(false);
+  setFeedCreateCategoryChips(activeFeedCategory, true);
   document.getElementById('feedCreateHeaderTitle').textContent = '게시물 수정';
-  document.getElementById('feedCreateCategoryLabel').textContent = FEED_CATEGORY_LABELS[activeFeedCategory];
   document.getElementById('feedCreateSubmitBtn').textContent = '수정하기';
   document.getElementById('feedPlaceInput').value = post.title || '';
   document.getElementById('feedNoteInput').value = post.note || '';
@@ -8380,11 +8480,11 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
   try {
     const data = await apiRequest('/feed', {
       method: 'POST',
-      body: JSON.stringify({ category: activeFeedCategory, title, note, rating: feedSelectedRating, photos: feedSelectedPhotos, location, lat: feedLat, lon: feedLon }),
+      body: JSON.stringify({ category: feedCreateSelectedCategory, title, note, rating: feedSelectedRating, photos: feedSelectedPhotos, location, lat: feedLat, lon: feedLon }),
     });
-    FEED_POSTS[activeFeedCategory].unshift(data.post);
-    sortFeedPosts(activeFeedCategory);
-    renderFeedPosts();
+    FEED_POSTS[feedCreateSelectedCategory].unshift(data.post);
+    sortFeedPosts(feedCreateSelectedCategory);
+    if(feedCreateSelectedCategory === activeFeedCategory) renderFeedPosts();
     closeFeedCreate();
     showToast('게시물을 올렸어요!');
   } catch(err){
