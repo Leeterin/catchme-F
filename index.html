@@ -5320,22 +5320,22 @@
     <!-- 소식 (맛집/카페/체험) -->
     <div class="schedule-view active" id="communityView-feed">
       <div class="feed-list-view active" id="feedListView">
-        <div class="feed-chip-row" id="feedSegment">
-          <button class="feed-chip" data-cat="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg> 맛집</button>
-          <button class="feed-chip" data-cat="cafe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> 카페</button>
-          <button class="feed-chip" data-cat="experience"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg> 체험</button>
-        </div>
         <div class="meetup-list-header">
           <div class="meetup-section-title" style="margin-bottom:0;">주변 추천</div>
           <button class="add-friend-btn" id="createFeedPostBtn" title="추천 올리기">+</button>
         </div>
+        <div class="meetup-chip-row" id="feedSegment">
+          <button class="meetup-chip active" data-cat="food">맛집</button>
+          <button class="meetup-chip" data-cat="cafe">카페</button>
+          <button class="meetup-chip" data-cat="experience">체험</button>
+        </div>
         <div class="feed-search-sort-row">
           <input type="text" class="search-input" id="feedSearchInput" placeholder="장소명, 동네 이름으로 검색" />
-          <select class="search-input feed-sort-select" id="feedSortSelect">
-            <option value="recent">최신순</option>
-            <option value="popular">인기순</option>
-            <option value="rating">평점순</option>
-          </select>
+          <div class="meetup-sort-toggle" id="feedSortToggle">
+            <button type="button" class="meetup-sort-btn active" data-sort="recent">최신순</button>
+            <button type="button" class="meetup-sort-btn" data-sort="popular">인기순</button>
+            <button type="button" class="meetup-sort-btn" data-sort="rating">평점순</button>
+          </div>
         </div>
         <div id="feedListContainer"></div>
       </div>
@@ -8076,25 +8076,25 @@ async function loadFeedPostsFromServer(){
   }
 }
 
-document.querySelectorAll('#feedSegment .feed-chip').forEach(btn => {
+document.querySelectorAll('#feedSegment .meetup-chip').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('#feedSegment .feed-chip').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('#feedSegment .meetup-chip').forEach(b => b.classList.toggle('active', b === btn));
     activeFeedCategory = btn.dataset.cat;
     renderFeedPosts();
   });
 });
 
-// 초기 활성 칩(맛집) 표시
-document.querySelector('#feedSegment .feed-chip[data-cat="food"]').classList.add('active');
-
 document.getElementById('feedSearchInput').addEventListener('input', (e) => {
   feedSearchQuery = e.target.value;
   renderFeedPosts();
 });
-document.getElementById('feedSortSelect').addEventListener('change', (e) => {
-  feedSortMode = e.target.value;
-  Object.keys(FEED_POSTS).forEach(cat => sortFeedPosts(cat));
-  renderFeedPosts();
+document.querySelectorAll('#feedSortToggle .meetup-sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#feedSortToggle .meetup-sort-btn').forEach(b => b.classList.toggle('active', b === btn));
+    feedSortMode = btn.dataset.sort;
+    Object.keys(FEED_POSTS).forEach(cat => sortFeedPosts(cat));
+    renderFeedPosts();
+  });
 });
 
 let editingFeedPostId = null; // 수정 중인 게시물 id (null이면 새로 작성 중)
