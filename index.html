@@ -1741,31 +1741,36 @@
     cursor:pointer;
     white-space:nowrap;
   }
-  .sort-picker-list{
-    display:flex;
-    flex-direction:column;
-    gap:1px;
-    margin-top:4px;
+  .sort-trigger-wrap{ position:relative; flex-shrink:0; }
+  .sort-dropdown-menu{
+    display:none;
+    position:absolute;
+    top:calc(100% + 4px);
+    right:0;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.18);
+    overflow:hidden;
+    z-index:5;
+    min-width:84px;
   }
+  .sort-dropdown-menu.open{ display:block; }
   .sort-picker-item{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
+    display:block;
     width:100%;
-    padding:12px 4px;
+    padding:9px 12px;
     border:none;
     background:none;
     text-align:left;
     font-family:'Inter',sans-serif;
-    font-size:14px;
+    font-size:12.5px;
     color:var(--text);
     cursor:pointer;
-    border-bottom:1px solid var(--line);
+    white-space:nowrap;
   }
-  .sort-picker-item:last-child{ border-bottom:none; }
+  .sort-picker-item:hover{ background:var(--surface-2); }
   .sort-picker-item.active{ color:var(--accent); font-weight:700; }
-  .sort-picker-item .sort-picker-check{ color:var(--accent); font-weight:700; visibility:hidden; }
-  .sort-picker-item.active .sort-picker-check{ visibility:visible; }
   .feed-sort-select{
     width:auto;
     flex-shrink:0;
@@ -5169,13 +5174,6 @@
   </div>
 
   <!-- 정렬 옵션 선택 팝업 - 소식/모임 공용 -->
-  <div class="mini-confirm-overlay" id="sortPickerOverlay">
-    <div class="mini-confirm-card" style="text-align:left;">
-      <div class="mini-confirm-title" style="margin-bottom:6px;">정렬</div>
-      <div class="sort-picker-list" id="sortPickerList"></div>
-    </div>
-  </div>
-
   <!-- 일정 삭제 확인 팝업: 반복 일정이면 "전체 삭제"와 "이 날짜만 삭제" 중에 고를 수 있음 -->
   <div class="mini-confirm-overlay" id="deleteConfirmOverlay">
     <div class="mini-confirm-card">
@@ -5380,7 +5378,10 @@
         </div>
         <div class="feed-search-sort-row">
           <input type="text" class="search-input" id="feedSearchInput" placeholder="장소명, 동네 이름으로 검색" />
-          <button type="button" class="sort-trigger-btn" id="feedSortTriggerBtn" data-sort="recent">최신순 ▾</button>
+          <div class="sort-trigger-wrap">
+            <button type="button" class="sort-trigger-btn" id="feedSortTriggerBtn" data-sort="recent">최신순 ▾</button>
+            <div class="sort-dropdown-menu" id="feedSortDropdown"></div>
+          </div>
         </div>
         <div id="feedListContainer"></div>
       </div>
@@ -5441,7 +5442,10 @@
         </div>
         <div class="feed-search-sort-row">
           <input type="text" class="search-input" id="meetupSearchInput" placeholder="모임 이름으로 검색" />
-          <button type="button" class="sort-trigger-btn" id="meetupSortTriggerBtn" data-sort="recent">최신순 ▾</button>
+          <div class="sort-trigger-wrap">
+            <button type="button" class="sort-trigger-btn" id="meetupSortTriggerBtn" data-sort="recent">최신순 ▾</button>
+            <div class="sort-dropdown-menu" id="meetupSortDropdown"></div>
+          </div>
         </div>
         <div id="meetupListContainer"></div>
       </div>
@@ -8125,6 +8129,7 @@ document.getElementById('feedSearchInput').addEventListener('input', (e) => {
 });
 document.getElementById('feedSortTriggerBtn').addEventListener('click', () => {
   openSortPicker({
+    dropdownId: 'feedSortDropdown',
     options: [
       { value: 'recent', label: '최신순' },
       { value: 'popular', label: '인기순' },
@@ -8520,6 +8525,7 @@ document.querySelectorAll('#meetupChipRow .meetup-chip').forEach(chip => {
 });
 document.getElementById('meetupSortTriggerBtn').addEventListener('click', () => {
   openSortPicker({
+    dropdownId: 'meetupSortDropdown',
     options: [
       { value: 'recent', label: '최신순' },
       { value: 'popular', label: '추천순' },
@@ -13931,28 +13937,28 @@ document.getElementById('reportSubmitBtn').addEventListener('click', async () =>
   }
 });
 
-// ---------- 정렬 옵션 선택 팝업 (소식/모임 공용) ----------
-function openSortPicker({ options, current, onSelect }){
-  const list = document.getElementById('sortPickerList');
-  list.innerHTML = options.map(opt => `
-    <button type="button" class="sort-picker-item${opt.value === current ? ' active' : ''}" data-value="${opt.value}">
-      ${escapeHtml(opt.label)}<span class="sort-picker-check">✓</span>
-    </button>
+// ---------- 정렬 옵션 선택 드롭다운 (소식/모임 공용) ----------
+function openSortPicker({ dropdownId, options, current, onSelect }){
+  const dropdown = document.getElementById(dropdownId);
+  const alreadyOpen = dropdown.classList.contains('open');
+  document.querySelectorAll('.sort-dropdown-menu.open').forEach(el => el.classList.remove('open'));
+  if(alreadyOpen) return; // 같은 버튼을 다시 누르면 닫히기만 함
+  dropdown.innerHTML = options.map(opt => `
+    <button type="button" class="sort-picker-item${opt.value === current ? ' active' : ''}" data-value="${opt.value}">${escapeHtml(opt.label)}</button>
   `).join('');
-  list.querySelectorAll('.sort-picker-item').forEach(item => {
-    item.addEventListener('click', () => {
+  dropdown.querySelectorAll('.sort-picker-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
       const opt = options.find(o => o.value === item.dataset.value);
       onSelect(opt.value, opt.label);
-      closeSortPicker();
+      dropdown.classList.remove('open');
     });
   });
-  document.getElementById('sortPickerOverlay').classList.add('show');
+  dropdown.classList.add('open');
 }
-function closeSortPicker(){
-  document.getElementById('sortPickerOverlay').classList.remove('show');
-}
-document.getElementById('sortPickerOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'sortPickerOverlay') closeSortPicker();
+document.addEventListener('click', (e) => {
+  if(e.target.closest('.sort-trigger-wrap')) return;
+  document.querySelectorAll('.sort-dropdown-menu.open').forEach(el => el.classList.remove('open'));
 });
 
 function openCancelConfirm(action, title){
