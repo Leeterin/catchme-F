@@ -2391,11 +2391,17 @@
     border-top:1px solid var(--line);
   }
   .chat-date-divider{
-    text-align:center;
+    display:flex;
+    justify-content:center;
+    margin:16px 0 12px;
+  }
+  .chat-date-divider span{
+    background:var(--surface-2);
     color:var(--text-dim);
     font-size:11.5px;
-    font-weight:500;
-    margin:14px 0 10px;
+    font-weight:600;
+    padding:5px 14px;
+    border-radius:999px;
   }
   .msg-row{
     display:flex;
@@ -10700,10 +10706,33 @@ function normalizeKoreanTimeWords(text){
   return text.replace(/(열한|열두|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*시/g, (match, word) => `${KOREAN_NUM_WORDS[word]}시`);
 }
 
-// "내일", "모레", "이번주 금요일", "다음주 화요일" 같은 날짜 표현을 오늘 기준 며칠 뒤인지(dayOffset)로 변환
+// "내일", "모레", "이번주 금요일", "다음주 화요일" 같은 날짜 표현을 오늘 기준 며칠 뒤인지(dayOffset)로 변환.
+// "8월 25일"처럼 명시적인 날짜가 있으면 그건 상대적인 dayOffset이 아니라 확정된 날짜(absoluteDate)로 반환함 -
+// 화면에서 어느 날짜를 보고 있든 상관없이 그 날짜에 일정이 들어가야 하기 때문
 function parseVoiceDateOffset(rawText){
   let text = rawText;
   let dayOffset = null;
+  let absoluteDate = null;
+
+  const absMatch = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if(absMatch){
+    const month = parseInt(absMatch[1], 10);
+    const day = parseInt(absMatch[2], 10);
+    if(month >= 1 && month <= 12 && day >= 1 && day <= 31){
+      let year = TODAY.getFullYear();
+      // 말한 달이 오늘보다 6개월 넘게 과거면(연말에 내년 1월 얘기하는 경우 등) 내년으로 간주
+      if(month - 1 < TODAY.getMonth() - 6) year += 1;
+      const candidate = new Date(year, month - 1, day);
+      if(candidate.getMonth() === month - 1){ // 2월 30일처럼 존재하지 않는 날짜는 무시
+        absoluteDate = candidate;
+        text = text.replace(absMatch[0], '');
+      }
+    }
+  }
+
+  if(absoluteDate){
+    return { dayOffset, absoluteDate, text };
+  }
 
   const weekdayMatch = text.match(/(다음\s*주|이번\s*주)?\s*([일월화수목금토])요일/);
   if(weekdayMatch){
@@ -10721,7 +10750,7 @@ function parseVoiceDateOffset(rawText){
     dayOffset = 0; text = text.replace(/오늘/g, '');
   }
 
-  return { dayOffset, text };
+  return { dayOffset, absoluteDate, text };
 }
 
 // 문장에서 "N시" 또는 "N시 M분"/"N시반" 시간 표현 하나를 찾아 { hour, minute, minuteSpecified, matchedText }로 반환
@@ -10771,6 +10800,7 @@ function parseVoiceSchedule(rawText){
     startHour: start.h, startMin: start.min,
     endHour: end.h, endMin: end.min,
     dayOffset: dateResult.dayOffset !== null ? dateResult.dayOffset : 0,
+    absoluteDate: dateResult.absoluteDate,
     title,
   };
 }
@@ -10789,6 +10819,7 @@ function parseVoiceDeleteCommand(rawText){
 
   return {
     dayOffset: dateResult.dayOffset !== null ? dateResult.dayOffset : 0,
+    absoluteDate: dateResult.absoluteDate,
     hour: timeExpr ? timeExpr.hour : null,
     minute: timeExpr ? timeExpr.minute : 0,
     minuteSpecified: timeExpr ? timeExpr.minuteSpecified : false,
@@ -10810,8 +10841,8 @@ function formatEventTimeLabel(ev){
 
 // 삭제 후보를 찾음: 날짜는 항상 필요, 시간/키워드가 있으면 그걸로 더 좁혀서 찾음
 function findDeleteCandidates(parsed){
-  const targetDate = new Date(TODAY);
-  targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
+  const targetDate = parsed.absoluteDate ? new Date(parsed.absoluteDate) : new Date(TODAY);
+  if(!parsed.absoluteDate) targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
   let candidates = getEventsForDate(targetDate);
 
   if(parsed.hour !== null){
@@ -10965,8 +10996,9 @@ function handleAddCommand(transcript, isRetry){
     return;
   }
 
-  const targetDate = new Date(scheduleFocusDate);
-  targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
+  // 명시적인 날짜("8월 25일")를 말했으면 화면에 보이는 날짜와 상관없이 그 날짜에 추가함
+  const targetDate = parsed.absoluteDate ? new Date(parsed.absoluteDate) : new Date(scheduleFocusDate);
+  if(!parsed.absoluteDate) targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
 
   createScheduleEvent({
     title: parsed.title,
@@ -14831,10 +14863,10 @@ function formatMessageTime(time){
   if(h === 0) h = 12;
   return `${ampm} ${h}:${String(m).padStart(2,'0')}`;
 }
-// 날짜가 바뀔 때 채팅 중간에 뜨는 구분선 문구 (예: "8월 18일 오후 9:20")
+// 날짜가 바뀔 때 채팅 중간에 뜨는 구분선 문구 (카카오톡처럼 시간 없이 날짜만 - 예: "2026년 9월 12일 토요일")
 function formatChatDateDividerLabel(time){
   const d = (time instanceof Date) ? time : new Date(time);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${formatMessageTime(d)}`;
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${WEEKDAY_KO[d.getDay()]}요일`;
 }
 // 같은 날인지 비교용 키 (연-월-일)
 function chatDateKey(time){
@@ -14887,7 +14919,9 @@ function renderChatMessages(){
     if(dateKey !== lastDateKey){
       const divider = document.createElement('div');
       divider.className = 'chat-date-divider';
-      divider.textContent = formatChatDateDividerLabel(msgTime);
+      const dividerLabel = document.createElement('span');
+      dividerLabel.textContent = formatChatDateDividerLabel(msgTime);
+      divider.appendChild(dividerLabel);
       box.appendChild(divider);
       lastDateKey = dateKey;
     }
