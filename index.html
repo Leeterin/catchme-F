@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c2b6e952138d9653c48eff5fc17de641&libraries=services&autoload=false"></script>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c6f8fe0cac2001af25f66a4dc7df2bfe&libraries=services&autoload=false"></script>
 <style>
   :root{
     --bg:#FAFAF8;
@@ -7008,7 +7008,7 @@ function loadKakaoSdkOnce(){
   if(!kakaoSdkRetryPromise){
     kakaoSdkRetryPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = '//dapi.kakao.com/v2/maps/sdk.js?appkey=c2b6e952138d9653c48eff5fc17de641&libraries=services&autoload=false';
+      script.src = '//dapi.kakao.com/v2/maps/sdk.js?appkey=c6f8fe0cac2001af25f66a4dc7df2bfe&libraries=services&autoload=false';
       script.onload = resolve;
       script.onerror = reject;
       document.head.appendChild(script);
