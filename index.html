@@ -516,7 +516,10 @@
   }
   .location-suggest-item:last-child{ border-bottom:none; }
   .location-suggest-item:hover{ background:var(--surface-2); }
+  .location-suggest-item.selected{ background:var(--accent-soft); }
   .location-suggest-item .pin{ color:var(--accent); flex-shrink:0; }
+  .location-suggest-item .name{ font-weight:600; color:var(--text); }
+  .location-suggest-item .addr{ font-size:11px; color:var(--text-dim); margin-top:2px; }
   .location-suggest-status{
     padding:10px 12px;
     font-size:11.5px;
@@ -5033,7 +5036,11 @@
           <input class="search-input" id="locationPickerInput" placeholder="주소나 장소명을 검색해보세요 (예: 강남역)" maxlength="60" autocomplete="off" />
           <div class="location-suggest-list" id="locationPickerSuggestList"></div>
         </div>
-        <button type="button" class="profile-chat-btn" id="locationPickerUseTypedBtn" style="margin-top:12px;">입력한 대로 찾기</button>
+        <div class="feed-place-map" id="locationPickerMapWrap" style="display:none;">
+          <div id="locationPickerMap" style="width:100%;height:140px;border-radius:10px;overflow:hidden;"></div>
+        </div>
+        <button type="button" class="profile-chat-btn" id="locationPickerConfirmBtn" style="margin-top:12px;" disabled>선택완료</button>
+        <button type="button" class="profile-chat-btn outline" id="locationPickerUseTypedBtn" style="margin-top:8px;">입력한 대로 찾기</button>
       </div>
     </div>
   </div>
@@ -14116,8 +14123,10 @@ document.getElementById('reservationCancelConfirmYesBtn').addEventListener('clic
 // 친구에게 예약 요청 보낼 때 쓰는 것과 같은 Nominatim 주소 검색을 재사용하되,
 // 어디서든(핀 고정 영역 등) 모달로 띄워서 쓸 수 있게 별도로 구현
 let locationPickerCallback = null; // (label, lat, lon) => void - 장소를 고른 뒤 실행할 콜백
-let locationPickerAbortController = null;
 let locationPickerDebounce = null;
+let locationPickerSelected = null; // 목록에서 고른(또는 지도에 핀 찍은) 장소 { label, lat, lon }
+let locationPickerMapInstance = null;
+let locationPickerMarker = null;
 
 function openLocationPicker(initialQuery, callback){
   locationPickerCallback = callback;
@@ -14125,51 +14134,76 @@ function openLocationPicker(initialQuery, callback){
   input.value = initialQuery || '';
   document.getElementById('locationPickerSuggestList').classList.remove('show');
   document.getElementById('locationPickerSuggestList').innerHTML = '';
+  resetLocationPickerSelection();
   document.getElementById('locationPickerOverlay').classList.add('show');
   input.focus();
 }
 function closeLocationPicker(){
   document.getElementById('locationPickerOverlay').classList.remove('show');
   locationPickerCallback = null;
-  if(locationPickerAbortController) locationPickerAbortController.abort();
   clearTimeout(locationPickerDebounce);
+  resetLocationPickerSelection();
 }
 
-async function searchLocationPickerSuggestions(query){
+// 목록에서 새로 검색하거나 모달을 열고 닫을 때, 이전에 골라둔 장소/핀/선택완료 버튼 상태를 초기화
+function resetLocationPickerSelection(){
+  locationPickerSelected = null;
+  document.getElementById('locationPickerMapWrap').style.display = 'none';
+  document.getElementById('locationPickerConfirmBtn').disabled = true;
+  document.getElementById('locationPickerSuggestList').querySelectorAll('.location-suggest-item.selected')
+    .forEach(el => el.classList.remove('selected'));
+}
+
+// 고른 장소를 작은 지도 위에 카카오톡 위치 공유처럼 핀으로 찍어서 보여줌
+function showLocationPickerMap(lat, lon){
+  document.getElementById('locationPickerMapWrap').style.display = 'block';
+  ensureKakaoMapsLoaded(() => {
+    const container = document.getElementById('locationPickerMap');
+    const center = new kakao.maps.LatLng(lat, lon);
+    if(!locationPickerMapInstance){
+      locationPickerMapInstance = new kakao.maps.Map(container, { center, level: 4 });
+    } else {
+      locationPickerMapInstance.setCenter(center);
+    }
+    setTimeout(() => locationPickerMapInstance.relayout(), 0);
+    if(locationPickerMarker) locationPickerMarker.setMap(null);
+    locationPickerMarker = new kakao.maps.Marker({ position: center, map: locationPickerMapInstance });
+  });
+}
+
+// 카카오 장소 검색(키워드 검색)으로 "강남역", "강남역 5번출구"처럼 실제로 등록된 장소들을 목록으로 보여줌
+function searchLocationPickerSuggestions(query){
   const listEl = document.getElementById('locationPickerSuggestList');
   listEl.innerHTML = `<div class="location-suggest-status">검색 중...</div>`;
   listEl.classList.add('show');
 
-  if(locationPickerAbortController) locationPickerAbortController.abort();
-  locationPickerAbortController = new AbortController();
+  ensureKakaoMapsLoaded(() => {
+    const places = new kakao.maps.services.Places();
+    places.keywordSearch(query, (results, status) => {
+      // 검색어가 바뀌는 동안 늦게 도착한 이전 결과는 무시함
+      if(document.getElementById('locationPickerInput').value.trim() !== query) return;
 
-  try {
-    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=0&limit=6&accept-language=ko&q=' + encodeURIComponent(query);
-    const res = await fetch(url, { signal: locationPickerAbortController.signal, headers: { 'Accept': 'application/json' } });
-    const results = await res.json();
-
-    if(!Array.isArray(results) || results.length === 0){
-      listEl.innerHTML = `<div class="location-suggest-status">검색 결과가 없어요. 다른 이름으로 검색해보세요.</div>`;
-      return;
-    }
-    listEl.innerHTML = results.map((r, idx) => `
-      <div class="location-suggest-item" data-idx="${idx}">
-        <span class="pin">${ICO.pin}</span><span>${r.display_name}</span>
-      </div>
-    `).join('');
-    listEl._results = results;
-  } catch(err){
-    if(err.name === 'AbortError') return; // 더 최신 검색으로 교체된 것뿐이라 무시
-    console.error('[location picker search] failed:', err);
-    listEl.innerHTML = `<div class="location-suggest-status">
-      주소 검색에 실패했어요. 이 파일을 file://로 직접 열면 브라우저가 외부 요청을 막을 수 있어요.<br/>
-      크롬에서 열어보시거나, 로컬 서버로 실행해보세요.<br/>
-      <span style="opacity:0.7;">(오류: ${err.message || err.name || '알 수 없음'})</span>
-    </div>`;
-  }
+      if(status !== kakao.maps.services.Status.OK || !results || results.length === 0){
+        listEl.innerHTML = `<div class="location-suggest-status">검색 결과가 없어요. 다른 이름으로 검색해보세요.</div>`;
+        return;
+      }
+      const top = results.slice(0, 8);
+      listEl.innerHTML = top.map((r, idx) => `
+        <div class="location-suggest-item" data-idx="${idx}">
+          <span class="pin">${ICO.pin}</span>
+          <span>
+            <div class="name">${escapeHtml(r.place_name)}</div>
+            <div class="addr">${escapeHtml(r.road_address_name || r.address_name || '')}</div>
+          </span>
+        </div>
+      `).join('');
+      listEl._results = top;
+    });
+  });
 }
 
 document.getElementById('locationPickerInput').addEventListener('input', (e) => {
+  resetLocationPickerSelection();
   const query = e.target.value.trim();
   clearTimeout(locationPickerDebounce);
   if(query.length < 2){
@@ -14186,9 +14220,25 @@ document.getElementById('locationPickerSuggestList').addEventListener('click', (
   const picked = results[parseInt(item.dataset.idx, 10)];
   if(!picked) return;
 
+  document.getElementById('locationPickerSuggestList').querySelectorAll('.location-suggest-item.selected')
+    .forEach(el => el.classList.remove('selected'));
+  item.classList.add('selected');
+
+  const lat = parseFloat(picked.y), lon = parseFloat(picked.x);
+  locationPickerSelected = { label: picked.place_name, lat, lon };
+  document.getElementById('locationPickerConfirmBtn').disabled = false;
+  showLocationPickerMap(lat, lon);
+});
+
+document.getElementById('locationPickerConfirmBtn').addEventListener('click', () => {
+  if(!locationPickerSelected){
+    showToast('목록에서 장소를 먼저 골라주세요.');
+    return;
+  }
+  const { label, lat, lon } = locationPickerSelected;
   const cb = locationPickerCallback;
   closeLocationPicker();
-  if(cb) cb(shortenLocationLabel(picked.display_name), parseFloat(picked.lat), parseFloat(picked.lon));
+  if(cb) cb(label, lat, lon);
 });
 
 document.getElementById('locationPickerUseTypedBtn').addEventListener('click', () => {
