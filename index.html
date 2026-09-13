@@ -14245,7 +14245,13 @@ let locationPickerMapInstance = null;
 let locationPickerMarker = null;
 let locationPickerGeocoder = null;
 
-function openLocationPicker(initialQuery, callback){
+function openLocationPicker(initialQuery, initialLat, initialLon, callback){
+  // 예전 호출부 호환: openLocationPicker(query, callback)처럼 좌표 없이 부르는 경우도 지원
+  if(typeof initialLat === 'function'){
+    callback = initialLat;
+    initialLat = null;
+    initialLon = null;
+  }
   locationPickerCallback = callback;
   const input = document.getElementById('locationPickerInput');
   input.value = '';
@@ -14256,8 +14262,12 @@ function openLocationPicker(initialQuery, callback){
 
   ensureKakaoMapsLoaded(() => {
     initLocationPickerMap();
-    // 이전에 이미 정해둔 장소가 있으면 그 위치부터 지도에 보여주고, 없으면 현재 위치 근처로 시작함
-    if(initialQuery){
+    const hasCoords = typeof initialLat === 'number' && typeof initialLon === 'number' && !isNaN(initialLat) && !isNaN(initialLon);
+    if(hasCoords){
+      // 이미 정확한 좌표를 알고 있으면 주소로 다시 검색하지 않고 그 좌표 그대로 핀을 찍음
+      // (주소 문자열로 재검색하면 살짝 다른 지점으로 잡혀서 핀이 "움직인 것"처럼 보였음)
+      placeLocationPickerPin(initialLat, initialLon, initialQuery || '선택한 위치');
+    } else if(initialQuery){
       locationPickerGeocoder.addressSearch(initialQuery, (result, status) => {
         if(status === kakao.maps.services.Status.OK && result[0]){
           placeLocationPickerPin(parseFloat(result[0].y), parseFloat(result[0].x), initialQuery);
@@ -14833,7 +14843,7 @@ function renderPinnedSchedule(){
     const setLocBtn = card.querySelector('.pin-set-loc');
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
-        openLocationPicker(location || '', (label, lat, lon) => {
+        openLocationPicker(location || '', pinned.locationLat, pinned.locationLon, (label, lat, lon) => {
           pinned.location = label;
           pinned.locationLat = lat;
           pinned.locationLon = lon;
