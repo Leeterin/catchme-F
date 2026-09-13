@@ -3650,11 +3650,6 @@
     text-align:center;
     margin:4px 0;
   }
-  /* 더 이상 유효하지 않은(예전) 장소 알림 카드 - 흐리게 처리해서 최신 카드랑 구분되게 함 */
-  .hotplace-notice-card.hotplace-outdated{
-    opacity:0.45;
-    filter:grayscale(0.4);
-  }
   .hotplace-notice-title{
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
@@ -6319,9 +6314,9 @@ function connectRealtimeSocket(){
       return;
     }
     if(message.type === 'LOCATION_NOTICE'){
-      // 상대방이 채팅방에 장소를 등록/변경했을 때 실시간으로 알려주는 메시지
+      // 상대방이 채팅방에 장소를 등록/변경했을 때 실시간으로 알려주는 메시지 (같은 핀의 이전 알림은 지우고 이것만 남김)
       const existing = room.messages.find(m => m._serverId === message.id);
-      if(!existing) room.messages.push(mapServerLocationNoticeMessage(message));
+      if(!existing) replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(message));
       loadPinsFromServer(roomId, room); // 바뀐 장소 좌표를 핀에도 반영
       touchRoom(roomId);
       if(activeChatRoomId === roomId){
@@ -9324,7 +9319,7 @@ function mapServerLocationNoticeMessage(m){
     location: l.location || l.place,
     locationLat: l.locationLat,
     locationLon: l.locationLon,
-    changed: !!l.changed,
+    pinId: l.pinId || null,
     time: m.createdAt,
   };
 }
@@ -13670,17 +13665,26 @@ function toggleSavedPlace(category, post){
 
 // 예약이 확정되고 장소가 정해져 있으면, 그 채팅방에 "주변 핫플 보기" 알림 메시지를 추가함
 let hotplaceMsgIdCounter = 1;
-function addHotplaceNoticeMessage(roomId, location, lat, lon, changed){
+function addHotplaceNoticeMessage(roomId, location, lat, lon, pinId){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
-  room.messages.push({
+  replaceHotplaceNoticeForPin(room, {
     who: 'other',
     type: 'hotplace',
     id: 'hp' + (hotplaceMsgIdCounter++),
     location, locationLat: lat, locationLon: lon,
-    changed: !!changed, // true면 "장소가 변경됐어요" 문구로, false/생략이면 기존 "~근처에서 만나요!" 문구로 표시됨
+    pinId: pinId || null,
     time: new Date(),
   });
+}
+
+// 같은 핀(pinId)에 대한 장소 알림 카드가 이미 있으면 지우고, 새 알림 하나만 채팅에 남김
+// (장소가 바뀔 때마다 카드가 계속 쌓이지 않고, 항상 최신 장소 하나만 보이게 하기 위함)
+function replaceHotplaceNoticeForPin(room, newMsg){
+  if(newMsg.pinId){
+    room.messages = room.messages.filter(m => !(m.type === 'hotplace' && m.pinId === newMsg.pinId));
+  }
+  room.messages.push(newMsg);
 }
 
 // 주소 문자열에서 2글자 이상 단어를 뽑아서, 커뮤니티 추천 글의 위치/장소명과 겹치는 게 있으면 "근처 추천"으로 우선 표시
@@ -14905,18 +14909,18 @@ function renderPinnedSchedule(){
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
         openLocationPicker(location || '', pinned.locationLat, pinned.locationLon, async (label, lat, lon) => {
-          const wasChange = !!(location && location !== label); // 이전에도 장소가 있었고 이번에 다른 곳으로 바뀐 건지
           pinned.location = label;
           pinned.locationLat = lat;
           pinned.locationLon = lon;
           const roomId = activeChatRoomId;
           const syncResult = await syncPinLocationUpdateToServer(room, pinned);
           if(syncResult && syncResult.message){
-            // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨)
-            room.messages.push(mapServerLocationNoticeMessage(syncResult.message));
+            // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨).
+            // 같은 핀의 이전 장소 알림 카드는 지우고 이 알림 하나만 남김
+            replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(syncResult.message));
           } else {
-            // 서버 동기화가 안 되는 방(로컬 데모 등)이면 기존처럼 로컬 알림만 추가
-            addHotplaceNoticeMessage(roomId, label, lat, lon, wasChange);
+            // 서버 동기화가 안 되는 방(로컬 데모 등)이면 기존처럼 로컬 알림만 추가 (로컬 핀 id로 이전 알림을 찾아 지움)
+            addHotplaceNoticeMessage(roomId, label, lat, lon, pinned.serverId || pinned.id);
           }
           touchRoom(roomId);
           renderPinnedSchedule();
@@ -15199,12 +15203,7 @@ function renderChatMessages(){
   const q = chatSearchQuery.trim().toLowerCase();
   let lastDateKey = null;
 
-  // 장소 알림(hotplace) 카드가 여러 개 쌓였을 때, 가장 최근 것만 또렷하게 보이고
-  // 이전 것들은 흐리게 처리해서 "지금 확정된 장소가 뭔지" 헷갈리지 않게 함
-  let lastHotplaceIdx = -1;
-  room.messages.forEach((mm, idx) => { if(mm.type === 'hotplace') lastHotplaceIdx = idx; });
-
-  room.messages.forEach((m, msgIdx) => {
+  room.messages.forEach(m => {
     if(q){
       const haystack = (m.type === 'reservation' || m.type === 'time-suggest'
         ? `${m.note || ''} ${m.dateLabel || ''} ${m.timeLabel || ''} ${m.location || ''}`
@@ -15391,17 +15390,10 @@ function renderChatMessages(){
       `;
     } else if(m.type === 'hotplace'){
       row.className = 'msg-row hotplace-notice-row';
-      const isLatestLocation = (msgIdx === lastHotplaceIdx);
-      const titleText = m.changed
-        ? `${ICO.pin} 장소가 변경됐어요: ${escapeHtml(m.location)}`
-        : `${ICO.pin} ${escapeHtml(m.location)} 근처에서 만나요!`;
-      const descText = m.changed
-        ? '새 약속 장소예요. 이전 장소는 더 이상 유효하지 않아요.'
-        : '약속 장소 주변 핫플레이스를 지도에서 확인해보세요.';
       row.innerHTML = `
-        <div class="hotplace-notice-card${isLatestLocation ? '' : ' hotplace-outdated'}">
-          <div class="hotplace-notice-title">${titleText}</div>
-          <div class="hotplace-notice-desc">${descText}</div>
+        <div class="hotplace-notice-card">
+          <div class="hotplace-notice-title">${ICO.pin} ${escapeHtml(m.location)} 근처에서 만나요!</div>
+          <div class="hotplace-notice-desc">약속 장소 주변 핫플레이스를 지도에서 확인해보세요.</div>
           <button type="button" class="hotplace-notice-btn" data-location="${escapeHtml(m.location)}">주변 핫플 보기</button>
         </div>
       `;
