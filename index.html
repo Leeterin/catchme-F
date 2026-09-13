@@ -9460,6 +9460,7 @@ function mapServerLocationNoticeMessage(m){
     locationLat: l.locationLat,
     locationLon: l.locationLon,
     pinId: l.pinId || null,
+    superseded: !!l.superseded, // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 경우 - 작은 알림으로만 표시함
     time: m.createdAt,
   };
 }
@@ -13820,10 +13821,12 @@ function addHotplaceNoticeMessage(roomId, location, lat, lon, pinId){
 
 // 같은 핀(pinId)에 대한 장소 알림 카드가 이미 있으면 지우고, 새 알림 하나만 채팅에 남김
 // (장소가 바뀔 때마다 카드가 계속 쌓이지 않고, 항상 최신 장소 하나만 보이게 하기 위함)
-// 이 채팅방엔 "OO 근처에서 만나요!" 알림이 항상 최신 하나만 남아야 하므로 (서버도 이제 방 단위로 이전 알림을 전부 지움),
-// 핀 id가 같은지 여부와 상관없이 이 방의 예전 핫플 알림 카드는 모두 지우고 새 알림 하나만 남김
+// 장소가 새로 바뀌면, 이 방에 있던 예전 "OO 근처에서 만나요!" 카드들은 지우지 않고
+// "약속 장소가 변경됐어요"라는 작은 알림으로 표시만 바꾸고, 새 알림 하나만 큰 카드로 보여줌
 function replaceHotplaceNoticeForPin(room, newMsg){
-  room.messages = room.messages.filter(m => m.type !== 'hotplace');
+  room.messages.forEach(m => {
+    if(m.type === 'hotplace' && !m.superseded) m.superseded = true;
+  });
   room.messages.push(newMsg);
 }
 
@@ -15632,15 +15635,21 @@ function renderChatMessages(){
         </div>
       `;
     } else if(m.type === 'hotplace'){
-      row.className = 'msg-row hotplace-notice-row';
-      row.innerHTML = `
-        <div class="hotplace-notice-card">
-          <div class="hotplace-notice-title">${ICO.pin} ${escapeHtml(m.location)} 근처에서 만나요!</div>
-          <div class="hotplace-notice-desc">약속 장소 주변 핫플레이스를 지도에서 확인해보세요.</div>
-          <button type="button" class="hotplace-notice-btn" data-location="${escapeHtml(m.location)}">주변 핫플 보기</button>
-        </div>
-      `;
-      row.querySelector('.hotplace-notice-btn').addEventListener('click', () => openHotplaceView(m.location, m.locationLat, m.locationLon));
+      if(m.superseded){
+        // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 카드 - 다른 시스템 알림처럼 작게만 표시함
+        row.className = 'msg-row system-notice-row';
+        row.innerHTML = `<div class="system-notice-card">${ICO.pin} 약속 장소가 변경됐어요</div>`;
+      } else {
+        row.className = 'msg-row hotplace-notice-row';
+        row.innerHTML = `
+          <div class="hotplace-notice-card">
+            <div class="hotplace-notice-title">${ICO.pin} ${escapeHtml(m.location)} 근처에서 만나요!</div>
+            <div class="hotplace-notice-desc">약속 장소 주변 핫플레이스를 지도에서 확인해보세요.</div>
+            <button type="button" class="hotplace-notice-btn" data-location="${escapeHtml(m.location)}">주변 핫플 보기</button>
+          </div>
+        `;
+        row.querySelector('.hotplace-notice-btn').addEventListener('click', () => openHotplaceView(m.location, m.locationLat, m.locationLon));
+      }
     } else if(m.type === 'time-suggest'){
       row.className = 'msg-row hotplace-notice-row';
       row.innerHTML = `
@@ -15790,7 +15799,7 @@ function getMsgPreviewText(m){
   if(m.type === 'location-suggest') return '장소 제안';
   if(m.type === 'location-fixed') return '장소 확정';
   if(m.type === 'time-options-suggest') return '시간 제안';
-  if(m.type === 'hotplace') return '핫플 알림';
+  if(m.type === 'hotplace') return m.superseded ? '약속 장소가 변경됐어요' : '핫플 알림';
   if(m.type === 'system-notice') return m.text || '알림';
   if(m.type === 'image') return '사진';
   const t = (m.text || '').trim();
