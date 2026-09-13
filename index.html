@@ -1736,6 +1736,35 @@
     font-size:10.5px;
     color:var(--text-dim);
   }
+  /* 카드 맨 위: 장소명 + (있으면) 도보 시간 배지 - 배지가 이름 옆에서 줄바꿈되며 겹치던 문제를 막기 위해
+     둘 다 flex-wrap으로 감싸고 배지는 pill 모양으로 줄바꿈 없이 표시함 */
+  .feed-post-card-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .feed-post-card-head .feed-post-place{
+    flex:1;
+    min-width:0;
+    line-height:1.35;
+  }
+  .feed-post-walk-badge{
+    flex:none;
+    display:inline-flex;
+    align-items:center;
+    gap:2px;
+    white-space:nowrap;
+    background:rgba(59,130,246,0.12);
+    color:var(--accent);
+    font-family:'Inter',sans-serif;
+    font-size:10.5px;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:999px;
+    margin-top:1px;
+  }
   .feed-post-location-link{
     display:inline-flex;
     align-items:center;
@@ -1746,6 +1775,17 @@
     color:var(--accent);
     text-decoration:none;
     margin-bottom:8px;
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+    max-width:100%;
+    text-align:left;
+  }
+  .feed-post-location-link span{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
   }
   .feed-post-location-link:hover{ text-decoration:underline; }
   .feed-post-note{
@@ -3793,6 +3833,94 @@
     background:var(--surface-2);
   }
 
+  /* 밥집 카드에서 주소를 눌렀을 때, 약속장소와 그 밥집을 함께 보여주는 작은 지도 오버레이 */
+  .place-detail-map-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(23,24,29,0.55);
+    align-items:center;
+    justify-content:center;
+    z-index:3200;
+    padding:20px;
+  }
+  .place-detail-map-overlay.show{ display:flex; }
+  .place-detail-map-panel{
+    width:100%;
+    max-width:392px;
+    height:70vh;
+    max-height:560px;
+    background:var(--surface);
+    border-radius:18px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 16px 40px rgba(0,0,0,0.28);
+    position:relative;
+  }
+  .place-detail-map-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 14px 12px 18px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+    gap:8px;
+  }
+  .place-detail-map-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .place-detail-map-canvas{
+    flex:1;
+    width:100%;
+    min-height:200px;
+    border:none;
+    background:var(--surface-2);
+  }
+  .place-detail-map-legend{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding:12px 16px;
+    border-top:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .place-detail-map-legend-item{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:12px;
+    font-weight:600;
+    color:var(--text);
+  }
+  .place-detail-map-dot{
+    flex-shrink:0;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+  }
+  .place-detail-map-dot.appt{ background:#F5A623; }
+  .place-detail-map-dot.place{ background:var(--accent); }
+  .place-detail-map-pin-label{
+    transform:translateY(-4px);
+    padding:3px 8px;
+    border-radius:8px;
+    font-size:11px;
+    font-weight:700;
+    font-family:'Inter',sans-serif;
+    white-space:nowrap;
+    color:#FFFFFF;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+  }
+  .place-detail-map-pin-label.appt{ background:#F5A623; }
+  .place-detail-map-pin-label.place{ background:var(--accent); }
+
   .custom-picker-overlay{
     position:fixed;
     inset:0;
@@ -5199,6 +5327,18 @@
         <div class="hotplace-list-desc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg> 눌러서 저장해둔 곳이에요. 나중에 가볼 곳으로 모아볼 수 있어요.</div>
         <div id="hotplaceSavedGroups"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 밥집/카페 카드에서 주소를 누르면 뜨는, 약속장소+그 장소를 함께 보여주는 지도 -->
+  <div class="place-detail-map-overlay" id="placeDetailMapOverlay">
+    <div class="place-detail-map-panel">
+      <div class="place-detail-map-header">
+        <div class="place-detail-map-title" id="placeDetailMapTitle">지도에서 보기</div>
+        <button type="button" class="mini-confirm-close" id="placeDetailMapCloseBtn" aria-label="닫기">&times;</button>
+      </div>
+      <div id="placeDetailMapCanvas" class="place-detail-map-canvas"></div>
+      <div class="place-detail-map-legend" id="placeDetailMapLegend"></div>
     </div>
   </div>
 
@@ -13709,10 +13849,11 @@ function buildFeedPostCard(post, category, distKm){
   const card = document.createElement('div');
   card.className = 'feed-post-card';
   card.innerHTML = `
-    <div class="feed-post-top">
-      <span class="feed-post-place">${escapeHtml(post.title)}${typeof distKm === 'number' ? ` <span style="color:var(--accent);font-size:10.5px;font-weight:700;">· ${formatWalkingTime(distKm)}</span>` : ''}</span>
-      <span class="feed-post-location">${ICO.pin} ${escapeHtml(post.location || '')}</span>
+    <div class="feed-post-card-head">
+      <span class="feed-post-place">${escapeHtml(post.title)}</span>
+      ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)}</span>` : ''}
     </div>
+    ${post.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(post.location)}</span></button>` : ''}
     ${post.note ? `<div class="feed-post-note">${escapeHtml(post.note)}</div>` : ''}
     <div class="feed-post-author">${post.author ? `${escapeHtml(post.author.name)} 님의 추천` : ''}</div>
     <div class="feed-post-actions">
@@ -13730,6 +13871,8 @@ function buildFeedPostCard(post, category, distKm){
     renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
     renderSavedPlacesGroups();
   });
+  const locBtn = card.querySelector('.feed-post-location-link');
+  if(locBtn) locBtn.addEventListener('click', () => openPlaceDetailMap(post));
   return card;
 }
 
@@ -14677,6 +14820,100 @@ function closeHotplaceView(){
 document.getElementById('hotplaceCloseBtn').addEventListener('click', () => goBackOrClose(closeHotplaceView));
 document.getElementById('hotplaceOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'hotplaceOverlay') closeHotplaceView();
+});
+
+// ---------- 밥집/카페 카드의 주소를 눌렀을 때 뜨는 작은 지도: 약속장소 + 그 밥집을 마커 2개로 함께 보여줌 ----------
+let placeDetailMapInstance = null;
+let placeDetailMapOverlays = []; // 마커/라벨들 - 다시 열 때마다 지우고 새로 그림
+
+function openPlaceDetailMap(post){
+  const apptLat = lastHotplaceLat, apptLon = lastHotplaceLon;
+  const apptLabel = lastHotplaceLocationHint || '';
+  const hasAppt = typeof apptLat === 'number' && !isNaN(apptLat) && typeof apptLon === 'number' && !isNaN(apptLon);
+  const hasPlace = typeof post.lat === 'number' && !isNaN(post.lat) && typeof post.lon === 'number' && !isNaN(post.lon);
+
+  if(!hasAppt && !hasPlace){
+    // 좌표가 하나도 없으면 지도를 그릴 수 없으니, 카카오맵 검색 결과로라도 보여줌
+    window.open(feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon), '_blank', 'noopener');
+    return;
+  }
+
+  document.getElementById('placeDetailMapTitle').textContent = post.title;
+  const legend = document.getElementById('placeDetailMapLegend');
+  legend.innerHTML = `
+    ${hasAppt ? `<div class="place-detail-map-legend-item"><span class="place-detail-map-dot appt"></span>약속장소${apptLabel ? ' · ' + escapeHtml(apptLabel) : ''}</div>` : ''}
+    ${hasPlace ? `<div class="place-detail-map-legend-item"><span class="place-detail-map-dot place"></span>${escapeHtml(post.title)}</div>` : ''}
+  `;
+
+  document.getElementById('placeDetailMapOverlay').classList.add('show');
+  pushViewState(closePlaceDetailMap);
+
+  const draw = () => {
+    kakao.maps.load(() => {
+      const container = document.getElementById('placeDetailMapCanvas');
+      const centerLat = hasAppt ? apptLat : post.lat;
+      const centerLon = hasAppt ? apptLon : post.lon;
+
+      if(!placeDetailMapInstance){
+        placeDetailMapInstance = new kakao.maps.Map(container, {
+          center: new kakao.maps.LatLng(centerLat, centerLon),
+          level: 4,
+        });
+      } else {
+        placeDetailMapInstance.setCenter(new kakao.maps.LatLng(centerLat, centerLon));
+      }
+
+      // 이전에 열었을 때 찍어둔 마커/라벨은 지우고 새로 그림
+      placeDetailMapOverlays.forEach(o => o.setMap(null));
+      placeDetailMapOverlays = [];
+
+      const bounds = new kakao.maps.LatLngBounds();
+      if(hasAppt){
+        const pos = new kakao.maps.LatLng(apptLat, apptLon);
+        const marker = new kakao.maps.Marker({ position: pos, map: placeDetailMapInstance });
+        const label = new kakao.maps.CustomOverlay({
+          position: pos,
+          content: `<div class="place-detail-map-pin-label appt">약속장소</div>`,
+          yAnchor: 2.4,
+        });
+        label.setMap(placeDetailMapInstance);
+        placeDetailMapOverlays.push(marker, label);
+        bounds.extend(pos);
+      }
+      if(hasPlace){
+        const pos = new kakao.maps.LatLng(post.lat, post.lon);
+        const marker = new kakao.maps.Marker({ position: pos, map: placeDetailMapInstance });
+        const label = new kakao.maps.CustomOverlay({
+          position: pos,
+          content: `<div class="place-detail-map-pin-label place">${escapeHtml(post.title)}</div>`,
+          yAnchor: 2.4,
+        });
+        label.setMap(placeDetailMapInstance);
+        placeDetailMapOverlays.push(marker, label);
+        bounds.extend(pos);
+      }
+      if(hasAppt && hasPlace){
+        placeDetailMapInstance.setBounds(bounds, 70, 70, 70, 70);
+      }
+      setTimeout(() => placeDetailMapInstance.relayout(), 0);
+    });
+  };
+
+  if(typeof kakao === 'undefined' || !kakao.maps){
+    loadKakaoSdkOnce().then(() => {
+      if(typeof kakao !== 'undefined' && kakao.maps) draw();
+      else console.error('[장소 지도] 카카오맵 SDK를 불러오지 못했어요.');
+    }).catch(() => console.error('[장소 지도] 카카오맵 SDK를 불러오지 못했어요.'));
+  } else {
+    draw();
+  }
+}
+function closePlaceDetailMap(){
+  document.getElementById('placeDetailMapOverlay').classList.remove('show');
+}
+document.getElementById('placeDetailMapCloseBtn').addEventListener('click', () => goBackOrClose(closePlaceDetailMap));
+document.getElementById('placeDetailMapOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'placeDetailMapOverlay') closePlaceDetailMap();
 });
 document.querySelectorAll('.hotplace-tab').forEach(btn => {
   btn.addEventListener('click', () => {
