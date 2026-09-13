@@ -6314,6 +6314,24 @@ function connectRealtimeSocket(){
       renderChatList();
       return;
     }
+    if(message.type === 'LOCATION_NOTICE'){
+      // 상대방이 채팅방에 장소를 등록/변경했을 때 실시간으로 알려주는 메시지
+      const existing = room.messages.find(m => m._serverId === message.id);
+      if(!existing) room.messages.push(mapServerLocationNoticeMessage(message));
+      loadPinsFromServer(roomId, room); // 바뀐 장소 좌표를 핀에도 반영
+      touchRoom(roomId);
+      if(activeChatRoomId === roomId){
+        renderChatMessages();
+        renderPinnedSchedule();
+      } else {
+        addIncomingMessageUnread(roomId);
+        if(settingsState.notif_message && !room.muted){
+          showToast(`${room.name}: 장소가 등록됐어요`);
+        }
+      }
+      renderChatList();
+      return;
+    }
     if(message.type === 'IMAGE'){
       const existing = room.messages.find(m => m._serverId === message.id);
       if(!existing) room.messages.push(mapServerImageMessage(message));
@@ -6714,7 +6732,7 @@ function showTab(tabKey){
     document.querySelector(`.nav-item[data-tab="${tabKey}"]`).classList.add('active');
     if(tabKey === 'schedule'){
       panels['schedule'].classList.remove('home-clean-mode');
-      switchScheduleView('day');
+      switchScheduleView(settingsState.default_schedule_view || 'month');
     }
     if(tabKey === 'friends'){
       // 친구 프로필/검색 등 하위 화면이 열려있었다면 정리하고 항상 친구 목록(첫 화면)부터 보여줌
@@ -9286,6 +9304,22 @@ function mapServerLocationSuggestMessage(m){
     locationLat: l.locationLat,
     locationLon: l.locationLon,
     status: RESERVATION_STATUS_MAP[l.status] || 'pending',
+    time: m.createdAt,
+  };
+}
+
+// 서버의 LOCATION_NOTICE 메시지("장소가 등록/변경됐어요" 알림)를 로컬 hotplace 알림 카드 형식으로 변환
+function mapServerLocationNoticeMessage(m){
+  const l = m.locationNotice;
+  return {
+    who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
+    senderId: m.senderId,
+    type: 'hotplace',
+    id: m.id,
+    _serverId: m.id,
+    location: l.location || l.place,
+    locationLat: l.locationLat,
+    locationLon: l.locationLon,
     time: m.createdAt,
   };
 }
@@ -13835,17 +13869,30 @@ function syncPinCreateToServer(roomId, room, pin){
       timeLabel: pin.timeLabel || null,
       note: pin.note || null,
       location: pin.location || null,
+      locationLat: typeof pin.locationLat === 'number' ? pin.locationLat : null,
+      locationLon: typeof pin.locationLon === 'number' ? pin.locationLon : null,
       sourceMessageId: pin.reservationMsgId || pin.sourceMsgId || null,
     }),
   }).then(data => { pin.serverId = data.pin.id; }).catch(err => console.error('[pins] sync create failed:', err));
 }
 
-function syncPinLocationUpdateToServer(room, pin){
-  if(!authToken || !room.isRealRoom || !pin.serverId) return;
-  apiRequest(`/chats/pins/${pin.serverId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ location: pin.location || null }),
-  }).catch(err => console.error('[pins] sync update failed:', err));
+// 핀의 장소(위치)를 서버에 반영. 장소가 새로 등록/변경된 경우 서버가 채팅방에 알림 메시지(LOCATION_NOTICE)를
+// 만들어서 상대방에게 실시간으로 보내주고, 그 메시지를 응답으로 돌려주므로 호출한 쪽에서 내 화면에도 바로 반영할 수 있음
+async function syncPinLocationUpdateToServer(room, pin){
+  if(!authToken || !room.isRealRoom || !pin.serverId) return null;
+  try {
+    return await apiRequest(`/chats/pins/${pin.serverId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        location: pin.location || null,
+        locationLat: typeof pin.locationLat === 'number' ? pin.locationLat : null,
+        locationLon: typeof pin.locationLon === 'number' ? pin.locationLon : null,
+      }),
+    });
+  } catch(err){
+    console.error('[pins] sync update failed:', err);
+    return null;
+  }
 }
 
 function syncPinDeleteToServer(room, pin){
@@ -13865,6 +13912,8 @@ async function loadPinsFromServer(roomId, room){
       timeLabel: p.timeLabel,
       note: p.note,
       location: p.location,
+      locationLat: p.locationLat,
+      locationLon: p.locationLon,
       sourceMsgId: p.sourceMessageId,
       reservationMsgId: p.sourceMessageId,
       dateObj: p.dateLabel ? parseDateLabelToDate(p.dateLabel) : null,
@@ -14843,13 +14892,20 @@ function renderPinnedSchedule(){
     const setLocBtn = card.querySelector('.pin-set-loc');
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
-        openLocationPicker(location || '', pinned.locationLat, pinned.locationLon, (label, lat, lon) => {
+        openLocationPicker(location || '', pinned.locationLat, pinned.locationLon, async (label, lat, lon) => {
           pinned.location = label;
           pinned.locationLat = lat;
           pinned.locationLon = lon;
-          syncPinLocationUpdateToServer(room, pinned);
-          addHotplaceNoticeMessage(activeChatRoomId, label, lat, lon);
-          touchRoom(activeChatRoomId);
+          const roomId = activeChatRoomId;
+          const syncResult = await syncPinLocationUpdateToServer(room, pinned);
+          if(syncResult && syncResult.message){
+            // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨)
+            room.messages.push(mapServerLocationNoticeMessage(syncResult.message));
+          } else {
+            // 서버 동기화가 안 되는 방(로컬 데모 등)이면 기존처럼 로컬 알림만 추가
+            addHotplaceNoticeMessage(roomId, label, lat, lon);
+          }
+          touchRoom(roomId);
           renderPinnedSchedule();
           renderChatMessages();
           renderChatList();
@@ -15028,6 +15084,7 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
       if(m.type === 'RESERVATION') return mapServerReservationMessage(m);
       if(m.type === 'TIME_PROPOSAL') return mapServerTimeProposalMessage(m, room);
       if(m.type === 'LOCATION_SUGGEST') return mapServerLocationSuggestMessage(m);
+      if(m.type === 'LOCATION_NOTICE') return mapServerLocationNoticeMessage(m);
       if(m.type === 'IMAGE') return mapServerImageMessage(m);
       return {
         who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
@@ -15416,9 +15473,9 @@ function renderChatMessages(){
         });
       }
     } else if(m.type === 'system-notice'){
+      // 장소 삭제/예약 취소 등 단순 알림 카드라 답장 기능은 필요 없음 (일부러 붙이지 않음)
       row.className = 'msg-row system-notice-row';
       row.innerHTML = `<div class="system-notice-card">${m.text}</div>`;
-      attachReplyTapToCard(row.querySelector('.system-notice-card'), m);
     } else if(m.type === 'image'){
       const imgHtml = `<div class="msg-bubble msg-bubble-image"><img src="${m.imageUrl}" alt="사진" loading="lazy" /></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + imgHtml) : (imgHtml + metaHtml);
