@@ -525,6 +525,119 @@
     font-size:11.5px;
     color:var(--text-dim);
   }
+
+  /* ---------------- 장소 정하기 풀스크린(카카오톡 위치 공유 스타일) ---------------- */
+  .location-picker-full{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:3300;
+    background:var(--surface);
+    flex-direction:column;
+  }
+  .location-picker-full.show{ display:flex; }
+  .location-picker-topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 14px 10px;
+    flex-shrink:0;
+    background:#17181D;
+    color:#fff;
+  }
+  .location-picker-close{
+    width:34px; height:34px;
+    border-radius:50%;
+    border:none;
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    font-size:20px;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .location-picker-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:15px;
+  }
+  .location-picker-topbar-spacer{ width:34px; }
+  .location-picker-searchbar{
+    flex-shrink:0;
+    padding:0 14px 12px;
+    background:#17181D;
+  }
+  .location-picker-search-input{
+    width:100%;
+    box-sizing:border-box;
+    padding:12px 14px;
+    border-radius:12px;
+    border:none;
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    font-size:13px;
+  }
+  .location-picker-search-input::placeholder{ color:rgba(255,255,255,0.55); }
+  .location-picker-map-area{
+    position:relative;
+    flex:1;
+    min-height:0;
+    background:var(--surface-2);
+  }
+  .location-picker-map-area #locationPickerMap{
+    width:100%;
+    height:100%;
+  }
+  .location-picker-locate-btn{
+    position:absolute;
+    left:14px;
+    top:14px;
+    width:38px; height:38px;
+    border-radius:50%;
+    border:none;
+    background:var(--surface);
+    color:var(--text);
+    box-shadow:0 4px 12px rgba(0,0,0,0.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    z-index:10;
+  }
+  .location-picker-bottom-card{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    background:var(--surface);
+    border-top:1px solid var(--line);
+  }
+  .location-picker-bottom-text{ flex:1; min-width:0; }
+  .location-picker-bottom-name{
+    font-weight:700;
+    font-size:13.5px;
+    color:var(--text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .location-picker-bottom-addr{
+    font-size:11.5px;
+    color:var(--text-dim);
+    margin-top:2px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .location-picker-bottom-card .profile-chat-btn{
+    flex-shrink:0;
+    width:auto;
+    padding:0 18px;
+    height:40px;
+  }
   .location-picked-chip{
     display:none;
     align-items:center;
@@ -5024,24 +5137,29 @@
     </div>
   </div>
 
-  <!-- 장소 검색(지도 기반 위치 설정) 팝업 -->
-  <div class="hotplace-overlay" id="locationPickerOverlay">
-    <div class="hotplace-panel" style="height:auto;max-height:70vh;">
-      <div class="hotplace-panel-header">
-        <div class="hotplace-panel-title">장소 검색</div>
-        <button type="button" class="mini-confirm-close" id="locationPickerCloseBtn" aria-label="닫기">&times;</button>
+  <!-- 장소 정하기(카카오톡 위치 공유처럼 지도를 꽉 채워서 검색하거나 직접 핀을 찍는 풀스크린 화면) -->
+  <div class="location-picker-full" id="locationPickerOverlay">
+    <div class="location-picker-topbar">
+      <button type="button" class="location-picker-close" id="locationPickerCloseBtn" aria-label="닫기">&times;</button>
+      <div class="location-picker-title">지도</div>
+      <span class="location-picker-topbar-spacer"></span>
+    </div>
+    <div class="location-search-wrap location-picker-searchbar">
+      <input class="location-picker-search-input" id="locationPickerInput" placeholder="장소명으로 검색" maxlength="60" autocomplete="off" />
+      <div class="location-suggest-list" id="locationPickerSuggestList"></div>
+    </div>
+    <div class="location-picker-map-area">
+      <div id="locationPickerMap"></div>
+      <button type="button" class="location-picker-locate-btn" id="locationPickerLocateBtn" aria-label="내 위치로 이동">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
+    <div class="location-picker-bottom-card" id="locationPickerBottomCard">
+      <div class="location-picker-bottom-text">
+        <div class="location-picker-bottom-name" id="locationPickerBottomName">지도를 눌러 위치를 찍어보세요</div>
+        <div class="location-picker-bottom-addr" id="locationPickerBottomAddr"></div>
       </div>
-      <div style="padding:16px;">
-        <div class="location-search-wrap">
-          <input class="search-input" id="locationPickerInput" placeholder="주소나 장소명을 검색해보세요 (예: 강남역)" maxlength="60" autocomplete="off" />
-          <div class="location-suggest-list" id="locationPickerSuggestList"></div>
-        </div>
-        <div class="feed-place-map" id="locationPickerMapWrap" style="display:none;">
-          <div id="locationPickerMap" style="width:100%;height:140px;border-radius:10px;overflow:hidden;"></div>
-        </div>
-        <button type="button" class="profile-chat-btn" id="locationPickerConfirmBtn" style="margin-top:12px;" disabled>선택완료</button>
-        <button type="button" class="profile-chat-btn outline" id="locationPickerUseTypedBtn" style="margin-top:8px;">입력한 대로 찾기</button>
-      </div>
+      <button type="button" class="profile-chat-btn" id="locationPickerConfirmBtn" disabled>선택완료</button>
     </div>
   </div>
 
@@ -14119,60 +14237,119 @@ document.getElementById('reservationCancelConfirmYesBtn').addEventListener('clic
   if(action) action();
 });
 
-// ---------- 장소 정하기: 핫플 보기 전에 실제 위치 서비스로 정확한 주소를 먼저 검색/선택 ----------
-// 친구에게 예약 요청 보낼 때 쓰는 것과 같은 Nominatim 주소 검색을 재사용하되,
-// 어디서든(핀 고정 영역 등) 모달로 띄워서 쓸 수 있게 별도로 구현
+// ---------- 장소 정하기: 카카오톡 위치 공유처럼 지도를 꽉 채워서 검색하거나 직접 핀을 찍어서 고름 ----------
 let locationPickerCallback = null; // (label, lat, lon) => void - 장소를 고른 뒤 실행할 콜백
 let locationPickerDebounce = null;
-let locationPickerSelected = null; // 목록에서 고른(또는 지도에 핀 찍은) 장소 { label, lat, lon }
+let locationPickerSelected = null; // 검색으로 고르거나 지도에 핀 찍어서 확정한 장소 { label, lat, lon }
 let locationPickerMapInstance = null;
 let locationPickerMarker = null;
+let locationPickerGeocoder = null;
 
 function openLocationPicker(initialQuery, callback){
   locationPickerCallback = callback;
   const input = document.getElementById('locationPickerInput');
-  input.value = initialQuery || '';
+  input.value = '';
   document.getElementById('locationPickerSuggestList').classList.remove('show');
   document.getElementById('locationPickerSuggestList').innerHTML = '';
   resetLocationPickerSelection();
   document.getElementById('locationPickerOverlay').classList.add('show');
-  input.focus();
+
+  ensureKakaoMapsLoaded(() => {
+    initLocationPickerMap();
+    // 이전에 이미 정해둔 장소가 있으면 그 위치부터 지도에 보여주고, 없으면 현재 위치 근처로 시작함
+    if(initialQuery){
+      locationPickerGeocoder.addressSearch(initialQuery, (result, status) => {
+        if(status === kakao.maps.services.Status.OK && result[0]){
+          placeLocationPickerPin(parseFloat(result[0].y), parseFloat(result[0].x), initialQuery);
+        } else {
+          searchLocationPickerSuggestions(initialQuery, { centerOnly:true });
+        }
+      });
+    } else {
+      centerLocationPickerOnCurrentPosition();
+    }
+  });
 }
 function closeLocationPicker(){
   document.getElementById('locationPickerOverlay').classList.remove('show');
   locationPickerCallback = null;
   clearTimeout(locationPickerDebounce);
+  document.getElementById('locationPickerInput').value = '';
+  document.getElementById('locationPickerSuggestList').classList.remove('show');
   resetLocationPickerSelection();
 }
 
-// 목록에서 새로 검색하거나 모달을 열고 닫을 때, 이전에 골라둔 장소/핀/선택완료 버튼 상태를 초기화
+// 새로 열거나 닫을 때, 이전에 찍어둔 핀/선택완료 버튼 상태를 초기화
 function resetLocationPickerSelection(){
   locationPickerSelected = null;
-  document.getElementById('locationPickerMapWrap').style.display = 'none';
   document.getElementById('locationPickerConfirmBtn').disabled = true;
-  document.getElementById('locationPickerSuggestList').querySelectorAll('.location-suggest-item.selected')
-    .forEach(el => el.classList.remove('selected'));
+  document.getElementById('locationPickerBottomName').textContent = '지도를 눌러 위치를 찍어보세요';
+  document.getElementById('locationPickerBottomAddr').textContent = '';
+  if(locationPickerMarker){ locationPickerMarker.setMap(null); locationPickerMarker = null; }
 }
 
-// 고른 장소를 작은 지도 위에 카카오톡 위치 공유처럼 핀으로 찍어서 보여줌
-function showLocationPickerMap(lat, lon){
-  document.getElementById('locationPickerMapWrap').style.display = 'block';
-  ensureKakaoMapsLoaded(() => {
-    const container = document.getElementById('locationPickerMap');
-    const center = new kakao.maps.LatLng(lat, lon);
-    if(!locationPickerMapInstance){
-      locationPickerMapInstance = new kakao.maps.Map(container, { center, level: 4 });
-    } else {
-      locationPickerMapInstance.setCenter(center);
-    }
-    setTimeout(() => locationPickerMapInstance.relayout(), 0);
-    if(locationPickerMarker) locationPickerMarker.setMap(null);
-    locationPickerMarker = new kakao.maps.Marker({ position: center, map: locationPickerMapInstance });
+// 지도를 한 번만 만들고, 지도 아무 곳이나 누르면 그 자리에 핀을 찍고 주소를 역지오코딩해서 보여줌(카카오톡 위치 공유와 동일한 방식)
+function initLocationPickerMap(){
+  if(locationPickerMapInstance) return;
+  const container = document.getElementById('locationPickerMap');
+  locationPickerMapInstance = new kakao.maps.Map(container, {
+    center: new kakao.maps.LatLng(37.5665, 126.9780),
+    level: 4,
+  });
+  locationPickerGeocoder = new kakao.maps.services.Geocoder();
+  kakao.maps.event.addListener(locationPickerMapInstance, 'click', (mouseEvent) => {
+    const pos = mouseEvent.latLng;
+    dropLocationPickerMarker(pos.getLat(), pos.getLng());
+    locationPickerGeocoder.coord2Address(pos.getLng(), pos.getLat(), (result, status) => {
+      const placeName = (status === kakao.maps.services.Status.OK && result[0])
+        ? (result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name)
+        : '선택한 위치';
+      setLocationPickerSelected(placeName, pos.getLat(), pos.getLng());
+    });
   });
 }
 
+// 사용자의 현재 위치 근처로 지도를 옮겨서 시작 (실패하면 그냥 서울시청 근처를 기본값으로 둠)
+function centerLocationPickerOnCurrentPosition(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const center = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+      locationPickerMapInstance.setCenter(center);
+      setTimeout(() => locationPickerMapInstance.relayout(), 0);
+    },
+    () => {},
+    { timeout: 4000 }
+  );
+}
+
+document.getElementById('locationPickerLocateBtn').addEventListener('click', centerLocationPickerOnCurrentPosition);
+
+// 지도 위에 핀을 옮겨 찍음 (검색 결과를 골랐을 때 / 지도를 직접 눌렀을 때 공통으로 사용)
+function dropLocationPickerMarker(lat, lon){
+  const pos = new kakao.maps.LatLng(lat, lon);
+  locationPickerMapInstance.setCenter(pos);
+  if(locationPickerMarker) locationPickerMarker.setMap(null);
+  locationPickerMarker = new kakao.maps.Marker({ position: pos, map: locationPickerMapInstance });
+  setTimeout(() => locationPickerMapInstance.relayout(), 0);
+}
+
+// 검색으로 고른 장소 하나를 지도에 반영 + 핀을 찍고 하단 카드/선택완료 버튼을 활성화
+function placeLocationPickerPin(lat, lon, label){
+  dropLocationPickerMarker(lat, lon);
+  setLocationPickerSelected(label, lat, lon);
+}
+
+// 확정된 위치를 하단 카드에 표시하고 선택완료 버튼을 활성화
+function setLocationPickerSelected(label, lat, lon){
+  locationPickerSelected = { label, lat, lon };
+  document.getElementById('locationPickerBottomName').textContent = label;
+  document.getElementById('locationPickerBottomAddr').textContent = '이 위치로 정할까요?';
+  document.getElementById('locationPickerConfirmBtn').disabled = false;
+}
+
 // 카카오 장소 검색(키워드 검색)으로 "강남역", "강남역 5번출구"처럼 실제로 등록된 장소들을 목록으로 보여줌
-function searchLocationPickerSuggestions(query){
+function searchLocationPickerSuggestions(query, opts){
   const listEl = document.getElementById('locationPickerSuggestList');
   listEl.innerHTML = `<div class="location-suggest-status">검색 중...</div>`;
   listEl.classList.add('show');
@@ -14181,10 +14358,17 @@ function searchLocationPickerSuggestions(query){
     const places = new kakao.maps.services.Places();
     places.keywordSearch(query, (results, status) => {
       // 검색어가 바뀌는 동안 늦게 도착한 이전 결과는 무시함
-      if(document.getElementById('locationPickerInput').value.trim() !== query) return;
+      if(document.getElementById('locationPickerInput').value.trim() !== query && !(opts && opts.centerOnly)) return;
 
       if(status !== kakao.maps.services.Status.OK || !results || results.length === 0){
-        listEl.innerHTML = `<div class="location-suggest-status">검색 결과가 없어요. 다른 이름으로 검색해보세요.</div>`;
+        listEl.innerHTML = `<div class="location-suggest-status">검색 결과가 없어요. 지도를 직접 눌러 위치를 찍어보세요.</div>`;
+        return;
+      }
+      // 이전에 정해둔 장소를 다시 보여주려고 부른 경우엔 목록 없이 지도만 그 위치로 옮겨줌
+      if(opts && opts.centerOnly){
+        listEl.classList.remove('show');
+        const first = results[0];
+        placeLocationPickerPin(parseFloat(first.y), parseFloat(first.x), first.place_name);
         return;
       }
       const top = results.slice(0, 8);
@@ -14203,7 +14387,6 @@ function searchLocationPickerSuggestions(query){
 }
 
 document.getElementById('locationPickerInput').addEventListener('input', (e) => {
-  resetLocationPickerSelection();
   const query = e.target.value.trim();
   clearTimeout(locationPickerDebounce);
   if(query.length < 2){
@@ -14220,19 +14403,14 @@ document.getElementById('locationPickerSuggestList').addEventListener('click', (
   const picked = results[parseInt(item.dataset.idx, 10)];
   if(!picked) return;
 
-  document.getElementById('locationPickerSuggestList').querySelectorAll('.location-suggest-item.selected')
-    .forEach(el => el.classList.remove('selected'));
-  item.classList.add('selected');
-
+  document.getElementById('locationPickerSuggestList').classList.remove('show');
   const lat = parseFloat(picked.y), lon = parseFloat(picked.x);
-  locationPickerSelected = { label: picked.place_name, lat, lon };
-  document.getElementById('locationPickerConfirmBtn').disabled = false;
-  showLocationPickerMap(lat, lon);
+  placeLocationPickerPin(lat, lon, picked.place_name);
 });
 
 document.getElementById('locationPickerConfirmBtn').addEventListener('click', () => {
   if(!locationPickerSelected){
-    showToast('목록에서 장소를 먼저 골라주세요.');
+    showToast('지도에서 위치를 먼저 찍어주세요.');
     return;
   }
   const { label, lat, lon } = locationPickerSelected;
@@ -14241,21 +14419,7 @@ document.getElementById('locationPickerConfirmBtn').addEventListener('click', ()
   if(cb) cb(label, lat, lon);
 });
 
-document.getElementById('locationPickerUseTypedBtn').addEventListener('click', () => {
-  const query = document.getElementById('locationPickerInput').value.trim();
-  if(!query){
-    showToast('장소를 입력해주세요.');
-    return;
-  }
-  const cb = locationPickerCallback;
-  closeLocationPicker();
-  if(cb) cb(query, null, null);
-});
-
 document.getElementById('locationPickerCloseBtn').addEventListener('click', closeLocationPicker);
-document.getElementById('locationPickerOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'locationPickerOverlay') closeLocationPicker();
-});
 
 // 실제 지도(구글 지도) 기반으로 약속 장소를 보여주고, 커뮤니티 멤버들이 추천한 밥집/카페/액티비티도 함께 보여줌
 // 주소 검색으로 좌표(lat/lon)까지 정해진 경우엔 그 정확한 좌표를 지도 중심으로 사용
