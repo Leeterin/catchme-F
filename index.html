@@ -14848,8 +14848,11 @@ function renderPinnedSchedule(){
           pinned.locationLat = lat;
           pinned.locationLon = lon;
           syncPinLocationUpdateToServer(room, pinned);
+          addHotplaceNoticeMessage(activeChatRoomId, label, lat, lon);
+          touchRoom(activeChatRoomId);
           renderPinnedSchedule();
           renderChatMessages();
+          renderChatList();
           openHotplaceView(label, lat, lon);
         });
       });
