@@ -5171,20 +5171,19 @@
         <button type="button" class="mini-confirm-close" id="hotplaceCloseBtn" aria-label="닫기">&times;</button>
       </div>
       <div class="hotplace-tabs" id="hotplaceTabs">
-        <button type="button" class="hotplace-tab active" data-tab="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg> 장소</button>
-        <button type="button" class="hotplace-tab" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg> 밥집</button>
+        <button type="button" class="hotplace-tab active" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg> 밥집</button>
         <button type="button" class="hotplace-tab" data-tab="cafe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> 카페</button>
         <button type="button" class="hotplace-tab" data-tab="experience"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg> 액티비티</button>
         <button type="button" class="hotplace-tab" data-tab="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg> 저장</button>
       </div>
-      <div class="hotplace-pane active" id="hotplacePane-map">
+      <div class="hotplace-pane" id="hotplacePane-map" style="display:none;">
         <div class="map-search-row">
           <input type="text" class="search-input" id="mapPlaceSearchInput" placeholder="스타벅스, 맛집 등 검색" style="margin-bottom:0;" />
           <button type="button" class="map-search-btn" id="mapPlaceSearchBtn">검색</button>
         </div>
         <div id="hotplaceMapFrame" class="hotplace-map-frame"></div>
       </div>
-      <div class="hotplace-pane" id="hotplacePane-food">
+      <div class="hotplace-pane active" id="hotplacePane-food">
         <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 밥집이에요.</div>
         <div id="hotplaceList-food"></div>
       </div>
@@ -14645,14 +14644,11 @@ function openHotplaceView(location, lat, lon){
   renderNaverPlacesSection('food', `${location} 맛집`);
   renderNaverPlacesSection('cafe', `${location} 카페`);
 
-  // 열 때마다 "장소" 탭으로 초기화
-  document.querySelectorAll('.hotplace-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'map'));
-  document.querySelectorAll('.hotplace-pane').forEach(p => p.classList.toggle('active', p.id === 'hotplacePane-map'));
+  // 열 때마다 "밥집" 탭으로 초기화 (지도/장소 탭은 없앴으니 바로 목록부터 보여줌)
+  document.querySelectorAll('.hotplace-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'food'));
+  document.querySelectorAll('.hotplace-pane').forEach(p => p.classList.toggle('active', p.id === 'hotplacePane-food'));
 
   document.getElementById('hotplaceOverlay').classList.add('show');
-  document.getElementById('mapPlaceSearchInput').value = '';
-  clearKakaoSearchMarkers();
-  renderKakaoMap(location, lastHotplaceLat, lastHotplaceLon);
   pushViewState(closeHotplaceView);
 }
 function closeHotplaceView(){
