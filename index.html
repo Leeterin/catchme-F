@@ -1097,7 +1097,14 @@
     font-size:20px;
     font-weight:800;
     color:var(--text);
+    background:none;
+    border:none;
+    padding:0;
+    text-align:left;
+    cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;
   }
+  .feed-detail-title:hover{ text-decoration:underline; }
   .feed-detail-kebab-wrap{ position:relative; flex-shrink:0; }
   .feed-detail-kebab-btn{
     border:none;
@@ -1262,13 +1269,76 @@
     font-size:13px;
     flex-shrink:0;
   }
-  /* 대표 게시물(장소당 첫 리뷰) - 인스타그램 게시물처럼 사진을 크게 보여줌 */
+  /* 소식 게시물 - 인스타그램 피드처럼 사진이 카드 끝까지 크게 채워지고, 여러 장이면 옆으로 넘겨봄 */
+  .feed-ig-photos{
+    position:relative;
+    margin:-13px -14px 10px;
+    overflow:hidden;
+  }
+  .feed-review-photos.feed-review-photos-hero{
+    margin:0;
+    gap:0;
+    scroll-snap-type:x mandatory;
+  }
   .feed-review-photos-hero img{
-    width:calc(100% - 6px);
-    max-width:280px;
-    height:260px;
+    width:100%;
+    max-width:none;
+    height:340px;
+    scroll-snap-align:start;
+    border-radius:0;
+  }
+  .feed-ig-photo-count{
+    position:absolute;
+    top:10px;
+    right:10px;
+    background:rgba(0,0,0,0.55);
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:999px;
+    pointer-events:none;
   }
   .feed-post-hero .feed-post-note{ font-size:13.5px; line-height:1.6; }
+  .feed-ig-header{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    margin-bottom:10px;
+  }
+  .feed-ig-header .placeholder-avatar{
+    width:32px;
+    height:32px;
+    font-size:12px;
+  }
+  .feed-ig-author-name{
+    font-size:13px;
+    font-weight:700;
+    color:var(--text);
+  }
+  .feed-ig-tag-row{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:4px;
+  }
+  .feed-ig-place-tag{
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+    color:var(--accent);
+  }
+  .feed-ig-place-tag:hover{ text-decoration:underline; }
+  .feed-tag-sub{
+    font-size:12px;
+    color:var(--text-dim);
+    margin:-4px 0 12px;
+  }
   /* 다른 사람들의 리뷰 - 댓글처럼 작은 한 줄로 보여줌 */
   .feed-secondary-review-title{
     font-size:11px;
@@ -1684,6 +1754,7 @@
     border-radius:14px;
     padding:13px 14px;
     margin-bottom:10px;
+    overflow:hidden;
   }
   .feed-post-card.sponsored{
     border-color:#F59E0B;
@@ -5719,6 +5790,14 @@
         <div id="feedPlaceDetailHeader"></div>
       </div>
 
+      <!-- 장소 태그(#상호명)를 눌렀을 때 - 카테고리 상관없이 같은 장소로 올라온 다른 글들을 해시태그처럼 모아서 보여줌 -->
+      <div class="feed-list-view" id="feedTagView">
+        <button class="profile-back" id="feedTagBackBtn">&#8249; 뒤로</button>
+        <div class="friend-calendar-title" id="feedTagTitle"></div>
+        <div class="feed-tag-sub" id="feedTagSub"></div>
+        <div id="feedTagListContainer"></div>
+      </div>
+
       <div class="feed-create-view" id="feedCreateView">
         <button class="profile-back" id="feedCreateBackBtn">&#8249; 뒤로</button>
         <div class="friend-calendar-title" id="feedCreateHeaderTitle">추천하기</div>
@@ -5765,7 +5844,7 @@
         </div>
 
         <div class="feed-create-section">
-          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">선택 · 최대 3장</span></div>
+          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">필수 · 1~5장</span></div>
           <div class="feed-photo-row" id="feedPhotoRow">
             <button type="button" class="feed-photo-add-btn" id="feedPhotoAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           </div>
@@ -8022,22 +8101,33 @@ function renderFeedPosts(){
 }
 renderFeedPosts();
 
-// 게시물 하나를 카드로 그림 - 제목(상호명) - 위치(지도 연동) - 별점 - 한줄소개 - 사진 - 작성자/좋아요/댓글 순
+// 게시물 하나를 카드로 그림 - 인스타그램 피드처럼 사진이 먼저 크게 나오고, 그 아래 작성자/장소태그/별점/한줄소개 순
 // 게시물 카드 하나의 HTML을 만듦 (목록/상세보기 화면 공용)
 function feedPostCardHtml(post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const photos = post.photos || [];
   const mapUrl = feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon);
+  const authorKey = post.author ? (post.author.username || post.author.id) : '?';
+  const authorInitial = post.author && post.author.name ? post.author.name[0] : '?';
   return `
-    <div class="feed-post-title-row">
-      <span class="feed-post-place">${escapeHtml(post.title || '')}</span>
+    ${photos.length > 0 ? `
+      <div class="feed-ig-photos">
+        <div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>
+        ${photos.length > 1 ? `<div class="feed-ig-photo-count">📷 ${photos.length}</div>` : ''}
+      </div>
+    ` : ''}
+    <div class="feed-ig-header">
+      <div class="placeholder-avatar" style="background:${colorForFriendId(authorKey)}">${escapeHtml(authorInitial)}</div>
+      <div class="feed-ig-author-name">${escapeHtml(post.author ? post.author.name : '')}</div>
+    </div>
+    <div class="feed-ig-tag-row">
+      <button type="button" class="feed-ig-place-tag">#${escapeHtml(post.title || '')}</button>
+      ${typeof post.avgRating === 'number' ? `<span class="feed-review-stars">${renderStarsHtml(post.avgRating)} <span class="feed-rating-count">${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</span></span>` : ''}
     </div>
     ${post.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(post.location)}</a>` : ''}
-    ${typeof post.avgRating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(post.avgRating)} <span class="feed-rating-count">${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</span></div>` : ''}
     <div class="feed-post-note">${escapeHtml(post.note || '')}</div>
-    ${photos.length > 0 ? `<div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
     <div class="feed-post-bottom-row">
-      <div class="feed-post-author">${escapeHtml(post.author ? post.author.name : '')}</div>
+      <div></div>
       ${isMine ? `
         <div class="feed-post-owner-actions">
           <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
@@ -8113,7 +8203,7 @@ function feedPostDetailHtml(post){
     ` : ''}
     <div class="feed-detail-body">
       <div class="feed-detail-title-row">
-        <div class="feed-detail-title">${escapeHtml(post.title || '')}</div>
+        <button type="button" class="feed-detail-title" title="이 장소의 다른 글 모아보기">${escapeHtml(post.title || '')}</button>
         <div class="feed-detail-kebab-wrap">
           <button type="button" class="feed-detail-kebab-btn">⋮</button>
           <div class="feed-detail-kebab-menu">
@@ -8158,6 +8248,8 @@ function feedPostDetailHtml(post){
 // 상세보기 화면의 리뷰(댓글)/수정/삭제/신고/저장/공유 동작을 전부 연결함
 function wireFeedPostDetail(container, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
+  const titleBtn = container.querySelector('.feed-detail-title');
+  if(titleBtn) titleBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
   if(isMine){
     const editBtn = container.querySelector('.feed-review-edit-btn');
     if(editBtn) editBtn.addEventListener('click', () => { container.querySelector('.feed-detail-kebab-menu').classList.remove('open'); openFeedReviewEdit(post); });
@@ -8347,6 +8439,41 @@ function closeFeedPostDetail(){
 }
 document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPostDetail));
 
+// 장소 태그(#상호명)를 눌렀을 때 - 카테고리(맛집/카페/체험) 상관없이 이름이 같은 장소로 올라온 글을 전부 모아서 보여줌
+function openFeedPlaceTagView(placeName){
+  const name = (placeName || '').trim();
+  if(!name) return;
+
+  const posts = ['food', 'cafe', 'experience']
+    .flatMap(cat => FEED_POSTS[cat] || [])
+    .filter(p => (p.title || '').trim() === name)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  document.getElementById('feedTagTitle').textContent = `# ${name}`;
+  document.getElementById('feedTagSub').textContent = `이 장소에 올라온 글 ${posts.length}개`;
+
+  const container = document.getElementById('feedTagListContainer');
+  container.innerHTML = '';
+  if(posts.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = '아직 이 장소에 대한 다른 글이 없어요.';
+    container.appendChild(empty);
+  } else {
+    posts.forEach(post => renderFeedPostCard(post, container));
+  }
+
+  document.getElementById('feedListView').classList.remove('active');
+  document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('feedTagView').classList.add('active');
+  pushViewState(closeFeedPlaceTagView);
+}
+function closeFeedPlaceTagView(){
+  document.getElementById('feedTagView').classList.remove('active');
+  document.getElementById('feedListView').classList.add('active');
+}
+document.getElementById('feedTagBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceTagView));
+
 // 게시물 삭제 공통 처리
 async function deleteFeedPostItem(post){
   await apiRequest(`/feed/${post.id}`, { method: 'DELETE' });
@@ -8358,6 +8485,9 @@ async function deleteFeedPostItem(post){
 // 게시물 카드의 동작(좋아요·댓글·수정·삭제·신고) 연결
 function wireFeedPostCard(card, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
+  // 장소 태그(#상호명)를 누르면 해시태그처럼 같은 장소로 올라온 다른 글들을 모아서 보여줌
+  const tagBtn = card.querySelector('.feed-ig-place-tag');
+  if(tagBtn) tagBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
   if(isMine){
     const editBtn = card.querySelector('.feed-review-edit-btn');
     if(editBtn) editBtn.addEventListener('click', () => openFeedReviewEdit(post));
@@ -8522,7 +8652,8 @@ let feedFormMode = 'create'; // 'create'(새 게시물 작성) | 'editReview'(�
 let feedPlacePicked = null; // { lat, lon } - 검색해서 실제로 고른 장소면 좌표까지 저장됨
 let feedPlaceMapInstance = null;
 let feedSelectedRating = 0; // 지금 폼에서 고른 별점 (1~5, 0이면 아직 안 고름)
-let feedSelectedPhotos = []; // 지금 폼에 첨부된 사진들 (base64 문자열 배열, 최대 3장)
+let feedSelectedPhotos = []; // 지금 폼에 첨부된 사진들 (base64 문자열 배열, 최소 1장 ~ 최대 5장)
+const FEED_MAX_PHOTOS = 5;
 
 function setFeedPlaceFieldsLocked(locked){
   document.getElementById('feedPlaceInput').disabled = locked;
@@ -8554,13 +8685,13 @@ function renderFeedPhotoRow(){
     });
     row.insertBefore(thumb, addBtn);
   });
-  addBtn.style.display = feedSelectedPhotos.length >= 3 ? 'none' : 'flex';
+  addBtn.style.display = feedSelectedPhotos.length >= FEED_MAX_PHOTOS ? 'none' : 'flex';
 }
 document.getElementById('feedPhotoAddBtn').addEventListener('click', () => document.getElementById('feedPhotoInput').click());
 document.getElementById('feedPhotoInput').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];
   e.target.value = '';
-  if(!file || feedSelectedPhotos.length >= 3) return;
+  if(!file || feedSelectedPhotos.length >= FEED_MAX_PHOTOS) return;
   const reader = new FileReader();
   reader.onload = (ev) => {
     const img = new Image();
@@ -8738,6 +8869,10 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
   }
   if(feedSelectedRating < 1){
     showToast('별점을 골라주세요.');
+    return;
+  }
+  if(feedSelectedPhotos.length < 1){
+    showToast('사진을 1장 이상 올려주세요.');
     return;
   }
   if(!authToken){
