@@ -13820,10 +13820,10 @@ function addHotplaceNoticeMessage(roomId, location, lat, lon, pinId){
 
 // 같은 핀(pinId)에 대한 장소 알림 카드가 이미 있으면 지우고, 새 알림 하나만 채팅에 남김
 // (장소가 바뀔 때마다 카드가 계속 쌓이지 않고, 항상 최신 장소 하나만 보이게 하기 위함)
+// 이 채팅방엔 "OO 근처에서 만나요!" 알림이 항상 최신 하나만 남아야 하므로 (서버도 이제 방 단위로 이전 알림을 전부 지움),
+// 핀 id가 같은지 여부와 상관없이 이 방의 예전 핫플 알림 카드는 모두 지우고 새 알림 하나만 남김
 function replaceHotplaceNoticeForPin(room, newMsg){
-  if(newMsg.pinId){
-    room.messages = room.messages.filter(m => !(m.type === 'hotplace' && m.pinId === newMsg.pinId));
-  }
+  room.messages = room.messages.filter(m => m.type !== 'hotplace');
   room.messages.push(newMsg);
 }
 
