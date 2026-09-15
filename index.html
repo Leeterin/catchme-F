@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=c2b6e952138d9653c48eff5fc17de641&libraries=services&autoload=false"></script>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=0478c56c589c7ff7bca5d5bbd76cb0c6&libraries=services&autoload=false"></script>
 <style>
   :root{
     --bg:#FAFAF8;
@@ -516,11 +516,127 @@
   }
   .location-suggest-item:last-child{ border-bottom:none; }
   .location-suggest-item:hover{ background:var(--surface-2); }
+  .location-suggest-item.selected{ background:var(--accent-soft); }
   .location-suggest-item .pin{ color:var(--accent); flex-shrink:0; }
+  .location-suggest-item .name{ font-weight:600; color:var(--text); }
+  .location-suggest-item .addr{ font-size:11px; color:var(--text-dim); margin-top:2px; }
   .location-suggest-status{
     padding:10px 12px;
     font-size:11.5px;
     color:var(--text-dim);
+  }
+
+  /* ---------------- 장소 정하기 풀스크린(카카오톡 위치 공유 스타일) ---------------- */
+  .location-picker-full{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:3300;
+    background:var(--surface);
+    flex-direction:column;
+  }
+  .location-picker-full.show{ display:flex; }
+  .location-picker-topbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 14px 10px;
+    flex-shrink:0;
+    background:#17181D;
+    color:#fff;
+  }
+  .location-picker-close{
+    width:34px; height:34px;
+    border-radius:50%;
+    border:none;
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    font-size:20px;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .location-picker-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:15px;
+  }
+  .location-picker-topbar-spacer{ width:34px; }
+  .location-picker-searchbar{
+    flex-shrink:0;
+    padding:0 14px 12px;
+    background:#17181D;
+  }
+  .location-picker-search-input{
+    width:100%;
+    box-sizing:border-box;
+    padding:12px 14px;
+    border-radius:12px;
+    border:none;
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    font-size:13px;
+  }
+  .location-picker-search-input::placeholder{ color:rgba(255,255,255,0.55); }
+  .location-picker-map-area{
+    position:relative;
+    flex:1;
+    min-height:0;
+    background:var(--surface-2);
+  }
+  .location-picker-map-area #locationPickerMap{
+    width:100%;
+    height:100%;
+  }
+  .location-picker-locate-btn{
+    position:absolute;
+    left:14px;
+    top:14px;
+    width:38px; height:38px;
+    border-radius:50%;
+    border:none;
+    background:var(--surface);
+    color:var(--text);
+    box-shadow:0 4px 12px rgba(0,0,0,0.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    z-index:10;
+  }
+  .location-picker-bottom-card{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+    background:var(--surface);
+    border-top:1px solid var(--line);
+  }
+  .location-picker-bottom-text{ flex:1; min-width:0; }
+  .location-picker-bottom-name{
+    font-weight:700;
+    font-size:13.5px;
+    color:var(--text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .location-picker-bottom-addr{
+    font-size:11.5px;
+    color:var(--text-dim);
+    margin-top:2px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .location-picker-bottom-card .profile-chat-btn{
+    flex-shrink:0;
+    width:auto;
+    padding:0 18px;
+    height:40px;
   }
   .location-picked-chip{
     display:none;
@@ -981,7 +1097,14 @@
     font-size:20px;
     font-weight:800;
     color:var(--text);
+    background:none;
+    border:none;
+    padding:0;
+    text-align:left;
+    cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;
   }
+  .feed-detail-title:hover{ text-decoration:underline; }
   .feed-detail-kebab-wrap{ position:relative; flex-shrink:0; }
   .feed-detail-kebab-btn{
     border:none;
@@ -1146,13 +1269,76 @@
     font-size:13px;
     flex-shrink:0;
   }
-  /* 대표 게시물(장소당 첫 리뷰) - 인스타그램 게시물처럼 사진을 크게 보여줌 */
+  /* 소식 게시물 - 인스타그램 피드처럼 사진이 카드 끝까지 크게 채워지고, 여러 장이면 옆으로 넘겨봄 */
+  .feed-ig-photos{
+    position:relative;
+    margin:-13px -14px 10px;
+    overflow:hidden;
+  }
+  .feed-review-photos.feed-review-photos-hero{
+    margin:0;
+    gap:0;
+    scroll-snap-type:x mandatory;
+  }
   .feed-review-photos-hero img{
-    width:calc(100% - 6px);
-    max-width:280px;
-    height:260px;
+    width:100%;
+    max-width:none;
+    height:340px;
+    scroll-snap-align:start;
+    border-radius:0;
+  }
+  .feed-ig-photo-count{
+    position:absolute;
+    top:10px;
+    right:10px;
+    background:rgba(0,0,0,0.55);
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    padding:3px 9px;
+    border-radius:999px;
+    pointer-events:none;
   }
   .feed-post-hero .feed-post-note{ font-size:13.5px; line-height:1.6; }
+  .feed-ig-header{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    margin-bottom:10px;
+  }
+  .feed-ig-header .placeholder-avatar{
+    width:32px;
+    height:32px;
+    font-size:12px;
+  }
+  .feed-ig-author-name{
+    font-size:13px;
+    font-weight:700;
+    color:var(--text);
+  }
+  .feed-ig-tag-row{
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:4px;
+  }
+  .feed-ig-place-tag{
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+    color:var(--accent);
+  }
+  .feed-ig-place-tag:hover{ text-decoration:underline; }
+  .feed-tag-sub{
+    font-size:12px;
+    color:var(--text-dim);
+    margin:-4px 0 12px;
+  }
   /* 다른 사람들의 리뷰 - 댓글처럼 작은 한 줄로 보여줌 */
   .feed-secondary-review-title{
     font-size:11px;
@@ -1568,6 +1754,7 @@
     border-radius:14px;
     padding:13px 14px;
     margin-bottom:10px;
+    overflow:hidden;
   }
   .feed-post-card.sponsored{
     border-color:#F59E0B;
@@ -1620,6 +1807,35 @@
     font-size:10.5px;
     color:var(--text-dim);
   }
+  /* 카드 맨 위: 장소명 + (있으면) 도보 시간 배지 - 배지가 이름 옆에서 줄바꿈되며 겹치던 문제를 막기 위해
+     둘 다 flex-wrap으로 감싸고 배지는 pill 모양으로 줄바꿈 없이 표시함 */
+  .feed-post-card-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+    margin-bottom:6px;
+  }
+  .feed-post-card-head .feed-post-place{
+    flex:1;
+    min-width:0;
+    line-height:1.35;
+  }
+  .feed-post-walk-badge{
+    flex:none;
+    display:inline-flex;
+    align-items:center;
+    gap:2px;
+    white-space:nowrap;
+    background:rgba(59,130,246,0.12);
+    color:var(--accent);
+    font-family:'Inter',sans-serif;
+    font-size:10.5px;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:999px;
+    margin-top:1px;
+  }
   .feed-post-location-link{
     display:inline-flex;
     align-items:center;
@@ -1630,6 +1846,17 @@
     color:var(--accent);
     text-decoration:none;
     margin-bottom:8px;
+    background:none;
+    border:none;
+    padding:0;
+    cursor:pointer;
+    max-width:100%;
+    text-align:left;
+  }
+  .feed-post-location-link span{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
   }
   .feed-post-location-link:hover{ text-decoration:underline; }
   .feed-post-note{
@@ -2391,11 +2618,17 @@
     border-top:1px solid var(--line);
   }
   .chat-date-divider{
-    text-align:center;
+    display:flex;
+    justify-content:center;
+    margin:16px 0 12px;
+  }
+  .chat-date-divider span{
+    background:var(--surface-2);
     color:var(--text-dim);
     font-size:11.5px;
-    font-weight:500;
-    margin:14px 0 10px;
+    font-weight:600;
+    padding:5px 14px;
+    border-radius:999px;
   }
   .msg-row{
     display:flex;
@@ -3670,6 +3903,94 @@
     border:none;
     background:var(--surface-2);
   }
+
+  /* 밥집 카드에서 주소를 눌렀을 때, 약속장소와 그 밥집을 함께 보여주는 작은 지도 오버레이 */
+  .place-detail-map-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(23,24,29,0.55);
+    align-items:center;
+    justify-content:center;
+    z-index:3200;
+    padding:20px;
+  }
+  .place-detail-map-overlay.show{ display:flex; }
+  .place-detail-map-panel{
+    width:100%;
+    max-width:392px;
+    height:70vh;
+    max-height:560px;
+    background:var(--surface);
+    border-radius:18px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    box-shadow:0 16px 40px rgba(0,0,0,0.28);
+    position:relative;
+  }
+  .place-detail-map-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 14px 12px 18px;
+    border-bottom:1px solid var(--line);
+    flex-shrink:0;
+    gap:8px;
+  }
+  .place-detail-map-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .place-detail-map-canvas{
+    flex:1;
+    width:100%;
+    min-height:200px;
+    border:none;
+    background:var(--surface-2);
+  }
+  .place-detail-map-legend{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    padding:12px 16px;
+    border-top:1px solid var(--line);
+    flex-shrink:0;
+  }
+  .place-detail-map-legend-item{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:12px;
+    font-weight:600;
+    color:var(--text);
+  }
+  .place-detail-map-dot{
+    flex-shrink:0;
+    width:9px;
+    height:9px;
+    border-radius:50%;
+  }
+  .place-detail-map-dot.appt{ background:#F5A623; }
+  .place-detail-map-dot.place{ background:var(--accent); }
+  .place-detail-map-pin-label{
+    transform:translateY(-4px);
+    padding:3px 8px;
+    border-radius:8px;
+    font-size:11px;
+    font-weight:700;
+    font-family:'Inter',sans-serif;
+    white-space:nowrap;
+    color:#FFFFFF;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+  }
+  .place-detail-map-pin-label.appt{ background:#F5A623; }
+  .place-detail-map-pin-label.place{ background:var(--accent); }
 
   .custom-picker-overlay{
     position:fixed;
@@ -5015,20 +5336,29 @@
     </div>
   </div>
 
-  <!-- 장소 검색(지도 기반 위치 설정) 팝업 -->
-  <div class="hotplace-overlay" id="locationPickerOverlay">
-    <div class="hotplace-panel" style="height:auto;max-height:70vh;">
-      <div class="hotplace-panel-header">
-        <div class="hotplace-panel-title">장소 검색</div>
-        <button type="button" class="mini-confirm-close" id="locationPickerCloseBtn" aria-label="닫기">&times;</button>
+  <!-- 장소 정하기(카카오톡 위치 공유처럼 지도를 꽉 채워서 검색하거나 직접 핀을 찍는 풀스크린 화면) -->
+  <div class="location-picker-full" id="locationPickerOverlay">
+    <div class="location-picker-topbar">
+      <button type="button" class="location-picker-close" id="locationPickerCloseBtn" aria-label="닫기">&times;</button>
+      <div class="location-picker-title">지도</div>
+      <span class="location-picker-topbar-spacer"></span>
+    </div>
+    <div class="location-search-wrap location-picker-searchbar">
+      <input class="location-picker-search-input" id="locationPickerInput" placeholder="장소명으로 검색" maxlength="60" autocomplete="off" />
+      <div class="location-suggest-list" id="locationPickerSuggestList"></div>
+    </div>
+    <div class="location-picker-map-area">
+      <div id="locationPickerMap"></div>
+      <button type="button" class="location-picker-locate-btn" id="locationPickerLocateBtn" aria-label="내 위치로 이동">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+      </button>
+    </div>
+    <div class="location-picker-bottom-card" id="locationPickerBottomCard">
+      <div class="location-picker-bottom-text">
+        <div class="location-picker-bottom-name" id="locationPickerBottomName">지도를 눌러 위치를 찍어보세요</div>
+        <div class="location-picker-bottom-addr" id="locationPickerBottomAddr"></div>
       </div>
-      <div style="padding:16px;">
-        <div class="location-search-wrap">
-          <input class="search-input" id="locationPickerInput" placeholder="주소나 장소명을 검색해보세요 (예: 강남역)" maxlength="60" autocomplete="off" />
-          <div class="location-suggest-list" id="locationPickerSuggestList"></div>
-        </div>
-        <button type="button" class="profile-chat-btn" id="locationPickerUseTypedBtn" style="margin-top:12px;">입력한 대로 찾기</button>
-      </div>
+      <button type="button" class="profile-chat-btn" id="locationPickerConfirmBtn" disabled>선택완료</button>
     </div>
   </div>
 
@@ -5040,20 +5370,19 @@
         <button type="button" class="mini-confirm-close" id="hotplaceCloseBtn" aria-label="닫기">&times;</button>
       </div>
       <div class="hotplace-tabs" id="hotplaceTabs">
-        <button type="button" class="hotplace-tab active" data-tab="map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg> 장소</button>
-        <button type="button" class="hotplace-tab" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg> 밥집</button>
+        <button type="button" class="hotplace-tab active" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg> 밥집</button>
         <button type="button" class="hotplace-tab" data-tab="cafe"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg> 카페</button>
         <button type="button" class="hotplace-tab" data-tab="experience"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg> 액티비티</button>
         <button type="button" class="hotplace-tab" data-tab="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg> 저장</button>
       </div>
-      <div class="hotplace-pane active" id="hotplacePane-map">
+      <div class="hotplace-pane" id="hotplacePane-map" style="display:none;">
         <div class="map-search-row">
           <input type="text" class="search-input" id="mapPlaceSearchInput" placeholder="스타벅스, 맛집 등 검색" style="margin-bottom:0;" />
           <button type="button" class="map-search-btn" id="mapPlaceSearchBtn">검색</button>
         </div>
         <div id="hotplaceMapFrame" class="hotplace-map-frame"></div>
       </div>
-      <div class="hotplace-pane" id="hotplacePane-food">
+      <div class="hotplace-pane active" id="hotplacePane-food">
         <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 밥집이에요.</div>
         <div id="hotplaceList-food"></div>
       </div>
@@ -5069,6 +5398,18 @@
         <div class="hotplace-list-desc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg> 눌러서 저장해둔 곳이에요. 나중에 가볼 곳으로 모아볼 수 있어요.</div>
         <div id="hotplaceSavedGroups"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- 밥집/카페 카드에서 주소를 누르면 뜨는, 약속장소+그 장소를 함께 보여주는 지도 -->
+  <div class="place-detail-map-overlay" id="placeDetailMapOverlay">
+    <div class="place-detail-map-panel">
+      <div class="place-detail-map-header">
+        <div class="place-detail-map-title" id="placeDetailMapTitle">지도에서 보기</div>
+        <button type="button" class="mini-confirm-close" id="placeDetailMapCloseBtn" aria-label="닫기">&times;</button>
+      </div>
+      <div id="placeDetailMapCanvas" class="place-detail-map-canvas"></div>
+      <div class="place-detail-map-legend" id="placeDetailMapLegend"></div>
     </div>
   </div>
 
@@ -5449,6 +5790,14 @@
         <div id="feedPlaceDetailHeader"></div>
       </div>
 
+      <!-- 장소 태그(#상호명)를 눌렀을 때 - 카테고리 상관없이 같은 장소로 올라온 다른 글들을 해시태그처럼 모아서 보여줌 -->
+      <div class="feed-list-view" id="feedTagView">
+        <button class="profile-back" id="feedTagBackBtn">&#8249; 뒤로</button>
+        <div class="friend-calendar-title" id="feedTagTitle"></div>
+        <div class="feed-tag-sub" id="feedTagSub"></div>
+        <div id="feedTagListContainer"></div>
+      </div>
+
       <div class="feed-create-view" id="feedCreateView">
         <button class="profile-back" id="feedCreateBackBtn">&#8249; 뒤로</button>
         <div class="friend-calendar-title" id="feedCreateHeaderTitle">추천하기</div>
@@ -5495,7 +5844,7 @@
         </div>
 
         <div class="feed-create-section">
-          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">선택 · 최대 3장</span></div>
+          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">필수 · 1~5장</span></div>
           <div class="feed-photo-row" id="feedPhotoRow">
             <button type="button" class="feed-photo-add-btn" id="feedPhotoAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           </div>
@@ -6078,6 +6427,7 @@ document.addEventListener('visibilitychange', () => {
     loadRoomMessagesFromServer(activeChatRoomId, CHAT_ROOMS[activeChatRoomId], false);
   }
   loadScheduleFromServer();
+  if(activeChatRoomId) renderPinnedSchedule();
 });
 
 function connectRealtimeSocket(){
@@ -6178,6 +6528,24 @@ function connectRealtimeSocket(){
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
           showToast(`${room.name}: 장소 제안 관련 알림이 있어요`);
+        }
+      }
+      renderChatList();
+      return;
+    }
+    if(message.type === 'LOCATION_NOTICE'){
+      // 상대방이 채팅방에 장소를 등록/변경했을 때 실시간으로 알려주는 메시지 (같은 핀의 이전 알림은 지우고 이것만 남김)
+      const existing = room.messages.find(m => m._serverId === message.id);
+      if(!existing) replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(message));
+      loadPinsFromServer(roomId, room); // 바뀐 장소 좌표를 핀에도 반영
+      touchRoom(roomId);
+      if(activeChatRoomId === roomId){
+        renderChatMessages();
+        renderPinnedSchedule();
+      } else {
+        addIncomingMessageUnread(roomId);
+        if(settingsState.notif_message && !room.muted){
+          showToast(`${room.name}: 장소가 등록됐어요`);
         }
       }
       renderChatList();
@@ -6583,7 +6951,7 @@ function showTab(tabKey){
     document.querySelector(`.nav-item[data-tab="${tabKey}"]`).classList.add('active');
     if(tabKey === 'schedule'){
       panels['schedule'].classList.remove('home-clean-mode');
-      switchScheduleView('day');
+      switchScheduleView(settingsState.default_schedule_view || 'month');
     }
     if(tabKey === 'friends'){
       // 친구 프로필/검색 등 하위 화면이 열려있었다면 정리하고 항상 친구 목록(첫 화면)부터 보여줌
@@ -6995,7 +7363,7 @@ function loadKakaoSdkOnce(){
   if(!kakaoSdkRetryPromise){
     kakaoSdkRetryPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = '//dapi.kakao.com/v2/maps/sdk.js?appkey=c2b6e952138d9653c48eff5fc17de641&libraries=services&autoload=false';
+      script.src = '//dapi.kakao.com/v2/maps/sdk.js?appkey=0478c56c589c7ff7bca5d5bbd76cb0c6&libraries=services&autoload=false';
       script.onload = resolve;
       script.onerror = reject;
       document.head.appendChild(script);
@@ -7734,22 +8102,33 @@ function renderFeedPosts(){
 }
 renderFeedPosts();
 
-// 게시물 하나를 카드로 그림 - 제목(상호명) - 위치(지도 연동) - 별점 - 한줄소개 - 사진 - 작성자/좋아요/댓글 순
+// 게시물 하나를 카드로 그림 - 인스타그램 피드처럼 사진이 먼저 크게 나오고, 그 아래 작성자/장소태그/별점/한줄소개 순
 // 게시물 카드 하나의 HTML을 만듦 (목록/상세보기 화면 공용)
 function feedPostCardHtml(post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const photos = post.photos || [];
   const mapUrl = feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon);
+  const authorKey = post.author ? (post.author.username || post.author.id) : '?';
+  const authorInitial = post.author && post.author.name ? post.author.name[0] : '?';
   return `
-    <div class="feed-post-title-row">
-      <span class="feed-post-place">${escapeHtml(post.title || '')}</span>
+    ${photos.length > 0 ? `
+      <div class="feed-ig-photos">
+        <div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>
+        ${photos.length > 1 ? `<div class="feed-ig-photo-count">📷 ${photos.length}</div>` : ''}
+      </div>
+    ` : ''}
+    <div class="feed-ig-header">
+      <div class="placeholder-avatar" style="background:${colorForFriendId(authorKey)}">${escapeHtml(authorInitial)}</div>
+      <div class="feed-ig-author-name">${escapeHtml(post.author ? post.author.name : '')}</div>
+    </div>
+    <div class="feed-ig-tag-row">
+      <button type="button" class="feed-ig-place-tag">#${escapeHtml(post.title || '')}</button>
+      ${typeof post.avgRating === 'number' ? `<span class="feed-review-stars">${renderStarsHtml(post.avgRating)} <span class="feed-rating-count">${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</span></span>` : ''}
     </div>
     ${post.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(post.location)}</a>` : ''}
-    ${typeof post.avgRating === 'number' ? `<div class="feed-review-stars">${renderStarsHtml(post.avgRating)} <span class="feed-rating-count">${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</span></div>` : ''}
     <div class="feed-post-note">${escapeHtml(post.note || '')}</div>
-    ${photos.length > 0 ? `<div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>` : ''}
     <div class="feed-post-bottom-row">
-      <div class="feed-post-author">${escapeHtml(post.author ? post.author.name : '')}</div>
+      <div></div>
       ${isMine ? `
         <div class="feed-post-owner-actions">
           <button type="button" class="feed-post-btn feed-review-edit-btn">수정</button>
@@ -7825,7 +8204,7 @@ function feedPostDetailHtml(post){
     ` : ''}
     <div class="feed-detail-body">
       <div class="feed-detail-title-row">
-        <div class="feed-detail-title">${escapeHtml(post.title || '')}</div>
+        <button type="button" class="feed-detail-title" title="이 장소의 다른 글 모아보기">${escapeHtml(post.title || '')}</button>
         <div class="feed-detail-kebab-wrap">
           <button type="button" class="feed-detail-kebab-btn">⋮</button>
           <div class="feed-detail-kebab-menu">
@@ -7870,6 +8249,8 @@ function feedPostDetailHtml(post){
 // 상세보기 화면의 리뷰(댓글)/수정/삭제/신고/저장/공유 동작을 전부 연결함
 function wireFeedPostDetail(container, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
+  const titleBtn = container.querySelector('.feed-detail-title');
+  if(titleBtn) titleBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
   if(isMine){
     const editBtn = container.querySelector('.feed-review-edit-btn');
     if(editBtn) editBtn.addEventListener('click', () => { container.querySelector('.feed-detail-kebab-menu').classList.remove('open'); openFeedReviewEdit(post); });
@@ -8059,6 +8440,41 @@ function closeFeedPostDetail(){
 }
 document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPostDetail));
 
+// 장소 태그(#상호명)를 눌렀을 때 - 카테고리(맛집/카페/체험) 상관없이 이름이 같은 장소로 올라온 글을 전부 모아서 보여줌
+function openFeedPlaceTagView(placeName){
+  const name = (placeName || '').trim();
+  if(!name) return;
+
+  const posts = ['food', 'cafe', 'experience']
+    .flatMap(cat => FEED_POSTS[cat] || [])
+    .filter(p => (p.title || '').trim() === name)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  document.getElementById('feedTagTitle').textContent = `# ${name}`;
+  document.getElementById('feedTagSub').textContent = `이 장소에 올라온 글 ${posts.length}개`;
+
+  const container = document.getElementById('feedTagListContainer');
+  container.innerHTML = '';
+  if(posts.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = '아직 이 장소에 대한 다른 글이 없어요.';
+    container.appendChild(empty);
+  } else {
+    posts.forEach(post => renderFeedPostCard(post, container));
+  }
+
+  document.getElementById('feedListView').classList.remove('active');
+  document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('feedTagView').classList.add('active');
+  pushViewState(closeFeedPlaceTagView);
+}
+function closeFeedPlaceTagView(){
+  document.getElementById('feedTagView').classList.remove('active');
+  document.getElementById('feedListView').classList.add('active');
+}
+document.getElementById('feedTagBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceTagView));
+
 // 게시물 삭제 공통 처리
 async function deleteFeedPostItem(post){
   await apiRequest(`/feed/${post.id}`, { method: 'DELETE' });
@@ -8070,6 +8486,9 @@ async function deleteFeedPostItem(post){
 // 게시물 카드의 동작(좋아요·댓글·수정·삭제·신고) 연결
 function wireFeedPostCard(card, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
+  // 장소 태그(#상호명)를 누르면 해시태그처럼 같은 장소로 올라온 다른 글들을 모아서 보여줌
+  const tagBtn = card.querySelector('.feed-ig-place-tag');
+  if(tagBtn) tagBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
   if(isMine){
     const editBtn = card.querySelector('.feed-review-edit-btn');
     if(editBtn) editBtn.addEventListener('click', () => openFeedReviewEdit(post));
@@ -8234,7 +8653,8 @@ let feedFormMode = 'create'; // 'create'(새 게시물 작성) | 'editReview'(�
 let feedPlacePicked = null; // { lat, lon } - 검색해서 실제로 고른 장소면 좌표까지 저장됨
 let feedPlaceMapInstance = null;
 let feedSelectedRating = 0; // 지금 폼에서 고른 별점 (1~5, 0이면 아직 안 고름)
-let feedSelectedPhotos = []; // 지금 폼에 첨부된 사진들 (base64 문자열 배열, 최대 3장)
+let feedSelectedPhotos = []; // 지금 폼에 첨부된 사진들 (base64 문자열 배열, 최소 1장 ~ 최대 5장)
+const FEED_MAX_PHOTOS = 5;
 
 function setFeedPlaceFieldsLocked(locked){
   document.getElementById('feedPlaceInput').disabled = locked;
@@ -8266,13 +8686,13 @@ function renderFeedPhotoRow(){
     });
     row.insertBefore(thumb, addBtn);
   });
-  addBtn.style.display = feedSelectedPhotos.length >= 3 ? 'none' : 'flex';
+  addBtn.style.display = feedSelectedPhotos.length >= FEED_MAX_PHOTOS ? 'none' : 'flex';
 }
 document.getElementById('feedPhotoAddBtn').addEventListener('click', () => document.getElementById('feedPhotoInput').click());
 document.getElementById('feedPhotoInput').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];
   e.target.value = '';
-  if(!file || feedSelectedPhotos.length >= 3) return;
+  if(!file || feedSelectedPhotos.length >= FEED_MAX_PHOTOS) return;
   const reader = new FileReader();
   reader.onload = (ev) => {
     const img = new Image();
@@ -8450,6 +8870,10 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
   }
   if(feedSelectedRating < 1){
     showToast('별점을 골라주세요.');
+    return;
+  }
+  if(feedSelectedPhotos.length < 1){
+    showToast('사진을 1장 이상 올려주세요.');
     return;
   }
   if(!authToken){
@@ -9155,6 +9579,24 @@ function mapServerLocationSuggestMessage(m){
     locationLat: l.locationLat,
     locationLon: l.locationLon,
     status: RESERVATION_STATUS_MAP[l.status] || 'pending',
+    time: m.createdAt,
+  };
+}
+
+// 서버의 LOCATION_NOTICE 메시지("장소가 등록/변경됐어요" 알림)를 로컬 hotplace 알림 카드 형식으로 변환
+function mapServerLocationNoticeMessage(m){
+  const l = m.locationNotice;
+  return {
+    who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
+    senderId: m.senderId,
+    type: 'hotplace',
+    id: m.id,
+    _serverId: m.id,
+    location: l.location || l.place,
+    locationLat: l.locationLat,
+    locationLon: l.locationLon,
+    pinId: l.pinId || null,
+    superseded: !!l.superseded, // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 경우 - 작은 알림으로만 표시함
     time: m.createdAt,
   };
 }
@@ -10700,10 +11142,33 @@ function normalizeKoreanTimeWords(text){
   return text.replace(/(열한|열두|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*시/g, (match, word) => `${KOREAN_NUM_WORDS[word]}시`);
 }
 
-// "내일", "모레", "이번주 금요일", "다음주 화요일" 같은 날짜 표현을 오늘 기준 며칠 뒤인지(dayOffset)로 변환
+// "내일", "모레", "이번주 금요일", "다음주 화요일" 같은 날짜 표현을 오늘 기준 며칠 뒤인지(dayOffset)로 변환.
+// "8월 25일"처럼 명시적인 날짜가 있으면 그건 상대적인 dayOffset이 아니라 확정된 날짜(absoluteDate)로 반환함 -
+// 화면에서 어느 날짜를 보고 있든 상관없이 그 날짜에 일정이 들어가야 하기 때문
 function parseVoiceDateOffset(rawText){
   let text = rawText;
   let dayOffset = null;
+  let absoluteDate = null;
+
+  const absMatch = text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/);
+  if(absMatch){
+    const month = parseInt(absMatch[1], 10);
+    const day = parseInt(absMatch[2], 10);
+    if(month >= 1 && month <= 12 && day >= 1 && day <= 31){
+      let year = TODAY.getFullYear();
+      // 말한 달이 오늘보다 6개월 넘게 과거면(연말에 내년 1월 얘기하는 경우 등) 내년으로 간주
+      if(month - 1 < TODAY.getMonth() - 6) year += 1;
+      const candidate = new Date(year, month - 1, day);
+      if(candidate.getMonth() === month - 1){ // 2월 30일처럼 존재하지 않는 날짜는 무시
+        absoluteDate = candidate;
+        text = text.replace(absMatch[0], '');
+      }
+    }
+  }
+
+  if(absoluteDate){
+    return { dayOffset, absoluteDate, text };
+  }
 
   const weekdayMatch = text.match(/(다음\s*주|이번\s*주)?\s*([일월화수목금토])요일/);
   if(weekdayMatch){
@@ -10721,7 +11186,7 @@ function parseVoiceDateOffset(rawText){
     dayOffset = 0; text = text.replace(/오늘/g, '');
   }
 
-  return { dayOffset, text };
+  return { dayOffset, absoluteDate, text };
 }
 
 // 문장에서 "N시" 또는 "N시 M분"/"N시반" 시간 표현 하나를 찾아 { hour, minute, minuteSpecified, matchedText }로 반환
@@ -10771,6 +11236,7 @@ function parseVoiceSchedule(rawText){
     startHour: start.h, startMin: start.min,
     endHour: end.h, endMin: end.min,
     dayOffset: dateResult.dayOffset !== null ? dateResult.dayOffset : 0,
+    absoluteDate: dateResult.absoluteDate,
     title,
   };
 }
@@ -10789,6 +11255,7 @@ function parseVoiceDeleteCommand(rawText){
 
   return {
     dayOffset: dateResult.dayOffset !== null ? dateResult.dayOffset : 0,
+    absoluteDate: dateResult.absoluteDate,
     hour: timeExpr ? timeExpr.hour : null,
     minute: timeExpr ? timeExpr.minute : 0,
     minuteSpecified: timeExpr ? timeExpr.minuteSpecified : false,
@@ -10810,8 +11277,8 @@ function formatEventTimeLabel(ev){
 
 // 삭제 후보를 찾음: 날짜는 항상 필요, 시간/키워드가 있으면 그걸로 더 좁혀서 찾음
 function findDeleteCandidates(parsed){
-  const targetDate = new Date(TODAY);
-  targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
+  const targetDate = parsed.absoluteDate ? new Date(parsed.absoluteDate) : new Date(TODAY);
+  if(!parsed.absoluteDate) targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
   let candidates = getEventsForDate(targetDate);
 
   if(parsed.hour !== null){
@@ -10965,8 +11432,9 @@ function handleAddCommand(transcript, isRetry){
     return;
   }
 
-  const targetDate = new Date(scheduleFocusDate);
-  targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
+  // 명시적인 날짜("8월 25일")를 말했으면 화면에 보이는 날짜와 상관없이 그 날짜에 추가함
+  const targetDate = parsed.absoluteDate ? new Date(parsed.absoluteDate) : new Date(scheduleFocusDate);
+  if(!parsed.absoluteDate) targetDate.setDate(targetDate.getDate() + parsed.dayOffset);
 
   createScheduleEvent({
     title: parsed.title,
@@ -13474,16 +13942,28 @@ function toggleSavedPlace(category, post){
 
 // 예약이 확정되고 장소가 정해져 있으면, 그 채팅방에 "주변 핫플 보기" 알림 메시지를 추가함
 let hotplaceMsgIdCounter = 1;
-function addHotplaceNoticeMessage(roomId, location, lat, lon){
+function addHotplaceNoticeMessage(roomId, location, lat, lon, pinId){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
-  room.messages.push({
+  replaceHotplaceNoticeForPin(room, {
     who: 'other',
     type: 'hotplace',
     id: 'hp' + (hotplaceMsgIdCounter++),
     location, locationLat: lat, locationLon: lon,
+    pinId: pinId || null,
     time: new Date(),
   });
+}
+
+// 같은 핀(pinId)에 대한 장소 알림 카드가 이미 있으면 지우고, 새 알림 하나만 채팅에 남김
+// (장소가 바뀔 때마다 카드가 계속 쌓이지 않고, 항상 최신 장소 하나만 보이게 하기 위함)
+// 장소가 새로 바뀌면, 이 방에 있던 예전 "OO 근처에서 만나요!" 카드들은 지우지 않고
+// "약속 장소가 변경됐어요"라는 작은 알림으로 표시만 바꾸고, 새 알림 하나만 큰 카드로 보여줌
+function replaceHotplaceNoticeForPin(room, newMsg){
+  room.messages.forEach(m => {
+    if(m.type === 'hotplace' && !m.superseded) m.superseded = true;
+  });
+  room.messages.push(newMsg);
 }
 
 // 주소 문자열에서 2글자 이상 단어를 뽑아서, 커뮤니티 추천 글의 위치/장소명과 겹치는 게 있으면 "근처 추천"으로 우선 표시
@@ -13495,17 +13975,30 @@ function extractLocationKeywords(text){
 }
 // 핫플 카드 하나를 만드는 공용 함수 (밥집/카페/액티비티 목록과 ⭐저장 목록에서 함께 사용).
 // place는 이제 "장소" 객체(name/location/lat/lon/reviewCount/latestReview)를 받음.
-function buildFeedPostCard(post, category, isNearby){
+// 도보 속도를 분당 80m(시속 4.8km)로 가정하고 거리를 도보 시간으로 환산
+function formatWalkingTime(km){
+  const minutes = Math.round((km * 1000) / 80);
+  return minutes < 1 ? '도보 1분 이내' : `도보 ${minutes}분`;
+}
+// 거리를 사람이 읽기 좋은 단위로 표시 - 1km 미만이면 미터(m), 그 이상이면 소수점 1자리 km로
+function formatDistanceMeters(km){
+  const meters = km * 1000;
+  if(meters < 1000) return `${Math.round(meters)}m`;
+  return `${km.toFixed(1)}km`;
+}
+
+function buildFeedPostCard(post, category, distKm){
   const saved = isPlaceSaved(category, post);
   // 아래 액션 함수들(제안하기/장소픽스)은 예전 "게시물" 모양을 기대하므로, 호환되는 임시 객체로 감싸서 넘겨줌
   const compat = { place: post.title, note: post.note, location: post.location, lat: post.lat, lon: post.lon };
   const card = document.createElement('div');
   card.className = 'feed-post-card';
   card.innerHTML = `
-    <div class="feed-post-top">
-      <span class="feed-post-place">${escapeHtml(post.title)}${isNearby ? ' <span style="color:var(--accent);font-size:10.5px;font-weight:700;">· 근처</span>' : ''}</span>
-      <span class="feed-post-location">${ICO.pin} ${escapeHtml(post.location || '')}</span>
+    <div class="feed-post-card-head">
+      <span class="feed-post-place">${escapeHtml(post.title)}</span>
+      ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>` : ''}
     </div>
+    ${post.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(post.location)}</span></button>` : ''}
     ${post.note ? `<div class="feed-post-note">${escapeHtml(post.note)}</div>` : ''}
     <div class="feed-post-author">${post.author ? `${escapeHtml(post.author.name)} 님의 추천` : ''}</div>
     <div class="feed-post-actions">
@@ -13523,6 +14016,8 @@ function buildFeedPostCard(post, category, isNearby){
     renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
     renderSavedPlacesGroups();
   });
+  const locBtn = card.querySelector('.feed-post-location-link');
+  if(locBtn) locBtn.addEventListener('click', () => openPlaceDetailMap(post));
   return card;
 }
 
@@ -13546,25 +14041,32 @@ function renderHotplaceList(category, locationHint, hintLat, hintLon){
   }
 
   const hasCoords = typeof hintLat === 'number' && typeof hintLon === 'number' && !isNaN(hintLat) && !isNaN(hintLon);
-  const keywords = extractLocationKeywords(locationHint);
+  const MAX_WALK_KM = 20 * 80 / 1000; // 도보 20분 거리 (분당 80m 기준 약 1.6km)
 
-  const scored = posts.map(post => {
-    if(hasCoords && typeof post.lat === 'number' && typeof post.lon === 'number'){
-      // 실제 좌표가 둘 다 있으면 거리로 정확히 판정 (5km 이내를 "근처"로 봄)
-      const km = distanceKm(hintLat, hintLon, post.lat, post.lon);
-      return { post, isNearby: km <= 5, dist: km };
-    }
-    // 좌표가 없으면(직접 입력한 주소 등) 이름이 겹치는지로 대략 판정
-    const haystack = `${post.location} ${post.title}`;
-    const isNearby = keywords.some(k => haystack.includes(k));
-    return { post, isNearby, dist: isNearby ? 0 : Infinity };
-  });
-  // 가까운(또는 이름이 겹치는) 추천을 먼저 보여주고, 나머지는 그 아래로
-  scored.sort((a, b) => a.dist - b.dist);
+  let scored;
+  if(hasCoords){
+    // 약속 장소 좌표가 있으면 실제 거리로 정확히 걸러서, 도보 20분 이내인 곳만 보여줌
+    scored = posts
+      .filter(post => typeof post.lat === 'number' && typeof post.lon === 'number')
+      .map(post => ({ post, dist: distanceKm(hintLat, hintLon, post.lat, post.lon) }))
+      .filter(({ dist }) => dist <= MAX_WALK_KM);
+  } else {
+    // 좌표가 없으면(직접 입력한 주소 등) 예전처럼 이름이 겹치는 것만 대략 보여줌 (도보 시간은 알 수 없어 표시 안 함)
+    const keywords = extractLocationKeywords(locationHint);
+    scored = posts
+      .filter(post => keywords.some(k => `${post.location} ${post.title}`.includes(k)))
+      .map(post => ({ post, dist: null }));
+  }
+  // 가까운(도보로 짧은) 추천을 먼저 보여줌
+  scored.sort((a, b) => (a.dist ?? 0) - (b.dist ?? 0));
 
   container.innerHTML = '';
-  scored.forEach(({ post, isNearby }) => {
-    container.appendChild(buildFeedPostCard(post, category, isNearby));
+  if(scored.length === 0){
+    container.innerHTML = `<div class="search-empty">약속 장소에서 도보 20분 이내에 추천된 곳이 없어요.</div>`;
+    return;
+  }
+  scored.forEach(({ post, dist }) => {
+    container.appendChild(buildFeedPostCard(post, category, dist));
   });
 }
 
@@ -13637,7 +14139,7 @@ function renderSavedPlacesGroups(){
     container.appendChild(groupTitle);
 
     list.forEach(post => {
-      container.appendChild(buildFeedPostCard(post, key, false));
+      container.appendChild(buildFeedPostCard(post, key, null));
     });
   });
 }
@@ -13678,17 +14180,30 @@ function syncPinCreateToServer(roomId, room, pin){
       timeLabel: pin.timeLabel || null,
       note: pin.note || null,
       location: pin.location || null,
+      locationLat: typeof pin.locationLat === 'number' ? pin.locationLat : null,
+      locationLon: typeof pin.locationLon === 'number' ? pin.locationLon : null,
       sourceMessageId: pin.reservationMsgId || pin.sourceMsgId || null,
     }),
   }).then(data => { pin.serverId = data.pin.id; }).catch(err => console.error('[pins] sync create failed:', err));
 }
 
-function syncPinLocationUpdateToServer(room, pin){
-  if(!authToken || !room.isRealRoom || !pin.serverId) return;
-  apiRequest(`/chats/pins/${pin.serverId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ location: pin.location || null }),
-  }).catch(err => console.error('[pins] sync update failed:', err));
+// 핀의 장소(위치)를 서버에 반영. 장소가 새로 등록/변경된 경우 서버가 채팅방에 알림 메시지(LOCATION_NOTICE)를
+// 만들어서 상대방에게 실시간으로 보내주고, 그 메시지를 응답으로 돌려주므로 호출한 쪽에서 내 화면에도 바로 반영할 수 있음
+async function syncPinLocationUpdateToServer(room, pin){
+  if(!authToken || !room.isRealRoom || !pin.serverId) return null;
+  try {
+    return await apiRequest(`/chats/pins/${pin.serverId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        location: pin.location || null,
+        locationLat: typeof pin.locationLat === 'number' ? pin.locationLat : null,
+        locationLon: typeof pin.locationLon === 'number' ? pin.locationLon : null,
+      }),
+    });
+  } catch(err){
+    console.error('[pins] sync update failed:', err);
+    return null;
+  }
 }
 
 function syncPinDeleteToServer(room, pin){
@@ -13708,6 +14223,8 @@ async function loadPinsFromServer(roomId, room){
       timeLabel: p.timeLabel,
       note: p.note,
       location: p.location,
+      locationLat: p.locationLat,
+      locationLon: p.locationLon,
       sourceMsgId: p.sourceMessageId,
       reservationMsgId: p.sourceMessageId,
       dateObj: p.dateLabel ? parseDateLabelToDate(p.dateLabel) : null,
@@ -14080,61 +14597,165 @@ document.getElementById('reservationCancelConfirmYesBtn').addEventListener('clic
   if(action) action();
 });
 
-// ---------- 장소 정하기: 핫플 보기 전에 실제 위치 서비스로 정확한 주소를 먼저 검색/선택 ----------
-// 친구에게 예약 요청 보낼 때 쓰는 것과 같은 Nominatim 주소 검색을 재사용하되,
-// 어디서든(핀 고정 영역 등) 모달로 띄워서 쓸 수 있게 별도로 구현
+// ---------- 장소 정하기: 카카오톡 위치 공유처럼 지도를 꽉 채워서 검색하거나 직접 핀을 찍어서 고름 ----------
 let locationPickerCallback = null; // (label, lat, lon) => void - 장소를 고른 뒤 실행할 콜백
-let locationPickerAbortController = null;
 let locationPickerDebounce = null;
+let locationPickerSelected = null; // 검색으로 고르거나 지도에 핀 찍어서 확정한 장소 { label, lat, lon }
+let locationPickerMapInstance = null;
+let locationPickerMarker = null;
+let locationPickerGeocoder = null;
 
-function openLocationPicker(initialQuery, callback){
+function openLocationPicker(initialQuery, initialLat, initialLon, callback){
+  // 예전 호출부 호환: openLocationPicker(query, callback)처럼 좌표 없이 부르는 경우도 지원
+  if(typeof initialLat === 'function'){
+    callback = initialLat;
+    initialLat = null;
+    initialLon = null;
+  }
   locationPickerCallback = callback;
   const input = document.getElementById('locationPickerInput');
-  input.value = initialQuery || '';
+  input.value = '';
   document.getElementById('locationPickerSuggestList').classList.remove('show');
   document.getElementById('locationPickerSuggestList').innerHTML = '';
+  resetLocationPickerSelection();
   document.getElementById('locationPickerOverlay').classList.add('show');
-  input.focus();
+
+  ensureKakaoMapsLoaded(() => {
+    initLocationPickerMap();
+    const hasCoords = typeof initialLat === 'number' && typeof initialLon === 'number' && !isNaN(initialLat) && !isNaN(initialLon);
+    if(hasCoords){
+      // 이미 정확한 좌표를 알고 있으면 주소로 다시 검색하지 않고 그 좌표 그대로 핀을 찍음
+      // (주소 문자열로 재검색하면 살짝 다른 지점으로 잡혀서 핀이 "움직인 것"처럼 보였음)
+      placeLocationPickerPin(initialLat, initialLon, initialQuery || '선택한 위치');
+    } else if(initialQuery){
+      locationPickerGeocoder.addressSearch(initialQuery, (result, status) => {
+        if(status === kakao.maps.services.Status.OK && result[0]){
+          placeLocationPickerPin(parseFloat(result[0].y), parseFloat(result[0].x), initialQuery);
+        } else {
+          searchLocationPickerSuggestions(initialQuery, { centerOnly:true });
+        }
+      });
+    } else {
+      centerLocationPickerOnCurrentPosition();
+    }
+  });
 }
 function closeLocationPicker(){
   document.getElementById('locationPickerOverlay').classList.remove('show');
   locationPickerCallback = null;
-  if(locationPickerAbortController) locationPickerAbortController.abort();
   clearTimeout(locationPickerDebounce);
+  document.getElementById('locationPickerInput').value = '';
+  document.getElementById('locationPickerSuggestList').classList.remove('show');
+  resetLocationPickerSelection();
 }
 
-async function searchLocationPickerSuggestions(query){
+// 새로 열거나 닫을 때, 이전에 찍어둔 핀/선택완료 버튼 상태를 초기화
+function resetLocationPickerSelection(){
+  locationPickerSelected = null;
+  document.getElementById('locationPickerConfirmBtn').disabled = true;
+  document.getElementById('locationPickerBottomName').textContent = '지도를 눌러 위치를 찍어보세요';
+  document.getElementById('locationPickerBottomAddr').textContent = '';
+  if(locationPickerMarker){ locationPickerMarker.setMap(null); locationPickerMarker = null; }
+}
+
+// 지도를 한 번만 만들고, 지도 아무 곳이나 누르면 그 자리에 핀을 찍고 주소를 역지오코딩해서 보여줌(카카오톡 위치 공유와 동일한 방식)
+function initLocationPickerMap(){
+  if(locationPickerMapInstance) return;
+  const container = document.getElementById('locationPickerMap');
+  locationPickerMapInstance = new kakao.maps.Map(container, {
+    center: new kakao.maps.LatLng(37.5665, 126.9780),
+    level: 4,
+  });
+  locationPickerGeocoder = new kakao.maps.services.Geocoder();
+  kakao.maps.event.addListener(locationPickerMapInstance, 'click', (mouseEvent) => {
+    const pos = mouseEvent.latLng;
+    // 직접 누른 위치는 지도를 다시 가운데로 옮기지 않고, 누른 자리 그대로에 핀만 찍음
+    placeLocationPickerMarkerAt(pos.getLat(), pos.getLng(), { recenter:false });
+    locationPickerGeocoder.coord2Address(pos.getLng(), pos.getLat(), (result, status) => {
+      const placeName = (status === kakao.maps.services.Status.OK && result[0])
+        ? (result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name)
+        : '선택한 위치';
+      setLocationPickerSelected(placeName, pos.getLat(), pos.getLng());
+    });
+  });
+}
+
+// 사용자의 현재 위치 근처로 지도를 옮겨서 시작 (실패하면 그냥 서울시청 근처를 기본값으로 둠)
+function centerLocationPickerOnCurrentPosition(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const center = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+      locationPickerMapInstance.setCenter(center);
+      setTimeout(() => locationPickerMapInstance.relayout(), 0);
+    },
+    () => {},
+    { timeout: 4000 }
+  );
+}
+
+document.getElementById('locationPickerLocateBtn').addEventListener('click', centerLocationPickerOnCurrentPosition);
+
+// 지도 위에 핀을 찍음. recenter:true면 검색 결과처럼 화면에 안 보이던 곳이니 지도를 그 위치로 옮기고,
+// recenter:false면 사용자가 직접 누른 자리 그대로 두고 핀만 그 자리에 찍음 (지도가 움직이면 "핀이 딴 데로 튄다"고 느껴짐)
+function placeLocationPickerMarkerAt(lat, lon, opts){
+  const pos = new kakao.maps.LatLng(lat, lon);
+  if(!opts || opts.recenter !== false) locationPickerMapInstance.setCenter(pos);
+  if(locationPickerMarker) locationPickerMarker.setMap(null);
+  locationPickerMarker = new kakao.maps.Marker({ position: pos, map: locationPickerMapInstance });
+  setTimeout(() => locationPickerMapInstance.relayout(), 0);
+}
+
+// 검색으로 고른 장소 하나를 지도에 반영 + 핀을 찍고 하단 카드/선택완료 버튼을 활성화 (화면에 없던 곳이니 지도를 그 위치로 옮겨줌)
+function placeLocationPickerPin(lat, lon, label){
+  placeLocationPickerMarkerAt(lat, lon, { recenter:true });
+  setLocationPickerSelected(label, lat, lon);
+}
+
+// 확정된 위치를 하단 카드에 표시하고 선택완료 버튼을 활성화
+function setLocationPickerSelected(label, lat, lon){
+  locationPickerSelected = { label, lat, lon };
+  document.getElementById('locationPickerBottomName').textContent = label;
+  document.getElementById('locationPickerBottomAddr').textContent = '이 위치로 정할까요?';
+  document.getElementById('locationPickerConfirmBtn').disabled = false;
+}
+
+// 카카오 장소 검색(키워드 검색)으로 "강남역", "강남역 5번출구"처럼 실제로 등록된 장소들을 목록으로 보여줌
+function searchLocationPickerSuggestions(query, opts){
   const listEl = document.getElementById('locationPickerSuggestList');
   listEl.innerHTML = `<div class="location-suggest-status">검색 중...</div>`;
   listEl.classList.add('show');
 
-  if(locationPickerAbortController) locationPickerAbortController.abort();
-  locationPickerAbortController = new AbortController();
+  ensureKakaoMapsLoaded(() => {
+    const places = new kakao.maps.services.Places();
+    places.keywordSearch(query, (results, status) => {
+      // 검색어가 바뀌는 동안 늦게 도착한 이전 결과는 무시함
+      if(document.getElementById('locationPickerInput').value.trim() !== query && !(opts && opts.centerOnly)) return;
 
-  try {
-    const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=0&limit=6&accept-language=ko&q=' + encodeURIComponent(query);
-    const res = await fetch(url, { signal: locationPickerAbortController.signal, headers: { 'Accept': 'application/json' } });
-    const results = await res.json();
-
-    if(!Array.isArray(results) || results.length === 0){
-      listEl.innerHTML = `<div class="location-suggest-status">검색 결과가 없어요. 다른 이름으로 검색해보세요.</div>`;
-      return;
-    }
-    listEl.innerHTML = results.map((r, idx) => `
-      <div class="location-suggest-item" data-idx="${idx}">
-        <span class="pin">${ICO.pin}</span><span>${r.display_name}</span>
-      </div>
-    `).join('');
-    listEl._results = results;
-  } catch(err){
-    if(err.name === 'AbortError') return; // 더 최신 검색으로 교체된 것뿐이라 무시
-    console.error('[location picker search] failed:', err);
-    listEl.innerHTML = `<div class="location-suggest-status">
-      주소 검색에 실패했어요. 이 파일을 file://로 직접 열면 브라우저가 외부 요청을 막을 수 있어요.<br/>
-      크롬에서 열어보시거나, 로컬 서버로 실행해보세요.<br/>
-      <span style="opacity:0.7;">(오류: ${err.message || err.name || '알 수 없음'})</span>
-    </div>`;
-  }
+      if(status !== kakao.maps.services.Status.OK || !results || results.length === 0){
+        listEl.innerHTML = `<div class="location-suggest-status">검색 결과가 없어요. 지도를 직접 눌러 위치를 찍어보세요.</div>`;
+        return;
+      }
+      // 이전에 정해둔 장소를 다시 보여주려고 부른 경우엔 목록 없이 지도만 그 위치로 옮겨줌
+      if(opts && opts.centerOnly){
+        listEl.classList.remove('show');
+        const first = results[0];
+        placeLocationPickerPin(parseFloat(first.y), parseFloat(first.x), first.place_name);
+        return;
+      }
+      const top = results.slice(0, 8);
+      listEl.innerHTML = top.map((r, idx) => `
+        <div class="location-suggest-item" data-idx="${idx}">
+          <span class="pin">${ICO.pin}</span>
+          <span>
+            <div class="name">${escapeHtml(r.place_name)}</div>
+            <div class="addr">${escapeHtml(r.road_address_name || r.address_name || '')}</div>
+          </span>
+        </div>
+      `).join('');
+      listEl._results = top;
+    });
+  });
 }
 
 document.getElementById('locationPickerInput').addEventListener('input', (e) => {
@@ -14154,26 +14775,23 @@ document.getElementById('locationPickerSuggestList').addEventListener('click', (
   const picked = results[parseInt(item.dataset.idx, 10)];
   if(!picked) return;
 
-  const cb = locationPickerCallback;
-  closeLocationPicker();
-  if(cb) cb(shortenLocationLabel(picked.display_name), parseFloat(picked.lat), parseFloat(picked.lon));
+  document.getElementById('locationPickerSuggestList').classList.remove('show');
+  const lat = parseFloat(picked.y), lon = parseFloat(picked.x);
+  placeLocationPickerPin(lat, lon, picked.place_name);
 });
 
-document.getElementById('locationPickerUseTypedBtn').addEventListener('click', () => {
-  const query = document.getElementById('locationPickerInput').value.trim();
-  if(!query){
-    showToast('장소를 입력해주세요.');
+document.getElementById('locationPickerConfirmBtn').addEventListener('click', () => {
+  if(!locationPickerSelected){
+    showToast('지도에서 위치를 먼저 찍어주세요.');
     return;
   }
+  const { label, lat, lon } = locationPickerSelected;
   const cb = locationPickerCallback;
   closeLocationPicker();
-  if(cb) cb(query, null, null);
+  if(cb) cb(label, lat, lon);
 });
 
 document.getElementById('locationPickerCloseBtn').addEventListener('click', closeLocationPicker);
-document.getElementById('locationPickerOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'locationPickerOverlay') closeLocationPicker();
-});
 
 // 실제 지도(구글 지도) 기반으로 약속 장소를 보여주고, 커뮤니티 멤버들이 추천한 밥집/카페/액티비티도 함께 보여줌
 // 주소 검색으로 좌표(lat/lon)까지 정해진 경우엔 그 정확한 좌표를 지도 중심으로 사용
@@ -14334,18 +14952,11 @@ function openHotplaceView(location, lat, lon){
   renderHotplaceList('experience', location, lastHotplaceLat, lastHotplaceLon);
   renderSavedPlacesGroups();
 
-  // 네이버 실제 검색 결과도 밥집/카페 위쪽에 함께 불러옴
-  renderNaverPlacesSection('food', `${location} 맛집`);
-  renderNaverPlacesSection('cafe', `${location} 카페`);
-
-  // 열 때마다 "장소" 탭으로 초기화
-  document.querySelectorAll('.hotplace-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'map'));
-  document.querySelectorAll('.hotplace-pane').forEach(p => p.classList.toggle('active', p.id === 'hotplacePane-map'));
+  // 열 때마다 "밥집" 탭으로 초기화 (지도/장소 탭은 없앴으니 바로 목록부터 보여줌)
+  document.querySelectorAll('.hotplace-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'food'));
+  document.querySelectorAll('.hotplace-pane').forEach(p => p.classList.toggle('active', p.id === 'hotplacePane-food'));
 
   document.getElementById('hotplaceOverlay').classList.add('show');
-  document.getElementById('mapPlaceSearchInput').value = '';
-  clearKakaoSearchMarkers();
-  renderKakaoMap(location, lastHotplaceLat, lastHotplaceLon);
   pushViewState(closeHotplaceView);
 }
 function closeHotplaceView(){
@@ -14354,6 +14965,100 @@ function closeHotplaceView(){
 document.getElementById('hotplaceCloseBtn').addEventListener('click', () => goBackOrClose(closeHotplaceView));
 document.getElementById('hotplaceOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'hotplaceOverlay') closeHotplaceView();
+});
+
+// ---------- 밥집/카페 카드의 주소를 눌렀을 때 뜨는 작은 지도: 약속장소 + 그 밥집을 마커 2개로 함께 보여줌 ----------
+let placeDetailMapInstance = null;
+let placeDetailMapOverlays = []; // 마커/라벨들 - 다시 열 때마다 지우고 새로 그림
+
+function openPlaceDetailMap(post){
+  const apptLat = lastHotplaceLat, apptLon = lastHotplaceLon;
+  const apptLabel = lastHotplaceLocationHint || '';
+  const hasAppt = typeof apptLat === 'number' && !isNaN(apptLat) && typeof apptLon === 'number' && !isNaN(apptLon);
+  const hasPlace = typeof post.lat === 'number' && !isNaN(post.lat) && typeof post.lon === 'number' && !isNaN(post.lon);
+
+  if(!hasAppt && !hasPlace){
+    // 좌표가 하나도 없으면 지도를 그릴 수 없으니, 카카오맵 검색 결과로라도 보여줌
+    window.open(feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon), '_blank', 'noopener');
+    return;
+  }
+
+  document.getElementById('placeDetailMapTitle').textContent = post.title;
+  const legend = document.getElementById('placeDetailMapLegend');
+  legend.innerHTML = `
+    ${hasAppt ? `<div class="place-detail-map-legend-item"><span class="place-detail-map-dot appt"></span>약속장소${apptLabel ? ' · ' + escapeHtml(apptLabel) : ''}</div>` : ''}
+    ${hasPlace ? `<div class="place-detail-map-legend-item"><span class="place-detail-map-dot place"></span>${escapeHtml(post.title)}</div>` : ''}
+  `;
+
+  document.getElementById('placeDetailMapOverlay').classList.add('show');
+  pushViewState(closePlaceDetailMap);
+
+  const draw = () => {
+    kakao.maps.load(() => {
+      const container = document.getElementById('placeDetailMapCanvas');
+      const centerLat = hasAppt ? apptLat : post.lat;
+      const centerLon = hasAppt ? apptLon : post.lon;
+
+      if(!placeDetailMapInstance){
+        placeDetailMapInstance = new kakao.maps.Map(container, {
+          center: new kakao.maps.LatLng(centerLat, centerLon),
+          level: 4,
+        });
+      } else {
+        placeDetailMapInstance.setCenter(new kakao.maps.LatLng(centerLat, centerLon));
+      }
+
+      // 이전에 열었을 때 찍어둔 마커/라벨은 지우고 새로 그림
+      placeDetailMapOverlays.forEach(o => o.setMap(null));
+      placeDetailMapOverlays = [];
+
+      const bounds = new kakao.maps.LatLngBounds();
+      if(hasAppt){
+        const pos = new kakao.maps.LatLng(apptLat, apptLon);
+        const marker = new kakao.maps.Marker({ position: pos, map: placeDetailMapInstance });
+        const label = new kakao.maps.CustomOverlay({
+          position: pos,
+          content: `<div class="place-detail-map-pin-label appt">약속장소</div>`,
+          yAnchor: 2.4,
+        });
+        label.setMap(placeDetailMapInstance);
+        placeDetailMapOverlays.push(marker, label);
+        bounds.extend(pos);
+      }
+      if(hasPlace){
+        const pos = new kakao.maps.LatLng(post.lat, post.lon);
+        const marker = new kakao.maps.Marker({ position: pos, map: placeDetailMapInstance });
+        const label = new kakao.maps.CustomOverlay({
+          position: pos,
+          content: `<div class="place-detail-map-pin-label place">${escapeHtml(post.title)}</div>`,
+          yAnchor: 2.4,
+        });
+        label.setMap(placeDetailMapInstance);
+        placeDetailMapOverlays.push(marker, label);
+        bounds.extend(pos);
+      }
+      if(hasAppt && hasPlace){
+        placeDetailMapInstance.setBounds(bounds, 70, 70, 70, 70);
+      }
+      setTimeout(() => placeDetailMapInstance.relayout(), 0);
+    });
+  };
+
+  if(typeof kakao === 'undefined' || !kakao.maps){
+    loadKakaoSdkOnce().then(() => {
+      if(typeof kakao !== 'undefined' && kakao.maps) draw();
+      else console.error('[장소 지도] 카카오맵 SDK를 불러오지 못했어요.');
+    }).catch(() => console.error('[장소 지도] 카카오맵 SDK를 불러오지 못했어요.'));
+  } else {
+    draw();
+  }
+}
+function closePlaceDetailMap(){
+  document.getElementById('placeDetailMapOverlay').classList.remove('show');
+}
+document.getElementById('placeDetailMapCloseBtn').addEventListener('click', () => goBackOrClose(closePlaceDetailMap));
+document.getElementById('placeDetailMapOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'placeDetailMapOverlay') closePlaceDetailMap();
 });
 document.querySelectorAll('.hotplace-tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -14522,7 +15227,14 @@ function renderPinnedSchedule(){
     return;
   }
 
-  const pins = room.pinnedSchedules;
+  // 날짜(요일)가 지난 예약은 고정 영역에서 자동으로 안 보이게 함 (날짜 없는 핀은 그대로 유지)
+  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  const pins = room.pinnedSchedules.filter(p => !p.dateObj || p.dateObj >= todayStart);
+  if(pins.length === 0){
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
   el.style.display = 'flex';
   el.innerHTML = '';
 
@@ -14585,13 +15297,24 @@ function renderPinnedSchedule(){
     const setLocBtn = card.querySelector('.pin-set-loc');
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
-        openLocationPicker(location || '', (label, lat, lon) => {
+        openLocationPicker(location || '', pinned.locationLat, pinned.locationLon, async (label, lat, lon) => {
           pinned.location = label;
           pinned.locationLat = lat;
           pinned.locationLon = lon;
-          syncPinLocationUpdateToServer(room, pinned);
+          const roomId = activeChatRoomId;
+          const syncResult = await syncPinLocationUpdateToServer(room, pinned);
+          if(syncResult && syncResult.message){
+            // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨).
+            // 같은 핀의 이전 장소 알림 카드는 지우고 이 알림 하나만 남김
+            replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(syncResult.message));
+          } else {
+            // 서버 동기화가 안 되는 방(로컬 데모 등)이면 기존처럼 로컬 알림만 추가 (로컬 핀 id로 이전 알림을 찾아 지움)
+            addHotplaceNoticeMessage(roomId, label, lat, lon, pinned.serverId || pinned.id);
+          }
+          touchRoom(roomId);
           renderPinnedSchedule();
           renderChatMessages();
+          renderChatList();
           openHotplaceView(label, lat, lon);
         });
       });
@@ -14767,6 +15490,7 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
       if(m.type === 'RESERVATION') return mapServerReservationMessage(m);
       if(m.type === 'TIME_PROPOSAL') return mapServerTimeProposalMessage(m, room);
       if(m.type === 'LOCATION_SUGGEST') return mapServerLocationSuggestMessage(m);
+      if(m.type === 'LOCATION_NOTICE') return mapServerLocationNoticeMessage(m);
       if(m.type === 'IMAGE') return mapServerImageMessage(m);
       return {
         who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
@@ -14831,10 +15555,10 @@ function formatMessageTime(time){
   if(h === 0) h = 12;
   return `${ampm} ${h}:${String(m).padStart(2,'0')}`;
 }
-// 날짜가 바뀔 때 채팅 중간에 뜨는 구분선 문구 (예: "8월 18일 오후 9:20")
+// 날짜가 바뀔 때 채팅 중간에 뜨는 구분선 문구 (카카오톡처럼 시간 없이 날짜만 - 예: "2026년 9월 12일 토요일")
 function formatChatDateDividerLabel(time){
   const d = (time instanceof Date) ? time : new Date(time);
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 ${formatMessageTime(d)}`;
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${WEEKDAY_KO[d.getDay()]}요일`;
 }
 // 같은 날인지 비교용 키 (연-월-일)
 function chatDateKey(time){
@@ -14887,7 +15611,9 @@ function renderChatMessages(){
     if(dateKey !== lastDateKey){
       const divider = document.createElement('div');
       divider.className = 'chat-date-divider';
-      divider.textContent = formatChatDateDividerLabel(msgTime);
+      const dividerLabel = document.createElement('span');
+      dividerLabel.textContent = formatChatDateDividerLabel(msgTime);
+      divider.appendChild(dividerLabel);
       box.appendChild(divider);
       lastDateKey = dateKey;
     }
@@ -15052,15 +15778,21 @@ function renderChatMessages(){
         </div>
       `;
     } else if(m.type === 'hotplace'){
-      row.className = 'msg-row hotplace-notice-row';
-      row.innerHTML = `
-        <div class="hotplace-notice-card">
-          <div class="hotplace-notice-title">${ICO.pin} ${escapeHtml(m.location)} 근처에서 만나요!</div>
-          <div class="hotplace-notice-desc">약속 장소 주변 핫플레이스를 지도에서 확인해보세요.</div>
-          <button type="button" class="hotplace-notice-btn" data-location="${escapeHtml(m.location)}">주변 핫플 보기</button>
-        </div>
-      `;
-      row.querySelector('.hotplace-notice-btn').addEventListener('click', () => openHotplaceView(m.location, m.locationLat, m.locationLon));
+      if(m.superseded){
+        // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 카드 - 다른 시스템 알림처럼 작게만 표시함
+        row.className = 'msg-row system-notice-row';
+        row.innerHTML = `<div class="system-notice-card">${ICO.pin} 약속 장소가 변경됐어요</div>`;
+      } else {
+        row.className = 'msg-row hotplace-notice-row';
+        row.innerHTML = `
+          <div class="hotplace-notice-card">
+            <div class="hotplace-notice-title">${ICO.pin} ${escapeHtml(m.location)} 근처에서 만나요!</div>
+            <div class="hotplace-notice-desc">약속 장소 주변 핫플레이스를 지도에서 확인해보세요.</div>
+            <button type="button" class="hotplace-notice-btn" data-location="${escapeHtml(m.location)}">주변 핫플 보기</button>
+          </div>
+        `;
+        row.querySelector('.hotplace-notice-btn').addEventListener('click', () => openHotplaceView(m.location, m.locationLat, m.locationLon));
+      }
     } else if(m.type === 'time-suggest'){
       row.className = 'msg-row hotplace-notice-row';
       row.innerHTML = `
@@ -15153,9 +15885,9 @@ function renderChatMessages(){
         });
       }
     } else if(m.type === 'system-notice'){
+      // 장소 삭제/예약 취소 등 단순 알림 카드라 답장 기능은 필요 없음 (일부러 붙이지 않음)
       row.className = 'msg-row system-notice-row';
       row.innerHTML = `<div class="system-notice-card">${m.text}</div>`;
-      attachReplyTapToCard(row.querySelector('.system-notice-card'), m);
     } else if(m.type === 'image'){
       const imgHtml = `<div class="msg-bubble msg-bubble-image"><img src="${m.imageUrl}" alt="사진" loading="lazy" /></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + imgHtml) : (imgHtml + metaHtml);
@@ -15210,7 +15942,7 @@ function getMsgPreviewText(m){
   if(m.type === 'location-suggest') return '장소 제안';
   if(m.type === 'location-fixed') return '장소 확정';
   if(m.type === 'time-options-suggest') return '시간 제안';
-  if(m.type === 'hotplace') return '핫플 알림';
+  if(m.type === 'hotplace') return m.superseded ? '약속 장소가 변경됐어요' : '핫플 알림';
   if(m.type === 'system-notice') return m.text || '알림';
   if(m.type === 'image') return '사진';
   const t = (m.text || '').trim();
