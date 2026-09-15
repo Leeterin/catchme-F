@@ -1018,8 +1018,6 @@
     padding:0;
   }
   .feed-social-btn svg{ width:16px; height:16px; }
-  .feed-social-btn.liked{ color:#EF4444; }
-  .feed-social-btn.liked svg{ fill:#EF4444; }
   .feed-comment-section{
     margin-top:10px;
     padding-top:10px;
@@ -1189,43 +1187,9 @@
     color:var(--text);
     margin-bottom:16px;
   }
-  .feed-detail-actions{
-    display:flex;
-    gap:8px;
-    margin-bottom:16px;
-  }
-  .feed-detail-action-btn{
-    flex:1;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:6px;
-    padding:11px 0;
-    border-radius:11px;
-    border:1px solid var(--line);
-    background:var(--surface-2);
-    color:var(--text);
-    font-family:'Inter',sans-serif;
-    font-size:13px;
-    font-weight:700;
-    cursor:pointer;
-  }
-  .feed-detail-action-btn.active{
-    border-color:#F5A623;
-    color:#F5A623;
-  }
-  .feed-detail-action-btn.feed-share-btn{
-    border-color:var(--accent);
-    color:var(--accent);
-  }
-  .feed-detail-owner-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:12px 0;
+  .feed-detail-review-section{
+    padding-top:14px;
     border-top:1px solid var(--line);
-    border-bottom:1px solid var(--line);
-    margin-bottom:16px;
   }
   .feed-detail-review-title{
     font-size:14.5px;
@@ -1777,25 +1741,12 @@
     color:var(--text-dim);
     font-weight:600;
   }
-  .feed-place-detail-header{
-    padding:14px;
-    background:var(--surface-2);
-    border-radius:14px;
-    margin-bottom:4px;
-  }
-  .feed-place-detail-name{
-    font-family:'Space Grotesk',sans-serif;
-    font-weight:700;
-    font-size:16px;
-    margin-bottom:4px;
-  }
   .feed-post-top{
     display:flex;
     justify-content:space-between;
     align-items:center;
     margin-bottom:6px;
   }
-  .feed-post-title-row{ margin-bottom:4px; }
   .feed-post-place{
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
@@ -8102,14 +8053,23 @@ function renderFeedPosts(){
 }
 renderFeedPosts();
 
+// 게시물 작성자 아바타 - 프로필 사진을 올려둔 사람이면 친구/채팅 목록과 똑같이 실제 사진을 보여주고,
+// 없으면 다른 곳과 동일하게 이름 첫 글자 이니셜을 색상 원으로 보여줌 (목록 카드/상세보기 공용)
+function feedAuthorAvatarHtml(author){
+  if(author && author.hasAvatar){
+    return `<div class="placeholder-avatar"><img src="${cachedAvatarUrl(author.id)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
+  }
+  const key = author ? (author.username || author.id) : '?';
+  const initial = author && author.name ? author.name[0] : '?';
+  return `<div class="placeholder-avatar" style="background:${colorForFriendId(key)}">${escapeHtml(initial)}</div>`;
+}
+
 // 게시물 하나를 카드로 그림 - 인스타그램 피드처럼 사진이 먼저 크게 나오고, 그 아래 작성자/장소태그/별점/한줄소개 순
 // 게시물 카드 하나의 HTML을 만듦 (목록/상세보기 화면 공용)
 function feedPostCardHtml(post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const photos = post.photos || [];
   const mapUrl = feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon);
-  const authorKey = post.author ? (post.author.username || post.author.id) : '?';
-  const authorInitial = post.author && post.author.name ? post.author.name[0] : '?';
   return `
     ${photos.length > 0 ? `
       <div class="feed-ig-photos">
@@ -8118,7 +8078,7 @@ function feedPostCardHtml(post){
       </div>
     ` : ''}
     <div class="feed-ig-header">
-      <div class="placeholder-avatar" style="background:${colorForFriendId(authorKey)}">${escapeHtml(authorInitial)}</div>
+      ${feedAuthorAvatarHtml(post.author)}
       <div class="feed-ig-author-name">${escapeHtml(post.author ? post.author.name : '')}</div>
     </div>
     <div class="feed-ig-tag-row">
@@ -8203,6 +8163,10 @@ function feedPostDetailHtml(post){
       </div>
     ` : ''}
     <div class="feed-detail-body">
+      <div class="feed-ig-header">
+        ${feedAuthorAvatarHtml(post.author)}
+        <div class="feed-ig-author-name">${escapeHtml(post.author ? post.author.name : '')}</div>
+      </div>
       <div class="feed-detail-title-row">
         <button type="button" class="feed-detail-title" title="이 장소의 다른 글 모아보기">${escapeHtml(post.title || '')}</button>
         <div class="feed-detail-kebab-wrap">
@@ -8224,10 +8188,6 @@ function feedPostDetailHtml(post){
       <div class="feed-detail-mini-actions">
         <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
         <button type="button" class="feed-detail-mini-btn feed-share-btn" title="메시지 전송">${ICO.send}</button>
-      </div>
-
-      <div class="feed-detail-owner-row">
-        <div class="feed-post-author">${escapeHtml(post.author ? post.author.name : '')}</div>
       </div>
 
       <div class="feed-detail-review-section">
