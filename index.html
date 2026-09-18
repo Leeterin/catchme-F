@@ -14250,7 +14250,12 @@ async function loadChatRoomsFromServer(){
     const data = await apiRequest('/chats');
     data.rooms.forEach(r => {
       const existing = CHAT_ROOMS[r.id];
-      CHAT_ROOMS[r.id] = {
+      // 이 방을 이번 세션에서 이미 열어봐서 전체 메시지가 로컬에 쌓여있으면 그걸 그대로 씀.
+      // 아직 한 번도 안 열어봤으면(새로고침 직후 등) messages가 빈 배열이라 채팅 목록에 항상
+      // "대화를 시작해보세요"만 떴었는데, /chats 응답에 이미 같이 내려오는 lastMessage로
+      // 미리보기 한 줄만 미리 채워둠 (방을 열어야 하는 건 아니고, 목록 미리보기만 정확해짐)
+      const hasLoadedMessages = existing && existing.messages && existing.messages.length > 0;
+      const room = {
         name: r.name || '대화',
         color: existing ? existing.color : colorForFriendId(r.id),
         initial: (r.name || '?')[0],
@@ -14265,7 +14270,7 @@ async function loadChatRoomsFromServer(){
         muted: !!r.muted,
         otherLastReadAt: r.otherLastReadAt || null,
         lastActivity: r.lastActivityAt ? new Date(r.lastActivityAt).getTime() : (existing ? existing.lastActivity : 0),
-        messages: existing ? existing.messages : [],
+        messages: hasLoadedMessages ? existing.messages : [],
         _loaded: existing ? existing._loaded : false,
         // 아래 값들은 서버 응답(/chats)에 안 들어있는, 채팅방을 열어본 뒤에만 로컬에 채워지는 상태라서
         // existing에서 그대로 이어받아야 함. 안 그러면 목록을 다시 불러올 때마다(화면 복귀, 소켓 이벤트 등)
@@ -14276,6 +14281,10 @@ async function loadChatRoomsFromServer(){
         pinned: existing ? existing.pinned : false,
         _pinsLoaded: existing ? existing._pinsLoaded : false,
       };
+      if(!hasLoadedMessages && r.lastMessage){
+        room.messages = [mapServerMessageToLocal(r.lastMessage, room)];
+      }
+      CHAT_ROOMS[r.id] = room;
     });
     renderChatList();
     updateChatNavBadge();
@@ -16232,26 +16241,30 @@ function openChatRoom(id){
   pushViewState(closeChatRoomView);
 }
 
+// 서버에서 온 메시지 하나(어떤 타입이든)를 로컬 카드 형식으로 변환. 방 전체 메시지를 불러올 때뿐 아니라,
+// 채팅 목록에서 아직 한 번도 열어보지 않은 방의 "마지막 메시지 미리보기"를 채울 때도 재사용함
+function mapServerMessageToLocal(m, room){
+  if(m.type === 'RESERVATION') return mapServerReservationMessage(m);
+  if(m.type === 'TIME_PROPOSAL') return mapServerTimeProposalMessage(m, room);
+  if(m.type === 'LOCATION_SUGGEST') return mapServerLocationSuggestMessage(m);
+  if(m.type === 'LOCATION_NOTICE') return mapServerLocationNoticeMessage(m);
+  if(m.type === 'IMAGE') return mapServerImageMessage(m);
+  return {
+    who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
+    senderId: m.senderId,
+    text: m.text,
+    time: m.createdAt,
+    read: !!(room && room.otherLastReadAt && new Date(m.createdAt) <= new Date(room.otherLastReadAt)),
+    id: m.id,
+    _serverId: m.id,
+    replyTo: m.replyTo ? { msgId: m.replyTo.msgId, preview: m.replyTo.preview } : null,
+  };
+}
+
 // 채팅방의 메시지를 서버에서 불러와 room.messages에 채움 (방 처음 열 때, 그리고 백그라운드 복귀 시 재동기화에도 재사용)
 function loadRoomMessagesFromServer(id, room, isFirstLoad){
   return apiRequest(`/chats/${id}/messages`).then(data => {
-    room.messages = data.messages.map(m => {
-      if(m.type === 'RESERVATION') return mapServerReservationMessage(m);
-      if(m.type === 'TIME_PROPOSAL') return mapServerTimeProposalMessage(m, room);
-      if(m.type === 'LOCATION_SUGGEST') return mapServerLocationSuggestMessage(m);
-      if(m.type === 'LOCATION_NOTICE') return mapServerLocationNoticeMessage(m);
-      if(m.type === 'IMAGE') return mapServerImageMessage(m);
-      return {
-        who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
-        senderId: m.senderId,
-        text: m.text,
-        time: m.createdAt,
-        read: !!(room.otherLastReadAt && new Date(m.createdAt) <= new Date(room.otherLastReadAt)),
-        id: m.id,
-        _serverId: m.id,
-        replyTo: m.replyTo ? { msgId: m.replyTo.msgId, preview: m.replyTo.preview } : null,
-      };
-    });
+    room.messages = data.messages.map(m => mapServerMessageToLocal(m, room));
     room._loaded = true;
     if(activeChatRoomId === id) renderChatMessages();
   }).catch(err => { if(isFirstLoad) showToast(err.message); else console.error('[messages resync]', err); });
