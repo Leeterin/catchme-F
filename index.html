@@ -926,25 +926,6 @@
     transition:color .1s ease;
   }
   .feed-rating-picker .feed-star.on{ color:#F5A623; }
-  .feed-comment-rating-picker{
-    display:flex;
-    align-items:center;
-    gap:3px;
-    font-size:16px;
-    line-height:1;
-    margin:6px 0 2px;
-  }
-  .feed-comment-rating-picker .feed-star{
-    color:var(--line);
-    cursor:pointer;
-    transition:color .1s ease;
-  }
-  .feed-comment-rating-picker .feed-star.on{ color:#F5A623; }
-  .feed-comment-rating-hint{
-    margin-left:6px;
-    font-size:11px;
-    color:var(--text-dim);
-  }
   .feed-comment-row .feed-comment-rating-badge{
     color:#F5A623;
     font-size:11px;
@@ -1350,12 +1331,18 @@
   }
   .feed-tag-grid-cell{
     position:relative;
-    aspect-ratio:1;
     overflow:hidden;
     cursor:pointer;
     background:var(--surface-2);
+    display:flex;
+    flex-direction:column;
   }
-  .feed-tag-grid-cell img{
+  .feed-tag-grid-photo{
+    position:relative;
+    aspect-ratio:1;
+    overflow:hidden;
+  }
+  .feed-tag-grid-photo img{
     width:100%;
     height:100%;
     object-fit:cover;
@@ -1380,6 +1367,29 @@
     padding:2px 5px;
     border-radius:999px;
     pointer-events:none;
+  }
+  /* 그리드 셀 사진 아래 별점/한줄평 - 최대한 작고 깔끔하게 한 줄씩만 */
+  .feed-tag-grid-info{
+    padding:4px 3px 5px;
+    min-width:0;
+  }
+  .feed-tag-grid-rating{
+    font-size:9px;
+    line-height:1.2;
+    color:#f5a623;
+    letter-spacing:-0.5px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .feed-tag-grid-note{
+    font-size:10.5px;
+    line-height:1.3;
+    color:var(--text-dim);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    margin-top:1px;
   }
   /* 장소 모아보기 - 세로형(리스트) 보기: 썸네일 + 작성자/별점/한줄평을 한 줄씩 세로로 나열 */
   .feed-tag-list{
@@ -8430,15 +8440,11 @@ function feedPostCardHtml(post){
     <div class="feed-review-social-row">
       <button type="button" class="feed-social-btn feed-comment-toggle-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-        <span class="feed-comment-count">리뷰 ${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span>
+        <span class="feed-comment-count">댓글 ${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span>
       </button>
     </div>
     <div class="feed-comment-section" style="display:none;">
       <div class="feed-comment-list"></div>
-      <div class="feed-comment-rating-picker">
-        <span class="feed-star" data-star="1">★</span><span class="feed-star" data-star="2">★</span><span class="feed-star" data-star="3">★</span><span class="feed-star" data-star="4">★</span><span class="feed-star" data-star="5">★</span>
-        <span class="feed-comment-rating-hint">별점 남기기(선택)</span>
-      </div>
       <div class="feed-comment-input-row">
         <input type="text" class="feed-comment-input" placeholder="댓글을 입력하세요" maxlength="200" />
         <button type="button" class="feed-comment-submit-btn">등록</button>
@@ -8522,15 +8528,11 @@ function feedPostDetailHtml(post){
       </div>
 
       <div class="feed-detail-review-section">
-        <div class="feed-detail-review-title">리뷰 <span class="feed-comment-count">${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span></div>
+        <div class="feed-detail-review-title">댓글 <span class="feed-comment-count">${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span></div>
         <div class="feed-comment-list"></div>
-        <div class="feed-comment-rating-picker">
-          <span class="feed-star" data-star="1">★</span><span class="feed-star" data-star="2">★</span><span class="feed-star" data-star="3">★</span><span class="feed-star" data-star="4">★</span><span class="feed-star" data-star="5">★</span>
-          <span class="feed-comment-rating-hint">별점 남기기(선택)</span>
-        </div>
         <div class="feed-comment-input-row">
-          <input type="text" class="feed-comment-input" placeholder="이 곳에 대한 리뷰를 남겨보세요" maxlength="200" />
-          <button type="button" class="feed-comment-submit-btn">리뷰 등록</button>
+          <input type="text" class="feed-comment-input" placeholder="댓글을 남겨보세요" maxlength="200" />
+          <button type="button" class="feed-comment-submit-btn">댓글 등록</button>
         </div>
       </div>
     </div>
@@ -8590,7 +8592,7 @@ function wireFeedPostDetail(container, post){
   const commentList = container.querySelector('.feed-comment-list');
   function renderCommentList(comments){
     if(comments.length === 0){
-      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요!</div>`;
+      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</div>`;
       return;
     }
     commentList.innerHTML = comments.map(c => `
@@ -8619,7 +8621,7 @@ function wireFeedPostDetail(container, post){
             updateFeedDetailRatingDisplay(container, post);
           }
           if(!commentList.querySelector('.feed-comment-row')){
-            commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요!</div>`;
+            commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</div>`;
           }
         } catch(err){
           showToast(err.message);
@@ -8633,40 +8635,24 @@ function wireFeedPostDetail(container, post){
       const data = await apiRequest(`/feed/${post.id}/comments`);
       renderCommentList(data.comments || []);
     } catch(err){
-      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">리뷰를 불러오지 못했어요.</div>`;
+      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">댓글을 불러오지 못했어요.</div>`;
     }
   }
   loadAndRenderComments();
 
+  // 댓글에는 더 이상 별점을 붙이지 않음 (장소 자체의 별점은 게시물을 쓸 때만 매김) - 예전에 별점과 함께
+  // 남겨진 댓글은 renderCommentList/삭제 로직에서 그대로 표시·정산되도록 남겨둠
   const commentInput = container.querySelector('.feed-comment-input');
-  let commentSelectedRating = 0;
-  const commentStars = container.querySelectorAll('.feed-comment-rating-picker .feed-star');
-  commentStars.forEach(star => {
-    star.addEventListener('click', () => {
-      const val = parseInt(star.dataset.star, 10);
-      commentSelectedRating = (commentSelectedRating === val) ? 0 : val;
-      commentStars.forEach(s => s.classList.toggle('on', parseInt(s.dataset.star, 10) <= commentSelectedRating));
-    });
-  });
   const submitComment = async () => {
     const text = commentInput.value.trim();
     if(!text) return;
-    const ratingToSubmit = commentSelectedRating; // 아래에서 폼을 리셋하기 전에 미리 값을 챙겨둠
     try {
-      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text, rating: ratingToSubmit || null }) });
+      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
       commentInput.value = '';
-      commentSelectedRating = 0;
-      commentStars.forEach(s => s.classList.remove('on'));
       const countEl = container.querySelector('.feed-comment-count');
       const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
       countEl.textContent = `${n}개`;
       post.commentCount = n;
-      if(ratingToSubmit > 0){
-        const total = (post.avgRating || 0) * post.ratingCount + ratingToSubmit;
-        post.ratingCount += 1;
-        post.avgRating = Math.round((total / post.ratingCount) * 10) / 10;
-        updateFeedDetailRatingDisplay(container, post);
-      }
       await loadAndRenderComments();
     } catch(err){
       showToast(err.message);
@@ -8774,20 +8760,36 @@ function renderFeedTagList(){
     });
   } else {
     // 인스타그램 프로필 그리드처럼, 게시물마다 대표사진(0번 사진) 한 장씩 3열 그리드로 모아서 보여줌
+    // + 사진 밑에 그 글의 별점/한줄평을 작게 한 줄씩 표시
     container.className = 'feed-tag-grid';
     posts.forEach(post => {
       const cover = (post.photos && post.photos[0]) || '';
       const cell = document.createElement('div');
       cell.className = 'feed-tag-grid-cell';
-      cell.innerHTML = cover
+
+      const photo = document.createElement('div');
+      photo.className = 'feed-tag-grid-photo';
+      photo.innerHTML = cover
         ? `<img src="${cover}" alt="" />`
         : `<div class="feed-tag-grid-noimg">${ICO.pin}</div>`;
       if(post.photos && post.photos.length > 1){
         const badge = document.createElement('div');
         badge.className = 'feed-tag-grid-count';
         badge.textContent = `📷 ${post.photos.length}`;
-        cell.appendChild(badge);
+        photo.appendChild(badge);
       }
+      cell.appendChild(photo);
+
+      if(typeof post.rating === 'number' || post.note){
+        const info = document.createElement('div');
+        info.className = 'feed-tag-grid-info';
+        info.innerHTML = `
+          ${typeof post.rating === 'number' ? `<div class="feed-tag-grid-rating">${renderStarsHtml(post.rating)} ${post.rating.toFixed(1)}</div>` : ''}
+          ${post.note ? `<div class="feed-tag-grid-note">${escapeHtml(post.note)}</div>` : ''}
+        `;
+        cell.appendChild(info);
+      }
+
       cell.addEventListener('click', () => openFeedPostDetail(post, 'tag'));
       container.appendChild(cell);
     });
@@ -8910,23 +8912,12 @@ function wireFeedPostCard(card, post){
     }
   });
   const commentInput = card.querySelector('.feed-comment-input');
-  let commentSelectedRating = 0;
-  const commentStars = card.querySelectorAll('.feed-comment-rating-picker .feed-star');
-  commentStars.forEach(star => {
-    star.addEventListener('click', () => {
-      const val = parseInt(star.dataset.star, 10);
-      commentSelectedRating = (commentSelectedRating === val) ? 0 : val; // 같은 별을 다시 누르면 선택 취소
-      commentStars.forEach(s => s.classList.toggle('on', parseInt(s.dataset.star, 10) <= commentSelectedRating));
-    });
-  });
   const submitComment = async () => {
     const text = commentInput.value.trim();
     if(!text) return;
     try {
-      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text, rating: commentSelectedRating || null }) });
+      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
       commentInput.value = '';
-      commentSelectedRating = 0;
-      commentStars.forEach(s => s.classList.remove('on'));
       const countEl = card.querySelector('.feed-comment-count');
       const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
       countEl.textContent = `댓글 ${n}개`;
