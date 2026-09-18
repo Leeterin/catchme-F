@@ -15354,7 +15354,7 @@ function renderPinnedSchedule(){
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 일정 보기</button>` : ''}
         <button type="button" class="pin-action-btn pin-set-loc">${location ? ICO.pin + ' ' + escapeHtml(location) : '장소 정하기'}</button>
         ${location ? `<button type="button" class="pin-action-btn danger pin-remove-loc">장소 삭제</button>` : ''}
-        <button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>
+        ${!dateObj ? `<button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>` : ''}
       </div>
     `;
 
