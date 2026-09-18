@@ -15935,13 +15935,17 @@ function renderChatMessages(){
         }
       } else {
         const isDirectPick = totalMembers === 2; // 1:1이면 상대가 하나만 골라도 바로 확정되는 방식
+        // 1:1에서 여러 후보를 보낸 사람은 이미 "이 중 아무거나 괜찮다"는 뜻으로 제안한 거라, 자기가 보낸
+        // 후보 중 하나를 또 "선택"할 필요가 없음 - 상대방 화면에만 선택 버튼을 보여주고, 보낸 사람 화면에는
+        // 버튼 없이 날짜/시간만 보여줌 (그룹 채팅은 전원 동의 방식이라 보낸 사람도 투표해야 하므로 그대로 둠)
+        const hideVoteBtn = isDirectPick && m.who === 'me';
         const optionsHtml = m.options.map((o, idx) => {
           const iVoted = o.votes.includes('나');
           const btnLabel = isDirectPick ? (iVoted ? '✓ 선택함' : '이 시간 선택') : (iVoted ? '✓ 투표함' : '투표하기');
           return `
             <div class="time-option-row time-option-vote-row">
               <span class="chat-date-link" data-idx="${idx}">${o.dateLabel} ${o.timeLabel}</span>
-              <button type="button" class="time-option-vote-btn${iVoted ? ' voted' : ''}" data-idx="${idx}">${btnLabel}</button>
+              ${hideVoteBtn ? '' : `<button type="button" class="time-option-vote-btn${iVoted ? ' voted' : ''}" data-idx="${idx}">${btnLabel}</button>`}
               ${isDirectPick ? '' : `<span class="time-option-vote-count">${o.votes.length}/${totalMembers}명</span>`}
             </div>
           `;
