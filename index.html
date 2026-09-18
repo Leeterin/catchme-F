@@ -2596,6 +2596,65 @@
     color:var(--cta);
   }
 
+  .appt-detail-section{ margin-bottom:24px; }
+  .appt-detail-label{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    font-size:11.5px;
+    font-weight:700;
+    color:var(--text-dim);
+    margin-bottom:9px;
+  }
+  .appt-detail-datetime{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:21px;
+    color:var(--text);
+  }
+  .appt-detail-empty{
+    font-size:12.5px;
+    color:var(--text-dim);
+  }
+  .appt-detail-location-card{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:var(--accent-soft);
+    border:1px solid var(--accent);
+    border-radius:12px;
+    padding:12px 14px;
+    color:var(--accent);
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .appt-detail-place-row{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    background:var(--surface-2);
+    border-radius:12px;
+    padding:10px 12px;
+    margin-bottom:8px;
+    cursor:pointer;
+  }
+  .appt-detail-place-row:last-child{ margin-bottom:0; }
+  .appt-detail-place-name{
+    font-weight:700;
+    font-size:13.5px;
+    color:var(--text);
+  }
+  .appt-detail-place-sub{
+    font-size:11.5px;
+    color:var(--text-dim);
+  }
+  .appt-detail-place-meta{
+    font-size:10.5px;
+    color:var(--text-dim);
+    margin-top:3px;
+  }
+
   .chat-messages{
     display:flex;
     flex-direction:column;
@@ -5700,6 +5759,14 @@
       </div>
     </div>
 
+    <!-- 확정된 일정 상세보기 (상단 고정 카드를 누르면 열림) -->
+    <div class="calendar-match-view" id="appointmentDetailView">
+      <div class="match-panel-header">
+        <button class="profile-back" id="appointmentDetailBackBtn">&#8249;</button>
+        <span id="appointmentDetailTitle">약속 상세</span>
+      </div>
+      <div id="appointmentDetailBody"></div>
+    </div>
 
     <!-- 그룹 멤버 목록 (별도 화면) -->
     <div class="calendar-match-view" id="groupMembersView">
@@ -15358,11 +15425,10 @@ function renderPinnedSchedule(){
       </div>
     `;
 
-    // 카드 자체를 누르면 이 핀이 확정된 채팅 메시지로 바로 이동 (버튼 클릭은 제외)
+    // 카드 자체를 누르면 이 약속의 상세보기 화면이 열림 (버튼 클릭은 제외)
     card.addEventListener('click', (e) => {
       if(e.target.closest('button, input')) return;
-      const targetMsgId = pinned.reservationMsgId || pinned.sourceMsgId;
-      scrollToChatMessage(targetMsgId);
+      openAppointmentDetailView(activeChatRoomId, pinned.id);
     });
 
     const goDayBtn = card.querySelector('.pin-goday');
@@ -15412,6 +15478,71 @@ function renderPinnedSchedule(){
     listEl.appendChild(card);
   });
 }
+
+// ---------- 상단 고정 카드를 누르면 열리는 "약속 상세보기" 화면 ----------
+// 날짜/시간 -> 장소 -> 친구가 추천해서 수락한 장소들(시간순) 순서로 보여줌
+function openAppointmentDetailView(roomId, pinId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  const pin = (room.pinnedSchedules || []).find(p => p.id === pinId);
+  if(!pin) return;
+
+  document.getElementById('appointmentDetailTitle').textContent = pin.dateLabel ? `${pin.dateLabel} 약속` : '약속 상세';
+
+  // 이 방에서 친구가 제안하고 수락된 장소들을 시간순으로 모음 (한 방에는 보통 진행 중인 약속이 하나라는 전제)
+  const acceptedPlaces = (room.messages || []).filter(m => m.type === 'location-suggest' && m.status === 'confirmed');
+
+  const body = document.getElementById('appointmentDetailBody');
+  body.innerHTML = `
+    <div class="appt-detail-section">
+      <div class="appt-detail-label">${ICO.calendar} 날짜 · 시간</div>
+      ${pin.dateLabel
+        ? `<div class="appt-detail-datetime">${escapeHtml(pin.dateLabel)} ${escapeHtml(pin.timeLabel || '')}</div>`
+        : `<div class="appt-detail-empty">아직 날짜가 정해지지 않았어요.</div>`}
+    </div>
+    <div class="appt-detail-section">
+      <div class="appt-detail-label">${ICO.pin} 장소</div>
+      ${pin.location
+        ? `<div class="appt-detail-location-card" id="apptDetailLocationCard">${ICO.pin} ${escapeHtml(pin.location)}</div>`
+        : `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>`}
+    </div>
+    <div class="appt-detail-section">
+      <div class="appt-detail-label">${ICO.check} 친구가 추천해서 수락한 장소</div>
+      ${acceptedPlaces.length === 0
+        ? `<div class="appt-detail-empty">아직 수락된 장소 제안이 없어요.</div>`
+        : acceptedPlaces.map((m, idx) => {
+            const senderLabel = m.who === 'me' ? '내가 추천' : `${escapeHtml(getGroupSenderName(room, m) || room.name)}님이 추천`;
+            return `
+              <div class="appt-detail-place-row" data-idx="${idx}">
+                <div class="appt-detail-place-name">${idx + 1}. ${escapeHtml(m.place)}</div>
+                ${m.location ? `<div class="appt-detail-place-sub">${escapeHtml(m.location)}</div>` : ''}
+                <div class="appt-detail-place-meta">${senderLabel} · ${formatMessageTime(m.time)}</div>
+              </div>
+            `;
+          }).join('')}
+    </div>
+  `;
+
+  const locCard = document.getElementById('apptDetailLocationCard');
+  if(locCard){
+    locCard.addEventListener('click', () => openHotplaceView(pin.location, pin.locationLat, pin.locationLon));
+  }
+  body.querySelectorAll('.appt-detail-place-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const m = acceptedPlaces[parseInt(row.dataset.idx, 10)];
+      if(m && m.location) openHotplaceView(m.location, m.locationLat, m.locationLon);
+    });
+  });
+
+  document.getElementById('chatRoomView').classList.remove('active');
+  document.getElementById('appointmentDetailView').classList.add('active');
+  pushViewState(closeAppointmentDetailView);
+}
+function closeAppointmentDetailView(){
+  document.getElementById('appointmentDetailView').classList.remove('active');
+  document.getElementById('chatRoomView').classList.add('active');
+}
+document.getElementById('appointmentDetailBackBtn').addEventListener('click', () => goBackOrClose(closeAppointmentDetailView));
 
 // ---------- 채팅에서 예약/제안 날짜를 눌러 그날 시간표 바로 확인하기 ----------
 let dayViewOpenedFromChat = null; // 이 값이 있으면 하루 보기의 뒤로가기가 채팅으로 돌아감
