@@ -1915,6 +1915,29 @@
     min-width:0;
     line-height:1.35;
   }
+  .feed-post-card-inner{
+    display:flex;
+    align-items:flex-start;
+    gap:12px;
+  }
+  .feed-post-main{
+    flex:1;
+    min-width:0;
+  }
+  .feed-post-thumb{
+    flex:none;
+    width:84px;
+    height:84px;
+    border-radius:12px;
+    overflow:hidden;
+    background:var(--surface-2);
+  }
+  .feed-post-thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
   .feed-post-walk-badge{
     flex:none;
     display:inline-flex;
@@ -14385,18 +14408,24 @@ function buildFeedPostCard(post, category, distKm){
       : `<button type="button" class="feed-post-btn suggest">여기 어때요?</button>`;
   const card = document.createElement('div');
   card.className = 'feed-post-card';
+  const coverPhoto = (post.photos && post.photos[0]) || '';
   card.innerHTML = `
-    <div class="feed-post-card-head">
-      <span class="feed-post-place">${escapeHtml(post.title)}</span>
-      ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>` : ''}
-    </div>
-    ${post.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(post.location)}</span></button>` : ''}
-    ${post.note ? `<div class="feed-post-note">${escapeHtml(post.note)}</div>` : ''}
-    <div class="feed-post-author">${post.author ? `${escapeHtml(post.author.name)} 님의 추천` : ''}</div>
-    <div class="feed-post-actions">
-      <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
-      ${suggestBtnHtml}
-      <button type="button" class="feed-post-btn fix">장소 픽스</button>
+    <div class="feed-post-card-inner">
+      <div class="feed-post-main">
+        <div class="feed-post-card-head">
+          <span class="feed-post-place">${escapeHtml(post.title)}</span>
+          ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>` : ''}
+        </div>
+        ${post.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(post.location)}</span></button>` : ''}
+        ${post.note ? `<div class="feed-post-note">${escapeHtml(post.note)}</div>` : ''}
+        <div class="feed-post-author">${post.author ? `${escapeHtml(post.author.name)} 님의 추천` : ''}</div>
+        <div class="feed-post-actions">
+          <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
+          ${suggestBtnHtml}
+          <button type="button" class="feed-post-btn fix">장소 픽스</button>
+        </div>
+      </div>
+      ${coverPhoto ? `<div class="feed-post-thumb"><img src="${coverPhoto}" alt="" /></div>` : ''}
     </div>
   `;
   const suggestBtn = card.querySelector('.feed-post-btn.suggest');
@@ -14437,21 +14466,27 @@ function buildFeedPlaceGroupCard(group, category, distKm){
 
   const card = document.createElement('div');
   card.className = 'feed-post-card feed-place-group-card';
+  const coverPhoto = posts.map(p => (p.photos && p.photos[0])).find(Boolean) || '';
   card.innerHTML = `
-    <div class="feed-post-card-head">
-      <span class="feed-post-place">${escapeHtml(primary.title)}</span>
-      <div class="feed-place-group-head-right">
-        ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>` : ''}
-        <button type="button" class="feed-place-group-chevron" title="이 장소의 모든 리뷰 보기">&rsaquo;</button>
+    <div class="feed-post-card-inner">
+      <div class="feed-post-main">
+        <div class="feed-post-card-head">
+          <span class="feed-post-place">${escapeHtml(primary.title)}</span>
+          <div class="feed-place-group-head-right">
+            ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>` : ''}
+            <button type="button" class="feed-place-group-chevron" title="이 장소의 모든 리뷰 보기">&rsaquo;</button>
+          </div>
+        </div>
+        ${primary.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(primary.location)}</span></button>` : ''}
+        ${summaryHtml ? `<div class="feed-place-group-summary">${summaryHtml}</div>` : ''}
+        <div class="feed-post-author">${primary.author ? `${escapeHtml(primary.author.name)} 님의 추천${posts.length > 1 ? ` 외 ${posts.length - 1}명` : ''}` : ''}</div>
+        <div class="feed-post-actions">
+          <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
+          ${suggestBtnHtml}
+          <button type="button" class="feed-post-btn fix">장소 픽스</button>
+        </div>
       </div>
-    </div>
-    ${primary.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(primary.location)}</span></button>` : ''}
-    ${summaryHtml ? `<div class="feed-place-group-summary">${summaryHtml}</div>` : ''}
-    <div class="feed-post-author">${primary.author ? `${escapeHtml(primary.author.name)} 님의 추천${posts.length > 1 ? ` 외 ${posts.length - 1}명` : ''}` : ''}</div>
-    <div class="feed-post-actions">
-      <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
-      ${suggestBtnHtml}
-      <button type="button" class="feed-post-btn fix">장소 픽스</button>
+      ${coverPhoto ? `<div class="feed-post-thumb"><img src="${coverPhoto}" alt="" /></div>` : ''}
     </div>
   `;
   const suggestBtn = card.querySelector('.feed-post-btn.suggest');
