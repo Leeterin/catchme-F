@@ -1342,10 +1342,10 @@
   .feed-tag-view-btn svg{ width:15px; height:15px; }
   .feed-tag-view-btn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .feed-tag-view-btn:hover:not(.active){ background:var(--surface-2); }
-  /* 장소 모아보기 - 인스타그램 프로필 그리드처럼 게시물마다 대표사진 한 장씩 4열로 모아서 보여줌 */
+  /* 장소 모아보기 - 인스타그램 프로필 그리드처럼 게시물마다 대표사진 한 장씩 3열로 모아서 보여줌 */
   .feed-tag-grid{
     display:grid;
-    grid-template-columns:repeat(4, 1fr);
+    grid-template-columns:repeat(3, 1fr);
     gap:2px;
   }
   .feed-tag-grid-cell{
@@ -8703,7 +8703,7 @@ function renderFeedTagList(){
       container.appendChild(row);
     });
   } else {
-    // 인스타그램 프로필 그리드처럼, 게시물마다 대표사진(0번 사진) 한 장씩 4열 그리드로 모아서 보여줌
+    // 인스타그램 프로필 그리드처럼, 게시물마다 대표사진(0번 사진) 한 장씩 3열 그리드로 모아서 보여줌
     container.className = 'feed-tag-grid';
     posts.forEach(post => {
       const cover = (post.photos && post.photos[0]) || '';
