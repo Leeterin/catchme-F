@@ -6478,6 +6478,7 @@ function connectRealtimeSocket(){
       touchRoom(roomId);
       if(activeChatRoomId === roomId){
         renderChatMessages();
+        markRoomRead(roomId); // 이 방을 이미 보고 있는 중에 도착한 메시지도 바로 "읽음" 처리해서 상대방 화면에 실시간으로 반영되게 함
       } else {
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
@@ -6502,6 +6503,7 @@ function connectRealtimeSocket(){
       touchRoom(roomId);
       if(activeChatRoomId === roomId){
         renderChatMessages();
+        markRoomRead(roomId);
       } else {
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
@@ -6524,6 +6526,7 @@ function connectRealtimeSocket(){
       if(activeChatRoomId === roomId){
         renderChatMessages();
         renderPinnedSchedule();
+        markRoomRead(roomId);
       } else {
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
@@ -6542,6 +6545,7 @@ function connectRealtimeSocket(){
       if(activeChatRoomId === roomId){
         renderChatMessages();
         renderPinnedSchedule();
+        markRoomRead(roomId);
       } else {
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
@@ -6557,6 +6561,7 @@ function connectRealtimeSocket(){
       touchRoom(roomId);
       if(activeChatRoomId === roomId){
         renderChatMessages();
+        markRoomRead(roomId);
       } else {
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
@@ -6574,6 +6579,7 @@ function connectRealtimeSocket(){
       text: message.text,
       time: message.createdAt,
       read: false,
+      replyTo: message.replyTo ? { msgId: message.replyTo.msgId, preview: message.replyTo.preview } : null,
     };
     // 이미 내가 보내서 화면에 반영된 메시지(같은 id)라면 중복으로 또 넣지 않음
     if(room.messages.some(m => m._serverId === message.id)) return;
@@ -6584,6 +6590,7 @@ function connectRealtimeSocket(){
     touchRoom(roomId);
     if(activeChatRoomId === roomId){
       renderChatMessages();
+      markRoomRead(roomId);
     } else {
       addIncomingMessageUnread(roomId);
       // "새 메시지 알림"이 켜져있을 때만 인앱 토스트를 띄움 (미리보기 설정에 따라 내용 표시 여부도 결정)
@@ -15577,6 +15584,7 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
         read: !!(room.otherLastReadAt && new Date(m.createdAt) <= new Date(room.otherLastReadAt)),
         id: m.id,
         _serverId: m.id,
+        replyTo: m.replyTo ? { msgId: m.replyTo.msgId, preview: m.replyTo.preview } : null,
       };
     });
     room._loaded = true;
@@ -15981,15 +15989,17 @@ function renderChatMessages(){
       row.querySelector('.msg-bubble-text').textContent = m.text;
 
       // 인용된 원문: 아직 대화에 남아있으면 실제 내용/발신자로, 없으면 보낼 때 저장해둔 미리보기로 표시
+      // (실제 채팅방은 사람마다 로컬 id가 달라서, 내 화면 로컬 id(msgId)뿐 아니라 서버 id(_serverId)로도 찾아봄 -
+      // 안 그러면 상대방이 보낸 답장은 내 화면에서 원문을 못 찾아 항상 "삭제된 메시지"로만 보임)
       if(m.replyTo){
-        const originalMsg = room.messages.find(x => x.id === m.replyTo.msgId);
+        const originalMsg = room.messages.find(x => x.id === m.replyTo.msgId || (x._serverId && x._serverId === m.replyTo.msgId));
         const whoLabel = originalMsg ? (originalMsg.who === 'me' ? '나' : room.name) : '메시지';
         const previewText = originalMsg ? getMsgPreviewText(originalMsg) : (m.replyTo.preview || '삭제된 메시지');
         row.querySelector('.msg-quote-who').textContent = whoLabel;
         row.querySelector('.msg-quote-text').textContent = previewText;
         row.querySelector('.msg-quote-block').addEventListener('click', (e) => {
           e.stopPropagation();
-          scrollToChatMessage(m.replyTo.msgId);
+          scrollToChatMessage(originalMsg ? originalMsg.id : m.replyTo.msgId);
         });
       }
       // 말풍선을 누르면 그 메시지에 답장
@@ -16028,7 +16038,10 @@ function getMsgPreviewText(m){
 
 function startReplyTo(m){
   if(!m || !m.id) return;
-  replyingToMsg = { msgId: m.id, preview: getMsgPreviewText(m) };
+  // msgId는 이 화면(로컬)에서 인용문을 눌렀을 때 바로 스크롤 이동시키는 용도, serverId는 서버에 실제로
+  // 전송해서 상대방 화면에도 답장이 보이게 하는 용도 - 서버에 아직 동기화 안 된(전송 중인) 메시지에 답장하면
+  // serverId가 없을 수 있는데, 그럴 땐 내 화면에서만 인용이 보이고 상대방껜 그냥 일반 메시지로 감(드묾)
+  replyingToMsg = { msgId: m.id, serverId: m._serverId || null, preview: getMsgPreviewText(m) };
   document.getElementById('chatReplyPreviewText').textContent = replyingToMsg.preview || '메시지';
   document.getElementById('chatReplyPreviewBar').style.display = 'flex';
   document.getElementById('chatInput').focus();
@@ -16063,10 +16076,20 @@ function sendChatMessage(){
   if(room.isRealRoom){
     input.value = '';
     cancelReply();
-    apiRequest(`/chats/${roomId}/messages`, { method: 'POST', body: JSON.stringify({ text }) })
+    apiRequest(`/chats/${roomId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        text,
+        // 서버에 저장돼야 상대방 화면에도 답장이 보이니, 로컬 id 말고 서버 id로 보냄
+        replyToMessageId: (replyToPayload && replyingToMsg.serverId) ? replyingToMsg.serverId : undefined,
+        replyToPreview: (replyToPayload && replyingToMsg.serverId) ? replyToPayload.preview : undefined,
+      }),
+    })
       .then(data => {
         const msg = { who: 'me', text: data.message.text, time: data.message.createdAt, read: false, _serverId: data.message.id, id: 'msg' + (locationMsgIdCounter++) };
-        if(replyToPayload) msg.replyTo = replyToPayload;
+        // 서버가 실제로 답장을 저장해줬으면 그걸 기준으로, 아니면(동기화 전 메시지에 답장한 경우) 내 화면용 로컬 미리보기라도 남김
+        if(data.message.replyTo) msg.replyTo = { msgId: replyToPayload.msgId, preview: data.message.replyTo.preview };
+        else if(replyToPayload) msg.replyTo = replyToPayload;
         room.messages.push(msg);
         touchRoom(roomId);
         renderChatList();
