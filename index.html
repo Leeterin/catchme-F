@@ -15509,6 +15509,22 @@ function renderPinnedSchedule(){
 }
 
 // ---------- 상단 고정 카드를 누르면 열리는 "약속 상세보기" 화면 ----------
+// 이 화면 안의 주소/매장명을 누르면 지도에 그 위치를 핀으로 찍어서 보여줌.
+// openPlaceDetailMap은 원래 "약속장소 + 커뮤니티 장소" 두 핀을 같이 비교해서 보여주는 용도라
+// lastHotplaceLat/Lon(예전에 열었던 다른 곳의 약속장소 좌표)이 그대로 남아있으면 엉뚱한 핀이 같이 찍힐 수
+// 있어서, 여기서는 그 값을 비워서 지금 누른 위치 핀 하나만 뜨게 함
+function openApptLocationMap(title, location, lat, lon){
+  lastHotplaceLat = null;
+  lastHotplaceLon = null;
+  lastHotplaceLocationHint = null;
+  openPlaceDetailMap({
+    title: title || location || '약속 장소',
+    location: location || '',
+    lat: typeof lat === 'number' ? lat : null,
+    lon: typeof lon === 'number' ? lon : null,
+  });
+}
+
 // 날짜/시간 -> 장소 -> 친구가 추천해서 수락한 장소들(시간순) 순서로 보여줌
 function openAppointmentDetailView(roomId, pinId){
   const room = CHAT_ROOMS[roomId];
@@ -15561,12 +15577,12 @@ function openAppointmentDetailView(roomId, pinId){
 
   const locCard = document.getElementById('apptDetailLocationCard');
   if(locCard){
-    locCard.addEventListener('click', () => openHotplaceView(pin.location, pin.locationLat, pin.locationLon));
+    locCard.addEventListener('click', () => openApptLocationMap(pin.location, pin.location, pin.locationLat, pin.locationLon));
   }
   body.querySelectorAll('.appt-detail-place-row').forEach(row => {
     row.addEventListener('click', () => {
       const m = acceptedPlaces[parseInt(row.dataset.idx, 10)];
-      if(m && m.location) openHotplaceView(m.location, m.locationLat, m.locationLon);
+      if(m) openApptLocationMap(m.place, m.location, m.locationLat, m.locationLon);
     });
   });
 
