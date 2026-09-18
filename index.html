@@ -15586,7 +15586,8 @@ function openAppointmentDetailView(roomId, pinId){
     <div class="appt-detail-section">
       <div class="appt-detail-label">${ICO.pin} 장소</div>
       ${pin.location
-        ? `<div class="appt-detail-location-card" id="apptDetailLocationCard">${ICO.pin} ${escapeHtml(pin.location)}</div>`
+        ? `<div class="appt-detail-location-card" id="apptDetailLocationCard">${ICO.pin} ${escapeHtml(pin.location)}</div>
+           <button type="button" class="hotplace-notice-btn" id="apptDetailHotplaceBtn" style="margin-top:8px;">${ICO.pin} 주변 핫플 보기</button>`
         : `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>`}
     </div>
     <div class="appt-detail-section">
@@ -15604,7 +15605,6 @@ function openAppointmentDetailView(roomId, pinId){
                 ${srcMsg && srcMsg.location ? `<div class="appt-detail-place-sub">${escapeHtml(srcMsg.location)}</div>` : ''}
                 <div class="appt-detail-place-meta">${senderLabel}${timeLabel}</div>
                 <div class="appt-detail-place-actions">
-                  <button type="button" class="appt-place-action-btn appt-place-change" data-idx="${idx}">변경</button>
                   <button type="button" class="appt-place-action-btn danger appt-place-delete" data-idx="${idx}">삭제</button>
                 </div>
               </div>
@@ -15617,6 +15617,10 @@ function openAppointmentDetailView(roomId, pinId){
   if(locCard){
     locCard.addEventListener('click', () => openApptLocationMap(pin.location, pin.location, pin.locationLat, pin.locationLon));
   }
+  const hotplaceBtn = document.getElementById('apptDetailHotplaceBtn');
+  if(hotplaceBtn){
+    hotplaceBtn.addEventListener('click', () => openHotplaceView(pin.location, pin.locationLat, pin.locationLon));
+  }
   body.querySelectorAll('.appt-detail-place-row').forEach(row => {
     const idx = parseInt(row.dataset.idx, 10);
     const entry = acceptedPlaces[idx];
@@ -15626,13 +15630,6 @@ function openAppointmentDetailView(roomId, pinId){
       const { pin: p, srcMsg } = entry;
       openApptLocationMap((srcMsg && srcMsg.place) || p.location, (srcMsg && srcMsg.location) || p.location, p.locationLat, p.locationLon);
     });
-    const changeBtn = row.querySelector('.appt-place-change');
-    if(changeBtn){
-      changeBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        changePinLocation(room, roomId, entry.pin, () => openAppointmentDetailView(roomId, pinId));
-      });
-    }
     const deleteBtn = row.querySelector('.appt-place-delete');
     if(deleteBtn){
       deleteBtn.addEventListener('click', (e) => {
