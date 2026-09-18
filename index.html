@@ -16741,7 +16741,7 @@ function sendChatMessage(){
   const roomId = activeChatRoomId;
   const room = CHAT_ROOMS[roomId];
 
-  const replyToPayload = replyingToMsg ? { msgId: replyingToMsg.msgId, preview: replyingToMsg.preview } : null;
+  const replyToPayload = replyingToMsg ? { msgId: replyingToMsg.msgId, preview: replyingToMsg.preview, serverId: replyingToMsg.serverId || null } : null;
 
   if(room.isRealRoom){
     input.value = '';
@@ -16751,8 +16751,10 @@ function sendChatMessage(){
       body: JSON.stringify({
         text,
         // 서버에 저장돼야 상대방 화면에도 답장이 보이니, 로컬 id 말고 서버 id로 보냄
-        replyToMessageId: (replyToPayload && replyingToMsg.serverId) ? replyingToMsg.serverId : undefined,
-        replyToPreview: (replyToPayload && replyingToMsg.serverId) ? replyToPayload.preview : undefined,
+        // (cancelReply()가 전역 replyingToMsg를 이미 null로 초기화하므로, 그 전에 미리 담아둔
+        // replyToPayload.serverId를 써야 함 - replyingToMsg를 직접 읽으면 null 참조 에러로 전송 자체가 실패했었음)
+        replyToMessageId: (replyToPayload && replyToPayload.serverId) ? replyToPayload.serverId : undefined,
+        replyToPreview: (replyToPayload && replyToPayload.serverId) ? replyToPayload.preview : undefined,
       }),
     })
       .then(data => {
