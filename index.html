@@ -1677,6 +1677,16 @@
     font-size:14px;
     margin-bottom:10px;
   }
+  /* my모임 탭 안에서 이미 끝난 모임을 "지난 모임"으로 따로 묶어 보여줄 때 쓰는 구분선 제목 */
+  .meetup-past-divider{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin:16px 0 8px;
+    padding-top:12px;
+    border-top:1px solid var(--line);
+  }
   .meetup-card{
     background:var(--surface-2);
     border:1px solid var(--line);
@@ -7856,6 +7866,9 @@ function renderMeetups(){
     // my모임이 아닌 카테고리를 볼 때는, 내가 이미 참여중인 모임은 안 섞이게 빼고 보여줌 (my모임 탭에서만 보임)
     list = list.filter(m => !mineAll.includes(m));
     if(activeMeetupCategory !== 'all') list = list.filter(m => m.categoryKey === activeMeetupCategory);
+    // 둘러보기 목록(전체/카테고리별)에서는 이미 끝난 모임을 안 보이게 함. 그 모임에 참여했던 사람은
+    // my모임 탭의 "지난 모임" 구간에서 계속 볼 수 있으니(기록은 안 사라짐), 여기선 목록만 깔끔하게 유지함
+    list = list.filter(m => !isMeetupPast(m));
   }
 
   const q = meetupSearchQuery.trim().toLowerCase();
@@ -7877,7 +7890,21 @@ function renderMeetups(){
     return;
   }
 
-  list.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
+  if(activeMeetupCategory === 'mine'){
+    // my모임 탭 안에서는 아직 안 끝난 모임을 먼저 보여주고, 이미 끝난 모임은 "지난 모임"으로 아래에 따로 묶어서 보여줌
+    const upcoming = list.filter(m => !isMeetupPast(m));
+    const past = list.filter(m => isMeetupPast(m));
+    upcoming.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
+    if(past.length > 0){
+      const divider = document.createElement('div');
+      divider.className = 'meetup-past-divider';
+      divider.textContent = `지난 모임 (${past.length})`;
+      container.appendChild(divider);
+      past.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
+    }
+  } else {
+    list.forEach(meetup => container.appendChild(buildMeetupCard(meetup)));
+  }
 }
 
 // 모임 카드 하나를 만듦 (둘러보기/내 모임 탭 공용)
