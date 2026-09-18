@@ -4191,6 +4191,49 @@
   .place-detail-map-pin-label.appt{ background:#F5A623; }
   .place-detail-map-pin-label.place{ background:var(--accent); }
 
+  /* 핫플 카드 오른쪽 화살표(같은 장소로 리뷰 여러 개 묶여있을 때, 눌러서 모아보기) */
+  .feed-place-group-head-right{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex:none;
+  }
+  .feed-place-group-chevron{
+    background:none;
+    border:none;
+    padding:0 2px;
+    font-size:20px;
+    line-height:1;
+    color:var(--text-dim);
+    cursor:pointer;
+  }
+  .feed-place-group-chevron:hover{ color:var(--accent); }
+  .feed-place-group-summary{
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:7px;
+  }
+  .feed-place-group-card{ cursor:pointer; }
+
+  /* 핫플 카드에서 장소 하나의 모든 리뷰를 모아 보여주는 상세보기 - 지도 팝업보다 아래, 핫플 목록 팝업보다는 위 */
+  .hotplace-place-reviews-overlay{ z-index:3150; }
+  .hotplace-place-reviews-panel{
+    height:78vh;
+    max-height:600px;
+  }
+  .hotplace-place-reviews-body{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    padding:14px 16px calc(14px + env(safe-area-inset-bottom));
+  }
+  .hotplace-place-reviews-meta-row{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+  }
+
   .custom-picker-overlay{
     position:fixed;
     inset:0;
@@ -5611,6 +5654,17 @@
       </div>
       <div id="placeDetailMapCanvas" class="place-detail-map-canvas"></div>
       <div class="place-detail-map-legend" id="placeDetailMapLegend"></div>
+    </div>
+  </div>
+
+  <!-- 핫플 목록에서 같은 장소로 리뷰가 여러 개 묶인 카드를 누르면, 그 장소의 모든 리뷰를 모아서 보여주는 상세보기 -->
+  <div class="place-detail-map-overlay hotplace-place-reviews-overlay" id="hotplacePlaceReviewsOverlay">
+    <div class="place-detail-map-panel hotplace-place-reviews-panel">
+      <div class="place-detail-map-header">
+        <div class="place-detail-map-title" id="hotplacePlaceReviewsTitle">장소 리뷰</div>
+        <button type="button" class="mini-confirm-close" id="hotplacePlaceReviewsCloseBtn" aria-label="닫기">&times;</button>
+      </div>
+      <div id="hotplacePlaceReviewsBody" class="hotplace-place-reviews-body"></div>
     </div>
   </div>
 
@@ -14369,6 +14423,67 @@ function buildFeedPostCard(post, category, distKm){
   return card;
 }
 
+// 같은 장소(제목이 같음)로 리뷰가 여러 개 올라온 경우, 리스트에 카드를 여러 번 반복해서 보여주는 대신
+// 대표 카드 하나만 보여주고 오른쪽에 ">" 화살표를 붙여서, 누르면 그 장소의 모든 리뷰를 모아 볼 수 있게 함.
+// group = { title, posts: [게시물, ...] } - posts[0]을 대표(장소명/위치/좌표)로 씀
+function buildFeedPlaceGroupCard(group, category, distKm){
+  const { posts } = group;
+  const primary = posts[0];
+  const saved = isPlaceSaved(category, primary);
+  const compat = { place: primary.title, note: primary.note, location: primary.location, lat: primary.lat, lon: primary.lon };
+  const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
+  const placeStatus = getRoomPlaceStatus(room, primary.title);
+  const suggestBtnHtml = placeStatus === 'confirmed'
+    ? `<button type="button" class="feed-post-btn status-badge confirmed" disabled>확정됨</button>`
+    : placeStatus === 'pending'
+      ? `<button type="button" class="feed-post-btn status-badge pending" disabled>제안됨</button>`
+      : `<button type="button" class="feed-post-btn suggest">여기 어때요?</button>`;
+  const ratings = posts.map(p => p.rating).filter(r => typeof r === 'number');
+  const avgRating = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
+  const summaryHtml = posts.length > 1
+    ? `리뷰 ${posts.length}개${avgRating ? ` · ${renderStarsHtml(avgRating)} ${avgRating.toFixed(1)}` : ''}`
+    : (primary.note ? escapeHtml(primary.note) : '');
+
+  const card = document.createElement('div');
+  card.className = 'feed-post-card feed-place-group-card';
+  card.innerHTML = `
+    <div class="feed-post-card-head">
+      <span class="feed-post-place">${escapeHtml(primary.title)}</span>
+      <div class="feed-place-group-head-right">
+        ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>` : ''}
+        <button type="button" class="feed-place-group-chevron" title="이 장소의 모든 리뷰 보기">&rsaquo;</button>
+      </div>
+    </div>
+    ${primary.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(primary.location)}</span></button>` : ''}
+    ${summaryHtml ? `<div class="feed-place-group-summary">${summaryHtml}</div>` : ''}
+    <div class="feed-post-author">${primary.author ? `${escapeHtml(primary.author.name)} 님의 추천${posts.length > 1 ? ` 외 ${posts.length - 1}명` : ''}` : ''}</div>
+    <div class="feed-post-actions">
+      <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
+      ${suggestBtnHtml}
+      <button type="button" class="feed-post-btn fix">장소 픽스</button>
+    </div>
+  `;
+  const suggestBtn = card.querySelector('.feed-post-btn.suggest');
+  if(suggestBtn) suggestBtn.addEventListener('click', () => suggestHotplaceToChat(compat));
+  card.querySelector('.feed-post-btn.fix').addEventListener('click', () => fixHotplaceLocation(compat));
+  card.querySelector('.feed-post-btn.star').addEventListener('click', () => {
+    toggleSavedPlace(category, primary);
+    renderHotplaceList('food', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+    renderHotplaceList('cafe', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+    renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+    renderSavedPlacesGroups();
+  });
+  const locBtn = card.querySelector('.feed-post-location-link');
+  if(locBtn) locBtn.addEventListener('click', () => openPlaceDetailMap(primary));
+  card.querySelector('.feed-place-group-chevron').addEventListener('click', () => openHotplacePlaceReviews(group, category, distKm));
+  // 버튼/링크가 아닌 카드의 나머지 부분을 눌러도 상세보기가 열리게 함
+  card.addEventListener('click', (e) => {
+    if(e.target.closest('button, a')) return;
+    openHotplacePlaceReviews(group, category, distKm);
+  });
+  return card;
+}
+
 // 두 좌표 사이의 대략적인 직선 거리(km) - 위도/경도가 둘 다 있을 때만 정확한 "근처" 판정에 사용
 function distanceKm(lat1, lon1, lat2, lon2){
   const R = 6371;
@@ -14413,8 +14528,21 @@ function renderHotplaceList(category, locationHint, hintLat, hintLon){
     container.innerHTML = `<div class="search-empty">약속 장소에서 도보 20분 이내에 추천된 곳이 없어요.</div>`;
     return;
   }
+
+  // 같은 장소(제목이 같음)로 리뷰가 여러 개 있으면 카드 하나로 묶어서, 같은 곳이 리스트에 반복해서 뜨지 않게 함
+  const groupsByPlace = new Map();
+  const groupOrder = [];
   scored.forEach(({ post, dist }) => {
-    container.appendChild(buildFeedPostCard(post, category, dist));
+    const key = (post.title || '').trim().toLowerCase();
+    if(!groupsByPlace.has(key)){
+      groupsByPlace.set(key, { title: post.title, posts: [], dist });
+      groupOrder.push(key);
+    }
+    groupsByPlace.get(key).posts.push(post);
+  });
+  groupOrder.forEach(key => {
+    const group = groupsByPlace.get(key);
+    container.appendChild(buildFeedPlaceGroupCard(group, category, group.dist));
   });
 }
 
@@ -14425,7 +14553,88 @@ function refreshHotplaceListsIfOpen(){
   renderHotplaceList('food', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
   renderHotplaceList('cafe', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
   renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+  // 장소별 리뷰 모아보기가 그 위에 떠있으면 그것도 최신 상태로 다시 그림
+  if(currentHotplacePlaceReviewsGroup){
+    const { group, category, distKm } = currentHotplacePlaceReviewsGroup;
+    renderHotplacePlaceReviewsBody(group, category, distKm);
+  }
 }
+
+// ---------- 핫플 카드에서 같은 장소로 리뷰가 여러 개 묶였을 때, 그 장소의 모든 리뷰를 모아 보여주는 상세보기 ----------
+let currentHotplacePlaceReviewsGroup = null; // { group, category, distKm } - 열려있는 동안 제안/확정/저장 후 다시 그리는 데 씀
+
+function renderHotplacePlaceReviewsBody(group, category, distKm){
+  const { posts } = group;
+  const primary = posts[0];
+  const saved = isPlaceSaved(category, primary);
+  const compat = { place: primary.title, note: primary.note, location: primary.location, lat: primary.lat, lon: primary.lon };
+  const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
+  const placeStatus = getRoomPlaceStatus(room, primary.title);
+  const suggestBtnHtml = placeStatus === 'confirmed'
+    ? `<button type="button" class="feed-post-btn status-badge confirmed" disabled>확정됨</button>`
+    : placeStatus === 'pending'
+      ? `<button type="button" class="feed-post-btn status-badge pending" disabled>제안됨</button>`
+      : `<button type="button" class="feed-post-btn suggest">여기 어때요?</button>`;
+
+  document.getElementById('hotplacePlaceReviewsTitle').textContent = primary.title;
+
+  const body = document.getElementById('hotplacePlaceReviewsBody');
+  body.innerHTML = `
+    <div class="hotplace-place-reviews-meta-row">
+      ${primary.location ? `<button type="button" class="feed-post-location-link">${ICO.pin}<span>${escapeHtml(primary.location)}</span></button>` : '<span></span>'}
+      ${typeof distKm === 'number' ? `<span class="feed-post-walk-badge">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>` : ''}
+    </div>
+    <div class="feed-post-actions" style="margin:8px 0 16px;">
+      <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
+      ${suggestBtnHtml}
+      <button type="button" class="feed-post-btn fix">장소 픽스</button>
+    </div>
+    <div class="feed-tag-sub" style="margin:0 0 8px;">리뷰 ${posts.length}개</div>
+    <div class="feed-tag-list">
+      ${posts.map(post => `
+        <div class="feed-tag-list-row" style="cursor:default;">
+          <div class="feed-tag-list-thumb">${(post.photos && post.photos[0]) ? `<img src="${post.photos[0]}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
+          <div class="feed-tag-list-body">
+            <div class="feed-tag-list-author">${post.author ? escapeHtml(post.author.name) : ''}</div>
+            ${typeof post.rating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.rating)} ${post.rating.toFixed(1)}</div>` : ''}
+            <div class="feed-tag-list-note">${post.note ? escapeHtml(post.note) : ''}</div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  const locBtn = body.querySelector('.feed-post-location-link');
+  if(locBtn) locBtn.addEventListener('click', () => openPlaceDetailMap(primary));
+  const suggestBtn = body.querySelector('.feed-post-btn.suggest');
+  if(suggestBtn) suggestBtn.addEventListener('click', () => suggestHotplaceToChat(compat));
+  const fixBtn = body.querySelector('.feed-post-btn.fix');
+  if(fixBtn) fixBtn.addEventListener('click', () => fixHotplaceLocation(compat));
+  const starBtn = body.querySelector('.feed-post-btn.star');
+  if(starBtn) starBtn.addEventListener('click', () => {
+    toggleSavedPlace(category, primary);
+    renderHotplacePlaceReviewsBody(group, category, distKm);
+    renderHotplaceList('food', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+    renderHotplaceList('cafe', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+    renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+    renderSavedPlacesGroups();
+  });
+}
+
+function openHotplacePlaceReviews(group, category, distKm){
+  currentHotplacePlaceReviewsGroup = { group, category, distKm };
+  renderHotplacePlaceReviewsBody(group, category, distKm);
+  document.getElementById('hotplacePlaceReviewsOverlay').classList.add('show');
+  pushViewState(closeHotplacePlaceReviews);
+}
+function closeHotplacePlaceReviews(){
+  currentHotplacePlaceReviewsGroup = null;
+  document.getElementById('hotplacePlaceReviewsOverlay').classList.remove('show');
+}
+document.getElementById('hotplacePlaceReviewsCloseBtn').addEventListener('click', () => goBackOrClose(closeHotplacePlaceReviews));
+document.getElementById('hotplacePlaceReviewsOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'hotplacePlaceReviewsOverlay') closeHotplacePlaceReviews();
+});
 
 // 네이버 검색 결과로 받은 장소 하나를 카드로 만듦 (커뮤니티 추천 카드랑 비슷한 모양, 저장/제안 버튼은 없음)
 function buildNaverPlaceCard(place){
