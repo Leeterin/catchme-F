@@ -2006,6 +2006,22 @@
     color:#F5A623;
     border-color:#F5A623;
   }
+  /* 이미 제안했거나(대기중) 확정된 장소는 "여기 어때요?" 버튼 대신 상태만 보여주는 비활성 배지로 표시 */
+  .feed-post-btn.status-badge{
+    cursor:default;
+  }
+  .feed-post-btn.status-badge.pending,
+  .feed-post-btn.status-badge.pending:hover{
+    background:var(--surface-2);
+    color:var(--text-dim);
+    border-color:var(--line);
+  }
+  .feed-post-btn.status-badge.confirmed,
+  .feed-post-btn.status-badge.confirmed:hover{
+    background:rgba(74,222,128,0.14);
+    border-color:#4ADE80;
+    color:#22A55A;
+  }
   .hotplace-saved-group-title{
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
@@ -14298,10 +14314,30 @@ function formatDistanceMeters(km){
   return `${km.toFixed(1)}km`;
 }
 
+// 지금 열려있는 채팅방 기준으로 이 장소가 이미 "제안(답변 대기중)"됐는지, 이미 "확정(픽스)"됐는지 확인
+// null(둘 다 아님) | 'pending'(제안됨) | 'confirmed'(확정됨)
+function getRoomPlaceStatus(room, placeName){
+  if(!room || !placeName) return null;
+  const name = placeName.trim().toLowerCase();
+  if(!name) return null;
+  const confirmedPin = (room.pinnedSchedules || []).find(p => !p.dateObj && (p.location || '').trim().toLowerCase() === name);
+  if(confirmedPin) return 'confirmed';
+  const pendingMsg = (room.messages || []).find(m => m.type === 'location-suggest' && m.status === 'pending' && (m.place || '').trim().toLowerCase() === name);
+  if(pendingMsg) return 'pending';
+  return null;
+}
+
 function buildFeedPostCard(post, category, distKm){
   const saved = isPlaceSaved(category, post);
   // 아래 액션 함수들(제안하기/장소픽스)은 예전 "게시물" 모양을 기대하므로, 호환되는 임시 객체로 감싸서 넘겨줌
   const compat = { place: post.title, note: post.note, location: post.location, lat: post.lat, lon: post.lon };
+  const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
+  const placeStatus = getRoomPlaceStatus(room, post.title);
+  const suggestBtnHtml = placeStatus === 'confirmed'
+    ? `<button type="button" class="feed-post-btn status-badge confirmed" disabled>확정됨</button>`
+    : placeStatus === 'pending'
+      ? `<button type="button" class="feed-post-btn status-badge pending" disabled>제안됨</button>`
+      : `<button type="button" class="feed-post-btn suggest">여기 어때요?</button>`;
   const card = document.createElement('div');
   card.className = 'feed-post-card';
   card.innerHTML = `
@@ -14314,11 +14350,12 @@ function buildFeedPostCard(post, category, distKm){
     <div class="feed-post-author">${post.author ? `${escapeHtml(post.author.name)} 님의 추천` : ''}</div>
     <div class="feed-post-actions">
       <button type="button" class="feed-post-btn star${saved ? ' saved' : ''}" title="${saved ? '저장 해제' : '나중에 가볼 곳으로 저장'}">${saved ? ICO.starFilled : ICO.starOutline}</button>
-      <button type="button" class="feed-post-btn suggest">여기 어때요?</button>
+      ${suggestBtnHtml}
       <button type="button" class="feed-post-btn fix">장소 픽스</button>
     </div>
   `;
-  card.querySelector('.feed-post-btn.suggest').addEventListener('click', () => suggestHotplaceToChat(compat));
+  const suggestBtn = card.querySelector('.feed-post-btn.suggest');
+  if(suggestBtn) suggestBtn.addEventListener('click', () => suggestHotplaceToChat(compat));
   card.querySelector('.feed-post-btn.fix').addEventListener('click', () => fixHotplaceLocation(compat));
   card.querySelector('.feed-post-btn.star').addEventListener('click', () => {
     toggleSavedPlace(category, post);
@@ -14379,6 +14416,15 @@ function renderHotplaceList(category, locationHint, hintLat, hintLon){
   scored.forEach(({ post, dist }) => {
     container.appendChild(buildFeedPostCard(post, category, dist));
   });
+}
+
+// 핫플 목록 팝업이 지금 열려있으면, 마지막으로 열었던 위치 기준으로 다시 그려서
+// 방금 제안/확정/취소한 장소의 버튼 상태(제안됨/확정됨/여기 어때요?)를 바로 반영함
+function refreshHotplaceListsIfOpen(){
+  if(!document.getElementById('hotplaceOverlay').classList.contains('show')) return;
+  renderHotplaceList('food', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+  renderHotplaceList('cafe', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+  renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
 }
 
 // 네이버 검색 결과로 받은 장소 하나를 카드로 만듦 (커뮤니티 추천 카드랑 비슷한 모양, 저장/제안 버튼은 없음)
@@ -14615,6 +14661,7 @@ async function suggestHotplaceToChat(post){
       touchRoom(roomId);
       renderChatMessages();
       renderChatList();
+      refreshHotplaceListsIfOpen();
       showToast(`"${post.place}"을(를) 제안했어요. 계속 둘러보고 더 제안할 수 있어요.`);
     } catch(err){
       showToast(err.message);
@@ -14634,6 +14681,7 @@ async function suggestHotplaceToChat(post){
   touchRoom(roomId);
   renderChatMessages();
   renderChatList();
+  refreshHotplaceListsIfOpen();
   // 창을 닫지 않고 그대로 유지해서 다른 곳도 둘러보고 여러 개 더 제안할 수 있게 함
   showToast(`"${post.place}"을(를) 제안했어요. 계속 둘러보고 더 제안할 수 있어요.`);
 
@@ -14649,6 +14697,7 @@ async function suggestHotplaceToChat(post){
       renderPinnedSchedule();
     }
     renderChatList();
+    refreshHotplaceListsIfOpen();
   }, 2200);
 }
 
@@ -14672,7 +14721,12 @@ async function fixHotplaceLocation(post){
           immediate: true,
         }),
       });
-      room.messages.push(mapServerLocationSuggestMessage(data.message));
+      // 이미 같은 장소로 대기 중인 제안이 있었으면, 서버가 새 메시지를 만드는 대신 그 제안을 그대로 확정 처리해서
+      // 같은 id를 돌려줌 - 그때는 새로 push하지 않고 기존 메시지를 업데이트해서 카드가 중복되지 않게 함
+      const mapped = mapServerLocationSuggestMessage(data.message);
+      const existing = room.messages.find(m => m._serverId === mapped._serverId);
+      if(existing) Object.assign(existing, mapped);
+      else room.messages.push(mapped);
       await loadPinsFromServer(roomId, room);
       touchRoom(roomId);
       renderChatMessages();
@@ -14715,6 +14769,7 @@ function cancelLocationSuggest(msg){
         Object.assign(msg, mapServerLocationSuggestMessage(data.message));
         renderChatMessages();
         renderChatList();
+        refreshHotplaceListsIfOpen();
         showToast('장소 제안을 취소했어요.');
       })
       .catch(err => showToast(err.message));
@@ -14725,6 +14780,7 @@ function cancelLocationSuggest(msg){
   touchRoom(activeChatRoomId);
   renderChatMessages();
   renderChatList();
+  refreshHotplaceListsIfOpen();
 }
 
 // ---------- 예약 취소 ----------
@@ -16208,6 +16264,7 @@ function renderChatMessages(){
               renderChatMessages();
               renderPinnedSchedule();
               renderChatList();
+              refreshHotplaceListsIfOpen();
             } catch(err){
               showToast(err.message);
             }
@@ -16219,6 +16276,7 @@ function renderChatMessages(){
           renderChatMessages();
           renderPinnedSchedule();
           renderChatList();
+          refreshHotplaceListsIfOpen();
         });
       }
       if(showCancel){
