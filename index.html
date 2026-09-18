@@ -14315,6 +14315,23 @@ function removePinnedLocation(pinId){
   showToast('장소를 삭제했어요.');
 }
 
+// 상단 고정 카드 자체를 완전히 지움 (날짜/장소가 없어서 자동으로 안 없어지는 오래된 핀을 직접 정리할 때 사용)
+function deletePinnedItem(pinId){
+  const roomId = activeChatRoomId;
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !room.pinnedSchedules) return;
+  const pin = room.pinnedSchedules.find(p => p.id === pinId);
+  if(!pin) return;
+
+  room.pinnedSchedules = room.pinnedSchedules.filter(p => p.id !== pinId);
+  syncPinDeleteToServer(room, pin);
+
+  touchRoom(roomId);
+  renderPinnedSchedule();
+  renderChatList();
+  showToast('고정 카드를 삭제했어요.');
+}
+
 // 마음에 드는 핫플을 채팅으로 제안 (상대가 수락하면 장소가 확정됨)
 async function suggestHotplaceToChat(post){
   if(!activeChatRoomId || !CHAT_ROOMS[activeChatRoomId]){
@@ -15330,6 +15347,7 @@ function renderPinnedSchedule(){
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 일정 보기</button>` : ''}
         <button type="button" class="pin-action-btn pin-set-loc">${location ? ICO.pin + ' ' + escapeHtml(location) : '장소 정하기'}</button>
         ${location ? `<button type="button" class="pin-action-btn danger pin-remove-loc">장소 삭제</button>` : ''}
+        <button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>
       </div>
     `;
 
@@ -15374,6 +15392,14 @@ function renderPinnedSchedule(){
     const removeLocBtn = card.querySelector('.pin-remove-loc');
     if(removeLocBtn){
       removeLocBtn.addEventListener('click', () => removePinnedLocation(pinned.id));
+    }
+
+    const deleteItemBtn = card.querySelector('.pin-delete-item');
+    if(deleteItemBtn){
+      deleteItemBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deletePinnedItem(pinned.id);
+      });
     }
 
     listEl.appendChild(card);
