@@ -15398,9 +15398,12 @@ function renderPinnedSchedule(){
     return;
   }
 
-  // 날짜(요일)가 지난 예약은 고정 영역에서 자동으로 안 보이게 함 (날짜 없는 핀은 그대로 유지)
+  // 날짜(요일)가 지난 예약은 고정 영역에서 자동으로 안 보이게 함.
+  // 날짜 없이 "장소만" 있는 핀은 이제 메인 채팅화면에 따로 카드로 안 보여주고, 확정된 일정(날짜 있는 핀)을
+  // 눌러서 들어가는 "약속 상세보기" 화면 안에서만 보여줌 - 안 그러면 장소 제안이 오갈 때마다 메인 화면
+  // 상단이 장소 카드로 계속 지저분하게 쌓임
   const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-  const pins = room.pinnedSchedules.filter(p => !p.dateObj || p.dateObj >= todayStart);
+  const pins = room.pinnedSchedules.filter(p => p.dateObj && p.dateObj >= todayStart);
   if(pins.length === 0){
     el.style.display = 'none';
     el.innerHTML = '';
