@@ -2654,6 +2654,27 @@
     color:var(--text-dim);
     margin-top:3px;
   }
+  .appt-detail-place-actions{
+    display:flex;
+    gap:6px;
+    margin-top:8px;
+  }
+  .appt-place-action-btn{
+    padding:6px 12px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--text-dim);
+    font-size:11px;
+    font-weight:700;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+  }
+  .appt-place-action-btn:hover{ background:var(--surface-2); }
+  .appt-place-action-btn.danger{
+    border-color:var(--cta);
+    color:var(--cta);
+  }
 
   .chat-messages{
     display:flex;
@@ -15389,6 +15410,31 @@ renderChatList();
 
 let activeChatRoomId = null;
 
+// 핀의 장소를 새로 고르고(장소 선택 팝업), 서버 동기화 + "장소가 변경됐어요" 알림까지 처리하는 공용 로직.
+// 상단 고정 카드의 "장소 정하기" 버튼과, 약속 상세보기 화면의 "변경" 버튼이 같이 씀.
+// afterPicked(label, lat, lon)로 화면마다 다른 마무리 동작(핫플 열기, 상세보기 다시 그리기 등)을 넘김
+function changePinLocation(room, roomId, pin, afterPicked){
+  openLocationPicker(pin.location || '', pin.locationLat, pin.locationLon, async (label, lat, lon) => {
+    pin.location = label;
+    pin.locationLat = lat;
+    pin.locationLon = lon;
+    const syncResult = await syncPinLocationUpdateToServer(room, pin);
+    if(syncResult && syncResult.message){
+      // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨).
+      // 같은 핀의 이전 장소 알림 카드는 지우고 이 알림 하나만 남김
+      replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(syncResult.message));
+    } else {
+      // 서버 동기화가 안 되는 방(로컬 데모 등)이면 기존처럼 로컬 알림만 추가 (로컬 핀 id로 이전 알림을 찾아 지움)
+      addHotplaceNoticeMessage(roomId, label, lat, lon, pin.serverId || pin.id);
+    }
+    touchRoom(roomId);
+    renderPinnedSchedule();
+    renderChatMessages();
+    renderChatList();
+    if(afterPicked) afterPicked(label, lat, lon);
+  });
+}
+
 function renderPinnedSchedule(){
   const room = CHAT_ROOMS[activeChatRoomId];
   const el = document.getElementById('chatPinnedSchedule');
@@ -15471,26 +15517,7 @@ function renderPinnedSchedule(){
     const setLocBtn = card.querySelector('.pin-set-loc');
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
-        openLocationPicker(location || '', pinned.locationLat, pinned.locationLon, async (label, lat, lon) => {
-          pinned.location = label;
-          pinned.locationLat = lat;
-          pinned.locationLon = lon;
-          const roomId = activeChatRoomId;
-          const syncResult = await syncPinLocationUpdateToServer(room, pinned);
-          if(syncResult && syncResult.message){
-            // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨).
-            // 같은 핀의 이전 장소 알림 카드는 지우고 이 알림 하나만 남김
-            replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(syncResult.message));
-          } else {
-            // 서버 동기화가 안 되는 방(로컬 데모 등)이면 기존처럼 로컬 알림만 추가 (로컬 핀 id로 이전 알림을 찾아 지움)
-            addHotplaceNoticeMessage(roomId, label, lat, lon, pinned.serverId || pinned.id);
-          }
-          touchRoom(roomId);
-          renderPinnedSchedule();
-          renderChatMessages();
-          renderChatList();
-          openHotplaceView(label, lat, lon);
-        });
+        changePinLocation(room, activeChatRoomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon));
       });
     }
 
@@ -15537,15 +15564,16 @@ function openAppointmentDetailView(roomId, pinId){
 
   document.getElementById('appointmentDetailTitle').textContent = pin.dateLabel ? `${pin.dateLabel} 약속` : '약속 상세';
 
-  // 이 방에서 지금 "현재 유효한" 장소 제안만 보여줌. 채팅 기록(room.messages)에는 예전에 테스트하거나
-  // 취소/변경되기 전에 확정했던 제안들까지 전부 남아있어서, status만 보고 다 모으면 예전에 지나간
-  // 제안들까지 줄줄이 다 나와버림 (이 방은 "지금 진행 중인 약속 하나"라는 전제라서, 실제로 지금
-  // 유효한 건 가장 최근에 확정된 것 하나뿐임)
-  const confirmedSuggestions = (room.messages || [])
-    .filter(m => m.type === 'location-suggest' && m.status === 'confirmed')
-    .sort((a, b) => new Date(a.time) - new Date(b.time));
-  const latestConfirmed = confirmedSuggestions[confirmedSuggestions.length - 1];
-  const acceptedPlaces = latestConfirmed ? [latestConfirmed] : [];
+  // "친구가 추천해서 수락한 장소" = 날짜 없이 장소만 있는 핀 중에서, 사람이 직접 "장소 정하기"로 입력한 게
+  // 아니라 "장소 제안"이 수락/즉시확정돼서 생긴 것(sourceMsgId가 있는 것)만. 실제로 저장된 핀 자체를 갖고
+  // 보여주기 때문에, 아래에서 변경/삭제 버튼이 이 핀에 바로 반영됨(채팅 기록만 보고 표시하면 지우거나
+  // 바꿀 수 있는 실체가 없음)
+  const acceptedPlaces = (room.pinnedSchedules || [])
+    .filter(p => !p.dateObj && p.sourceMsgId)
+    .map(p => ({
+      pin: p,
+      srcMsg: (room.messages || []).find(m => m.id === p.sourceMsgId || m._serverId === p.sourceMsgId),
+    }));
 
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
@@ -15565,13 +15593,20 @@ function openAppointmentDetailView(roomId, pinId){
       <div class="appt-detail-label">${ICO.check} 친구가 추천해서 수락한 장소</div>
       ${acceptedPlaces.length === 0
         ? `<div class="appt-detail-empty">아직 수락된 장소 제안이 없어요.</div>`
-        : acceptedPlaces.map((m, idx) => {
-            const senderLabel = m.who === 'me' ? '내가 추천' : `${escapeHtml(getGroupSenderName(room, m) || room.name)}님이 추천`;
+        : acceptedPlaces.map(({ pin: p, srcMsg }, idx) => {
+            const senderLabel = srcMsg
+              ? (srcMsg.who === 'me' ? '내가 추천' : `${escapeHtml(getGroupSenderName(room, srcMsg) || room.name)}님이 추천`)
+              : '추천된 장소';
+            const timeLabel = srcMsg ? ` · ${formatMessageTime(srcMsg.time)}` : '';
             return `
               <div class="appt-detail-place-row" data-idx="${idx}">
-                <div class="appt-detail-place-name">${idx + 1}. ${escapeHtml(m.place)}</div>
-                ${m.location ? `<div class="appt-detail-place-sub">${escapeHtml(m.location)}</div>` : ''}
-                <div class="appt-detail-place-meta">${senderLabel} · ${formatMessageTime(m.time)}</div>
+                <div class="appt-detail-place-name">${idx + 1}. ${escapeHtml(p.location)}</div>
+                ${srcMsg && srcMsg.location ? `<div class="appt-detail-place-sub">${escapeHtml(srcMsg.location)}</div>` : ''}
+                <div class="appt-detail-place-meta">${senderLabel}${timeLabel}</div>
+                <div class="appt-detail-place-actions">
+                  <button type="button" class="appt-place-action-btn appt-place-change" data-idx="${idx}">변경</button>
+                  <button type="button" class="appt-place-action-btn danger appt-place-delete" data-idx="${idx}">삭제</button>
+                </div>
               </div>
             `;
           }).join('')}
@@ -15583,10 +15618,29 @@ function openAppointmentDetailView(roomId, pinId){
     locCard.addEventListener('click', () => openApptLocationMap(pin.location, pin.location, pin.locationLat, pin.locationLon));
   }
   body.querySelectorAll('.appt-detail-place-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const m = acceptedPlaces[parseInt(row.dataset.idx, 10)];
-      if(m) openApptLocationMap(m.place, m.location, m.locationLat, m.locationLon);
+    const idx = parseInt(row.dataset.idx, 10);
+    const entry = acceptedPlaces[idx];
+    if(!entry) return;
+    row.addEventListener('click', (e) => {
+      if(e.target.closest('button')) return;
+      const { pin: p, srcMsg } = entry;
+      openApptLocationMap((srcMsg && srcMsg.place) || p.location, (srcMsg && srcMsg.location) || p.location, p.locationLat, p.locationLon);
     });
+    const changeBtn = row.querySelector('.appt-place-change');
+    if(changeBtn){
+      changeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        changePinLocation(room, roomId, entry.pin, () => openAppointmentDetailView(roomId, pinId));
+      });
+    }
+    const deleteBtn = row.querySelector('.appt-place-delete');
+    if(deleteBtn){
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deletePinnedItem(entry.pin.id);
+        openAppointmentDetailView(roomId, pinId);
+      });
+    }
   });
 
   document.getElementById('chatRoomView').classList.remove('active');
