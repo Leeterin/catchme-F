@@ -2740,6 +2740,73 @@
     color:var(--cta);
   }
 
+  .past-appt-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .past-appt-card{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:12px 14px;
+    cursor:pointer;
+  }
+  .past-appt-card:hover{ border-color:var(--accent); }
+  .past-appt-icon{ font-size:16px; flex-shrink:0; opacity:0.6; }
+  .past-appt-info{ flex:1; min-width:0; }
+  .past-appt-time{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:13px;
+    color:var(--text);
+  }
+  .past-appt-note{
+    font-size:11.5px;
+    color:var(--text-dim);
+    margin-top:3px;
+  }
+
+  .meet-badge-chip{
+    display:inline-flex;
+    align-items:center;
+    gap:3px;
+    margin-left:6px;
+    padding:2px 7px 2px 6px;
+    border:1px solid currentColor;
+    border-radius:999px;
+    font-size:10px;
+    font-weight:700;
+    font-family:'Inter',sans-serif;
+    vertical-align:middle;
+    white-space:nowrap;
+  }
+  .meet-badge-chip svg{ flex-shrink:0; }
+  .profile-meet-badge{
+    margin-top:8px;
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:4px 0;
+  }
+  .profile-meet-count{
+    font-size:12.5px;
+    color:var(--text-dim);
+    font-weight:600;
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+  }
+  .profile-meet-next{
+    width:100%;
+    font-size:11px;
+    color:var(--text-dim);
+    margin-top:2px;
+  }
+
   .appt-detail-section{ margin-bottom:24px; }
   .appt-detail-label{
     display:flex;
@@ -5520,6 +5587,7 @@
       <div class="profile-avatar-lg" id="profileAvatarLg"></div>
       <div class="profile-name" id="profileName"></div>
       <div class="profile-status" id="profileStatus"></div>
+      <div class="profile-meet-badge" id="profileMeetBadge"></div>
       <div id="profileContactInfo" style="margin-top:6px;"></div>
       <div class="person-profile-actions">
         <button class="person-action-btn request" id="friendCalendarBtn">캘린더 보기</button>
@@ -5957,6 +6025,10 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
               <span>매칭하기</span>
             </div>
+            <div class="chat-extra-option" id="extraPastApptOption">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span>지난 약속 보기</span>
+            </div>
             <div class="chat-extra-option" id="extraMuteOption">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
               <span id="extraMuteOptionLabel">알림 끄기</span>
@@ -6006,6 +6078,15 @@
         <span id="appointmentDetailTitle">약속 상세</span>
       </div>
       <div id="appointmentDetailBody"></div>
+    </div>
+
+    <!-- 지난 약속 목록 (채팅방 추가 기능 메뉴에서 열림) - 날짜가 지나서 상단 고정 카드에서는 사라진 약속들을 모아봄 -->
+    <div class="calendar-match-view" id="pastAppointmentsView">
+      <div class="match-panel-header">
+        <button class="profile-back" id="pastAppointmentsBackBtn">&#8249;</button>
+        <span>지난 약속</span>
+      </div>
+      <div id="pastAppointmentsBody"></div>
     </div>
 
     <!-- 그룹 멤버 목록 (별도 화면) -->
@@ -9564,6 +9645,7 @@ document.getElementById('meetupCreateSubmitBtn').addEventListener('click', async
     emoji: cat.emoji,
     color: cat.color,
     title, date, location,
+    lat: meetupLat, lon: meetupLon, // 위치 필터가 켜져있을 때 내가 만든 모임이 my모임 탭에서도 걸러지지 않게 저장해둠
     eventDate: eventDateISO,
     ageRange: MEETUP_AGE_LABELS[ageKey],
     desc: desc || '모임장이 아직 소개글을 작성하지 않았어요.',
@@ -9597,8 +9679,14 @@ document.getElementById('meetupCreateSubmitBtn').addEventListener('click', async
   document.getElementById('meetupLocationInput').value = '';
   document.getElementById('meetupMaxInput').value = '6';
 
+  // 방금 만든 모임은 "전체/카테고리별" 둘러보기 목록에는 (내가 이미 참여중이라) 안 보이고 my모임 탭에만 보이는데,
+  // 그대로 두면 사용자 입장에서는 "만들었는데 목록에 없다 = 안 만들어졌다"로 오해하기 쉬움.
+  // 그래서 만들자마자 my모임 탭으로 화면을 전환해서 방금 만든 모임이 바로 눈에 보이게 하고, 성공 토스트도 띄움
+  activeMeetupCategory = 'mine';
+  document.querySelectorAll('#meetupChipRow .meetup-chip').forEach(c => c.classList.toggle('active', c.dataset.cat === 'mine'));
   renderMeetups();
   closeMeetupCreate();
+  showToast('모임을 만들었어요!');
 });
 
 // ============================================================
@@ -12630,6 +12718,59 @@ function renderIncomingFriendRequests(){
   });
 }
 
+// ---------- 친구 만남 횟수 뱃지 ----------
+// "몇 번 만났는지"는 그 친구와의 1:1 채팅방에서 이미 지난(실제로 있었던) 확정 약속 개수로 계산함.
+// 그룹 모임 참여까지 합치려면 "같이" 참여했는지 매칭이 애매해지기 쉬워서, 가장 명확하게 셀 수 있는
+// "1:1로 날짜/시간까지 확정하고 실제로 지난 약속 수"만 기준으로 삼음 (지난 약속 목록 기능과 같은 데이터를 재사용)
+function findFriendRoomId(friend){
+  if(!friend) return null;
+  if(friend.id === DEMO_FRIEND.id) return CHAT_ROOMS['dm-' + friend.id] ? 'dm-' + friend.id : null;
+  const existing = Object.entries(CHAT_ROOMS).find(([, r]) => r.counterpartUsername === friend.username);
+  return existing ? existing[0] : null;
+}
+function getMeetCountWithFriend(friend){
+  const roomId = findFriendRoomId(friend);
+  const room = roomId ? CHAT_ROOMS[roomId] : null;
+  if(!room || !room.pinnedSchedules) return 0;
+  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  return room.pinnedSchedules.filter(p => p.dateObj && p.dateObj < todayStart).length;
+}
+// 3단계 뱃지: 단골(3회+) → 친밀(5회+) → 각별(10회+). 개인 친구/비즈니스 관계 구분 없이 동일한 기준으로 적용됨
+const MEET_BADGE_TIERS = [
+  { min: 10, key: 'special', label: '각별', color: '#F5A623',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>' },
+  { min: 5, key: 'close', label: '친밀', color: '#F472B6',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>' },
+  { min: 3, key: 'regular', label: '단골', color: '#38BDF8',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>' },
+];
+function getMeetBadgeTier(count){
+  return MEET_BADGE_TIERS.find(b => count >= b.min) || null;
+}
+// 친구 목록 줄 옆에 붙이는 작은 뱃지 chip (조건 미달이면 빈 문자열)
+function renderMeetBadgeChip(friend){
+  const count = getMeetCountWithFriend(friend);
+  const tier = getMeetBadgeTier(count);
+  if(!tier) return '';
+  return `<span class="meet-badge-chip" style="color:${tier.color};border-color:${tier.color};" title="${tier.label} · 함께한 확정 약속 ${count}회">${tier.icon}${tier.label}</span>`;
+}
+// 친구 프로필 화면에 보여주는 좀 더 자세한 만남 횟수 + 다음 단계까지 안내
+function renderProfileMeetBadge(friend){
+  const el = document.getElementById('profileMeetBadge');
+  if(!el) return;
+  const count = getMeetCountWithFriend(friend);
+  const tier = getMeetBadgeTier(count);
+  const nextTier = [...MEET_BADGE_TIERS].sort((a, b) => a.min - b.min).find(b => count < b.min);
+  let html = `<span class="profile-meet-count">${ICO.pushpin} 함께한 확정 약속 ${count}회</span>`;
+  if(tier){
+    html += ` <span class="meet-badge-chip" style="color:${tier.color};border-color:${tier.color};">${tier.icon}${tier.label}</span>`;
+  }
+  if(nextTier){
+    html += `<div class="profile-meet-next">'${nextTier.label}' 뱃지까지 ${nextTier.min - count}회 남았어요</div>`;
+  }
+  el.innerHTML = html;
+}
+
 function renderFriendsList(){
   const container = document.getElementById('friendsListContainer');
   container.innerHTML = '';
@@ -12688,7 +12829,7 @@ function renderFriendsList(){
       : escapeHtml(friend.name[0]);
     row.innerHTML = `
       <div class="placeholder-avatar" style="${friend.avatar ? '' : `background:${friend.color}`}">${avatarInner}</div>
-      <div class="placeholder-text"><b>${escapeHtml(friend.name)}</b><span>${escapeHtml(friend.status)}</span></div>
+      <div class="placeholder-text"><b>${escapeHtml(friend.name)}${renderMeetBadgeChip(friend)}</b><span>${escapeHtml(friend.status)}</span></div>
     `;
     row.addEventListener('click', () => openFriendProfile(friend.id));
     container.appendChild(row);
@@ -12712,6 +12853,7 @@ function openFriendProfile(friendId){
   }
   document.getElementById('profileName').textContent = friend.name;
   document.getElementById('profileStatus').textContent = friend.status;
+  renderProfileMeetBadge(friend);
 
   const contactRows = [];
   if(friend.phonePublic && friend.phone){
@@ -16019,12 +16161,16 @@ function openApptLocationMap(title, location, lat, lon){
   });
 }
 
+// 약속 상세보기를 닫을 때 어느 화면으로 돌아갈지 (기본은 채팅방이지만, "지난 약속" 목록에서 들어온 경우엔 그 목록으로 돌아가야 함)
+let apptDetailReturnViewId = 'chatRoomView';
+
 // 날짜/시간 -> 장소 -> 친구가 추천해서 수락한 장소들(시간순) 순서로 보여줌
-function openAppointmentDetailView(roomId, pinId){
+function openAppointmentDetailView(roomId, pinId, returnViewId){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
   const pin = (room.pinnedSchedules || []).find(p => p.id === pinId);
   if(!pin) return;
+  apptDetailReturnViewId = returnViewId || 'chatRoomView';
 
   document.getElementById('appointmentDetailTitle').textContent = pin.dateLabel ? `${pin.dateLabel} 약속` : '약속 상세';
 
@@ -16099,20 +16245,81 @@ function openAppointmentDetailView(roomId, pinId){
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         deletePinnedItem(entry.pin.id);
-        openAppointmentDetailView(roomId, pinId);
+        openAppointmentDetailView(roomId, pinId, apptDetailReturnViewId);
       });
     }
   });
 
-  document.getElementById('chatRoomView').classList.remove('active');
+  document.getElementById(apptDetailReturnViewId).classList.remove('active');
   document.getElementById('appointmentDetailView').classList.add('active');
   pushViewState(closeAppointmentDetailView);
 }
 function closeAppointmentDetailView(){
   document.getElementById('appointmentDetailView').classList.remove('active');
-  document.getElementById('chatRoomView').classList.add('active');
+  document.getElementById(apptDetailReturnViewId).classList.add('active');
 }
 document.getElementById('appointmentDetailBackBtn').addEventListener('click', () => goBackOrClose(closeAppointmentDetailView));
+
+// ---------- 채팅방: 지난 약속 목록 ----------
+// 상단 고정 카드(renderPinnedSchedule)는 날짜가 지난 약속을 자동으로 숨겨서 화면을 깔끔하게 유지하는데,
+// 그러면 나중에 "그때 어디서 만나기로 했었지?" 같은 걸 다시 찾아볼 방법이 없어서(채팅 기록을 일일이 스크롤하는
+// 것 말고는) 추가함. 채팅방 안의 "추가 기능" 메뉴에서 열 수 있음
+let pastAppointmentsRoomId = null;
+
+function openPastAppointmentsView(roomId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  pastAppointmentsRoomId = roomId;
+  renderPastAppointmentsList();
+  document.getElementById('chatRoomView').classList.remove('active');
+  document.getElementById('pastAppointmentsView').classList.add('active');
+  pushViewState(closePastAppointmentsView);
+}
+function closePastAppointmentsView(){
+  document.getElementById('pastAppointmentsView').classList.remove('active');
+  document.getElementById('chatRoomView').classList.add('active');
+  pastAppointmentsRoomId = null;
+}
+function renderPastAppointmentsList(){
+  const body = document.getElementById('pastAppointmentsBody');
+  const room = CHAT_ROOMS[pastAppointmentsRoomId];
+  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  const pastPins = room && room.pinnedSchedules
+    ? room.pinnedSchedules.filter(p => p.dateObj && p.dateObj < todayStart).slice().sort((a, b) => b.dateObj - a.dateObj)
+    : [];
+
+  if(pastPins.length === 0){
+    body.innerHTML = `<div class="search-empty">지난 약속이 없어요.</div>`;
+    return;
+  }
+
+  body.innerHTML = '';
+  const listEl = document.createElement('div');
+  listEl.className = 'past-appt-list';
+  pastPins.forEach(pinned => {
+    const { dateLabel, timeLabel, note, location } = pinned;
+    const card = document.createElement('div');
+    card.className = 'past-appt-card';
+    card.innerHTML = `
+      <span class="past-appt-icon">${ICO.pushpin}</span>
+      <div class="past-appt-info">
+        ${dateLabel ? `<div class="past-appt-time">${escapeHtml(dateLabel)} ${escapeHtml(timeLabel || '')}</div>` : ''}
+        ${note ? `<div class="past-appt-note">${escapeHtml(note)}</div>` : ''}
+        ${location ? `<div class="past-appt-note">${ICO.pin} ${escapeHtml(location)}</div>` : ''}
+      </div>
+    `;
+    card.addEventListener('click', () => openAppointmentDetailView(pastAppointmentsRoomId, pinned.id, 'pastAppointmentsView'));
+    listEl.appendChild(card);
+  });
+  body.appendChild(listEl);
+}
+document.getElementById('pastAppointmentsBackBtn').addEventListener('click', () => goBackOrClose(closePastAppointmentsView));
+document.getElementById('extraPastApptOption').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('chatExtraDropdown').classList.remove('open');
+  if(!activeChatRoomId) return;
+  openPastAppointmentsView(activeChatRoomId);
+});
 
 // ---------- 채팅에서 예약/제안 날짜를 눌러 그날 시간표 바로 확인하기 ----------
 let dayViewOpenedFromChat = null; // 이 값이 있으면 하루 보기의 뒤로가기가 채팅으로 돌아감
