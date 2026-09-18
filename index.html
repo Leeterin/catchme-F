@@ -15518,8 +15518,15 @@ function openAppointmentDetailView(roomId, pinId){
 
   document.getElementById('appointmentDetailTitle').textContent = pin.dateLabel ? `${pin.dateLabel} 약속` : '약속 상세';
 
-  // 이 방에서 친구가 제안하고 수락된 장소들을 시간순으로 모음 (한 방에는 보통 진행 중인 약속이 하나라는 전제)
-  const acceptedPlaces = (room.messages || []).filter(m => m.type === 'location-suggest' && m.status === 'confirmed');
+  // 이 방에서 지금 "현재 유효한" 장소 제안만 보여줌. 채팅 기록(room.messages)에는 예전에 테스트하거나
+  // 취소/변경되기 전에 확정했던 제안들까지 전부 남아있어서, status만 보고 다 모으면 예전에 지나간
+  // 제안들까지 줄줄이 다 나와버림 (이 방은 "지금 진행 중인 약속 하나"라는 전제라서, 실제로 지금
+  // 유효한 건 가장 최근에 확정된 것 하나뿐임)
+  const confirmedSuggestions = (room.messages || [])
+    .filter(m => m.type === 'location-suggest' && m.status === 'confirmed')
+    .sort((a, b) => new Date(a.time) - new Date(b.time));
+  const latestConfirmed = confirmedSuggestions[confirmedSuggestions.length - 1];
+  const acceptedPlaces = latestConfirmed ? [latestConfirmed] : [];
 
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
