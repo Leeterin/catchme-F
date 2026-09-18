@@ -1311,8 +1311,37 @@
   .feed-tag-sub{
     font-size:12px;
     color:var(--text-dim);
-    margin:-4px 0 12px;
+    margin:-4px 0 0;
   }
+  /* 장소 모아보기 상단 - 제목/개수와 그리드↔세로 보기 전환 버튼을 양옆에 배치 */
+  .feed-tag-view-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .feed-tag-view-toggle{
+    display:flex;
+    gap:4px;
+    flex-shrink:0;
+    margin-top:1px;
+  }
+  .feed-tag-view-btn{
+    width:30px;
+    height:30px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--text-dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+  }
+  .feed-tag-view-btn svg{ width:15px; height:15px; }
+  .feed-tag-view-btn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .feed-tag-view-btn:hover:not(.active){ background:var(--surface-2); }
   /* 장소 모아보기 - 인스타그램 프로필 그리드처럼 게시물마다 대표사진 한 장씩 4열로 모아서 보여줌 */
   .feed-tag-grid{
     display:grid;
@@ -1351,6 +1380,61 @@
     padding:2px 5px;
     border-radius:999px;
     pointer-events:none;
+  }
+  /* 장소 모아보기 - 세로형(리스트) 보기: 썸네일 + 작성자/별점/한줄평을 한 줄씩 세로로 나열 */
+  .feed-tag-list{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .feed-tag-list-row{
+    display:flex;
+    gap:10px;
+    padding:8px;
+    border-radius:12px;
+    cursor:pointer;
+  }
+  .feed-tag-list-row:hover{ background:var(--surface-2); }
+  .feed-tag-list-thumb{
+    width:76px;
+    height:76px;
+    border-radius:10px;
+    overflow:hidden;
+    flex-shrink:0;
+    background:var(--surface-2);
+  }
+  .feed-tag-list-thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .feed-tag-list-thumb-noimg{
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--text-dim);
+  }
+  .feed-tag-list-body{
+    flex:1;
+    min-width:0;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:3px;
+  }
+  .feed-tag-list-author{ font-size:12.5px; font-weight:700; color:var(--text); }
+  .feed-tag-list-rating{ font-size:11.5px; color:var(--text-dim); }
+  .feed-tag-list-note{
+    font-size:12.5px;
+    color:var(--text-dim);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
   }
   /* 다른 사람들의 리뷰 - 댓글처럼 작은 한 줄로 보여줌 */
   .feed-secondary-review-title{
@@ -5902,8 +5986,20 @@
       <!-- 장소 태그(#상호명)를 눌렀을 때 - 카테고리 상관없이 같은 장소로 올라온 다른 글들을 해시태그처럼 모아서 보여줌 -->
       <div class="feed-list-view" id="feedTagView">
         <button class="profile-back" id="feedTagBackBtn">&#8249; 뒤로</button>
-        <div class="friend-calendar-title" id="feedTagTitle"></div>
-        <div class="feed-tag-sub" id="feedTagSub"></div>
+        <div class="feed-tag-view-header">
+          <div>
+            <div class="friend-calendar-title" id="feedTagTitle"></div>
+            <div class="feed-tag-sub" id="feedTagSub"></div>
+          </div>
+          <div class="feed-tag-view-toggle" id="feedTagViewToggle">
+            <button type="button" class="feed-tag-view-btn active" data-view="grid" title="그리드로 보기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button type="button" class="feed-tag-view-btn" data-view="list" title="세로로 보기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
         <div id="feedTagListContainer"></div>
       </div>
 
@@ -8573,19 +8669,12 @@ function closeFeedPostDetail(){
 document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPostDetail));
 
 // 장소 태그(#상호명)를 눌렀을 때 - 카테고리(맛집/카페/체험) 상관없이 이름이 같은 장소로 올라온 글을 전부 모아서 보여줌
-function openFeedPlaceTagView(placeName){
-  const name = (placeName || '').trim();
-  if(!name) return;
+let feedTagViewMode = 'grid'; // 'grid'(인스타그램 프로필처럼 4열 사진 그리드) | 'list'(세로로 한 줄씩) - 오른쪽 위 버튼으로 전환
+let feedTagCurrentPosts = []; // 지금 장소 모아보기 화면에 떠있는 게시물들 (보기 방식 전환 시 다시 불러오지 않고 이걸로 재렌더링)
 
-  const posts = ['food', 'cafe', 'experience']
-    .flatMap(cat => FEED_POSTS[cat] || [])
-    .filter(p => (p.title || '').trim() === name)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  document.getElementById('feedTagTitle').innerHTML = `${ICO.pin} ${escapeHtml(name)}`;
-  document.getElementById('feedTagSub').textContent = `이 장소에 올라온 글 ${posts.length}개`;
-
-  // 인스타그램 프로필 그리드처럼, 게시물마다 대표사진(0번 사진) 한 장씩 4열 그리드로 모아서 보여줌
+// feedTagViewMode에 따라 grid/list 중 골라서 렌더링
+function renderFeedTagList(){
+  const posts = feedTagCurrentPosts;
   const container = document.getElementById('feedTagListContainer');
   container.innerHTML = '';
   if(posts.length === 0){
@@ -8594,7 +8683,27 @@ function openFeedPlaceTagView(placeName){
     empty.className = 'search-empty';
     empty.textContent = '아직 이 장소에 대한 다른 글이 없어요.';
     container.appendChild(empty);
+    return;
+  }
+  if(feedTagViewMode === 'list'){
+    container.className = 'feed-tag-list';
+    posts.forEach(post => {
+      const cover = (post.photos && post.photos[0]) || '';
+      const row = document.createElement('div');
+      row.className = 'feed-tag-list-row';
+      row.innerHTML = `
+        <div class="feed-tag-list-thumb">${cover ? `<img src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
+        <div class="feed-tag-list-body">
+          <div class="feed-tag-list-author">${escapeHtml(post.author ? post.author.name : '')}</div>
+          ${typeof post.avgRating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.avgRating)} ${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</div>` : ''}
+          <div class="feed-tag-list-note">${escapeHtml(post.note || '')}</div>
+        </div>
+      `;
+      row.addEventListener('click', () => openFeedPostDetail(post, 'tag'));
+      container.appendChild(row);
+    });
   } else {
+    // 인스타그램 프로필 그리드처럼, 게시물마다 대표사진(0번 사진) 한 장씩 4열 그리드로 모아서 보여줌
     container.className = 'feed-tag-grid';
     posts.forEach(post => {
       const cover = (post.photos && post.photos[0]) || '';
@@ -8613,6 +8722,22 @@ function openFeedPlaceTagView(placeName){
       container.appendChild(cell);
     });
   }
+}
+
+function openFeedPlaceTagView(placeName){
+  const name = (placeName || '').trim();
+  if(!name) return;
+
+  const posts = ['food', 'cafe', 'experience']
+    .flatMap(cat => FEED_POSTS[cat] || [])
+    .filter(p => (p.title || '').trim() === name)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  document.getElementById('feedTagTitle').innerHTML = `${ICO.pin} ${escapeHtml(name)}`;
+  document.getElementById('feedTagSub').textContent = `이 장소에 올라온 글 ${posts.length}개`;
+
+  feedTagCurrentPosts = posts;
+  renderFeedTagList();
 
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedPlaceDetailView').classList.remove('active');
@@ -8624,6 +8749,15 @@ function closeFeedPlaceTagView(){
   document.getElementById('feedListView').classList.add('active');
 }
 document.getElementById('feedTagBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceTagView));
+document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.view;
+    if(mode === feedTagViewMode) return;
+    feedTagViewMode = mode;
+    document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+    renderFeedTagList();
+  });
+});
 
 // 게시물 삭제 공통 처리
 async function deleteFeedPostItem(post){
@@ -9025,6 +9159,9 @@ document.getElementById('createFeedPostBtn').addEventListener('click', openFeedC
 document.getElementById('feedCreateBackBtn').addEventListener('click', () => goBackOrClose(closeFeedCreate));
 
 document.getElementById('feedCreateSubmitBtn').addEventListener('click', async () => {
+  const submitBtn = document.getElementById('feedCreateSubmitBtn');
+  if(submitBtn.disabled) return; // 서버 응답 오기 전에 또 눌러도 무시 (게시물 중복 업로드 방지)
+
   const title = document.getElementById('feedPlaceInput').value.trim();
   const note = document.getElementById('feedNoteInput').value.trim();
   const location = document.getElementById('feedLocationInput').value.trim();
@@ -9048,10 +9185,11 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
     return;
   }
 
-  // ---------- 내 게시물 수정 ----------
-  if(feedFormMode === 'editReview'){
-    if(!editingFeedPostId) return;
-    try {
+  submitBtn.disabled = true;
+  try {
+    // ---------- 내 게시물 수정 ----------
+    if(feedFormMode === 'editReview'){
+      if(!editingFeedPostId) return;
       const data = await apiRequest(`/feed/${editingFeedPostId}`, {
         method: 'PATCH',
         body: JSON.stringify({ title, note, location, rating: feedSelectedRating, photos: feedSelectedPhotos }),
@@ -9061,14 +9199,10 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
       renderFeedPosts();
       closeFeedCreate();
       showToast('수정했어요.');
-    } catch(err){
-      showToast(err.message);
+      return;
     }
-    return;
-  }
 
-  // ---------- 새 게시물 작성 ----------
-  try {
+    // ---------- 새 게시물 작성 ----------
     const data = await apiRequest('/feed', {
       method: 'POST',
       body: JSON.stringify({ category: feedCreateSelectedCategory, title, note, rating: feedSelectedRating, photos: feedSelectedPhotos, location, lat: feedLat, lon: feedLon }),
@@ -9080,6 +9214,8 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
     showToast('게시물을 올렸어요!');
   } catch(err){
     showToast(err.message);
+  } finally {
+    submitBtn.disabled = false;
   }
 });
 
