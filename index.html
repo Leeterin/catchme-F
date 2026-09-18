@@ -3931,18 +3931,19 @@
   }
   .hotplace-panel-footer{
     flex-shrink:0;
-    padding:12px 14px calc(12px + env(safe-area-inset-bottom));
+    display:flex;
+    justify-content:center;
+    padding:10px 14px calc(10px + env(safe-area-inset-bottom));
     border-top:1px solid var(--line);
   }
   .hotplace-close-btn{
-    width:100%;
-    padding:12px;
-    border-radius:12px;
+    padding:8px 26px;
+    border-radius:999px;
     border:none;
     background:var(--surface-2);
-    color:var(--text);
-    font-weight:700;
-    font-size:14px;
+    color:var(--text-dim);
+    font-weight:600;
+    font-size:12.5px;
     font-family:'Inter',sans-serif;
     cursor:pointer;
   }
@@ -5444,7 +5445,6 @@
     <div class="hotplace-panel">
       <div class="hotplace-panel-header">
         <div class="hotplace-panel-title" id="hotplaceTitle">주변 핫플레이스</div>
-        <button type="button" class="mini-confirm-close" id="hotplaceCloseBtn" aria-label="닫기">&times;</button>
       </div>
       <div class="hotplace-tabs" id="hotplaceTabs">
         <button type="button" class="hotplace-tab active" data-tab="food"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg> 밥집</button>
@@ -15133,7 +15133,6 @@ function openHotplaceView(location, lat, lon){
 function closeHotplaceView(){
   document.getElementById('hotplaceOverlay').classList.remove('show');
 }
-document.getElementById('hotplaceCloseBtn').addEventListener('click', () => goBackOrClose(closeHotplaceView));
 document.getElementById('hotplaceCloseFooterBtn').addEventListener('click', () => goBackOrClose(closeHotplaceView));
 document.getElementById('hotplaceOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'hotplaceOverlay') closeHotplaceView();
