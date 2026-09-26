@@ -1259,6 +1259,8 @@
   .feed-ig-header{
     display:flex;
     align-items:center;
+    flex-wrap:wrap;
+    row-gap:4px;
     gap:9px;
     margin-bottom:10px;
   }
@@ -2888,6 +2890,21 @@
     white-space:nowrap;
   }
   .meet-badge-chip svg{ flex-shrink:0; }
+  /* 이달의 맛집왕 배너 - 소식 목록 맨 위에 표시 */
+  .feed-monthly-king-banner{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:linear-gradient(135deg, rgba(245,166,35,0.14), rgba(245,166,35,0.05));
+    border:1px solid rgba(245,166,35,0.35);
+    color:var(--text);
+    border-radius:12px;
+    padding:10px 13px;
+    margin-bottom:12px;
+    font-size:12.5px;
+  }
+  .feed-monthly-king-banner svg{ color:#F5A623; flex-shrink:0; }
+  .feed-monthly-king-banner b{ color:#F5A623; }
   .profile-meet-badge{
     margin-top:8px;
     display:flex;
@@ -8643,6 +8660,76 @@ function sortFeedPosts(category){
   });
 }
 
+// ---------- 소식 탭 활동 뱃지: 첫 리뷰어 / 친구 N명+ 다녀간 곳 / 이달의 맛집왕 ----------
+// 리뷰를 남기고 싶어지게 만드는 가벼운 동기부여 장치들. 전부 이미 불러와 있는 FEED_POSTS/FRIENDS로만 계산함(추가 API 호출 없음).
+const FEED_BADGE_ICON = {
+  medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><circle cx="12" cy="8" r="6"/><path d="M8.5 13.5L7 22l5-3 5 3-1.5-8.5"/></svg>',
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19"/><circle cx="9" cy="8" r="3.2"/><path d="M20 19v-1.3a3 3 0 0 0-2.2-2.9"/><path d="M14.7 4.3a3.2 3.2 0 0 1 0 6.1"/></svg>',
+  crown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M3 19h18l-1.5-8-4.5 3.5L12 8l-3 6.5L4.5 11z"/></svg>',
+};
+
+// 같은 장소(제목 완전일치, 장소 태그 모아보기와 동일한 기준)로 올라온 모든 글을 카테고리 구분 없이 모음
+function getFeedPostsForPlace(title){
+  const name = (title || '').trim();
+  if(!name) return [];
+  return ['food', 'cafe', 'experience'].flatMap(cat => FEED_POSTS[cat] || []).filter(p => (p.title || '').trim() === name);
+}
+
+// 이 글이 그 장소에 대한 가장 첫 리뷰인지(같은 장소 글들 중 작성일이 가장 이름)
+function isFirstReviewerPost(post){
+  const posts = getFeedPostsForPlace(post.title);
+  if(posts.length === 0) return false;
+  const earliest = posts.reduce((a, b) => new Date(a.createdAt) < new Date(b.createdAt) ? a : b);
+  return earliest.id === post.id;
+}
+function renderFirstReviewerBadgeHtml(post){
+  if(!isFirstReviewerPost(post)) return '';
+  return `<span class="meet-badge-chip" style="color:#38BDF8;border-color:#38BDF8;" title="이 장소에 처음으로 리뷰를 남겼어요">${FEED_BADGE_ICON.medal}첫 리뷰어</span>`;
+}
+
+const FRIEND_VISIT_BADGE_MIN = 3; // 친구 몇 명 이상 다녀갔을 때 뱃지를 보여줄지
+// 이 장소에 글을 남긴 "친구"(FRIENDS 목록에 있는 사람) 수 - 중복 제거
+function countFriendVisitsForPlace(title){
+  if(!FRIENDS.length) return 0;
+  const friendIds = new Set(FRIENDS.map(f => f.id));
+  const visited = new Set(getFeedPostsForPlace(title).filter(p => p.author && friendIds.has(p.author.id)).map(p => p.author.id));
+  return visited.size;
+}
+function renderFriendVisitBadgeHtml(title){
+  const count = countFriendVisitsForPlace(title);
+  if(count < FRIEND_VISIT_BADGE_MIN) return '';
+  return `<span class="meet-badge-chip" style="color:#22B07D;border-color:#22B07D;" title="친구 ${count}명이 다녀간 곳이에요">${FEED_BADGE_ICON.users}친구 ${count}명+ 다녀간 곳</span>`;
+}
+
+const MONTHLY_KING_MIN_COUNT = 2; // 이 정도는 올려야 "이달의 맛집왕" 타이틀을 붙여줌
+// 이번 달(달력 기준)에 후기를 가장 많이 남긴 사람 - 렌더 한 번당 한 번만 계산해서 재사용(renderFeedPosts에서 매번 초기화)
+let _monthlyTopReviewerCache;
+function getMonthlyTopReviewer(){
+  if(_monthlyTopReviewerCache !== undefined) return _monthlyTopReviewerCache;
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const counts = new Map();
+  ['food', 'cafe', 'experience'].forEach(cat => {
+    (FEED_POSTS[cat] || []).forEach(p => {
+      if(!p.author) return;
+      const d = new Date(p.createdAt);
+      if(d.getFullYear() !== y || d.getMonth() !== m) return;
+      const entry = counts.get(p.author.id) || { count: 0, author: p.author };
+      entry.count += 1;
+      counts.set(p.author.id, entry);
+    });
+  });
+  let top = null;
+  counts.forEach(entry => { if(!top || entry.count > top.count) top = entry; });
+  _monthlyTopReviewerCache = (top && top.count >= MONTHLY_KING_MIN_COUNT) ? top : null;
+  return _monthlyTopReviewerCache;
+}
+function renderMonthlyKingBadgeHtml(authorId){
+  const top = getMonthlyTopReviewer();
+  if(!top || !authorId || top.author.id !== authorId) return '';
+  return `<span class="meet-badge-chip" style="color:#F5A623;border-color:#F5A623;" title="이번 달 후기 ${top.count}개 · 이달의 맛집왕">${FEED_BADGE_ICON.crown}이달의 맛집왕</span>`;
+}
+
 // 별점을 채워진/빈 별로 표시 (예: 4점이면 ★★★★☆)
 function renderStarsHtml(rating){
   if(typeof rating !== 'number') return '';
@@ -8663,6 +8750,7 @@ function feedPlaceMapLinkUrl(name, location, lat, lon){
 function renderFeedPosts(){
   const container = document.getElementById('feedListContainer');
   container.innerHTML = '';
+  _monthlyTopReviewerCache = undefined; // 게시물 목록이 새로 그려질 때마다 이달의 맛집왕도 다시 계산
 
   const q = feedSearchQuery.trim().toLowerCase();
   let posts = FEED_POSTS[activeFeedCategory].filter(p =>
@@ -8687,6 +8775,14 @@ function renderFeedPosts(){
         : '아직 등록된 추천이 없어요.';
     container.appendChild(empty);
     return;
+  }
+
+  const monthlyKing = getMonthlyTopReviewer();
+  if(monthlyKing){
+    const banner = document.createElement('div');
+    banner.className = 'feed-monthly-king-banner';
+    banner.innerHTML = `${FEED_BADGE_ICON.crown}<b>이달의 맛집왕</b> ${escapeHtml(monthlyKing.author.name || '')}님 · 이번 달 후기 ${monthlyKing.count}개`;
+    container.appendChild(banner);
   }
 
   posts.forEach(post => renderFeedPostCard(post, container));
@@ -8719,10 +8815,13 @@ function feedPostCardHtml(post){
     <div class="feed-ig-header">
       ${feedAuthorAvatarHtml(post.author)}
       <div class="feed-ig-author-name">${escapeHtml(post.author ? post.author.name : '')}</div>
+      ${renderFirstReviewerBadgeHtml(post)}
+      ${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}
     </div>
     <div class="feed-ig-tag-row">
       <button type="button" class="feed-ig-place-tag">${ICO.pin} ${escapeHtml(post.title || '')}</button>
       ${typeof post.avgRating === 'number' ? `<span class="feed-review-stars">${renderStarsHtml(post.avgRating)} <span class="feed-rating-count">${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</span></span>` : ''}
+      ${renderFriendVisitBadgeHtml(post.title)}
     </div>
     ${buildPlaceInfoRowHtml(post)}
     <div class="feed-post-note">${escapeHtml(post.note || '')}</div>
@@ -8800,6 +8899,8 @@ function feedPostDetailHtml(post){
       <div class="feed-ig-header">
         ${feedAuthorAvatarHtml(post.author)}
         <div class="feed-ig-author-name">${escapeHtml(post.author ? post.author.name : '')}</div>
+        ${renderFirstReviewerBadgeHtml(post)}
+        ${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}
       </div>
       <div class="feed-detail-title-row">
         <button type="button" class="feed-detail-title" title="이 장소의 다른 글 모아보기">${escapeHtml(post.title || '')}</button>
@@ -8815,6 +8916,7 @@ function feedPostDetailHtml(post){
           </div>
         </div>
       </div>
+      ${renderFriendVisitBadgeHtml(post.title) ? `<div style="margin:-4px 0 2px;">${renderFriendVisitBadgeHtml(post.title)}</div>` : ''}
       ${typeof post.avgRating === 'number' ? `<div class="feed-detail-rating"><span class="feed-detail-rating-num">${post.avgRating.toFixed(1)}</span> ${renderStarsHtml(post.avgRating)} ${post.ratingCount > 1 ? `<span>(${post.ratingCount})</span>` : ''}</div>` : ''}
       ${buildPlaceInfoRowHtml(post)}
       <div class="feed-detail-note">${escapeHtml(post.note || '')}</div>
@@ -9051,7 +9153,7 @@ function renderFeedTagList(){
       row.innerHTML = `
         <div class="feed-tag-list-thumb">${cover ? `<img src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
         <div class="feed-tag-list-body">
-          <div class="feed-tag-list-author">${escapeHtml(post.author ? post.author.name : '')}</div>
+          <div class="feed-tag-list-author">${escapeHtml(post.author ? post.author.name : '')}${renderFirstReviewerBadgeHtml(post)}${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}</div>
           ${typeof post.avgRating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.avgRating)} ${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</div>` : ''}
           <div class="feed-tag-list-note">${escapeHtml(post.note || '')}</div>
         </div>
@@ -9117,7 +9219,7 @@ function openFeedPlaceTagView(placeName){
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   document.getElementById('feedTagTitle').innerHTML = `${ICO.pin} ${escapeHtml(name)}`;
-  document.getElementById('feedTagSub').textContent = `이 장소에 올라온 글 ${posts.length}개`;
+  document.getElementById('feedTagSub').innerHTML = `이 장소에 올라온 글 ${posts.length}개 ${renderFriendVisitBadgeHtml(name)}`;
 
   // 실주소/전화/길찾기/공유 - 이 장소로 올라온 글 중 대표(가장 최근) 글의 정보를 씀
   const placeInfoEl = document.getElementById('feedTagPlaceInfo');
