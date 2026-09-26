@@ -2254,6 +2254,21 @@
     white-space:nowrap;
   }
   .sort-trigger-wrap{ position:relative; flex-shrink:0; }
+  /* 소식 탭 검색/정렬 줄 옆의 "지도 전체보기" 버튼 */
+  .feed-map-view-btn{
+    flex:none;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:34px;
+    height:34px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--surface-2);
+    color:var(--text);
+    cursor:pointer;
+  }
+  .feed-map-view-btn:hover{ background:var(--surface-3, var(--surface-2)); }
   .sort-dropdown-menu{
     display:none;
     position:absolute;
@@ -5853,6 +5868,17 @@
     </div>
   </div>
 
+  <!-- 소식 탭 "지도 전체보기" - 지금 카테고리(맛집/카페/체험)에서 보이는 장소들을 한 지도에 모아서 보여줌 -->
+  <div class="place-detail-map-overlay" id="feedMapOverlay">
+    <div class="place-detail-map-panel">
+      <div class="place-detail-map-header">
+        <div class="place-detail-map-title" id="feedMapOverlayTitle">지도에서 보기</div>
+        <button type="button" class="mini-confirm-close" id="feedMapOverlayCloseBtn" aria-label="닫기">&times;</button>
+      </div>
+      <div id="feedMapOverlayCanvas" class="place-detail-map-canvas"></div>
+    </div>
+  </div>
+
   <!-- 핫플 목록에서 같은 장소로 리뷰가 여러 개 묶인 카드를 누르면, 그 장소의 모든 리뷰를 모아서 보여주는 상세보기 -->
   <div class="place-detail-map-overlay hotplace-place-reviews-overlay" id="hotplacePlaceReviewsOverlay">
     <div class="place-detail-map-panel hotplace-place-reviews-panel">
@@ -6253,6 +6279,9 @@
             <button type="button" class="sort-trigger-btn" id="feedSortTriggerBtn" data-sort="recent">최신순 ▾</button>
             <div class="sort-dropdown-menu" id="feedSortDropdown"></div>
           </div>
+          <button type="button" class="feed-map-view-btn" id="feedMapViewBtn" title="지도 전체보기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+          </button>
         </div>
         <div id="feedListContainer"></div>
       </div>
@@ -16088,6 +16117,96 @@ function closePlaceDetailMap(){
 document.getElementById('placeDetailMapCloseBtn').addEventListener('click', () => goBackOrClose(closePlaceDetailMap));
 document.getElementById('placeDetailMapOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'placeDetailMapOverlay') closePlaceDetailMap();
+});
+
+// ---------- 소식 탭 "지도 전체보기" - 지금 카테고리(맛집/카페/체험)에서 목록에 뜨는 장소들을 한 지도에 모아서 보여줌 ----------
+let feedMapInstance = null;
+let feedMapOverlays = []; // 마커/라벨 - 다시 열 때마다 지우고 새로 그림
+
+function openFeedMapView(){
+  // renderFeedPosts()와 똑같은 필터(카테고리 + 검색어 + 위치 반경)를 그대로 적용해서, 지금 목록에 보이는 장소만 지도에 찍음
+  const q = feedSearchQuery.trim().toLowerCase();
+  let posts = FEED_POSTS[activeFeedCategory].filter(p =>
+    !q || (p.title || '').toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q)
+  );
+  const hasRefLocation = communityRefLocation && typeof communityRefLocation.lat === 'number' && typeof communityRefLocation.lon === 'number';
+  if(hasRefLocation){
+    posts = posts.filter(p => typeof p.lat === 'number' && typeof p.lon === 'number' &&
+      distanceKmClient(communityRefLocation.lat, communityRefLocation.lon, p.lat, p.lon) <= FEED_NEARBY_RADIUS_KM);
+  }
+
+  // 같은 장소로 올라온 글이 여러 개면 지도엔 한 번만 찍음(제일 최근 글을 대표로 씀)
+  const groups = new Map();
+  posts.forEach(p => {
+    if(typeof p.lat !== 'number' || isNaN(p.lat) || typeof p.lon !== 'number' || isNaN(p.lon)) return;
+    const key = (p.title || '').trim();
+    if(!key) return;
+    const existing = groups.get(key);
+    if(!existing || new Date(p.createdAt) > new Date(existing.createdAt)) groups.set(key, p);
+  });
+  const places = [...groups.values()];
+
+  const categoryLabel = { food: '맛집', cafe: '카페', experience: '체험' }[activeFeedCategory] || '';
+  document.getElementById('feedMapOverlayTitle').textContent = `${categoryLabel} 지도${places.length ? ` · ${places.length}곳` : ''}`;
+
+  document.getElementById('feedMapOverlay').classList.add('show');
+  pushViewState(closeFeedMapView);
+
+  const container = document.getElementById('feedMapOverlayCanvas');
+  if(places.length === 0){
+    // 지도에 찍을 좌표를 가진 장소가 하나도 없으면 안내만 보여줌
+    container.innerHTML = `<div class="search-empty" style="padding:40px 20px;">지도에 표시할 위치 정보가 있는 장소가 아직 없어요.</div>`;
+    return;
+  }
+
+  const draw = () => {
+    kakao.maps.load(() => {
+      container.innerHTML = ''; // 안내 문구가 남아있었을 수 있으니 지도 그리기 전에 비워둠
+      const center = new kakao.maps.LatLng(places[0].lat, places[0].lon);
+      feedMapInstance = new kakao.maps.Map(container, { center, level: 6 });
+
+      feedMapOverlays.forEach(o => o.setMap(null));
+      feedMapOverlays = [];
+
+      const bounds = new kakao.maps.LatLngBounds();
+      places.forEach(place => {
+        const pos = new kakao.maps.LatLng(place.lat, place.lon);
+        const marker = new kakao.maps.Marker({ position: pos, map: feedMapInstance });
+        const label = new kakao.maps.CustomOverlay({
+          position: pos,
+          content: `<div class="place-detail-map-pin-label place">${escapeHtml(place.title)}</div>`,
+          yAnchor: 2.4,
+        });
+        label.setMap(feedMapInstance);
+        // 마커를 누르면 그 장소의 "장소 태그 모아보기" 화면으로 바로 이동
+        kakao.maps.event.addListener(marker, 'click', () => {
+          closeFeedMapView();
+          openFeedPlaceTagView(place.title);
+        });
+        feedMapOverlays.push(marker, label);
+        bounds.extend(pos);
+      });
+      feedMapInstance.setBounds(bounds, 60, 60, 60, 60);
+      setTimeout(() => feedMapInstance.relayout(), 0);
+    });
+  };
+
+  if(typeof kakao === 'undefined' || !kakao.maps){
+    loadKakaoSdkOnce().then(() => {
+      if(typeof kakao !== 'undefined' && kakao.maps) draw();
+      else console.error('[소식 지도] 카카오맵 SDK를 불러오지 못했어요.');
+    }).catch(() => console.error('[소식 지도] 카카오맵 SDK를 불러오지 못했어요.'));
+  } else {
+    draw();
+  }
+}
+function closeFeedMapView(){
+  document.getElementById('feedMapOverlay').classList.remove('show');
+}
+document.getElementById('feedMapViewBtn').addEventListener('click', openFeedMapView);
+document.getElementById('feedMapOverlayCloseBtn').addEventListener('click', () => goBackOrClose(closeFeedMapView));
+document.getElementById('feedMapOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'feedMapOverlay') closeFeedMapView();
 });
 document.querySelectorAll('.hotplace-tab').forEach(btn => {
   btn.addEventListener('click', () => {
