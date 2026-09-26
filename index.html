@@ -1348,13 +1348,37 @@
     object-fit:cover;
     display:block;
   }
+  /* 사진 없이 별점+한줄평만 올린 글 - 빈 회색 박스 대신 리뷰 내용을 카드처럼 보여줌 */
   .feed-tag-grid-noimg{
     width:100%;
     height:100%;
     display:flex;
+    flex-direction:column;
     align-items:center;
     justify-content:center;
+    gap:4px;
+    padding:10px 8px;
+    text-align:center;
+    background:linear-gradient(160deg, var(--surface-2), var(--surface-3, var(--surface-2)));
+  }
+  .feed-tag-grid-noimg-icon{
     color:var(--text-dim);
+    opacity:0.6;
+  }
+  .feed-tag-grid-noimg-rating{
+    font-size:10px;
+    color:#f5a623;
+    letter-spacing:-0.5px;
+    white-space:nowrap;
+  }
+  .feed-tag-grid-noimg-note{
+    font-size:10.5px;
+    line-height:1.35;
+    color:var(--text);
+    display:-webkit-box;
+    -webkit-line-clamp:3;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
   }
   .feed-tag-grid-count{
     position:absolute;
@@ -8997,9 +9021,18 @@ function renderFeedTagList(){
 
       const photo = document.createElement('div');
       photo.className = 'feed-tag-grid-photo';
-      photo.innerHTML = cover
-        ? `<img src="${cover}" alt="" />`
-        : `<div class="feed-tag-grid-noimg">${ICO.pin}</div>`;
+      if(cover){
+        photo.innerHTML = `<img src="${cover}" alt="" />`;
+      } else {
+        // 사진 없이 별점/한줄평만 올린 글 - 빈 박스 대신 리뷰 내용을 그대로 카드처럼 보여줌
+        photo.innerHTML = `
+          <div class="feed-tag-grid-noimg">
+            <div class="feed-tag-grid-noimg-icon">${ICO.pin}</div>
+            ${typeof post.rating === 'number' ? `<div class="feed-tag-grid-noimg-rating">${renderStarsHtml(post.rating)} ${post.rating.toFixed(1)}</div>` : ''}
+            ${post.note ? `<div class="feed-tag-grid-noimg-note">${escapeHtml(post.note)}</div>` : ''}
+          </div>
+        `;
+      }
       if(post.photos && post.photos.length > 1){
         const badge = document.createElement('div');
         badge.className = 'feed-tag-grid-count';
@@ -9008,7 +9041,8 @@ function renderFeedTagList(){
       }
       cell.appendChild(photo);
 
-      if(typeof post.rating === 'number' || post.note){
+      // 사진이 있는 글만 아래에 별점/한줄평을 따로 표시 (사진 없는 글은 위 박스 안에 이미 다 보여줬으니 중복 안 함)
+      if(cover && (typeof post.rating === 'number' || post.note)){
         const info = document.createElement('div');
         info.className = 'feed-tag-grid-info';
         info.innerHTML = `
