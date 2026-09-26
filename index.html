@@ -365,8 +365,9 @@
     object-fit:cover;
     display:block;
   }
-  .placeholder-text b{ display:block; font-size:13.5px; }
-  .placeholder-text span{ font-size:11.5px; color:var(--text-dim); }
+  .placeholder-text{ min-width:0; } /* flex:1로 쓰이는 곳(채팅 목록 등)에서 긴 텍스트(링크 등)가 칸을 벗어나지 않게 함 */
+  .placeholder-text b{ display:block; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .placeholder-text span{ display:block; font-size:11.5px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   /* ---------------- 친구 목록 / 프로필 화면 ---------------- */
   .friends-list-view{ display:none; }
