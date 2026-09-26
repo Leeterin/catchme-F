@@ -7815,8 +7815,10 @@ document.getElementById('settingsBackToHomeBtn').addEventListener('click', () =>
 // 커뮤니티: 위치 설정 (현위치 / 지정 위치)
 // ============================================================
 let communityCustomLocation = '';
-let communityRefLocation = null; // { lat, lon } - 근처 모임/친구를 찾을 기준 좌표
+let communityRefLocation = null; // { lat, lon } - 근처 모임/친구/소식을 찾을 기준 좌표
 const COMMUNITY_RADIUS_KM = 5;
+// 소식(추천) 목록은 "주변 핫플 보기"(약속 장소 근처 추천)와 똑같은 반경을 씀 - 도보 20분 거리(분당 80m 기준 약 1.6km)
+const FEED_NEARBY_RADIUS_KM = 20 * 80 / 1000;
 
 // 카카오맵 SDK는 autoload=false로 불러와서, 예약 지도 화면을 한 번도 안 열어봤으면
 // kakao.maps.services 등이 아직 초기화 안 된 상태임. 여기서 필요할 때 확실히 로드해줌.
@@ -7870,10 +7872,11 @@ function distanceKmClient(lat1, lon1, lat2, lon2){
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-// 위치가 정해지면 모임 목록/추천친구 화면을 그 위치 기준으로 다시 그림
+// 위치가 정해지면 모임 목록/추천친구/소식 화면을 그 위치 기준으로 다시 그림
 function refreshCommunityLocationViews(){
   renderMeetups();
   if(document.getElementById('communityView-suggest').classList.contains('active')) renderSuggestions();
+  renderFeedPosts();
 }
 
 document.getElementById('locationBtn').addEventListener('click', (e) => {
@@ -8573,13 +8576,26 @@ function renderFeedPosts(){
   container.innerHTML = '';
 
   const q = feedSearchQuery.trim().toLowerCase();
-  const posts = FEED_POSTS[activeFeedCategory].filter(p =>
+  let posts = FEED_POSTS[activeFeedCategory].filter(p =>
     !q || (p.title || '').toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q)
   );
+
+  // 위치(현위치/지정 위치)가 설정돼 있으면, "주변 핫플 보기"와 똑같은 반경(도보 20분, 약 1.6km) 안의 장소만 보여줌.
+  // 좌표가 없는 옛날 게시물은 반경 판정을 할 수 없으니 위치가 설정된 동안엔 제외됨.
+  const hasRefLocation = communityRefLocation && typeof communityRefLocation.lat === 'number' && typeof communityRefLocation.lon === 'number';
+  if(hasRefLocation){
+    posts = posts.filter(p => typeof p.lat === 'number' && typeof p.lon === 'number' &&
+      distanceKmClient(communityRefLocation.lat, communityRefLocation.lon, p.lat, p.lon) <= FEED_NEARBY_RADIUS_KM);
+  }
+
   if(posts.length === 0){
     const empty = document.createElement('div');
     empty.className = 'search-empty';
-    empty.textContent = q ? `"${feedSearchQuery}"에 대한 검색 결과가 없어요.` : '아직 등록된 추천이 없어요.';
+    empty.textContent = q
+      ? `"${feedSearchQuery}"에 대한 검색 결과가 없어요.`
+      : hasRefLocation
+        ? `이 근처 ${FEED_NEARBY_RADIUS_KM.toFixed(1)}km(도보 20분) 안에는 등록된 추천이 없어요.`
+        : '아직 등록된 추천이 없어요.';
     container.appendChild(empty);
     return;
   }
@@ -9137,6 +9153,8 @@ async function loadFeedPostsFromServer(){
         id: p.id,
         title: p.title,
         location: p.location || '',
+        address: p.address || null,
+        phone: p.phone || null,
         lat: p.lat, lon: p.lon,
         note: p.note || '',
         rating: typeof p.rating === 'number' ? p.rating : null,
@@ -14859,7 +14877,6 @@ function renderHotplaceList(category, locationHint, hintLat, hintLon){
   }
 
   const hasCoords = typeof hintLat === 'number' && typeof hintLon === 'number' && !isNaN(hintLat) && !isNaN(hintLon);
-  const MAX_WALK_KM = 20 * 80 / 1000; // 도보 20분 거리 (분당 80m 기준 약 1.6km)
 
   let scored;
   if(hasCoords){
@@ -14867,7 +14884,7 @@ function renderHotplaceList(category, locationHint, hintLat, hintLon){
     scored = posts
       .filter(post => typeof post.lat === 'number' && typeof post.lon === 'number')
       .map(post => ({ post, dist: distanceKm(hintLat, hintLon, post.lat, post.lon) }))
-      .filter(({ dist }) => dist <= MAX_WALK_KM);
+      .filter(({ dist }) => dist <= FEED_NEARBY_RADIUS_KM);
   } else {
     // 좌표가 없으면(직접 입력한 주소 등) 예전처럼 이름이 겹치는 것만 대략 보여줌 (도보 시간은 알 수 없어 표시 안 함)
     const keywords = extractLocationKeywords(locationHint);
