@@ -8635,7 +8635,6 @@ function feedAuthorAvatarHtml(author){
 function feedPostCardHtml(post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const photos = post.photos || [];
-  const mapUrl = feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon);
   return `
     ${photos.length > 0 ? `
       <div class="feed-ig-photos">
@@ -8651,7 +8650,7 @@ function feedPostCardHtml(post){
       <button type="button" class="feed-ig-place-tag">${ICO.pin} ${escapeHtml(post.title || '')}</button>
       ${typeof post.avgRating === 'number' ? `<span class="feed-review-stars">${renderStarsHtml(post.avgRating)} <span class="feed-rating-count">${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</span></span>` : ''}
     </div>
-    ${post.location ? `<a class="feed-post-location-link" href="${mapUrl}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(post.location)}</a>` : ''}
+    ${buildPlaceInfoRowHtml(post)}
     <div class="feed-post-note">${escapeHtml(post.note || '')}</div>
     <div class="feed-post-bottom-row">
       <div></div>
@@ -8716,7 +8715,6 @@ function updateFeedDetailRatingDisplay(container, post){
 function feedPostDetailHtml(post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const photos = post.photos || [];
-  const mapUrl = feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon);
   const saved = isPlaceSaved(activeFeedCategory, post);
   return `
     ${photos.length > 0 ? `
@@ -8744,7 +8742,7 @@ function feedPostDetailHtml(post){
         </div>
       </div>
       ${typeof post.avgRating === 'number' ? `<div class="feed-detail-rating"><span class="feed-detail-rating-num">${post.avgRating.toFixed(1)}</span> ${renderStarsHtml(post.avgRating)} ${post.ratingCount > 1 ? `<span>(${post.ratingCount})</span>` : ''}</div>` : ''}
-      ${post.location ? `<a class="feed-detail-location" href="${mapUrl}" target="_blank" rel="noopener">${ICO.pin} ${escapeHtml(post.location)}</a>` : ''}
+      ${buildPlaceInfoRowHtml(post)}
       <div class="feed-detail-note">${escapeHtml(post.note || '')}</div>
 
       <div class="feed-detail-mini-actions">
@@ -8769,6 +8767,10 @@ function wireFeedPostDetail(container, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const titleBtn = container.querySelector('.feed-detail-title');
   if(titleBtn) titleBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
+  // 실주소/전화/길찾기/공유
+  const addrEl = container.querySelector('.feed-place-info-addr');
+  if(addrEl) addrEl.addEventListener('click', () => openPlaceDetailMap(post));
+  wirePlaceInfoRow(container, post);
   if(isMine){
     const editBtn = container.querySelector('.feed-review-edit-btn');
     if(editBtn) editBtn.addEventListener('click', () => { container.querySelector('.feed-detail-kebab-menu').classList.remove('open'); openFeedReviewEdit(post); });
@@ -9070,6 +9072,10 @@ function wireFeedPostCard(card, post){
   // 장소 태그(#상호명)를 누르면 해시태그처럼 같은 장소로 올라온 다른 글들을 모아서 보여줌
   const tagBtn = card.querySelector('.feed-ig-place-tag');
   if(tagBtn) tagBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
+  // 실주소/전화/길찾기/공유 - 카드를 눌러 상세보기로 들어가는 것과 겹치지 않게 클릭을 여기서 막음
+  const addrEl = card.querySelector('.feed-place-info-addr');
+  if(addrEl) addrEl.addEventListener('click', (e) => { e.stopPropagation(); openPlaceDetailMap(post); });
+  wirePlaceInfoRow(card, post);
   if(isMine){
     const editBtn = card.querySelector('.feed-review-edit-btn');
     if(editBtn) editBtn.addEventListener('click', () => openFeedReviewEdit(post));
