@@ -6246,6 +6246,7 @@
           <div>
             <div class="friend-calendar-title" id="feedTagTitle"></div>
             <div class="feed-tag-sub" id="feedTagSub"></div>
+            <div id="feedTagPlaceInfo"></div>
           </div>
           <div class="feed-tag-view-toggle" id="feedTagViewToggle">
             <button type="button" class="feed-tag-view-btn active" data-view="grid" title="그리드로 보기">
@@ -9034,6 +9035,16 @@ function openFeedPlaceTagView(placeName){
 
   document.getElementById('feedTagTitle').innerHTML = `${ICO.pin} ${escapeHtml(name)}`;
   document.getElementById('feedTagSub').textContent = `이 장소에 올라온 글 ${posts.length}개`;
+
+  // 실주소/전화/길찾기/공유 - 이 장소로 올라온 글 중 대표(가장 최근) 글의 정보를 씀
+  const placeInfoEl = document.getElementById('feedTagPlaceInfo');
+  const primaryPost = posts[0] || null;
+  placeInfoEl.innerHTML = primaryPost ? buildPlaceInfoRowHtml(primaryPost) : '';
+  if(primaryPost){
+    const addrEl = placeInfoEl.querySelector('.feed-place-info-addr');
+    if(addrEl) addrEl.addEventListener('click', (e) => { e.stopPropagation(); openPlaceDetailMap(primaryPost); });
+    wirePlaceInfoRow(placeInfoEl, primaryPost);
+  }
 
   feedTagCurrentPosts = posts;
   renderFeedTagList();
