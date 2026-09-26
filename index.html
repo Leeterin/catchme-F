@@ -2254,18 +2254,21 @@
     white-space:nowrap;
   }
   .sort-trigger-wrap{ position:relative; flex-shrink:0; }
-  /* 소식 탭 검색/정렬 줄 옆의 "지도 전체보기" 버튼 */
+  /* 소식 탭 검색/정렬 줄 옆의 "지도 전체보기" 버튼 - 아이콘만으로는 뭔지 알아보기 어려워서 글자도 같이 표시함 */
   .feed-map-view-btn{
     flex:none;
     display:flex;
     align-items:center;
-    justify-content:center;
-    width:34px;
-    height:34px;
+    gap:4px;
+    padding:9px 11px;
     border-radius:999px;
     border:1px solid var(--line);
     background:var(--surface-2);
     color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    font-weight:600;
+    white-space:nowrap;
     cursor:pointer;
   }
   .feed-map-view-btn:hover{ background:var(--surface-3, var(--surface-2)); }
@@ -6280,7 +6283,8 @@
             <div class="sort-dropdown-menu" id="feedSortDropdown"></div>
           </div>
           <button type="button" class="feed-map-view-btn" id="feedMapViewBtn" title="지도 전체보기">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+            지도 전체보기
           </button>
         </div>
         <div id="feedListContainer"></div>
