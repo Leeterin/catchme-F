@@ -6306,7 +6306,7 @@
         </div>
 
         <div class="feed-create-section">
-          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">필수 · 1~5장</span></div>
+          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">선택 · 최대 5장</span></div>
           <div class="feed-photo-row" id="feedPhotoRow">
             <button type="button" class="feed-photo-add-btn" id="feedPhotoAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           </div>
@@ -9500,10 +9500,6 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
   }
   if(feedSelectedRating < 1){
     showToast('별점을 골라주세요.');
-    return;
-  }
-  if(feedSelectedPhotos.length < 1){
-    showToast('사진을 1장 이상 올려주세요.');
     return;
   }
   if(!authToken){
