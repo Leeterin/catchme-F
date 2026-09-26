@@ -6194,6 +6194,7 @@
           <span id="locationBtnLabel">위치 설정</span>
         </button>
         <div class="location-dropdown" id="locationDropdown">
+          <div class="location-option selected" data-mode="all">전체보기</div>
           <div class="location-option" data-mode="current">현위치</div>
           <div class="location-option" data-mode="custom">지정 위치</div>
           <div class="location-custom-input-row" id="locationCustomRow" style="display:none;">
@@ -7896,6 +7897,19 @@ document.querySelectorAll('.location-option').forEach(opt => {
       return;
     }
 
+    // 전체보기: 위치 필터를 완전히 해제해서, 반경 제한 없이 다시 전체를 보여줌
+    if(mode === 'all'){
+      communityCustomLocation = '';
+      communityRefLocation = null;
+      document.querySelectorAll('.location-option').forEach(o => o.classList.remove('selected'));
+      opt.classList.add('selected');
+      document.getElementById('locationCustomRow').style.display = 'none';
+      document.getElementById('locationBtnLabel').textContent = '전체보기';
+      document.getElementById('locationDropdown').classList.remove('open');
+      refreshCommunityLocationViews();
+      return;
+    }
+
     // 현위치: 브라우저 위치 권한을 받아서 실제 좌표를 구함
     if(!navigator.geolocation){
       showToast('이 브라우저에서는 위치 확인을 지원하지 않아요.');
@@ -7909,6 +7923,7 @@ document.querySelectorAll('.location-option').forEach(opt => {
         communityRefLocation = { lat: pos.coords.latitude, lon: pos.coords.longitude };
         document.querySelectorAll('.location-option').forEach(o => o.classList.remove('selected'));
         opt.classList.add('selected');
+        document.getElementById('locationCustomRow').style.display = 'none';
         document.getElementById('locationBtnLabel').textContent = '현위치';
         refreshCommunityLocationViews();
         // 내 최근 위치로 서버에 저장해둬야, 다른 친구가 "근처 친구"를 찾을 때 나도 대상이 됨
