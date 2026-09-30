@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">캐치미</string>
+    <string name="title_activity_main">캐치미</string>
+    <string name="package_name">com.catchme.app</string>
+    <string name="custom_url_scheme">com.catchme.app</string>
+</resources>
