@@ -1619,6 +1619,19 @@
     font-weight:400;
   }
 
+  .feed-review-profile-card{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:10px 12px;
+    margin-bottom:14px;
+    border-radius:14px;
+    background:var(--surface-2);
+    cursor:pointer;
+    transition:opacity .1s ease;
+  }
+  .feed-review-profile-card:hover{ opacity:0.8; }
+
   /* ===== [출시 초기 임시 숨김] 근처 모임 / 추천 친구 =====
      우선 "추천"(맛집·카페·체험)만 남겨두기로 해서, 그 둘로 가는 세그먼트 버튼을 통째로 숨김.
      관련 HTML/JS는 전혀 안 건드렸고 화면에서만 안 보이게 한 거라, 나중에 두 기능을 다시 켤 때는
@@ -6311,6 +6324,16 @@
       </div>
     </div>
 
+    <!-- 추천 탭 맨 위에서 바로 리뷰용 프로필을 보고 수정할 수 있게 함 -->
+    <div class="feed-review-profile-card" id="feedReviewProfileCard">
+      <div class="profile-avatar-lg" id="feedReviewProfileAvatar" style="width:44px;height:44px;font-size:16px;margin:0;flex-shrink:0;"></div>
+      <div class="placeholder-text" style="flex:1;">
+        <b id="feedReviewProfileName"></b>
+        <span>리뷰용 프로필 · 탭해서 수정</span>
+      </div>
+      <button class="edit-icon-btn" id="feedReviewProfileEditBtn" type="button">&#9998;</button>
+    </div>
+
     <div class="segment-control" id="communitySegment">
       <button class="segment-btn active" data-view="feed">소식</button>
       <button class="segment-btn" data-view="meetup">근처 모임</button>
@@ -7554,6 +7577,9 @@ function showTab(tabKey){
       activeChatRoomId = null;
       chatReturnToCalendar = null; // 이전에 "채팅에서 확인"으로 들어왔던 상태가 남아있으면 정리 (goToReservationChat에서 이 직후에 다시 설정함)
       renderChatList();
+    }
+    if(tabKey === 'community'){
+      renderFeedReviewProfileCard();
     }
   }
 }
@@ -10389,6 +10415,7 @@ document.getElementById('reviewProfileSetupSaveBtn').addEventListener('click', (
   myProfileData.reviewNickname = nickname;
   myProfileData.reviewAvatarUrl = reviewProfileSetupDraftAvatarUrl;
   saveReviewProfileToServer();
+  renderFeedReviewProfileCard();
   closeReviewProfileSetupOverlay();
   if(callback) callback();
 });
@@ -10417,10 +10444,30 @@ function saveReviewProfileToServer(){
       currentUser.reviewAvatarUrl = myProfileData.reviewAvatarUrl;
       persistSession();
     }
+    renderFeedReviewProfileCard();
   }).catch(err => {
     showToast(err.message);
   });
 }
+
+// 추천 탭 맨 위 리뷰용 프로필 카드 - 리뷰용 닉네임/사진이 있으면 그걸, 없으면 실명/실제 프로필 사진을 보여줌
+function renderFeedReviewProfileCard(){
+  const nameEl = document.getElementById('feedReviewProfileName');
+  const avatarEl = document.getElementById('feedReviewProfileAvatar');
+  if(!nameEl || !avatarEl) return; // 로그인 전 등 화면이 아직 안 그려졌으면 그냥 넘어감
+  nameEl.textContent = myProfileData.reviewNickname || myProfileData.name;
+  if(myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl){
+    avatarEl.style.background = '';
+    avatarEl.innerHTML = `<img src="${myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+  } else {
+    avatarEl.innerHTML = '';
+    avatarEl.textContent = (myProfileData.reviewNickname || myProfileData.name || '?')[0];
+    avatarEl.style.background = myProfileData.color;
+  }
+}
+document.getElementById('feedReviewProfileCard').addEventListener('click', () => {
+  openReviewProfileSetupOverlay(() => { renderFeedReviewProfileCard(); }, true);
+});
 
 // 공개/비공개 토글만 바뀐 경우 (보기 모드에서) 서버에 조용히 반영
 function saveProfileVisibility(){
