@@ -17536,7 +17536,7 @@ function renderChatMessages(){
     } else if(m.type === 'system-notice'){
       // 장소 삭제/예약 취소 등 단순 알림 카드라 답장 기능은 필요 없음 (일부러 붙이지 않음)
       row.className = 'msg-row system-notice-row';
-      row.innerHTML = `<div class="system-notice-card">${m.text}</div>`;
+      row.innerHTML = `<div class="system-notice-card">${escapeHtml(m.text)}</div>`;
     } else if(m.type === 'image'){
       const imgHtml = `<div class="msg-bubble msg-bubble-image"><img src="${m.imageUrl}" alt="사진" loading="lazy" /></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + imgHtml) : (imgHtml + metaHtml);
