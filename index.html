@@ -14916,14 +14916,17 @@ async function loadChatRoomsFromServer(){
       const hasLoadedMessages = existing && existing.messages && existing.messages.length > 0;
       const room = {
         name: r.name || '대화',
-        color: existing ? existing.color : colorForFriendId(r.id),
+        // 1:1 채팅방은 상대방의 실제 유저 id로 색을 뽑아야 친구 탭에서 보이는 색이랑 똑같이 나옴.
+        // 예전엔 "방 id"로 해시를 돌려서, 같은 사람이어도 친구 탭 색이랑 채팅방 색이 서로 다르게 나오는 버그가 있었음.
+        // 그룹 채팅방은 특정 한 명이 아니라서 그대로 방 id 기준으로 색을 배정함.
+        color: existing ? existing.color : colorForFriendId(r.counterpart ? r.counterpart.id : r.id),
         initial: (r.name || '?')[0],
         avatar: r.isGroup ? (existing ? existing.avatar : null) : (r.counterpart && r.counterpart.hasAvatar ? cachedAvatarUrl(r.counterpart.id) : null),
         isGroup: !!r.isGroup,
         isRealRoom: true,
         counterpartUsername: r.counterpart ? r.counterpart.username : null,
         members: r.isGroup && r.members
-          ? r.members.map(m => ({ userId: m.userId, name: m.name, username: m.username, color: colorForFriendId(m.username), avatar: m.hasAvatar ? cachedAvatarUrl(m.userId) : null }))
+          ? r.members.map(m => ({ userId: m.userId, name: m.name, username: m.username, color: colorForFriendId(m.userId), avatar: m.hasAvatar ? cachedAvatarUrl(m.userId) : null }))
           : (existing ? existing.members : undefined),
         unreadCount: (typeof r.unreadCount === 'number') ? r.unreadCount : (existing ? existing.unreadCount : 0),
         muted: !!r.muted,
