@@ -1619,6 +1619,12 @@
     font-weight:400;
   }
 
+  /* ===== [출시 초기 임시 숨김] 근처 모임 / 추천 친구 =====
+     우선 "추천"(맛집·카페·체험)만 남겨두기로 해서, 그 둘로 가는 세그먼트 버튼을 통째로 숨김.
+     관련 HTML/JS는 전혀 안 건드렸고 화면에서만 안 보이게 한 거라, 나중에 두 기능을 다시 켤 때는
+     아래 한 줄만 지우면(또는 주석 처리하면) 바로 원래대로 돌아옴. */
+  #communitySegment{ display:none !important; }
+
   /* ---------------- 커뮤니티 위치 설정 ---------------- */
   .community-header{
     display:flex;
@@ -6285,8 +6291,8 @@
   <div class="tab-panel" id="panel-community">
     <div class="community-header">
       <div>
-        <h2>커뮤니티</h2>
-        <p class="desc">다른 유저들의 모임 후기와 팁을 볼 수 있어요.</p>
+        <h2>추천</h2>
+        <p class="desc">다른 유저들이 추천한 맛집·카페·체험을 볼 수 있어요.</p>
       </div>
       <div class="location-picker-wrap">
         <button class="location-btn" id="locationBtn">
@@ -6579,7 +6585,7 @@
     </div>
     <div class="nav-item" data-tab="community">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>
-      <span>커뮤니티</span>
+      <span>추천</span>
     </div>
   </div>
 
