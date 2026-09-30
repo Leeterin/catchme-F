@@ -822,7 +822,11 @@
 
   /* ---------------- 내 프로필 ---------------- */
   .my-profile-avatar-wrap{ text-align:center; }
-  .my-profile-avatar-wrap .profile-avatar-lg{ margin-bottom:6px; }
+  /* 기본 .profile-avatar-lg는 margin:0 auto 16px (좌우 auto)인데, 리뷰용 프로필과 나란히 놓는 flex 줄 안에서는
+     좌우 auto margin이 flex의 '빈 공간 자동 분배' 규칙 때문에 본인 옆 여백을 다 먹어버려서
+     리뷰용 아바타가 카드 오른쪽 끝까지 밀려나 보이는 버그가 있었음. margin을 0으로 완전히 없애고,
+     대신 정렬/간격은 아래 줄을 감싸는 flex 컨테이너(justify-content:center, gap)가 전담하게 함. */
+  .my-profile-avatar-wrap .profile-avatar-lg{ margin:0; }
 
   .edit-icon-btn{
     width:32px;height:32px;
@@ -5489,12 +5493,12 @@
       <button class="edit-icon-btn" id="myProfileEditBtn">&#9998;</button>
     </div>
     <div class="my-profile-avatar-wrap">
-      <div style="display:flex;align-items:center;justify-content:center;gap:14px;">
-        <div class="profile-avatar-lg" id="myProfileAvatar"></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:6px;">
+        <div class="profile-avatar-lg" id="myProfileAvatar" style="margin:0;"></div>
         <!-- 리뷰용 프로필(닉네임/사진)을 설정해뒀으면 수정 모드에 들어가지 않아도 여기서 바로 보이게 함 -->
         <div id="myProfileReviewAvatarWrap" style="display:none;flex-direction:column;align-items:center;gap:4px;">
-          <div class="profile-avatar-lg" id="myProfileReviewAvatarBadge" style="width:52px;height:52px;font-size:18px;margin:0;"></div>
-          <div style="font-size:10.5px;color:var(--text-dim);" id="myProfileReviewAvatarLabel">리뷰용</div>
+          <div class="profile-avatar-lg" id="myProfileReviewAvatarBadge" style="width:48px;height:48px;font-size:16px;margin:0;"></div>
+          <div style="font-size:10.5px;color:var(--text-dim);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="myProfileReviewAvatarLabel">리뷰용</div>
         </div>
       </div>
     </div>
