@@ -6089,8 +6089,8 @@
   <!-- 리뷰용 프로필 만들기 팝업 - 리뷰(소식 게시물)를 처음 쓰려는데 아직 리뷰용 닉네임/사진을 한 번도 설정 안 한 경우에만 뜸 -->
   <div class="mini-confirm-overlay" id="reviewProfileSetupOverlay">
     <div class="mini-confirm-card" style="text-align:left;">
-      <div class="mini-confirm-title" style="margin-bottom:6px;">리뷰용 프로필을 만들어볼까요?</div>
-      <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:14px;">실명으로 리뷰 달기 부담스러우면, 소식 탭에서만 대신 보여줄 닉네임/사진을 만들 수 있어요. 건너뛰면 실명/기존 프로필 사진으로 올라가요.</div>
+      <div class="mini-confirm-title" id="reviewProfileSetupTitle" style="margin-bottom:6px;">리뷰용 프로필을 만들어볼까요?</div>
+      <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:14px;">실명으로 리뷰 달기 부담스러우면, 소식 탭에서만 대신 보여줄 닉네임/사진을 만들 수 있어요. 비워두면 실명/기존 프로필 사진으로 올라가요.</div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
         <div class="profile-avatar-lg" id="reviewProfileSetupAvatarPreview" style="width:52px;height:52px;font-size:18px;margin:0;flex-shrink:0;"></div>
         <button class="pin-action-btn" id="reviewProfileSetupPhotoChangeBtn" type="button">사진 선택</button>
@@ -6099,7 +6099,7 @@
       <div class="mp-input-group" style="margin-bottom:0;"><label>리뷰용 닉네임</label><input class="search-input" id="reviewProfileSetupNicknameInput" maxlength="20" placeholder="예: 동네 미식가 (비우면 실명 사용)" /></div>
       <div class="mini-confirm-actions">
         <button type="button" id="reviewProfileSetupSaveBtn" class="mini-confirm-btn danger">만들고 계속하기</button>
-        <button type="button" id="reviewProfileSetupSkipBtn" class="mini-confirm-btn">나중에 (실명으로 계속)</button>
+        <button type="button" id="reviewProfileSetupSkipBtn" class="mini-confirm-btn">나중에</button>
       </div>
     </div>
   </div>
@@ -10129,6 +10129,10 @@ function renderMyProfile(){
       <div class="mp-input-group"><label>이메일</label><input class="search-input" id="mpEmailInput" value="${myProfileData.email}" maxlength="40" /></div>
       <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtnEdit">${myProfileData.emailPublic ? '공개' : '비공개'}</button></div>
 
+      <!-- 리뷰용 닉네임/사진은 리뷰를 처음 쓸 때 뜨는 팝업에서만 만들 수 있어서, 나중에 바꾸고 싶을 때 들어올 곳이
+           없었음 - 프로필 화면을 어지럽히지 않는 선에서, 그 팝업을 다시 여는 작은 링크만 하나 둠. -->
+      <button class="pin-action-btn" id="mpEditReviewProfileBtn" type="button" style="width:100%;margin-bottom:14px;">리뷰용 프로필 수정</button>
+
       <button class="profile-chat-btn" id="mpSaveBtn" style="margin-top:6px;">저장하기</button>
     `;
     document.getElementById('mpPhotoChangeBtn').addEventListener('click', () => {
@@ -10142,6 +10146,9 @@ function renderMyProfile(){
         renderMyProfile();
       });
     }
+    document.getElementById('mpEditReviewProfileBtn').addEventListener('click', () => {
+      openReviewProfileSetupOverlay(() => {}, true); // 리뷰 작성 시작 팝업이랑 같은 팝업을 "수정" 문구로 재사용
+    });
     document.getElementById('phoneVisBtnEdit').addEventListener('click', () => {
       myProfileData.phonePublic = !myProfileData.phonePublic;
       renderMyProfile();
@@ -10316,11 +10323,16 @@ function saveProfileToServer(){
 let reviewProfileSetupPendingCallback = null;
 let reviewProfileSetupDraftAvatarUrl = null; // 저장 전 임시로 고른 사진
 
-function openReviewProfileSetupOverlay(onDone){
+function openReviewProfileSetupOverlay(onDone, isEdit){
   reviewProfileSetupPendingCallback = onDone;
   reviewProfileSetupDraftAvatarUrl = myProfileData.reviewAvatarUrl || null;
   document.getElementById('reviewProfileSetupNicknameInput').value = myProfileData.reviewNickname || '';
   renderReviewProfileSetupAvatarPreview();
+  // 리뷰를 처음 쓰기 전에 만들 때랑, 프로필 화면에서 나중에 고칠 때랑 문구를 다르게 보여줌
+  // (수정할 땐 "만들고 계속하기/나중에" 대신 "저장하기/취소"가 더 자연스러워서)
+  document.getElementById('reviewProfileSetupTitle').textContent = isEdit ? '리뷰용 프로필 수정' : '리뷰용 프로필을 만들어볼까요?';
+  document.getElementById('reviewProfileSetupSaveBtn').textContent = isEdit ? '저장하기' : '만들고 계속하기';
+  document.getElementById('reviewProfileSetupSkipBtn').textContent = isEdit ? '취소' : '나중에';
   document.getElementById('reviewProfileSetupOverlay').classList.add('show');
 }
 
