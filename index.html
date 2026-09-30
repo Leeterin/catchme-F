@@ -5489,7 +5489,14 @@
       <button class="edit-icon-btn" id="myProfileEditBtn">&#9998;</button>
     </div>
     <div class="my-profile-avatar-wrap">
-      <div class="profile-avatar-lg" id="myProfileAvatar"></div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:14px;">
+        <div class="profile-avatar-lg" id="myProfileAvatar"></div>
+        <!-- 리뷰용 프로필(닉네임/사진)을 설정해뒀으면 수정 모드에 들어가지 않아도 여기서 바로 보이게 함 -->
+        <div id="myProfileReviewAvatarWrap" style="display:none;flex-direction:column;align-items:center;gap:4px;">
+          <div class="profile-avatar-lg" id="myProfileReviewAvatarBadge" style="width:52px;height:52px;font-size:18px;margin:0;"></div>
+          <div style="font-size:10.5px;color:var(--text-dim);" id="myProfileReviewAvatarLabel">리뷰용</div>
+        </div>
+      </div>
     </div>
     <div id="myProfileBody"></div>
   </div>
@@ -10056,6 +10063,25 @@ function renderMyProfile(){
     avatar.style.background = myProfileData.color;
   }
 
+  // 리뷰용 프로필 사진/닉네임 중 하나라도 설정돼 있으면 내 프로필 사진 옆에 작게 같이 보여줌.
+  // (예전엔 수정 화면의 body에서만 그려줘서, 수정을 눌러야만 리뷰용 프로필이 보였음 - 보기 화면에서도 바로 보이게 함)
+  const reviewAvatarWrap = document.getElementById('myProfileReviewAvatarWrap');
+  if(myProfileData.reviewAvatarUrl || myProfileData.reviewNickname){
+    reviewAvatarWrap.style.display = 'flex';
+    const reviewBadge = document.getElementById('myProfileReviewAvatarBadge');
+    if(myProfileData.reviewAvatarUrl){
+      reviewBadge.style.background = '';
+      reviewBadge.innerHTML = `<img src="${myProfileData.reviewAvatarUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+    } else {
+      reviewBadge.innerHTML = '';
+      reviewBadge.textContent = (myProfileData.reviewNickname || myProfileData.name || '?')[0];
+      reviewBadge.style.background = myProfileData.color;
+    }
+    document.getElementById('myProfileReviewAvatarLabel').textContent = myProfileData.reviewNickname || '리뷰용';
+  } else {
+    reviewAvatarWrap.style.display = 'none';
+  }
+
   const body = document.getElementById('myProfileBody');
 
   if(!myProfileEditing){
@@ -10346,7 +10372,16 @@ function saveProfileVisibility(){
 }
 
 document.getElementById('myProfileBtn').addEventListener('click', openMyProfile);
-document.getElementById('myProfileBackBtn').addEventListener('click', () => showTab(null));
+document.getElementById('myProfileBackBtn').addEventListener('click', () => {
+  // 수정 화면에서 뒤로가기를 누르면 메인 화면까지 나가버리는 게 아니라, 내 프로필 "보기" 화면으로만 돌아가게 함.
+  // 이미 보기 화면이면(수정 중이 아니면) 원래대로 메인 화면으로 나감.
+  if(myProfileEditing){
+    myProfileEditing = false;
+    renderMyProfile();
+  } else {
+    showTab(null);
+  }
+});
 document.getElementById('myProfileEditBtn').addEventListener('click', () => {
   myProfileEditing = !myProfileEditing;
   renderMyProfile();
