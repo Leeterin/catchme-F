@@ -822,11 +822,7 @@
 
   /* ---------------- 내 프로필 ---------------- */
   .my-profile-avatar-wrap{ text-align:center; }
-  /* 기본 .profile-avatar-lg는 margin:0 auto 16px (좌우 auto)인데, 리뷰용 프로필과 나란히 놓는 flex 줄 안에서는
-     좌우 auto margin이 flex의 '빈 공간 자동 분배' 규칙 때문에 본인 옆 여백을 다 먹어버려서
-     리뷰용 아바타가 카드 오른쪽 끝까지 밀려나 보이는 버그가 있었음. margin을 0으로 완전히 없애고,
-     대신 정렬/간격은 아래 줄을 감싸는 flex 컨테이너(justify-content:center, gap)가 전담하게 함. */
-  .my-profile-avatar-wrap .profile-avatar-lg{ margin:0; }
+  .my-profile-avatar-wrap .profile-avatar-lg{ margin-bottom:6px; }
 
   .edit-icon-btn{
     width:32px;height:32px;
@@ -5493,14 +5489,7 @@
       <button class="edit-icon-btn" id="myProfileEditBtn">&#9998;</button>
     </div>
     <div class="my-profile-avatar-wrap">
-      <div style="display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:6px;">
-        <div class="profile-avatar-lg" id="myProfileAvatar" style="margin:0;"></div>
-        <!-- 리뷰용 프로필(닉네임/사진)을 설정해뒀으면 수정 모드에 들어가지 않아도 여기서 바로 보이게 함 -->
-        <div id="myProfileReviewAvatarWrap" style="display:none;flex-direction:column;align-items:center;gap:4px;">
-          <div class="profile-avatar-lg" id="myProfileReviewAvatarBadge" style="width:48px;height:48px;font-size:16px;margin:0;"></div>
-          <div style="font-size:10.5px;color:var(--text-dim);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="myProfileReviewAvatarLabel">리뷰용</div>
-        </div>
-      </div>
+      <div class="profile-avatar-lg" id="myProfileAvatar"></div>
     </div>
     <div id="myProfileBody"></div>
   </div>
@@ -6087,6 +6076,24 @@
       <div class="feed-share-friend-list" id="feedShareFriendList"></div>
       <div class="mini-confirm-actions">
         <button type="button" id="feedShareCancelBtn" class="mini-confirm-btn">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 리뷰용 프로필 만들기 팝업 - 리뷰(소식 게시물)를 처음 쓰려는데 아직 리뷰용 닉네임/사진을 한 번도 설정 안 한 경우에만 뜸 -->
+  <div class="mini-confirm-overlay" id="reviewProfileSetupOverlay">
+    <div class="mini-confirm-card" style="text-align:left;">
+      <div class="mini-confirm-title" style="margin-bottom:6px;">리뷰용 프로필을 만들어볼까요?</div>
+      <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:14px;">실명으로 리뷰 달기 부담스러우면, 소식 탭에서만 대신 보여줄 닉네임/사진을 만들 수 있어요. 건너뛰면 실명/기존 프로필 사진으로 올라가요.</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div class="profile-avatar-lg" id="reviewProfileSetupAvatarPreview" style="width:52px;height:52px;font-size:18px;margin:0;flex-shrink:0;"></div>
+        <button class="pin-action-btn" id="reviewProfileSetupPhotoChangeBtn" type="button">사진 선택</button>
+        <input type="file" id="reviewProfileSetupPhotoInput" accept="image/*" style="display:none;" />
+      </div>
+      <div class="mp-input-group" style="margin-bottom:0;"><label>리뷰용 닉네임</label><input class="search-input" id="reviewProfileSetupNicknameInput" maxlength="20" placeholder="예: 동네 미식가 (비우면 실명 사용)" /></div>
+      <div class="mini-confirm-actions">
+        <button type="button" id="reviewProfileSetupSaveBtn" class="mini-confirm-btn danger">만들고 계속하기</button>
+        <button type="button" id="reviewProfileSetupSkipBtn" class="mini-confirm-btn">나중에 (실명으로 계속)</button>
       </div>
     </div>
   </div>
@@ -9548,7 +9555,21 @@ document.querySelectorAll('#feedCreateCategoryRow .feed-create-category-chip').f
   });
 });
 
+// 리뷰(소식 게시물)를 쓰기 전에, 리뷰용 프로필(닉네임/사진)을 한 번도 설정한 적 없는 사용자면
+// 먼저 만들 기회를 주고, 이미 있으면(또는 건너뛰면) 바로 진행함.
+function ensureReviewProfileThenRun(callback){
+  if(myProfileData.reviewNickname || myProfileData.reviewAvatarUrl){
+    callback();
+    return;
+  }
+  openReviewProfileSetupOverlay(callback);
+}
+
 function openFeedCreate(){
+  ensureReviewProfileThenRun(doOpenFeedCreate);
+}
+
+function doOpenFeedCreate(){
   feedFormMode = 'create';
   editingFeedPostId = null;
   feedPlacePicked = null;
@@ -10067,25 +10088,6 @@ function renderMyProfile(){
     avatar.style.background = myProfileData.color;
   }
 
-  // 리뷰용 프로필 사진/닉네임 중 하나라도 설정돼 있으면 내 프로필 사진 옆에 작게 같이 보여줌.
-  // (예전엔 수정 화면의 body에서만 그려줘서, 수정을 눌러야만 리뷰용 프로필이 보였음 - 보기 화면에서도 바로 보이게 함)
-  const reviewAvatarWrap = document.getElementById('myProfileReviewAvatarWrap');
-  if(myProfileData.reviewAvatarUrl || myProfileData.reviewNickname){
-    reviewAvatarWrap.style.display = 'flex';
-    const reviewBadge = document.getElementById('myProfileReviewAvatarBadge');
-    if(myProfileData.reviewAvatarUrl){
-      reviewBadge.style.background = '';
-      reviewBadge.innerHTML = `<img src="${myProfileData.reviewAvatarUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
-    } else {
-      reviewBadge.innerHTML = '';
-      reviewBadge.textContent = (myProfileData.reviewNickname || myProfileData.name || '?')[0];
-      reviewBadge.style.background = myProfileData.color;
-    }
-    document.getElementById('myProfileReviewAvatarLabel').textContent = myProfileData.reviewNickname || '리뷰용';
-  } else {
-    reviewAvatarWrap.style.display = 'none';
-  }
-
   const body = document.getElementById('myProfileBody');
 
   if(!myProfileEditing){
@@ -10121,20 +10123,6 @@ function renderMyProfile(){
       <div class="mp-input-group"><label>이메일</label><input class="search-input" id="mpEmailInput" value="${myProfileData.email}" maxlength="40" /></div>
       <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtnEdit">${myProfileData.emailPublic ? '공개' : '비공개'}</button></div>
 
-      <div style="margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--line);">
-        <div class="mp-field-label" style="font-weight:700;margin-bottom:4px;">리뷰용 프로필</div>
-        <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:10px;">실명으로 리뷰 달기 부담스러우면, 소식 탭에서만 대신 보여줄 닉네임/사진을 따로 설정할 수 있어요. 비워두면 실명/기존 프로필 사진이 그대로 보여요.</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div class="profile-avatar-lg" id="mpReviewAvatarPreview" style="width:52px;height:52px;font-size:18px;margin:0;flex-shrink:0;"></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="pin-action-btn" id="mpReviewPhotoChangeBtn" type="button">리뷰용 사진 변경</button>
-            ${myProfileData.reviewAvatarUrl ? `<button class="pin-action-btn danger" id="mpReviewPhotoRemoveBtn" type="button">사진 삭제</button>` : ''}
-            <input type="file" id="mpReviewPhotoInput" accept="image/*" style="display:none;" />
-          </div>
-        </div>
-        <div class="mp-input-group" style="margin-bottom:0;"><label>리뷰용 닉네임</label><input class="search-input" id="mpReviewNicknameInput" value="${escapeHtml(myProfileData.reviewNickname || '')}" maxlength="20" placeholder="예: 동네 미식가 (비우면 실명 사용)" /></div>
-      </div>
-
       <button class="profile-chat-btn" id="mpSaveBtn" style="margin-top:6px;">저장하기</button>
     `;
     document.getElementById('mpPhotoChangeBtn').addEventListener('click', () => {
@@ -10146,55 +10134,6 @@ function renderMyProfile(){
       removeBtn.addEventListener('click', () => {
         myProfileData.profileImageUrl = null;
         renderMyProfile();
-      });
-    }
-    // 리뷰용 프로필 사진 미리보기 - 설정해뒀으면 그 사진, 아니면 이름(닉네임 우선) 첫 글자
-    const reviewAvatarPreview = document.getElementById('mpReviewAvatarPreview');
-    if(myProfileData.reviewAvatarUrl){
-      reviewAvatarPreview.style.background = '';
-      reviewAvatarPreview.innerHTML = `<img src="${myProfileData.reviewAvatarUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
-    } else {
-      reviewAvatarPreview.innerHTML = '';
-      reviewAvatarPreview.textContent = (myProfileData.reviewNickname || myProfileData.name || '?')[0];
-      reviewAvatarPreview.style.background = myProfileData.color;
-    }
-    document.getElementById('mpReviewPhotoChangeBtn').addEventListener('click', () => {
-      document.getElementById('mpReviewPhotoInput').click();
-    });
-    document.getElementById('mpReviewPhotoInput').addEventListener('change', (e) => {
-      const file = e.target.files && e.target.files[0];
-      if(!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = new Image();
-        img.onload = () => {
-          const size = 256;
-          const canvas = document.createElement('canvas');
-          canvas.width = size; canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          const min = Math.min(img.width, img.height);
-          const sx = (img.width - min) / 2;
-          const sy = (img.height - min) / 2;
-          ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
-          // 저장 전에는 입력 중인 닉네임이 날아가지 않도록, 닉네임 값을 먼저 보관해뒀다가 다시 그린 뒤 복원함
-          const nicknameDraft = document.getElementById('mpReviewNicknameInput').value;
-          myProfileData.reviewAvatarUrl = canvas.toDataURL('image/jpeg', 0.8);
-          renderMyProfile();
-          const restored = document.getElementById('mpReviewNicknameInput');
-          if(restored) restored.value = nicknameDraft;
-        };
-        img.src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-    const reviewRemoveBtn = document.getElementById('mpReviewPhotoRemoveBtn');
-    if(reviewRemoveBtn){
-      reviewRemoveBtn.addEventListener('click', () => {
-        const nicknameDraft = document.getElementById('mpReviewNicknameInput').value;
-        myProfileData.reviewAvatarUrl = null;
-        renderMyProfile();
-        const restored = document.getElementById('mpReviewNicknameInput');
-        if(restored) restored.value = nicknameDraft;
       });
     }
     document.getElementById('phoneVisBtnEdit').addEventListener('click', () => {
@@ -10210,7 +10149,6 @@ function renderMyProfile(){
       myProfileData.id = document.getElementById('mpIdInput').value.trim() || myProfileData.id;
       myProfileData.phone = document.getElementById('mpPhoneInput').value.trim();
       myProfileData.email = document.getElementById('mpEmailInput').value.trim();
-      myProfileData.reviewNickname = document.getElementById('mpReviewNicknameInput').value.trim();
       myProfileEditing = false;
       saveProfileToServer();
       renderMyProfile();
@@ -10363,6 +10301,106 @@ function saveProfileToServer(){
     showToast(err.message);
     myProfileData.id = previousId; // 실패했으면 아이디는 원래 값으로 되돌림
     renderMyProfile();
+  });
+}
+
+// ============================================================
+// 리뷰용 프로필 만들기 팝업 (리뷰를 처음 쓸 때 뜸)
+// ============================================================
+let reviewProfileSetupPendingCallback = null;
+let reviewProfileSetupDraftAvatarUrl = null; // 저장 전 임시로 고른 사진
+
+function openReviewProfileSetupOverlay(onDone){
+  reviewProfileSetupPendingCallback = onDone;
+  reviewProfileSetupDraftAvatarUrl = myProfileData.reviewAvatarUrl || null;
+  document.getElementById('reviewProfileSetupNicknameInput').value = myProfileData.reviewNickname || '';
+  renderReviewProfileSetupAvatarPreview();
+  document.getElementById('reviewProfileSetupOverlay').classList.add('show');
+}
+
+function closeReviewProfileSetupOverlay(){
+  document.getElementById('reviewProfileSetupOverlay').classList.remove('show');
+  reviewProfileSetupPendingCallback = null;
+}
+
+function renderReviewProfileSetupAvatarPreview(){
+  const el = document.getElementById('reviewProfileSetupAvatarPreview');
+  if(reviewProfileSetupDraftAvatarUrl){
+    el.style.background = '';
+    el.innerHTML = `<img src="${reviewProfileSetupDraftAvatarUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
+  } else {
+    el.innerHTML = '';
+    const nickDraft = document.getElementById('reviewProfileSetupNicknameInput').value.trim();
+    el.textContent = (nickDraft || myProfileData.name || '?')[0];
+    el.style.background = myProfileData.color;
+  }
+}
+
+document.getElementById('reviewProfileSetupPhotoChangeBtn').addEventListener('click', () => {
+  document.getElementById('reviewProfileSetupPhotoInput').click();
+});
+document.getElementById('reviewProfileSetupPhotoInput').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const min = Math.min(img.width, img.height);
+      const sx = (img.width - min) / 2;
+      const sy = (img.height - min) / 2;
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+      reviewProfileSetupDraftAvatarUrl = canvas.toDataURL('image/jpeg', 0.8);
+      renderReviewProfileSetupAvatarPreview();
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+document.getElementById('reviewProfileSetupNicknameInput').addEventListener('input', () => {
+  if(!reviewProfileSetupDraftAvatarUrl) renderReviewProfileSetupAvatarPreview();
+});
+document.getElementById('reviewProfileSetupSaveBtn').addEventListener('click', () => {
+  const nickname = document.getElementById('reviewProfileSetupNicknameInput').value.trim();
+  const callback = reviewProfileSetupPendingCallback;
+  myProfileData.reviewNickname = nickname;
+  myProfileData.reviewAvatarUrl = reviewProfileSetupDraftAvatarUrl;
+  saveReviewProfileToServer();
+  closeReviewProfileSetupOverlay();
+  if(callback) callback();
+});
+document.getElementById('reviewProfileSetupSkipBtn').addEventListener('click', () => {
+  const callback = reviewProfileSetupPendingCallback;
+  closeReviewProfileSetupOverlay();
+  if(callback) callback();
+});
+
+// 리뷰용 닉네임/사진만 서버에 저장 (다른 프로필 필드는 안 건드림)
+function saveReviewProfileToServer(){
+  if(!authToken) return;
+  apiRequest('/profile', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      reviewNickname: myProfileData.reviewNickname || '',
+      reviewAvatarUrl: myProfileData.reviewAvatarUrl,
+    }),
+  }).then((data) => {
+    myProfileData.reviewNickname = data.user.reviewNickname || '';
+    myProfileData.reviewAvatarUrl = data.user.reviewAvatarUrl || null;
+    // currentUser도 같이 갱신해서 다시 로컬에 저장해둬야 함 - 안 그러면 새로고침했을 때
+    // localStorage에 저장돼있던 예전 currentUser로 되돌아가면서 방금 만든 리뷰용 프로필이 사라져 보이는 버그가 생김.
+    if(currentUser){
+      currentUser.reviewNickname = myProfileData.reviewNickname;
+      currentUser.reviewAvatarUrl = myProfileData.reviewAvatarUrl;
+      persistSession();
+    }
+  }).catch(err => {
+    showToast(err.message);
   });
 }
 
