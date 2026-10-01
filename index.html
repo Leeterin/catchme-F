@@ -6405,15 +6405,18 @@
         <div id="feedTagListContainer"></div>
       </div>
 
-      <!-- 작성자 이름/등급뱃지를 눌렀을 때 - 그 사람이 지금까지 쓴 리뷰를 전부 모아서 보여줌 -->
+      <!-- 작성자 이름/등급뱃지를 눌렀을 때 - 그 사람이 지금까지 쓴 리뷰를 전부 모아서 보여줌.
+           내 자신을 보는 경우(위쪽 "내 리뷰 프로필" 카드를 눌렀거나, 내 이름/뱃지를 눌렀을 때)는
+           같은 화면을 재사용하되 연필 아이콘(수정 버튼)을 추가로 보여줌 -->
       <div class="feed-list-view" id="feedAuthorView">
         <button class="profile-back" id="feedAuthorBackBtn">&#8249; 뒤로</button>
         <div class="feed-author-view-header">
           <div id="feedAuthorViewAvatar"></div>
-          <div>
+          <div style="flex:1;">
             <div class="friend-calendar-title" id="feedAuthorViewName"></div>
             <div class="feed-tag-sub" id="feedAuthorViewMeta"></div>
           </div>
+          <button class="edit-icon-btn" id="feedAuthorViewEditBtn" type="button" style="display:none;">&#9998;</button>
         </div>
         <div class="profile-meet-next" id="feedAuthorViewNext" style="display:none;"></div>
         <div id="feedAuthorListContainer"></div>
@@ -8839,15 +8842,32 @@ function renderReviewerLevelBadgeHtml(authorId){
   if(!tier) return '';
   return `<span class="meet-badge-chip reviewer-level-badge" style="color:${tier.color};border-color:${tier.color};" title="${tier.label} · 작성한 리뷰 ${count}개 · 눌러서 이 사람 리뷰 모아보기">${tier.icon}${tier.label}</span>`;
 }
-// 작성자 이름/등급뱃지를 누르면, 그 사람이 지금까지 쓴 리뷰를 전부 모아서 보여줌
-function openFeedAuthorView(author){
-  if(!author || !author.id) return;
+// 리뷰용 프로필(닉네임/사진) 아바타 html - 위쪽 "내 리뷰 프로필" 카드와 같은 우선순위(리뷰용 > 실명 프로필 > 이니셜).
+// 다른 사람 작성자 화면은 서버가 내려준 hasAvatar/hasReviewAvatar 플래그로 그리지만(feedAuthorAvatarHtml),
+// 내 자신을 볼 때는 서버 왕복 없이 이미 메모리에 있는 myProfileData로 바로 그려서 수정 직후에도 항상 최신 상태로 보임.
+function feedSelfReviewAvatarHtml(){
+  const name = myProfileData.reviewNickname || myProfileData.name || '?';
+  const img = myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl;
+  if(img){
+    return `<div class="placeholder-avatar"><img src="${img}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
+  }
+  return `<div class="placeholder-avatar" style="background:${myProfileData.color}">${escapeHtml(name[0])}</div>`;
+}
+
+// 작성자 이름/등급뱃지를 누르면, 그 사람이 지금까지 쓴 리뷰를 전부 모아서 보여줌 - 내 이름을 눌렀거나
+// 위쪽 "내 리뷰 프로필" 카드를 눌러서 들어온 경우(author.id === currentUser.id)는 isSelf가 true가 되어
+// 수정 버튼이 추가로 나타남. 화면 내용을 그리는 부분(renderFeedAuthorViewContent)과 화면을 "여는" 부분
+// (openFeedAuthorView, pushViewState로 뒤로가기 스택에 쌓는 부분)을 분리해둠 - 수정 후 이미 열려있는
+// 같은 화면을 새로고침할 때는 renderFeedAuthorViewContent만 다시 불러야지, openFeedAuthorView를
+// 다시 부르면 뒤로가기 스택/history가 중복으로 쌓여서 뒤로가기를 두 번 눌러야 나가지는 버그가 생김.
+function renderFeedAuthorViewContent(author){
+  const isSelf = !!(currentUser && author && author.id === currentUser.id);
   const count = getAuthorReviewCount(author.id);
   const tier = getReviewerLevelTier(count);
   const nextTier = [...REVIEWER_LEVEL_TIERS].sort((a, b) => a.min - b.min).find(t => count < t.min);
 
-  document.getElementById('feedAuthorViewAvatar').innerHTML = feedAuthorAvatarHtml(author);
-  document.getElementById('feedAuthorViewName').textContent = feedAuthorDisplayName(author);
+  document.getElementById('feedAuthorViewAvatar').innerHTML = isSelf ? feedSelfReviewAvatarHtml() : feedAuthorAvatarHtml(author);
+  document.getElementById('feedAuthorViewName').textContent = isSelf ? (myProfileData.reviewNickname || myProfileData.name) : feedAuthorDisplayName(author);
   document.getElementById('feedAuthorViewMeta').innerHTML = `작성한 리뷰 ${count}개` + (tier ? ` <span class="meet-badge-chip" style="color:${tier.color};border-color:${tier.color};">${tier.icon}${tier.label}</span>` : '');
   const nextEl = document.getElementById('feedAuthorViewNext');
   if(nextTier){
@@ -8856,6 +8876,7 @@ function openFeedAuthorView(author){
   } else {
     nextEl.style.display = 'none';
   }
+  document.getElementById('feedAuthorViewEditBtn').style.display = isSelf ? '' : 'none';
 
   const posts = ['food', 'cafe', 'experience']
     .flatMap(cat => FEED_POSTS[cat] || [])
@@ -8871,6 +8892,15 @@ function openFeedAuthorView(author){
   } else {
     posts.forEach(post => renderFeedPostCard(post, container));
   }
+}
+function openFeedAuthorView(author){
+  if(!author || !author.id) return;
+  renderFeedAuthorViewContent(author);
+
+  // 다른 사람이든 나 자신이든, 이 화면을 보는 동안에는 위쪽 "내 리뷰 프로필" 카드를 가려서
+  // (특히 다른 사람을 보고 있을 때) 내 프로필 카드가 같이 떠서 헷갈리는 일이 없게 함.
+  const reviewProfileCard = document.getElementById('feedReviewProfileCard');
+  if(reviewProfileCard) reviewProfileCard.style.display = 'none';
 
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedPlaceDetailView').classList.remove('active');
@@ -8881,8 +8911,26 @@ function openFeedAuthorView(author){
 function closeFeedAuthorView(){
   document.getElementById('feedAuthorView').classList.remove('active');
   document.getElementById('feedListView').classList.add('active');
+  const reviewProfileCard = document.getElementById('feedReviewProfileCard');
+  if(reviewProfileCard) reviewProfileCard.style.display = '';
 }
 document.getElementById('feedAuthorBackBtn').addEventListener('click', () => goBackOrClose(closeFeedAuthorView));
+document.getElementById('feedAuthorViewEditBtn').addEventListener('click', () => {
+  openReviewProfileSetupOverlay(() => {
+    if(!currentUser) return;
+    // 이미 불러와 있는 내 게시물들의 작성자 표시 정보(닉네임/사진 유무)도 같이 갱신해둬야
+    // 아래 리뷰 목록 카드에도 바로 새 닉네임/사진이 반영됨(서버에서 다시 안 불러와도 됨)
+    ['food', 'cafe', 'experience'].forEach(cat => {
+      (FEED_POSTS[cat] || []).forEach(p => {
+        if(p.author && p.author.id === currentUser.id){
+          p.author.reviewNickname = myProfileData.reviewNickname;
+          p.author.hasReviewAvatar = !!myProfileData.reviewAvatarUrl;
+        }
+      });
+    });
+    renderFeedAuthorViewContent(currentUser); // 화면이 이미 열려있는 채로 내용만 새로고침 (pushViewState는 다시 안 함)
+  }, true);
+});
 
 
 // 별점을 채워진/빈 별로 표시 (예: 4점이면 ★★★★☆)
@@ -10581,7 +10629,11 @@ function renderFeedReviewProfileCard(){
   }
 }
 document.getElementById('feedReviewProfileCard').addEventListener('click', () => {
-  openReviewProfileSetupOverlay(() => { renderFeedReviewProfileCard(); }, true);
+  // 예전엔 바로 닉네임/사진 수정 팝업만 띄웠는데, 이제는 "내 리뷰 모아보기"(등급+개수+리뷰 목록,
+  // 그 안에 수정 버튼) 화면으로 들어가도록 바꿈 - 작성자 이름/뱃지를 눌렀을 때와 똑같은 화면을
+  // 재사용함(내 계정이라 isSelf가 자동으로 true가 되어 수정 버튼이 나타남)
+  if(!currentUser) return;
+  openFeedAuthorView(currentUser);
 });
 
 // 공개/비공개 토글만 바뀐 경우 (보기 모드에서) 서버에 조용히 반영
