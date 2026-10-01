@@ -12174,7 +12174,23 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   const startMin = sh * 60 + sm;
   const endMin = eh * 60 + em;
 
-  if(endMin <= startMin){ showToast('종료 시간은 시작 시간보다 뒤여야 해요.'); return; }
+  // 반복 없음(once) 모드에서 종료 시간이 시작 시간보다 빠르면, "자정을 넘기는 일정"(예: 저녁 4시 ~ 다음날 새벽 3시)일 수 있으니
+  // 종료 날짜가 시작 날짜보다 뒤인지까지 같이 봐서 판단함. 자정을 넘기는 일정은 날짜별로 쪼개서 등록해야 해서(첫날은 시작시간~자정,
+  // 마지막날은 자정~종료시간, 그 사이는 하루 종일) dateRange(반복 창)와는 별도로 처리함 - 아래 overnightDateRange가 채워지면 그 경로를 탐.
+  let overnightDateRange = null;
+  if(formRepeatMode === 'once' && endMin <= startMin){
+    const startDateStr = document.getElementById('eventFormStartDate').value;
+    const endDateStr = document.getElementById('eventFormEndDate').value;
+    if(startDateStr && endDateStr){
+      const rangeStart = parseDateInputValue(startDateStr);
+      const rangeEnd = parseDateInputValue(endDateStr);
+      if(dateKeyNum(rangeEnd) > dateKeyNum(rangeStart)){
+        overnightDateRange = { start: rangeStart, end: rangeEnd };
+      }
+    }
+  }
+
+  if(endMin <= startMin && !overnightDateRange){ showToast('종료 시간은 시작 시간보다 뒤여야 해요.'); return; }
   if(formRepeatMode === 'weekly' && formSelectedWeekdays.size === 0){
     showToast('반복할 요일을 선택해주세요.');
     return;
@@ -12189,7 +12205,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   }
 
   let dateRange = null;
-  if(formRepeatMode === 'once'){
+  if(formRepeatMode === 'once' && !overnightDateRange){
     const startDateStr = document.getElementById('eventFormStartDate').value;
     const endDateStr = document.getElementById('eventFormEndDate').value;
     if(!startDateStr || !endDateStr){ showToast('시작/종료 날짜를 선택해주세요.'); return; }
@@ -12202,31 +12218,43 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     dateRange = { start: rangeStart, end: rangeEnd };
   }
 
-  // 이 일정이 적용될 날짜(들)에 이미 겹치는 일정이 있는지 확인해서 경고함 (막지는 않고, 계속할지 물어봄)
-  const overlapDateKeys = formRepeatMode === 'weekly'
-    ? Array.from(formSelectedWeekdays).map(dow => {
-        const d = new Date(scheduleFocusDate);
-        d.setDate(d.getDate() + (dow - d.getDay() + 7) % 7);
-        return dateKeyOf(d);
-      })
-    : (formRepeatMode === 'once' && dateRange)
-      ? (() => {
-          const keys = [];
-          const cursor = new Date(dateRange.start);
-          let count = 0;
-          while(cursor <= dateRange.end && count < 31){
-            keys.push(dateKeyOf(cursor));
-            cursor.setDate(cursor.getDate() + 1);
-            count++;
-          }
-          return keys;
-        })()
-      : [dateKeyOf(scheduleFocusDate)];
+  // 이 일정이 적용될 날짜(들)와, 그 날짜의 실제 시간 범위를 구함(자정 넘기는 일정은 날짜별로 범위가 다름:
+  // 첫날은 시작시간~자정, 마지막날은 자정~종료시간, 그 사이는 하루 종일). 이미 겹치는 일정이 있는지 확인해서 경고함(막지는 않고, 계속할지 물어봄)
+  let dailyWindows;
+  if(formRepeatMode === 'weekly'){
+    dailyWindows = Array.from(formSelectedWeekdays).map(dow => {
+      const d = new Date(scheduleFocusDate);
+      d.setDate(d.getDate() + (dow - d.getDay() + 7) % 7);
+      return { key: dateKeyOf(d), winStart: startMin, winEnd: endMin };
+    });
+  } else if(overnightDateRange){
+    dailyWindows = [];
+    const cursor = new Date(overnightDateRange.start);
+    let count = 0;
+    while(cursor <= overnightDateRange.end && count < 31){
+      const isFirst = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.start);
+      const isLast = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.end);
+      dailyWindows.push({ key: dateKeyOf(cursor), winStart: isFirst ? startMin : 0, winEnd: isLast ? endMin : 1440 });
+      cursor.setDate(cursor.getDate() + 1);
+      count++;
+    }
+  } else if(formRepeatMode === 'once' && dateRange){
+    dailyWindows = [];
+    const cursor = new Date(dateRange.start);
+    let count = 0;
+    while(cursor <= dateRange.end && count < 31){
+      dailyWindows.push({ key: dateKeyOf(cursor), winStart: startMin, winEnd: endMin });
+      cursor.setDate(cursor.getDate() + 1);
+      count++;
+    }
+  } else {
+    dailyWindows = [{ key: dateKeyOf(scheduleFocusDate), winStart: startMin, winEnd: endMin }];
+  }
 
   let overlapFound = null;
-  for(const key of overlapDateKeys){
+  for(const { key, winStart, winEnd } of dailyWindows){
     const dayEvents = getEventsForDate(parseDateInputValue(key));
-    const found = dayEvents.find(ev => ev.id !== editingEventId && ev.startMin < endMin && ev.endMin > startMin);
+    const found = dayEvents.find(ev => ev.id !== editingEventId && ev.startMin < winEnd && ev.endMin > winStart);
     if(found){ overlapFound = { dateKey: key, event: found }; break; }
   }
   if(overlapFound){
@@ -12253,19 +12281,68 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
             || (ev.dateRange && dateKeyOf(ev.dateRange.start))
             || dateKeyOf(scheduleFocusDate);
           ev.title = title;
-          ev.startMin = startMin;
-          ev.endMin = endMin;
           ev.type = formEventType;
           ev.visibility = { ...formVisibility };
           const prevExceptions = (ev.recurring && ev.recurring.exceptions) || [];
           ev.recurring = formRepeatMode === 'weekly' ? { weekdays: Array.from(formSelectedWeekdays), until, exceptions: prevExceptions } : null;
-          ev.dateRange = formRepeatMode === 'once' ? dateRange : null;
-          ev.dateKey = (formRepeatMode === 'weekly' || dateRange) ? null : dateKeyOf(scheduleFocusDate);
           ev.recurringAnchorDateKey = formRepeatMode === 'weekly' ? anchorForRecurring : null;
-          resyncAllScheduleEvents();
-          syncEventUpdateToServer(ev);
+          if(overnightDateRange){
+            // 자정을 넘기는 일정으로 바뀐 경우 - 수정 중이던 이 이벤트는 첫째 날(시작시간~자정) 몫으로 남기고,
+            // 나머지 날짜(마지막 날은 자정~종료시간, 그 사이는 하루 종일)는 새 이벤트로 추가함
+            ev.startMin = startMin;
+            ev.endMin = 1440;
+            ev.dateRange = null;
+            ev.dateKey = dateKeyOf(overnightDateRange.start);
+            resyncAllScheduleEvents();
+            syncEventUpdateToServer(ev);
+            const cursor = new Date(overnightDateRange.start);
+            cursor.setDate(cursor.getDate() + 1);
+            let count = 1;
+            while(cursor <= overnightDateRange.end && count < 31){
+              const isLast = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.end);
+              createScheduleEvent({
+                title, startMin: 0, endMin: isLast ? endMin : 1440,
+                visibility: { ...formVisibility },
+                recurringWeekdays: null, until: null, dateRange: null,
+                dateKey: dateKeyOf(cursor),
+                type: formEventType,
+              });
+              cursor.setDate(cursor.getDate() + 1);
+              count++;
+            }
+          } else {
+            ev.startMin = startMin;
+            ev.endMin = endMin;
+            ev.dateRange = formRepeatMode === 'once' ? dateRange : null;
+            ev.dateKey = (formRepeatMode === 'weekly' || dateRange) ? null : dateKeyOf(scheduleFocusDate);
+            resyncAllScheduleEvents();
+            syncEventUpdateToServer(ev);
+          }
         }
         showToast('일정을 수정했어요.');
+      } else if(overnightDateRange){
+        // 자정을 넘기는 일정 - 날짜별로 쪼개서 각각 등록함 (예: 저녁 4시~다음날 새벽 3시 -> 첫날 16:00~24:00 + 다음날 00:00~03:00,
+        // 여러 날에 걸치면 중간 날짜들은 00:00~24:00 하루 종일로 채움)
+        const cursor = new Date(overnightDateRange.start);
+        let count = 0;
+        while(cursor <= overnightDateRange.end && count < 31){
+          const isFirst = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.start);
+          const isLast = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.end);
+          createScheduleEvent({
+            title,
+            startMin: isFirst ? startMin : 0,
+            endMin: isLast ? endMin : 1440,
+            visibility: { ...formVisibility },
+            recurringWeekdays: null,
+            until: null,
+            dateRange: null,
+            dateKey: dateKeyOf(cursor),
+            type: formEventType,
+          });
+          cursor.setDate(cursor.getDate() + 1);
+          count++;
+        }
+        showToast('일정이 추가됐어요.');
       } else {
         createScheduleEvent({
           title, startMin, endMin,
