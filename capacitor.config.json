@@ -1,5 +1,9 @@
 {
   "appId": "com.catchme.app",
   "appName": "캐치미",
-  "webDir": "www"
+  "webDir": "www",
+  "server": {
+    "url": "https://catchme-29rt.onrender.com",
+    "cleartext": false
+  }
 }
