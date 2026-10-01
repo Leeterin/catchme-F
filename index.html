@@ -10992,7 +10992,10 @@ let scheduleGroupFilter = null;
 function eventMatchesScheduleGroupFilter(ev){
   if(!scheduleGroupFilter) return true;
   if(!ev.visibility || ev.visibility.private) return false;
-  return Array.isArray(ev.visibility.groupIds) && ev.visibility.groupIds.includes(scheduleGroupFilter);
+  const groupIds = Array.isArray(ev.visibility.groupIds) ? ev.visibility.groupIds : [];
+  // 전체공개(어떤 그룹에도 안 묶이고 나만보기도 아닌 일정)는 "전체"뿐 아니라 어느 그룹 필터를 걸어도 항상 보임
+  if(groupIds.length === 0) return true;
+  return groupIds.includes(scheduleGroupFilter);
 }
 function filterEventsByScheduleGroup(events){
   return events.filter(eventMatchesScheduleGroupFilter);
