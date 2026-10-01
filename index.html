@@ -5406,7 +5406,7 @@
       </div>
 
       <div class="auth-form active" id="authFormLogin">
-        <input type="text" id="loginEmailOrUsername" placeholder="아이디 또는 이메일" />
+        <input type="text" id="loginEmailOrUsername" placeholder="아이디 또는 이메일" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <input type="password" id="loginPassword" placeholder="비밀번호" />
         <button id="loginSubmitBtn" type="button">로그인</button>
         <div class="auth-error" id="loginError"></div>
@@ -5415,7 +5415,7 @@
 
       <div class="auth-form" id="authFormSignup">
         <div class="auth-field-group"><label>이름</label><input type="text" id="signupName" placeholder="이름을 입력하세요" maxlength="20" /></div>
-        <div class="auth-field-group"><label>아이디</label><input type="text" id="signupUsername" placeholder="영문 소문자로 시작, 3~20자" maxlength="20" /></div>
+        <div class="auth-field-group"><label>아이디</label><input type="text" id="signupUsername" placeholder="영문 소문자로 시작, 3~20자" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" /></div>
         <div class="auth-field-group"><label>이메일</label><input type="email" id="signupEmail" placeholder="이메일을 입력하세요" /></div>
         <div class="auth-field-group"><label>전화번호 <span style="font-weight:400;opacity:0.7;">(선택)</span></label><input type="tel" id="signupPhone" placeholder="010-1234-5678" /></div>
         <div class="auth-field-group"><label>비밀번호</label><input type="password" id="signupPassword" placeholder="8자 이상, 영문+숫자" /></div>
@@ -5775,7 +5775,7 @@
     <div class="friend-search-view" id="friendSearchView">
       <div class="search-list-view active" id="searchListView">
         <button class="profile-back" id="searchBackBtn">&#8249; 뒤로</button>
-        <input type="text" class="search-input" id="friendSearchInput" placeholder="아이디로 친구 검색" />
+        <input type="text" class="search-input" id="friendSearchInput" placeholder="아이디로 친구 검색" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <div id="friendSearchResults"></div>
       </div>
 
@@ -7870,7 +7870,7 @@ function openSettingsDetail(id){
       ${toggleRowHTML('friend_search_allow', '아이디로 나를 검색 허용', '', false)}
       <div class="settings-detail-desc" style="margin-top:16px;">차단한 사람은 서로 친구 요청/채팅을 할 수 없어요.</div>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
-        <input type="text" class="search-input" id="blockUsernameInput" placeholder="차단할 아이디 입력" style="margin-bottom:0;" />
+        <input type="text" class="search-input" id="blockUsernameInput" placeholder="차단할 아이디 입력" style="margin-bottom:0;" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <button type="button" class="profile-chat-btn" id="blockUserSubmitBtn" style="width:auto;padding:0 16px;">차단</button>
       </div>
       <div id="blockedListContainer"></div>
@@ -10148,7 +10148,7 @@ function renderMyProfile(){
         <input type="file" id="mpPhotoInput" accept="image/*" style="display:none;" />
       </div>
       <div class="mp-input-group"><label>이름</label><input class="search-input" id="mpNameInput" value="${myProfileData.name}" maxlength="20" /></div>
-      <div class="mp-input-group"><label>아이디</label><input class="search-input" id="mpIdInput" value="${myProfileData.id}" maxlength="20" /></div>
+      <div class="mp-input-group"><label>아이디</label><input class="search-input" id="mpIdInput" value="${myProfileData.id}" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" /></div>
       <div class="mp-input-group"><label>전화번호</label><input class="search-input" id="mpPhoneInput" value="${myProfileData.phone}" maxlength="20" /></div>
       <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.phonePublic ? ' on' : ''}" id="phoneVisBtnEdit">${myProfileData.phonePublic ? '공개' : '비공개'}</button></div>
       <div class="mp-input-group"><label>이메일</label><input class="search-input" id="mpEmailInput" value="${myProfileData.email}" maxlength="40" /></div>
