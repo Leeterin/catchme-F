@@ -1276,6 +1276,7 @@
     font-size:13px;
     font-weight:700;
     color:var(--text);
+    cursor:pointer;
   }
   .feed-ig-tag-row{
     display:flex;
@@ -2913,6 +2914,13 @@
     white-space:nowrap;
   }
   .meet-badge-chip svg{ flex-shrink:0; }
+  .reviewer-level-badge{ cursor:pointer; }
+  .feed-author-view-header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
   /* 이달의 맛집왕 배너 - 소식 목록 맨 위에 표시 */
   .feed-monthly-king-banner{
     display:flex;
@@ -6397,6 +6405,20 @@
         <div id="feedTagListContainer"></div>
       </div>
 
+      <!-- 작성자 이름/등급뱃지를 눌렀을 때 - 그 사람이 지금까지 쓴 리뷰를 전부 모아서 보여줌 -->
+      <div class="feed-list-view" id="feedAuthorView">
+        <button class="profile-back" id="feedAuthorBackBtn">&#8249; 뒤로</button>
+        <div class="feed-author-view-header">
+          <div id="feedAuthorViewAvatar"></div>
+          <div>
+            <div class="friend-calendar-title" id="feedAuthorViewName"></div>
+            <div class="feed-tag-sub" id="feedAuthorViewMeta"></div>
+          </div>
+        </div>
+        <div class="profile-meet-next" id="feedAuthorViewNext" style="display:none;"></div>
+        <div id="feedAuthorListContainer"></div>
+      </div>
+
       <div class="feed-create-view" id="feedCreateView">
         <button class="profile-back" id="feedCreateBackBtn">&#8249; 뒤로</button>
         <div class="friend-calendar-title" id="feedCreateHeaderTitle">추천하기</div>
@@ -8786,6 +8808,83 @@ function renderMonthlyKingBadgeHtml(authorId){
   return `<span class="meet-badge-chip" style="color:#F5A623;border-color:#F5A623;" title="이번 달 후기 ${top.count}개 · 이달의 맛집왕">${FEED_BADGE_ICON.crown}이달의 맛집왕</span>`;
 }
 
+// ---------- 작성자 등급 뱃지: 지금까지 쓴 리뷰 누적 개수 기준, 항상 작성자 이름 옆에 표시됨 ----------
+// 위의 첫 리뷰어/친구N+/이달의 맛집왕은 "이 장소" 또는 "이번 달" 한정 뱃지라 리뷰를 더 써도
+// 사라지거나 그대로인 게 제각각이었음. 이 등급 뱃지는 그 사람이 지금까지 쓴 리뷰 총 개수만 보고
+// 매겨져서, 리뷰를 쓰면 쓸수록 등급이 오르기만 하지 절대 내려가거나 사라지지 않음.
+const REVIEWER_LEVEL_TIERS = [
+  { min: 21, key: 'legend',  label: '리뷰 레전드', color: '#F5A623', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M7 5H4a3 3 0 0 0 3 4"/><path d="M17 5h3a3 3 0 0 1-3 4"/></svg>' },
+  { min: 11, key: 'expert',  label: '리뷰 고수', color: '#F472B6', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8-5.2-4.6 6.9-.6z"/></svg>' },
+  { min: 6,  key: 'foodie',  label: '맛잘알', color: '#22B07D', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 2v7a2.5 2.5 0 0 0 5 0V2"/><path d="M6.5 2v20"/><path d="M18 2c-1.8 0-3 2.5-3 6s1.2 5 3 5 3-1.5 3-5-1.2-6-3-6z"/><path d="M18 13v9"/></svg>' },
+  { min: 3,  key: 'regular', label: '리뷰 단골', color: '#38BDF8', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M3 9l1.5-5h15L21 9"/><path d="M4.5 9a2.3 2.3 0 0 0 4.5 0 2.3 2.3 0 0 0 4.5 0 2.3 2.3 0 0 0 4.5 0"/><path d="M5 9.5V21h14V9.5"/></svg>' },
+  { min: 1,  key: 'sprout',  label: '리뷰 새싹', color: '#9CA3AF', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 22V13"/><path d="M12 13C7 13 4 10 4 5c6 0 8 3 8 8z"/><path d="M12 13c0-5 2-8 8-8 0 5-2 8-8 8z"/></svg>' },
+];
+// 이 사람이 지금까지(카테고리 전체 통틀어) 쓴 리뷰 총 개수
+function getAuthorReviewCount(authorId){
+  if(!authorId) return 0;
+  let count = 0;
+  ['food', 'cafe', 'experience'].forEach(cat => {
+    (FEED_POSTS[cat] || []).forEach(p => { if(p.author && p.author.id === authorId) count++; });
+  });
+  return count;
+}
+function getReviewerLevelTier(count){
+  return REVIEWER_LEVEL_TIERS.find(t => count >= t.min) || null;
+}
+// 작성자 이름 옆에 항상 붙는 등급 뱃지(조건부 아님) - 누르면 그 사람 리뷰 모아보기로 이동
+function renderReviewerLevelBadgeHtml(authorId){
+  if(!authorId) return '';
+  const count = getAuthorReviewCount(authorId);
+  const tier = getReviewerLevelTier(count);
+  if(!tier) return '';
+  return `<span class="meet-badge-chip reviewer-level-badge" style="color:${tier.color};border-color:${tier.color};" title="${tier.label} · 작성한 리뷰 ${count}개 · 눌러서 이 사람 리뷰 모아보기">${tier.icon}${tier.label}</span>`;
+}
+// 작성자 이름/등급뱃지를 누르면, 그 사람이 지금까지 쓴 리뷰를 전부 모아서 보여줌
+function openFeedAuthorView(author){
+  if(!author || !author.id) return;
+  const count = getAuthorReviewCount(author.id);
+  const tier = getReviewerLevelTier(count);
+  const nextTier = [...REVIEWER_LEVEL_TIERS].sort((a, b) => a.min - b.min).find(t => count < t.min);
+
+  document.getElementById('feedAuthorViewAvatar').innerHTML = feedAuthorAvatarHtml(author);
+  document.getElementById('feedAuthorViewName').textContent = feedAuthorDisplayName(author);
+  document.getElementById('feedAuthorViewMeta').innerHTML = `작성한 리뷰 ${count}개` + (tier ? ` <span class="meet-badge-chip" style="color:${tier.color};border-color:${tier.color};">${tier.icon}${tier.label}</span>` : '');
+  const nextEl = document.getElementById('feedAuthorViewNext');
+  if(nextTier){
+    nextEl.textContent = `'${nextTier.label}' 등급까지 리뷰 ${nextTier.min - count}개 남았어요`;
+    nextEl.style.display = '';
+  } else {
+    nextEl.style.display = 'none';
+  }
+
+  const posts = ['food', 'cafe', 'experience']
+    .flatMap(cat => FEED_POSTS[cat] || [])
+    .filter(p => p.author && p.author.id === author.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const container = document.getElementById('feedAuthorListContainer');
+  container.innerHTML = '';
+  if(posts.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'search-empty';
+    empty.textContent = '아직 작성한 리뷰가 없어요.';
+    container.appendChild(empty);
+  } else {
+    posts.forEach(post => renderFeedPostCard(post, container));
+  }
+
+  document.getElementById('feedListView').classList.remove('active');
+  document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('feedTagView').classList.remove('active');
+  document.getElementById('feedAuthorView').classList.add('active');
+  pushViewState(closeFeedAuthorView);
+}
+function closeFeedAuthorView(){
+  document.getElementById('feedAuthorView').classList.remove('active');
+  document.getElementById('feedListView').classList.add('active');
+}
+document.getElementById('feedAuthorBackBtn').addEventListener('click', () => goBackOrClose(closeFeedAuthorView));
+
+
 // 별점을 채워진/빈 별로 표시 (예: 4점이면 ★★★★☆)
 function renderStarsHtml(rating){
   if(typeof rating !== 'number') return '';
@@ -8875,6 +8974,7 @@ function feedPostCardHtml(post){
     <div class="feed-ig-header">
       ${feedAuthorAvatarHtml(post.author)}
       <div class="feed-ig-author-name">${escapeHtml(feedAuthorDisplayName(post.author))}</div>
+      ${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}
       ${renderFirstReviewerBadgeHtml(post)}
       ${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}
     </div>
@@ -8959,6 +9059,7 @@ function feedPostDetailHtml(post){
       <div class="feed-ig-header">
         ${feedAuthorAvatarHtml(post.author)}
         <div class="feed-ig-author-name">${escapeHtml(feedAuthorDisplayName(post.author))}</div>
+        ${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}
         ${renderFirstReviewerBadgeHtml(post)}
         ${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}
       </div>
@@ -9003,6 +9104,11 @@ function wireFeedPostDetail(container, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const titleBtn = container.querySelector('.feed-detail-title');
   if(titleBtn) titleBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
+  // 작성자 이름/등급뱃지를 누르면 그 사람이 쓴 리뷰 모아보기로 이동
+  const authorNameEl = container.querySelector('.feed-ig-author-name');
+  if(authorNameEl) authorNameEl.addEventListener('click', () => openFeedAuthorView(post.author));
+  const authorBadgeEl = container.querySelector('.reviewer-level-badge');
+  if(authorBadgeEl) authorBadgeEl.addEventListener('click', () => openFeedAuthorView(post.author));
   // 실주소/전화/길찾기/공유
   const addrEl = container.querySelector('.feed-place-info-addr');
   if(addrEl) addrEl.addEventListener('click', () => openPlaceDetailMap(post));
@@ -9213,7 +9319,7 @@ function renderFeedTagList(){
       row.innerHTML = `
         <div class="feed-tag-list-thumb">${cover ? `<img src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
         <div class="feed-tag-list-body">
-          <div class="feed-tag-list-author">${escapeHtml(feedAuthorDisplayName(post.author))}${renderFirstReviewerBadgeHtml(post)}${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}</div>
+          <div class="feed-tag-list-author">${escapeHtml(feedAuthorDisplayName(post.author))}${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}${renderFirstReviewerBadgeHtml(post)}${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}</div>
           ${typeof post.avgRating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.avgRating)} ${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</div>` : ''}
           <div class="feed-tag-list-note">${escapeHtml(post.note || '')}</div>
         </div>
@@ -9328,6 +9434,11 @@ function wireFeedPostCard(card, post){
   // 장소 태그(#상호명)를 누르면 해시태그처럼 같은 장소로 올라온 다른 글들을 모아서 보여줌
   const tagBtn = card.querySelector('.feed-ig-place-tag');
   if(tagBtn) tagBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
+  // 작성자 이름/등급뱃지를 누르면 그 사람이 쓴 리뷰 모아보기로 이동 (카드 전체를 누르면 상세보기로 가는 것과 안 겹치게 전파를 막음)
+  const authorNameEl = card.querySelector('.feed-ig-author-name');
+  if(authorNameEl) authorNameEl.addEventListener('click', (e) => { e.stopPropagation(); openFeedAuthorView(post.author); });
+  const authorBadgeEl = card.querySelector('.reviewer-level-badge');
+  if(authorBadgeEl) authorBadgeEl.addEventListener('click', (e) => { e.stopPropagation(); openFeedAuthorView(post.author); });
   // 실주소/전화/길찾기/공유 - 카드를 눌러 상세보기로 들어가는 것과 겹치지 않게 클릭을 여기서 막음
   const addrEl = card.querySelector('.feed-place-info-addr');
   if(addrEl) addrEl.addEventListener('click', (e) => { e.stopPropagation(); openPlaceDetailMap(post); });
