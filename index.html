@@ -12910,6 +12910,24 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
   return { minIdx, maxIdx };
 }
 
+// 일주일 시간표에 보여줄 시간 범위를 계산하기 위한 재료 - "화면에 지금 보이는 7일"만 보고 범위를
+// 계산하면, 일정이 적은 특정 주(예: 이번 주엔 아침 일정 하나뿐)에서 그 주만 유독 좁게 접혀버려서
+// 주를 넘길 때마다 보이는 시간 범위가 들쭉날쭉해지는 문제가 있었음. 그래서 날짜/반복 여부와 상관없이
+// SCHEDULE_EVENTS에 등록된 모든 일정의 "몇 시~몇 시"만 모아서, 이 사람이 평소에 쓰는 시간대 전체를
+// 기준으로 범위를 계산함 - 등록된 일정이 하나도 없으면 기본값대로 24시간을 전부 보여줌.
+function getMyOverallScheduleHourCoverage(){
+  const coverage = DAY_HOURS.map(() => '');
+  SCHEDULE_EVENTS.forEach(ev => {
+    const startH = Math.floor(ev.startMin / 60);
+    const endH = Math.max(startH + 1, Math.ceil(ev.endMin / 60));
+    for(let h = startH; h < endH; h++){
+      const idx = DAY_HOURS.indexOf(h);
+      if(idx >= 0) coverage[idx] = ev.title || '1';
+    }
+  });
+  return coverage;
+}
+
 function renderWeekView(){
   const weekStart = getWeekStart(scheduleFocusDate);
   const weekEnd = new Date(weekStart);
@@ -12928,9 +12946,10 @@ function renderWeekView(){
     days.push(d);
   }
 
-  // 이 주에 실제로 등록된 일정이 있는 시간대만 계산해서, 필요없는 앞뒤 시간은 접어버림 (일정이 없으면 기본 9시~22시만, 있으면 새벽/이른아침 일정도 다 보임)
   const textsByDay = days.map(d => getScheduleText(dateKeyOf(d)));
-  const { minIdx, maxIdx } = computeVisibleHourRange(textsByDay, 9, 22, DAY_HOURS);
+  // 범위 자체는 "이번 주 7일"이 아니라 "지금까지 등록해둔 전체 일정" 기준으로 계산함(위 함수 참고) -
+  // 기본값은 24시간 전부, 일정을 등록해뒀으면 그 사람이 실제로 쓰는 시간대로 좁혀짐(앞뒤 1시간 여유)
+  const { minIdx, maxIdx } = computeVisibleHourRange([getMyOverallScheduleHourCoverage()], 0, 23, DAY_HOURS);
   const visibleHours = DAY_HOURS.slice(minIdx, maxIdx + 1);
 
   // 시간 라벨 컬럼
