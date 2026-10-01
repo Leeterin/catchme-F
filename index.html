@@ -6363,7 +6363,7 @@
         <!-- "주변 추천" 제목 줄은 없애고, 올리기(+) 버튼을 카테고리 칩 줄 맨 끝으로 옮겨서 한 줄로 합침 -
              전체적으로 한 줄 만큼 위로 붙어 보이게 됨 -->
         <div class="meetup-chip-row" id="feedSegment">
-          <button class="meetup-chip active" data-cat="food">맛집</button>
+          <button class="meetup-chip active" data-cat="food">음식점</button>
           <button class="meetup-chip" data-cat="cafe">카페</button>
           <button class="meetup-chip" data-cat="experience">체험</button>
           <button type="button" class="feed-map-view-btn" id="feedMapViewBtn" title="지도 전체보기">
@@ -6433,7 +6433,7 @@
         <div class="feed-create-category-row" id="feedCreateCategoryRow">
           <button type="button" class="feed-create-category-chip" data-cat="food">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1 1 2 2 2s2-1 2-2V2"/><path d="M5 11v11"/><path d="M15 2s-2 2-2 6 2 4 2 4v9"/></svg>
-            <span>맛집</span>
+            <span>음식점</span>
           </button>
           <button type="button" class="feed-create-category-chip" data-cat="cafe">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
@@ -8725,7 +8725,7 @@ document.querySelectorAll('#communitySegment .segment-btn').forEach(btn => {
 // ============================================================
 // 소식: 맛집 / 카페 / 체험 추천 (각자 올린 글이 독립적인 게시물로 따로 뜸 - 더 이상 장소로 안 묶음)
 // ============================================================
-const FEED_CATEGORY_LABELS = { food: '맛집', cafe: '카페', experience: '체험' };
+const FEED_CATEGORY_LABELS = { food: '음식점', cafe: '카페', experience: '체험' };
 const FEED_POSTS = {
   food: [],
   cafe: [],
@@ -10322,10 +10322,6 @@ function renderMyProfile(){
       <div class="mp-input-group"><label>이메일</label><input class="search-input" id="mpEmailInput" value="${myProfileData.email}" maxlength="40" /></div>
       <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtnEdit">${myProfileData.emailPublic ? '공개' : '비공개'}</button></div>
 
-      <!-- 리뷰용 닉네임/사진은 리뷰를 처음 쓸 때 뜨는 팝업에서만 만들 수 있어서, 나중에 바꾸고 싶을 때 들어올 곳이
-           없었음 - 프로필 화면을 어지럽히지 않는 선에서, 그 팝업을 다시 여는 작은 링크만 하나 둠. -->
-      <button class="pin-action-btn" id="mpEditReviewProfileBtn" type="button" style="width:100%;margin-bottom:14px;">리뷰용 프로필 수정</button>
-
       <button class="profile-chat-btn" id="mpSaveBtn" style="margin-top:6px;">저장하기</button>
     `;
     document.getElementById('mpPhotoChangeBtn').addEventListener('click', () => {
@@ -10339,9 +10335,6 @@ function renderMyProfile(){
         renderMyProfile();
       });
     }
-    document.getElementById('mpEditReviewProfileBtn').addEventListener('click', () => {
-      openReviewProfileSetupOverlay(() => {}, true); // 리뷰 작성 시작 팝업이랑 같은 팝업을 "수정" 문구로 재사용
-    });
     document.getElementById('phoneVisBtnEdit').addEventListener('click', () => {
       myProfileData.phonePublic = !myProfileData.phonePublic;
       renderMyProfile();
@@ -16855,7 +16848,7 @@ function openFeedMapView(){
   });
   const places = [...groups.values()];
 
-  const categoryLabel = { food: '맛집', cafe: '카페', experience: '체험' }[activeFeedCategory] || '';
+  const categoryLabel = { food: '음식점', cafe: '카페', experience: '체험' }[activeFeedCategory] || '';
   document.getElementById('feedMapOverlayTitle').textContent = `${categoryLabel} 지도${places.length ? ` · ${places.length}곳` : ''}`;
 
   document.getElementById('feedMapOverlay').classList.add('show');
