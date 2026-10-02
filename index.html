@@ -17740,13 +17740,18 @@ function openChatRoom(id){
   renderChatMessages();
   renderPinnedSchedule();
 
-  if(room.isRealRoom && !room._pinsLoaded){
+  // 핀(확정된 약속 목록)도 메시지와 같은 이유로 방에 들어올 때마다 항상 다시 불러옴
+  if(room.isRealRoom){
     room._pinsLoaded = true;
     loadPinsFromServer(id, room);
   }
 
-  if(room.isRealRoom && !room._loaded){
-    loadRoomMessagesFromServer(id, room, true);
+  // 전에는 "한 번 불러온 적 있으면" 다시 안 불러왔는데, 그러면 소켓 알림을 못 받은 채(백그라운드,
+  // 네트워크 끊김 등) 지나간 상태 변화(예: 상대방이 예약을 수락했는데 나만 그걸 실시간으로 못 받은
+  // 경우)가 방을 다시 들어와도 영영 반영이 안 되는 문제가 있었음 - 방에 들어올 때마다 항상 최신
+  // 메시지로 다시 동기화하도록 바꿈 (처음 들어온 게 아니면 실패해도 토스트 없이 조용히 넘어감)
+  if(room.isRealRoom){
+    loadRoomMessagesFromServer(id, room, !room._loaded);
   }
 
   document.getElementById('chatListView').classList.remove('active');
