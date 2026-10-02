@@ -23100,12 +23100,18 @@ function renderInviteManageHtml(){
   }
   html += renderInviteGridHtml(inv, 'manage');
   if(inv.status === 'OPEN' && n){
-    html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>같은 날 다른 칸을 한 번 더 누르면 그 시간까지 늘어나요</span></div>`;
+    html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>칸을 눌러 고르고, 끝나는 시간은 아래에서 늘릴 수 있어요</span></div>`;
     const sel = inviteState.confirmSel;
     if(sel){
+      // 고른 칸에서 앞뒤로 이어지는 고를 수 있는 칸까지 시작/끝을 옮길 수 있음
+      const openSet = inviteOpenSet(inv);
+      const canUse = h => h >= inv.startHour && h < inv.endHour && (!openSet || openSet.has(inviteCellKey(sel.date, h)));
+      let lo = sel.start, hi = sel.end;
+      while(canUse(lo - 1)) lo--;
+      while(canUse(hi)) hi++;
       let so = '', eo = '';
-      for(let m = sel.start * 60; m < sel.eMin; m += 5) so += `<option value="${m}"${m === sel.sMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
-      for(let m = sel.sMin + 5; m <= sel.end * 60; m += 5) eo += `<option value="${m}"${m === sel.eMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
+      for(let m = lo * 60; m < sel.eMin; m += 5) so += `<option value="${m}"${m === sel.sMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
+      for(let m = sel.sMin + 5; m <= hi * 60; m += 5) eo += `<option value="${m}"${m === sel.eMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
       html += `<div class="inv-fine"><div class="inv-fine-row"><span class="d">${inviteDateLabel(sel.date)}</span>`
         + `<select class="inv-fine-sel" data-fine="cs" aria-label="확정 시작 시간">${so}</select><span class="t">~</span>`
         + `<select class="inv-fine-sel" data-fine="ce" aria-label="확정 끝 시간">${eo}</select><span class="t">분 단위로 맞추기</span></div></div>`;
@@ -23291,12 +23297,8 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
       if(!inv.responses.length) return;
       const [date, hh] = key.split('|');
       const h = Number(hh);
-      const sel = st.confirmSel;
-      if(sel && sel.date === date && !sel.extended && !(h >= sel.start && h < sel.end)){
-        st.confirmSel = inviteFitSel(inv, { date, start: Math.min(sel.start, h), end: Math.max(sel.end, h + 1), extended: true });
-      } else {
-        st.confirmSel = inviteFitSel(inv, { date, start: h, end: h + 1, extended: false });
-      }
+      // 칸은 하나만 고름 (길이는 아래 시간 선택에서 늘림)
+      st.confirmSel = inviteFitSel(inv, { date, start: h, end: h + 1, extended: false });
       clearInviteArm();
       renderInviteOverlay();
     }
@@ -23408,7 +23410,11 @@ document.getElementById('inviteOverlay').addEventListener('change', (e) => {
       updateInviteGridClasses();
       renderInviteFoot();
     } else if(st.confirmSel){
-      if(kind === 'cs') st.confirmSel.sMin = v; else st.confirmSel.eMin = v;
+      const sel = st.confirmSel;
+      if(kind === 'cs') sel.sMin = v; else sel.eMin = v;
+      // 테두리 칸도 고른 시간에 맞춤
+      sel.start = Math.floor(sel.sMin / 60);
+      sel.end = Math.ceil(sel.eMin / 60);
       clearInviteArm();
       renderInviteOverlay();
     }
