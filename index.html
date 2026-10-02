@@ -4932,6 +4932,10 @@
   .week-cal-hour-end{
     height:0;
     overflow:visible;
+    /* 보통 시간 라벨(.week-cal-hour)은 32px 칸의 "위쪽 경계선"에 맞춰 보이도록 -6px만큼 위로
+       당겨서 배치하는데, 이 끝 경계 라벨은 높이가 0이라 이미 그 경계선 위치 자체이므로 같은
+       -6px를 또 적용하면 바로 윗 칸(예: 21시) 안쪽으로 파고들어 이상하게 떠보임 - 여기선 취소함 */
+    transform:translateY(0);
   }
   .week-cal-days{
     flex:1;
@@ -17915,6 +17919,9 @@ function renderChatMessages(){
       const showActions = m.who === 'other' && m.status === 'pending';
       const showWithdraw = m.who === 'me' && m.status === 'pending';
       const showConfirmedExtras = m.status === 'confirmed';
+      // 취소된 예약도, 취소한 사람이든 상대방이든 나중에 언제든 "이 시간 예약 가능으로 남기기"를
+      // 누를 수 있게 함 (취소하는 그 순간에만 고를 수 있으면 상대방은 영영 기회가 없으므로)
+      const showRestoreAvailOption = m.status === 'cancelled' && !!m._serverId && !m._restoreAvailHandled;
       const cardHtml = `
         <div class="reservation-card">
           <div class="reservation-card-header">${ICO.calendar} 예약 요청</div>
@@ -17934,6 +17941,10 @@ function renderChatMessages(){
           ${showConfirmedExtras ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn cancel">예약 취소</button>
+            </div>` : ''}
+          ${showRestoreAvailOption ? `
+            <div class="reservation-card-actions">
+              <button class="reservation-btn restore-avail">이 시간 예약 가능으로 남기기</button>
             </div>` : ''}
         </div>
       `;
@@ -18005,6 +18016,18 @@ function renderChatMessages(){
       }
       if(showConfirmedExtras){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable)));
+      }
+      if(showRestoreAvailOption){
+        row.querySelector('.reservation-btn.restore-avail').addEventListener('click', () => {
+          apiRequest(`/chats/messages/${m._serverId}/restore-availability-choice`, { method: 'POST', body: JSON.stringify({ restore: true }) })
+            .then(() => {
+              m._restoreAvailHandled = true;
+              loadScheduleFromServer(); // 복원된 "예약 가능"이 내 캘린더에도 바로 반영되게
+              renderChatMessages();
+              showToast('이 시간을 예약 가능으로 남겨뒀어요.');
+            })
+            .catch(err => showToast(err.message));
+        });
       }
     } else if(m.type === 'location-suggest'){
       const statusLabel = m.status === 'confirmed' ? '장소로 확정됨' : (m.status === 'cancelled' ? '제안 취소됨' : '제안됨');
