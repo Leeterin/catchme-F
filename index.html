@@ -1311,6 +1311,20 @@
   .meet-place-room button{ flex-shrink:0; border:1px solid var(--line); background:var(--surface); color:var(--text); border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; }
   .meet-place-room button.fill{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .meet-place-room .done{ font-size:11.5px; color:var(--text-dim); flex-shrink:0; }
+  /* 약속 끝난 뒤 장소 후기 */
+  .place-review-eyebrow{ font-size:12px; font-weight:700; color:var(--accent); margin-bottom:4px; }
+  .place-review-place{ font-size:13px; color:var(--text-dim); margin:-4px 0 12px; line-height:1.45; }
+  .place-review-place b{ color:var(--text); }
+  .place-review-tags{ display:flex; flex-direction:column; gap:6px; }
+  .place-review-tag{ display:flex; align-items:center; gap:8px; width:100%; text-align:left; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); font-size:13.5px; font-weight:600; cursor:pointer; }
+  .place-review-tag .em{ font-size:16px; }
+  .place-review-tag.on{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); color:var(--accent); }
+  .place-review-note{ width:100%; box-sizing:border-box; margin-top:10px; padding:9px 11px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); font-size:13px; font-family:inherit; resize:none; }
+  .place-review-dest{ font-size:11.5px; color:var(--text-dim); margin-top:8px; }
+  .place-review-never{ display:block; margin:10px auto 0; border:0; background:none; color:var(--text-dim); font-size:12px; text-decoration:underline; cursor:pointer; }
+  .feed-review-tags{ display:flex; flex-wrap:wrap; gap:5px; margin:6px 0 2px; }
+  .feed-review-tag{ font-size:11.5px; font-weight:600; padding:3px 8px; border-radius:999px; border:1px solid var(--line); color:var(--text); background:var(--surface); }
+  .feed-review-tag.meetup{ border-color:var(--accent); color:var(--accent); }
   .feed-detail-mini-actions{
     display:flex;
     justify-content:flex-end;
@@ -10187,6 +10201,7 @@ function feedPostCardHtml(post){
       ${renderFriendVisitBadgeHtml(post.title)}
     </div>
     ${buildPlaceInfoRowHtml(post)}
+    ${feedReviewTagsHtml(post)}
     <div class="feed-post-note">${escapeHtml(post.note || '')}</div>
     <div class="feed-post-bottom-row">
       <div></div>
@@ -10283,6 +10298,7 @@ function feedPostDetailHtml(post){
       ${renderFriendVisitBadgeHtml(post.title) ? `<div style="margin:-4px 0 2px;">${renderFriendVisitBadgeHtml(post.title)}</div>` : ''}
       ${typeof post.avgRating === 'number' ? `<div class="feed-detail-rating"><span class="feed-detail-rating-num">${post.avgRating.toFixed(1)}</span> ${renderStarsHtml(post.avgRating)} ${post.ratingCount > 1 ? `<span>(${post.ratingCount})</span>` : ''}</div>` : ''}
       ${buildPlaceInfoRowHtml(post)}
+      ${feedReviewTagsHtml(post)}
       <div class="feed-detail-note">${escapeHtml(post.note || '')}</div>
       <button type="button" class="feed-meet-place-btn">${ICO.pin}<span>약속 장소로 선택</span></button>
 
@@ -10514,6 +10530,217 @@ function meetPlaceInChatRoom(roomId, place, act){
   } else {
     go();
   }
+}
+
+// ---------- 약속이 끝난 뒤 그 채팅방에 들어오면 "오늘 여기서 만나보니 어땠어요?" 후기 알림 ----------
+// 확정된 일정(날짜 있는 핀)이 끝난 지 7일 안이고, 장소가 길거리/역/주소가 아닌 "가게"(카카오 장소 검색에서
+// 상호로 찾아지는 곳)일 때만 띄움. 남긴 후기는 추천 게시물로 올라가고, 카페면 추천 > 카페 탭에 들어감.
+const PLACE_REVIEW_TAGS = [
+  { key: 'talk', em: '🗣️', label: '대화하기 좋았어요' },
+  { key: 'group', em: '👥', label: '여러 명이 이용하기 좋았어요' },
+  { key: 'price', em: '💰', label: '가격이 괜찮았어요' },
+  { key: 'revisit', em: '❤️', label: '다음에도 이용하고 싶어요' },
+];
+const PLACE_REVIEW_WINDOW_DAYS = 7;
+const PLACE_REVIEW_DONE_KEY = 'catchme_place_review_done';
+// 가게가 아닌 곳(역/주차장/학교/관공서/병원/관광명소 등)의 카카오 카테고리 그룹
+const NON_STORE_GROUPS = ['SW8', 'PK6', 'OL7', 'SC4', 'PS3', 'PO3', 'BK9', 'AG2', 'HP8', 'PM9', 'AT4', 'AC5'];
+const NON_STORE_CATEGORY_PREFIX = ['교통,수송', '지역', '부동산', '사회,공공기관', '의료,건강', '교육,학문', '금융,보험'];
+const placeReviewSkippedThisSession = new Set(); // "나중에"를 누른 건 앱을 다시 켤 때까지 안 물어봄
+const placeReviewClassifyCache = {};
+let placeReviewState = null;
+
+function loadPlaceReviewDone(){
+  try { return JSON.parse(localStorage.getItem(PLACE_REVIEW_DONE_KEY) || '[]'); } catch(e){ return []; }
+}
+function markPlaceReviewDone(key){
+  try {
+    const list = loadPlaceReviewDone().filter(k => k !== key);
+    list.push(key);
+    localStorage.setItem(PLACE_REVIEW_DONE_KEY, JSON.stringify(list.slice(-200)));
+  } catch(e){}
+}
+function placeReviewNorm(s){ return String(s || '').replace(/\s+/g, '').toLowerCase(); }
+
+// 핀의 약속이 끝나는 시각 (시간이 없으면 그날 밤 자정)
+function pinEndDate(pin){
+  if(!pin.dateObj) return null;
+  const end = new Date(pin.dateObj);
+  const mins = pin.timeLabel ? parseTimeLabelMinutes(pin.timeLabel) : null;
+  if(mins && mins.endMin > mins.startMin) end.setHours(0, mins.endMin, 0, 0);
+  else end.setHours(24, 0, 0, 0);
+  return end;
+}
+
+// 이 방에서 후기를 물어볼 만한 지난 약속 하나 (가장 최근에 끝난 것)
+function findPlaceReviewCandidate(roomId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !room.isRealRoom || !room.pinnedSchedules) return null;
+  const now = Date.now();
+  const done = new Set(loadPlaceReviewDone());
+  const placeOnlyPin = [...room.pinnedSchedules].reverse().find(p => !p.dateLabel && p.location);
+  const myTitles = new Set(currentUser ? ['food', 'cafe', 'experience'].flatMap(c => FEED_POSTS[c] || [])
+    .filter(p => p.author && p.author.id === currentUser.id).map(p => placeReviewNorm(p.title)) : []);
+  const list = room.pinnedSchedules
+    .map(pin => ({ pin, end: pinEndDate(pin) }))
+    .filter(x => x.end && x.end.getTime() <= now && now - x.end.getTime() <= PLACE_REVIEW_WINDOW_DAYS * 86400e3)
+    .sort((a, b) => b.end - a.end);
+  for(const { pin, end } of list){
+    const placePin = pin.location ? pin : placeOnlyPin;
+    if(!placePin || !placePin.location) continue;
+    const name = placePin.location.trim();
+    const key = `${roomId}|${pin.serverId || (pin.dateLabel + ' ' + (pin.timeLabel || ''))}|${placeReviewNorm(name)}`;
+    if(done.has(key) || placeReviewSkippedThisSession.has(key)) continue;
+    if(myTitles.has(placeReviewNorm(name))) continue; // 이미 이 장소 후기를 올렸으면 안 물어봄
+    return {
+      key, roomId, pin, end, name,
+      lat: typeof placePin.locationLat === 'number' ? placePin.locationLat : null,
+      lon: typeof placePin.locationLon === 'number' ? placePin.locationLon : null,
+      address: placePin.locationAddress || '',
+    };
+  }
+  return null;
+}
+
+// 카카오 장소 검색으로 이 장소가 "가게"인지 확인하고, 카페/음식점/그 외(체험)로 나눔. 가게가 아니면 null
+function classifyReviewPlace(c, cb){
+  const cacheKey = placeReviewNorm(c.name) + '|' + (c.lat || '') + '|' + (c.lon || '');
+  if(cacheKey in placeReviewClassifyCache){ cb(placeReviewClassifyCache[cacheKey]); return; }
+  const finish = (v) => { placeReviewClassifyCache[cacheKey] = v; cb(v); };
+  ensureKakaoMapsLoaded(() => {
+    const svc = window.kakao && kakao.maps && kakao.maps.services;
+    if(!svc || !svc.Places){ cb(null); return; }
+    const opts = (c.lat !== null && c.lon !== null) ? { location: new kakao.maps.LatLng(c.lat, c.lon), radius: 2000, sort: svc.SortBy ? svc.SortBy.DISTANCE : undefined } : {};
+    try {
+      new svc.Places().keywordSearch(c.name, (results, status) => {
+        if(status !== svc.Status.OK || !results || !results.length){ finish(null); return; }
+        const target = placeReviewNorm(c.name);
+        const r = results.find(r => {
+          const nm = placeReviewNorm(r.place_name);
+          if(!(nm === target || nm.startsWith(target) || target.startsWith(nm))) return false;
+          if(c.lat !== null && r.distance !== undefined && r.distance !== '' && parseFloat(r.distance) > 300) return false;
+          return true;
+        });
+        if(!r){ finish(null); return; }
+        const group = r.category_group_code || '';
+        const catName = String(r.category_name || '');
+        if(NON_STORE_GROUPS.includes(group) || NON_STORE_CATEGORY_PREFIX.some(p => catName.startsWith(p)) || !catName){ finish(null); return; }
+        const category = group === 'CE7' ? 'cafe' : (group === 'FD6' ? 'food' : 'experience');
+        finish({
+          category,
+          kind: catName.split('>').pop().trim(),
+          lat: parseFloat(r.y), lon: parseFloat(r.x),
+          address: r.road_address_name || r.address_name || c.address || null,
+          phone: r.phone || null,
+        });
+      }, opts);
+    } catch(e){ finish(null); }
+  });
+}
+
+function maybePromptPlaceReview(roomId){
+  if(!authToken || placeReviewState || restoreAvailPromptShowing) return;
+  const c = findPlaceReviewCandidate(roomId);
+  if(!c) return;
+  classifyReviewPlace(c, (info) => {
+    if(!info){
+      // 가게가 아닌 곳(길거리/역 등)이면 이 약속은 다시 확인하지 않음
+      markPlaceReviewDone(c.key);
+      maybePromptPlaceReview(roomId);
+      return;
+    }
+    const roomView = document.getElementById('chatRoomView');
+    if(activeChatRoomId !== roomId || !roomView.classList.contains('active') || placeReviewState || restoreAvailPromptShowing) return;
+    openPlaceReviewSheet(c, info);
+  });
+}
+
+function openPlaceReviewSheet(c, info){
+  let ov = document.getElementById('placeReviewOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'mini-confirm-overlay';
+    ov.id = 'placeReviewOverlay';
+    ov.innerHTML = '<div class="mini-confirm-card" style="text-align:left;"></div>';
+    ov.addEventListener('click', (e) => { if(e.target === ov) closePlaceReviewSheet('later'); });
+    document.body.appendChild(ov);
+  }
+  placeReviewState = { c, info, tags: new Set() };
+  const endDay = new Date(c.end.getTime() - 1);
+  const isToday = endDay.toDateString() === new Date().toDateString();
+  const when = isToday ? '오늘' : (c.pin.dateLabel ? c.pin.dateLabel + '에' : '그날');
+  const dest = { cafe: '추천 > 카페', food: '추천 > 맛집', experience: '추천 > 체험' }[info.category];
+  ov.querySelector('.mini-confirm-card').innerHTML = `
+    <div class="place-review-eyebrow">약속 후기</div>
+    <div class="mini-confirm-title" style="margin-bottom:8px;">${escapeHtml(when)} 여기서 만나보니 어땠어요?</div>
+    <div class="place-review-place"><b>${escapeHtml(c.name)}</b>${info.kind ? ` · ${escapeHtml(info.kind)}` : ''}</div>
+    <div class="place-review-tags">
+      ${PLACE_REVIEW_TAGS.map(t => `<button type="button" class="place-review-tag" data-tag="${t.key}"><span class="em">${t.em}</span>${t.label}</button>`).join('')}
+    </div>
+    <textarea class="place-review-note" rows="2" maxlength="200" placeholder="한 줄 후기 (선택)"></textarea>
+    <div class="place-review-dest">추천을 남기면 ${dest}에 올라가요.</div>
+    <div class="mini-confirm-actions">
+      <button type="button" class="mini-confirm-btn" data-act="submit" disabled>추천 남기기</button>
+      <button type="button" class="mini-confirm-btn danger" data-act="later">나중에</button>
+    </div>
+    <button type="button" class="place-review-never" data-act="never">이 약속은 후기 안 남길래요</button>
+  `;
+  const card = ov.querySelector('.mini-confirm-card');
+  const submitBtn = card.querySelector('[data-act="submit"]');
+  card.querySelectorAll('.place-review-tag').forEach(btn => btn.addEventListener('click', () => {
+    const k = btn.dataset.tag;
+    if(placeReviewState.tags.has(k)) placeReviewState.tags.delete(k); else placeReviewState.tags.add(k);
+    btn.classList.toggle('on', placeReviewState.tags.has(k));
+    submitBtn.disabled = placeReviewState.tags.size === 0;
+  }));
+  card.querySelector('[data-act="later"]').addEventListener('click', () => closePlaceReviewSheet('later'));
+  card.querySelector('[data-act="never"]').addEventListener('click', () => closePlaceReviewSheet('never'));
+  submitBtn.addEventListener('click', () => submitPlaceReview(card.querySelector('.place-review-note').value.trim(), submitBtn));
+  ov.classList.add('show');
+}
+function closePlaceReviewSheet(how){
+  const ov = document.getElementById('placeReviewOverlay');
+  if(ov) ov.classList.remove('show');
+  const st = placeReviewState;
+  placeReviewState = null;
+  if(!st) return;
+  if(how === 'never') markPlaceReviewDone(st.c.key);
+  else if(how === 'later') placeReviewSkippedThisSession.add(st.c.key);
+}
+async function submitPlaceReview(note, btn){
+  const st = placeReviewState;
+  if(!st || !st.tags.size) return;
+  const { c, info } = st;
+  btn.disabled = true;
+  const tags = PLACE_REVIEW_TAGS.map(t => t.key).filter(k => st.tags.has(k)); // 항상 같은 순서로 저장
+  try {
+    const data = await apiRequest('/feed', {
+      method: 'POST',
+      body: JSON.stringify({
+        category: info.category, title: c.name, note, tags, fromMeetup: true,
+        location: info.address || c.address || '', address: info.address || null, phone: info.phone || null,
+        lat: info.lat, lon: info.lon,
+      }),
+    });
+    const post = data.post;
+    FEED_POSTS[info.category].unshift({ ...post, location: post.location || '', note: post.note || '', tags: post.tags || tags, fromMeetup: true });
+    sortFeedPosts(info.category);
+    renderFeedPosts();
+    markPlaceReviewDone(c.key);
+    placeReviewState = null;
+    document.getElementById('placeReviewOverlay').classList.remove('show');
+    showToast(info.category === 'cafe' ? '추천 카페에 올렸어요!' : info.category === 'food' ? '추천 맛집에 올렸어요!' : '추천 체험에 올렸어요!');
+  } catch(err){
+    btn.disabled = false;
+    showToast(err.message);
+  }
+}
+
+// 추천 게시물 카드/상세에 보여줄 후기 항목 칩
+function feedReviewTagsHtml(post){
+  const tags = (post.tags || []).map(k => PLACE_REVIEW_TAGS.find(t => t.key === k)).filter(Boolean);
+  if(!tags.length && !post.fromMeetup) return '';
+  return `<div class="feed-review-tags">${post.fromMeetup ? '<span class="feed-review-tag meetup">약속 후 남긴 후기</span>' : ''}${tags.map(t => `<span class="feed-review-tag">${t.em} ${t.label}</span>`).join('')}</div>`;
 }
 
 // ---------- 게시물을 친구한테 메시지로 보내기 ----------
@@ -10834,6 +11061,8 @@ async function loadFeedPostsFromServer(){
         avgRating: typeof p.avgRating === 'number' ? p.avgRating : null,
         ratingCount: p.ratingCount || 0,
         photos: p.photos || [],
+        tags: p.tags || [],
+        fromMeetup: !!p.fromMeetup,
         author: p.author,
         likeCount: p.likeCount || 0,
         commentCount: p.commentCount || 0,
@@ -17573,7 +17802,10 @@ async function loadPinsFromServer(roomId, room){
       reservationMsgId: p.sourceMessageId,
       dateObj: p.dateLabel ? parseDateLabelToDate(p.dateLabel) : null,
     }));
-    if(activeChatRoomId === roomId) renderPinnedSchedule();
+    if(activeChatRoomId === roomId){
+      renderPinnedSchedule();
+      maybePromptPlaceReview(roomId);
+    }
   } catch(err){
     console.error('[pins] load failed:', err);
   }
@@ -20035,6 +20267,7 @@ let chatReturnToCalendar = null; // 캘린더의 "채팅에서 확인"으로 들
 
 function closeChatRoomView(){
   closeRestoreAvailPrompt(); // 결정 안 하고 방을 나가도 팝업 상태를 리셋해서, 다음에 들어오면 다시 뜨게 함
+  if(placeReviewState) closePlaceReviewSheet('later');
   const view = document.getElementById('chatRoomView');
   view.classList.remove('active');
   view.style.top = '';
