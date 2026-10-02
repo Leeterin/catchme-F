@@ -6141,6 +6141,19 @@
     </div>
   </div>
 
+  <!-- 예약 취소로 생긴 "예약 가능" 시간을 다시 남겨둘지 묻는 팝업 - 취소된 예약이 있는 채팅방에 들어갈 때마다,
+       아직 결정을 안 한 취소 건이 있으면 뜸. 여러 건이면 하나씩 순서대로 뜨고, 아무거나 눌러서 결정하기
+       전까지는(바깥을 눌러도 안 닫히고) 방에 다시 들어올 때마다 계속 뜸 -->
+  <div class="mini-confirm-overlay" id="restoreAvailPromptOverlay">
+    <div class="mini-confirm-card">
+      <div class="mini-confirm-title" id="restoreAvailPromptTitle">예약이 취소됐어요</div>
+      <div class="mini-confirm-actions">
+        <button type="button" id="restoreAvailPromptKeepBtn" class="mini-confirm-btn">예약 가능으로 남기기</button>
+        <button type="button" id="restoreAvailPromptNoBtn" class="mini-confirm-btn danger">괜찮아요</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 신고하기 팝업 - 리뷰/모임/사용자 공용 -->
   <div class="mini-confirm-overlay" id="reportOverlay">
     <div class="mini-confirm-card" style="text-align:left;">
@@ -16625,6 +16638,48 @@ function runPendingCancel(keepAvailable){
 document.getElementById('reservationCancelConfirmKeepBtn').addEventListener('click', () => runPendingCancel(true));
 document.getElementById('reservationCancelConfirmDeleteBtn').addEventListener('click', () => runPendingCancel(false));
 
+// ---------- 취소된 예약을 "예약 가능"으로 남겨둘지 채팅방에 들어갈 때마다 물어봄 ----------
+// (예전엔 취소된 예약 카드 밑에 버튼으로 항상 붙어있었는데, 카드가 쌓이면 지저분하고 안 누르고 지나치기
+// 쉬워서 - 방에 들어올 때 팝업으로 물어보는 방식으로 바꿈. 결정하기 전까지는(바깥을 눌러도 안 닫힘)
+// 방에 다시 들어올 때마다 계속 뜨고, 한 방에 미결정 취소 건이 여러 개면 한 번에 다 보여주지 않고
+// 하나씩 순서대로 물어봄)
+let restoreAvailPromptShowing = false;
+let pendingRestoreAvailMessage = null;
+let pendingRestoreAvailRoomId = null;
+
+function checkPendingRestoreAvailPrompts(roomId){
+  if(restoreAvailPromptShowing) return; // 이미 하나 보여주는 중이면, 그게 끝난 뒤 자기가 알아서 다음 걸 또 체크함
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !room.messages) return;
+  const m = room.messages.find(msg => msg.type === 'reservation' && msg.status === 'cancelled' && msg._serverId && !msg._restoreAvailHandled);
+  if(!m) return;
+  pendingRestoreAvailMessage = m;
+  pendingRestoreAvailRoomId = roomId;
+  restoreAvailPromptShowing = true;
+  document.getElementById('restoreAvailPromptTitle').textContent = `${m.dateLabel} ${m.timeLabel}까지 예약이 취소됐어요. 이 시간을 예약 가능으로 남겨두시겠어요?`;
+  document.getElementById('restoreAvailPromptOverlay').classList.add('show');
+}
+function closeRestoreAvailPrompt(){
+  document.getElementById('restoreAvailPromptOverlay').classList.remove('show');
+  restoreAvailPromptShowing = false;
+}
+function runRestoreAvailChoice(restore){
+  const m = pendingRestoreAvailMessage;
+  const roomId = pendingRestoreAvailRoomId;
+  closeRestoreAvailPrompt();
+  if(!m) return;
+  apiRequest(`/chats/messages/${m._serverId}/restore-availability-choice`, { method: 'POST', body: JSON.stringify({ restore }) })
+    .then(() => {
+      m._restoreAvailHandled = true;
+      if(restore) loadScheduleFromServer(); // 복원된 "예약 가능"이 내 캘린더에도 바로 반영되게
+      showToast(restore ? '이 시간을 예약 가능으로 남겨뒀어요.' : '예약 가능 시간으로 남기지 않았어요.');
+      checkPendingRestoreAvailPrompts(roomId); // 같은 방에 또 결정 안 한 취소 건이 남아있으면 바로 이어서 물어봄
+    })
+    .catch(err => showToast(err.message)); // 실패하면 그냥 미결정 상태로 둠 - 다음에 방 들어오면 다시 뜸
+}
+document.getElementById('restoreAvailPromptKeepBtn').addEventListener('click', () => runRestoreAvailChoice(true));
+document.getElementById('restoreAvailPromptNoBtn').addEventListener('click', () => runRestoreAvailChoice(false));
+
 // ---------- 장소 정하기: 카카오톡 위치 공유처럼 지도를 꽉 채워서 검색하거나 직접 핀을 찍어서 고름 ----------
 let locationPickerCallback = null; // (label, lat, lon) => void - 장소를 고른 뒤 실행할 콜백
 let locationPickerDebounce = null;
@@ -17865,6 +17920,7 @@ function openChatRoom(id){
 
   renderChatMessages();
   renderPinnedSchedule();
+  checkPendingRestoreAvailPrompts(id); // 취소된 예약 중 아직 "예약 가능으로 남길지" 결정 안 한 게 있으면 물어봄
 
   // 핀(확정된 약속 목록)도 메시지와 같은 이유로 방에 들어올 때마다 항상 다시 불러옴
   if(room.isRealRoom){
@@ -17911,13 +17967,17 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
   return apiRequest(`/chats/${id}/messages`).then(data => {
     room.messages = data.messages.map(m => mapServerMessageToLocal(m, room));
     room._loaded = true;
-    if(activeChatRoomId === id) renderChatMessages();
+    if(activeChatRoomId === id){
+      renderChatMessages();
+      checkPendingRestoreAvailPrompts(id); // 서버에서 새로 받아온 메시지 기준으로 다시 한 번 확인 (새로고침 느낌으로 들어온 경우 대비)
+    }
   }).catch(err => { if(isFirstLoad) showToast(err.message); else console.error('[messages resync]', err); });
 }
 
 let chatReturnToCalendar = null; // 캘린더의 "채팅에서 확인"으로 들어온 경우, 뒤로가기 시 돌아갈 캘린더 상태(뷰/날짜)를 기억해둠
 
 function closeChatRoomView(){
+  closeRestoreAvailPrompt(); // 결정 안 하고 방을 나가도 팝업 상태를 리셋해서, 다음에 들어오면 다시 뜨게 함
   const view = document.getElementById('chatRoomView');
   view.classList.remove('active');
   view.style.top = '';
@@ -18036,9 +18096,6 @@ function renderChatMessages(){
       const showActions = m.who === 'other' && m.status === 'pending';
       const showWithdraw = m.who === 'me' && m.status === 'pending';
       const showConfirmedExtras = m.status === 'confirmed';
-      // 취소된 예약도, 취소한 사람이든 상대방이든 나중에 언제든 "이 시간 예약 가능으로 남기기"를
-      // 누를 수 있게 함 (취소하는 그 순간에만 고를 수 있으면 상대방은 영영 기회가 없으므로)
-      const showRestoreAvailOption = m.status === 'cancelled' && !!m._serverId && !m._restoreAvailHandled;
       const cardHtml = `
         <div class="reservation-card">
           <div class="reservation-card-header">${ICO.calendar} 예약 요청</div>
@@ -18058,10 +18115,6 @@ function renderChatMessages(){
           ${showConfirmedExtras ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn cancel">예약 취소</button>
-            </div>` : ''}
-          ${showRestoreAvailOption ? `
-            <div class="reservation-card-actions">
-              <button class="reservation-btn restore-avail">이 시간 예약 가능으로 남기기</button>
             </div>` : ''}
         </div>
       `;
@@ -18133,18 +18186,6 @@ function renderChatMessages(){
       }
       if(showConfirmedExtras){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable)));
-      }
-      if(showRestoreAvailOption){
-        row.querySelector('.reservation-btn.restore-avail').addEventListener('click', () => {
-          apiRequest(`/chats/messages/${m._serverId}/restore-availability-choice`, { method: 'POST', body: JSON.stringify({ restore: true }) })
-            .then(() => {
-              m._restoreAvailHandled = true;
-              loadScheduleFromServer(); // 복원된 "예약 가능"이 내 캘린더에도 바로 반영되게
-              renderChatMessages();
-              showToast('이 시간을 예약 가능으로 남겨뒀어요.');
-            })
-            .catch(err => showToast(err.message));
-        });
       }
     } else if(m.type === 'location-suggest'){
       const statusLabel = m.status === 'confirmed' ? '장소로 확정됨' : (m.status === 'cancelled' ? '제안 취소됨' : '제안됨');
