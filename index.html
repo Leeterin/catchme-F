@@ -1296,6 +1296,21 @@
     cursor:pointer;
   }
   .feed-detail-kebab-item:hover{ background:var(--surface-2); }
+  .feed-meet-place-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
+    margin:4px 0 12px; padding:12px; border:none; border-radius:14px;
+    background:var(--accent); color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .feed-meet-place-btn svg{ width:16px; height:16px; }
+  .meet-place-sub{ font-size:12.5px; color:var(--text-dim); margin:-6px 0 12px; line-height:1.45; }
+  .meet-place-section{ font-size:12px; font-weight:700; color:var(--text-dim); margin:14px 0 6px; }
+  .meet-place-rooms{ display:flex; flex-direction:column; gap:6px; max-height:240px; overflow-y:auto; }
+  .meet-place-room{ display:flex; align-items:center; gap:8px; padding:9px 10px; border:1px solid var(--line); border-radius:12px; }
+  .meet-place-room .nm{ flex:1; min-width:0; font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .meet-place-room .nm small{ display:block; font-weight:500; font-size:11px; color:var(--accent); }
+  .meet-place-room button{ flex-shrink:0; border:1px solid var(--line); background:var(--surface); color:var(--text); border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; }
+  .meet-place-room button.fill{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .meet-place-room .done{ font-size:11.5px; color:var(--text-dim); flex-shrink:0; }
   .feed-detail-mini-actions{
     display:flex;
     justify-content:flex-end;
@@ -5719,6 +5734,16 @@
     color:var(--text);
     font-size:14px;
   }
+  .inv-place{
+    display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:14px;
+    border:1px solid var(--line); border-radius:14px; background:var(--surface);
+  }
+  .inv-place > svg{ width:18px; height:18px; color:var(--accent); flex-shrink:0; }
+  .inv-place .tx{ flex:1; min-width:0; }
+  .inv-place .tx b{ display:block; font-size:14px; }
+  .inv-place .tx span{ display:block; font-size:12px; color:var(--text-dim); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .inv-place a, .inv-place button{ flex-shrink:0; font-size:12px; font-weight:700; color:var(--accent); background:none; border:none; padding:4px; cursor:pointer; text-decoration:none; }
+  .inv-place button.rm{ color:var(--text-dim); }
   .inv-card{
     background:var(--surface);
     border:1px solid var(--line);
@@ -10259,6 +10284,7 @@ function feedPostDetailHtml(post){
       ${typeof post.avgRating === 'number' ? `<div class="feed-detail-rating"><span class="feed-detail-rating-num">${post.avgRating.toFixed(1)}</span> ${renderStarsHtml(post.avgRating)} ${post.ratingCount > 1 ? `<span>(${post.ratingCount})</span>` : ''}</div>` : ''}
       ${buildPlaceInfoRowHtml(post)}
       <div class="feed-detail-note">${escapeHtml(post.note || '')}</div>
+      <button type="button" class="feed-meet-place-btn">${ICO.pin}<span>약속 장소로 선택</span></button>
 
       <div class="feed-detail-mini-actions">
         <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
@@ -10291,6 +10317,8 @@ function wireFeedPostDetail(container, post){
   const addrEl = container.querySelector('.feed-place-info-addr');
   if(addrEl) addrEl.addEventListener('click', () => openPlaceDetailMap(post));
   wirePlaceInfoRow(container, post);
+  const meetBtn = container.querySelector('.feed-meet-place-btn');
+  if(meetBtn) meetBtn.addEventListener('click', () => openMeetPlaceSheet(post));
   if(isMine){
     const editBtn = container.querySelector('.feed-review-edit-btn');
     if(editBtn) editBtn.addEventListener('click', () => { container.querySelector('.feed-detail-kebab-menu').classList.remove('open'); openFeedReviewEdit(post); });
@@ -10407,6 +10435,85 @@ function wireFeedPostDetail(container, post){
   };
   container.querySelector('.feed-comment-submit-btn').addEventListener('click', submitComment);
   commentInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.isComposing) submitComment(); });
+}
+
+// ---------- 추천 게시물 -> 약속 장소로 선택 ----------
+// 새 약속(링크로 시간 잡기)을 이 장소로 만들거나, 진행 중인 채팅방 약속의 장소로 제안/픽스함
+function meetPlaceFromPost(post){
+  return {
+    name: post.title || '',
+    address: post.address || post.location || '',
+    lat: typeof post.lat === 'number' ? post.lat : null,
+    lon: typeof post.lon === 'number' ? post.lon : null,
+  };
+}
+function meetPlaceRoomList(){
+  return Object.entries(CHAT_ROOMS)
+    .filter(([, r]) => r.isRealRoom)
+    .sort(([ia, a], [ib, b]) => ((ib === activeChatRoomId) - (ia === activeChatRoomId)) || ((b.lastActivity || 0) - (a.lastActivity || 0)))
+    .slice(0, 8);
+}
+function openMeetPlaceSheet(post){
+  if(!authToken){ showToast('로그인하면 약속 장소로 고를 수 있어요.'); return; }
+  let ov = document.getElementById('meetPlaceOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'mini-confirm-overlay';
+    ov.id = 'meetPlaceOverlay';
+    ov.innerHTML = '<div class="mini-confirm-card" style="text-align:left;"></div>';
+    ov.addEventListener('click', (e) => { if(e.target === ov) closeMeetPlaceSheet(); });
+    document.body.appendChild(ov);
+  }
+  const place = meetPlaceFromPost(post);
+  const rooms = meetPlaceRoomList();
+  const roomsHtml = rooms.map(([id, room]) => {
+    const status = getRoomPlaceStatus(room, place.name);
+    const right = status === 'confirmed' ? '<span class="done">이미 확정됨</span>'
+      : status === 'pending' ? '<span class="done">제안됨</span>'
+      : `<button type="button" data-act="suggest" data-room="${escapeHtml(id)}">제안</button><button type="button" class="fill" data-act="fix" data-room="${escapeHtml(id)}">픽스</button>`;
+    return `<div class="meet-place-room"><div class="nm">${id === activeChatRoomId ? '<small>지금 보던 채팅방</small>' : ''}${escapeHtml(room.name || '채팅방')}</div>${right}</div>`;
+  }).join('');
+  ov.querySelector('.mini-confirm-card').innerHTML = `
+    <div class="mini-confirm-title" style="margin-bottom:10px;">${escapeHtml(place.name)}</div>
+    <div class="meet-place-sub">${place.address ? escapeHtml(place.address) + '<br>' : ''}어떤 약속의 장소로 정할까요?</div>
+    <button type="button" class="place-choice-option recommended" data-act="new">
+      <span class="place-choice-title">새 약속 잡기</span>
+      <span class="place-choice-desc">이 장소로 약속 링크를 만들어요. 친구들은 가입 없이 되는 시간만 골라줘요.</span>
+    </button>
+    ${rooms.length ? `<div class="meet-place-section">채팅방 약속의 장소로</div><div class="meet-place-rooms">${roomsHtml}</div>` : ''}
+    <div class="mini-confirm-actions"><button type="button" class="mini-confirm-btn danger" data-act="close">닫기</button></div>
+  `;
+  ov.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', () => {
+    const act = btn.dataset.act;
+    closeMeetPlaceSheet();
+    if(act === 'new') openInviteCreate(false, { place });
+    else if(act === 'suggest' || act === 'fix') meetPlaceInChatRoom(btn.dataset.room, place, act);
+  }));
+  ov.classList.add('show');
+}
+function closeMeetPlaceSheet(){
+  const ov = document.getElementById('meetPlaceOverlay');
+  if(ov) ov.classList.remove('show');
+}
+// 게시물 상세보기를 닫고 그 채팅방으로 가서, 장소를 제안(투표)하거나 바로 픽스함
+function meetPlaceInChatRoom(roomId, place, act){
+  if(!CHAT_ROOMS[roomId]) return;
+  const go = () => {
+    document.getElementById('feedPlaceDetailView').classList.remove('active');
+    document.getElementById('feedListView').classList.add('active');
+    showTab('chat');
+    openChatRoom(roomId);
+    const compat = { place: place.name, note: '', location: place.address, lat: place.lat, lon: place.lon };
+    if(act === 'fix') fixHotplaceLocation(compat);
+    else suggestHotplaceToChat(compat);
+  };
+  const detailOpen = document.getElementById('feedPlaceDetailView').classList.contains('active');
+  if(detailOpen && viewCloseStack.length > 0){
+    window.addEventListener('popstate', () => setTimeout(go, 0), { once: true });
+    history.back();
+  } else {
+    go();
+  }
 }
 
 // ---------- 게시물을 친구한테 메시지로 보내기 ----------
@@ -22113,7 +22220,7 @@ async function openInviteList(firstOpen){
   renderInviteOverlay();
 }
 
-function openInviteCreate(fromList){
+function openInviteCreate(fromList, opts = {}){
   // 기본값: 다가오는 토요일 하루, 오전 10시 ~ 밤 10시
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -22126,6 +22233,7 @@ function openInviteCreate(fromList){
     calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
     calDates: new Set(),
     calError: '',
+    place: opts.place || null, // 추천 게시물에서 "약속 장소로 선택"하고 들어오면 장소가 붙어있음
   };
   inviteState.fromList = !!fromList;
   inviteState.mode = 'create';
@@ -22297,11 +22405,26 @@ function renderInviteListHtml(){
 
 function inviteAutoTitle(draft){
   const dates = draft.source === 'calendar' ? draft.calDates : draft.dates;
+  const at = draft.place ? `${draft.place.name}에서 ` : '';
   if(dates.size === 1){
     const d = inviteDateObj([...dates][0]);
-    return `${WEEKDAY_KO[d.getDay()]}요일에 만날 시간 골라줘!`;
+    return `${WEEKDAY_KO[d.getDay()]}요일 ${at}만날 시간 골라줘!`;
   }
-  return '언제 만날지 시간 골라줘!';
+  return draft.place ? `${at}언제 만날지 골라줘!` : '언제 만날지 시간 골라줘!';
+}
+
+// 약속 장소 줄 (만들기 화면에서는 빼기 버튼, 그 외에는 지도 링크)
+function inviteMapUrl(place){
+  if(typeof place.lat === 'number' && typeof place.lon === 'number'){
+    return `https://map.kakao.com/link/map/${encodeURIComponent(place.name)},${place.lat},${place.lon}`;
+  }
+  return `https://map.kakao.com/link/search/${encodeURIComponent(place.address || place.name)}`;
+}
+function invitePlaceHtml(place, removable){
+  if(!place) return '';
+  return `<div class="inv-place">${ICO.pin}<div class="tx"><b>${escapeHtml(place.name)}</b>${place.address ? `<span>${escapeHtml(place.address)}</span>` : ''}</div>${removable
+    ? '<button type="button" class="rm" data-act="rmPlace">빼기</button>'
+    : `<a href="${escapeHtml(inviteMapUrl(place))}" target="_blank" rel="noopener">지도</a>`}</div>`;
 }
 
 function renderInviteCreateHtml(){
@@ -22332,8 +22455,9 @@ function renderInviteCreateHtml(){
       <label class="inv-label" for="invTitleInput">친구에게 보낼 말</label>
       <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
     </div>`;
-  if(d.source === 'calendar') return tabs + titleHtml + renderInviteCalendarPickHtml(d);
-  return tabs + titleHtml + `
+  const placeHtml = d.place ? `<div class="inv-section"><label class="inv-label">약속 장소</label>${invitePlaceHtml(d.place, true)}</div>` : '';
+  if(d.source === 'calendar') return placeHtml + tabs + titleHtml + renderInviteCalendarPickHtml(d);
+  return placeHtml + tabs + titleHtml + `
     <div class="inv-section">
       <label class="inv-label">날짜 <small>· 여러 개 고를 수 있어요 (최대 14일)</small></label>
       <div class="inv-date-chips">${chips}</div>
@@ -22444,7 +22568,7 @@ function renderInviteManageHtml(){
       <div class="inv-hero-eyebrow">${inv.status === 'CONFIRMED' ? '확정된 약속' : inv.status === 'CANCELLED' ? '취소된 약속' : '응답 받는 중'}</div>
       <div class="inv-hero-title">${escapeHtml(inv.title)}</div>
       <div class="inv-hero-sub">${escapeHtml(inviteDatesSummary(inv))}</div>
-    </div>`;
+    </div>${invitePlaceHtml(inv.place, false)}`;
 
   if(inv.status === 'CONFIRMED'){
     html += `<div class="inv-card done">
@@ -22499,14 +22623,14 @@ function renderInviteGuestHtml(){
   const creator = escapeHtml(inviteCreatorName(inv));
 
   if(inv.status === 'CANCELLED'){
-    return `<div class="inv-hero"><div class="inv-hero-eyebrow">${creator}님의 약속</div><div class="inv-hero-title">${escapeHtml(inv.title)}</div></div>
+    return `<div class="inv-hero"><div class="inv-hero-eyebrow">${creator}님의 약속</div><div class="inv-hero-title">${escapeHtml(inv.title)}</div></div>${invitePlaceHtml(inv.place, false)}
       <div class="inv-card"><div class="inv-card-desc">이 약속은 취소됐어요.</div></div>`;
   }
 
   if(inv.status === 'CONFIRMED'){
     const mine = inv.myResponse;
     const mineIsLinked = inv.responses.some(r => r.mine && r.isMember);
-    let html = `<div class="inv-hero"><div class="inv-hero-eyebrow">${creator}님의 약속</div><div class="inv-hero-title">${escapeHtml(inv.title)}</div></div>
+    let html = `<div class="inv-hero"><div class="inv-hero-eyebrow">${creator}님의 약속</div><div class="inv-hero-title">${escapeHtml(inv.title)}</div></div>${invitePlaceHtml(inv.place, false)}
       <div class="inv-card done">
         <div class="inv-card-title">${ICO.check} 약속 시간이 정해졌어요</div>
         <div class="inv-confirmed-big">${escapeHtml(inviteConfirmedLabel(inv))}</div>
@@ -22546,7 +22670,7 @@ function renderInviteGuestHtml(){
       <div class="inv-hero-sub">${inv.fromCalendar
         ? `${creator}님이 되는 시간만 열려 있어요. 가입 없이 이름만 적고, 그중 나도 되는 시간을 모두 눌러주세요.`
         : '가입 없이 이름만 적고, 되는 시간을 모두 눌러주세요.'}</div>
-    </div>`;
+    </div>${invitePlaceHtml(inv.place, false)}`;
   const openNow = inviteOpenSet(inv);
   if(openNow && openNow.size === 0){
     return html + `<div class="inv-card"><div class="inv-card-desc">지금은 ${creator}님의 남은 시간이 없어요. ${creator}님에게 다른 시간을 물어봐 주세요.</div></div>`;
@@ -22724,6 +22848,7 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
     renderInviteOverlay();
   }
   else if(act === 'goAvail') goRegisterAvailabilityFromInvite();
+  else if(act === 'rmPlace' && st.draft){ st.draft.place = null; renderInviteOverlay(); }
   else if(act === 'copy') copyInviteLink();
   else if(act === 'share') shareInviteLink();
   else if(act === 'submit') submitInviteResponse();
@@ -22777,9 +22902,12 @@ async function createInviteFromDraft(){
   try {
     const data = await apiRequest('/invites', {
       method: 'POST',
-      body: JSON.stringify(d.source === 'calendar'
-        ? { title, dates: [...d.calDates].sort(), fromCalendar: true }
-        : { title, dates: [...d.dates].sort(), startHour: d.startHour, endHour: d.endHour }),
+      body: JSON.stringify({
+        ...(d.source === 'calendar'
+          ? { title, dates: [...d.calDates].sort(), fromCalendar: true }
+          : { title, dates: [...d.dates].sort(), startHour: d.startHour, endHour: d.endHour }),
+        ...(d.place ? { place: d.place } : {}),
+      }),
     });
     st.busy = false;
     st.token = data.invite.token;
@@ -22797,10 +22925,11 @@ async function createInviteFromDraft(){
 }
 
 function inviteShareText(inv){
+  const where = inv.place ? `\n장소: ${inv.place.name}${inv.place.address ? ` (${inv.place.address})` : ''}` : '';
   if(inv.status === 'CONFIRMED'){
-    return `[CATCHME] ${inv.title}\n약속 시간이 정해졌어요: ${inviteConfirmedLabel(inv)}`;
+    return `[CATCHME] ${inv.title}\n약속 시간이 정해졌어요: ${inviteConfirmedLabel(inv)}${where}`;
   }
-  return `[CATCHME] ${inv.title}\n${inviteCreatorName(inv)}님이 약속 시간을 물어보고 있어요. 가입 없이 링크에서 되는 시간만 눌러주세요!`;
+  return `[CATCHME] ${inv.title}${where}\n${inviteCreatorName(inv)}님이 약속 시간을 물어보고 있어요. 가입 없이 링크에서 되는 시간만 눌러주세요!`;
 }
 
 async function copyInviteLink(){
