@@ -11048,6 +11048,23 @@ function eventAppliesToDate(ev, dNum, dow, key){
   return ev.dateKey === key;
 }
 
+// 이 일정이 "여러 날짜에 걸치는" 일정이면(요일반복은 제외) 실제 시작/종료 날짜(자정 기준 Date)를 반환,
+// 하루짜리 일정이면 null. 한달 보기에서 여러 칸에 걸쳐 이어지는 막대로 그릴지 판단할 때 씀.
+function getEventMultiDayRange(ev){
+  if(ev.recurring) return null;
+  if(ev.dateRange){
+    const start = parseDateInputValue(ev.dateRange.start);
+    const end = parseDateInputValue(ev.dateRange.end);
+    return end > start ? { start, end } : null;
+  }
+  if(ev.dateKey && ev.endMin > 1440){
+    const start = parseDateInputValue(ev.dateKey);
+    const lastOffset = Math.floor((ev.endMin - 1) / 1440);
+    return { start, end: addDaysToDate(start, lastOffset) };
+  }
+  return null;
+}
+
 function getEventsForDate(dateObj){
   const key = dateKeyOf(dateObj);
   const dow = dateObj.getDay();
@@ -13512,6 +13529,31 @@ function renderMonthSchedView(){
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
   const MAX_LABELS = 3;
 
+  // 여러 날짜에 걸치는 일정("작대기")을 주(週) 단위로 몇 번째 자리(레인)에 놓을지 미리 정해둠.
+  // 같은 일정은 그 주 안에서 항상 같은 자리에 나오게 해야, 요일 칸을 넘어가도 끊기지 않고
+  // 하나로 이어진 막대처럼 보임. 겹치는 일정이 많아 레인이 MAX_LABELS를 넘으면 그 뒤는 안 보임(+N개로).
+  const multiDayEvents = filterEventsByScheduleGroup(SCHEDULE_EVENTS)
+    .map(ev => ({ ev, range: getEventMultiDayRange(ev) }))
+    .filter(x => x.range);
+  const laneByEventIdPerWeek = {}; // `${weekIndex}:${ev.id}` -> laneIndex
+  const totalWeeks = totalCells / 7;
+  for(let w = 0; w < totalWeeks; w++){
+    const weekStartDate = new Date(schedViewYear, schedViewMonth, w * 7 - firstDay + 1);
+    const weekEndDate = addDaysToDate(weekStartDate, 6);
+    const inThisWeek = multiDayEvents
+      .filter(x => x.range.start <= weekEndDate && x.range.end >= weekStartDate)
+      .sort((a, b) => a.range.start - b.range.start);
+    const laneEndCol = []; // 레인별로 마지막으로 차지한 끝 칸(그 주 안에서 0~6번째 요일) 기억
+    inThisWeek.forEach(x => {
+      const startCol = Math.max(0, daysBetween(weekStartDate, x.range.start));
+      const endCol = Math.min(6, daysBetween(weekStartDate, x.range.end));
+      let lane = laneEndCol.findIndex(endC => endC < startCol);
+      if(lane === -1){ lane = laneEndCol.length; laneEndCol.push(endCol); }
+      else { laneEndCol[lane] = endCol; }
+      laneByEventIdPerWeek[`${w}:${x.ev.id}`] = lane;
+    });
+  }
+
   for(let i=0;i<totalCells;i++){
     const cell = document.createElement('div');
     cell.className = 'day-cell';
@@ -13528,13 +13570,45 @@ function renderMonthSchedView(){
     if(dateKeyOf(cellDate) === dateKeyOf(TODAY)) cell.classList.add('today');
     if(dateKeyOf(cellDate) === dateKeyOf(monthSelectedDate)) cell.classList.add('selected-day');
 
+    const weekIndex = Math.floor(i / 7);
     const events = filterEventsByScheduleGroup(getEventsForDate(cellDate));
-    const visible = events.slice(0, MAX_LABELS);
-    const labelsHtml = visible.map(ev =>
-      `<div class="month-event-label" style="background:${ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForScheduleText(ev.title))}">${escapeHtml(truncateForMonthLabel(ev.title))}</div>`
-    ).join('');
-    const moreHtml = events.length > MAX_LABELS
-      ? `<div class="month-event-more">+${events.length - MAX_LABELS}개</div>`
+
+    // 여러 날짜짜리 일정을 레인 순서대로 먼저 자리 잡고, 남는 자리를 하루짜리 일정으로 채움
+    const slots = new Array(MAX_LABELS).fill(null);
+    multiDayEvents.forEach(x => {
+      if(x.range.start > cellDate || x.range.end < cellDate) return;
+      const lane = laneByEventIdPerWeek[`${weekIndex}:${x.ev.id}`];
+      if(lane !== undefined && lane < MAX_LABELS) slots[lane] = x.ev;
+    });
+    const singleDayEvents = events.filter(ev => !getEventMultiDayRange(ev));
+    let si = 0;
+    for(let s = 0; s < MAX_LABELS; s++){
+      if(slots[s]) continue;
+      if(si < singleDayEvents.length){ slots[s] = singleDayEvents[si]; si++; }
+    }
+    const shownEvents = slots.filter(Boolean);
+
+    const labelsHtml = shownEvents.map(ev => {
+      const bg = ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForScheduleText(ev.title));
+      const range = getEventMultiDayRange(ev);
+      if(!range){
+        return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(ev.title))}</div>`;
+      }
+      // 여러 날짜짜리 일정은 시작/끝 칸에서만 둥글게 하고, 칸 사이 여백을 음수 margin으로 메꿔서
+      // 요일 칸을 넘어가도 하나로 이어진 막대처럼 보이게 함. 제목은 시작 칸에만 보여줌(안 그러면
+      // 같은 글자가 칸마다 반복돼서 지저분해짐).
+      const isStartDay = dateKeyOf(cellDate) === dateKeyOf(range.start);
+      const isEndDay = dateKeyOf(cellDate) === dateKeyOf(range.end);
+      let barStyle;
+      if(isStartDay && isEndDay) barStyle = '';
+      else if(isStartDay) barStyle = 'border-radius:4px 0 0 4px;margin-right:-3px;padding-right:5px;';
+      else if(isEndDay) barStyle = 'border-radius:0 4px 4px 0;margin-left:-3px;padding-left:5px;';
+      else barStyle = 'border-radius:0;margin-left:-3px;margin-right:-3px;padding-left:5px;padding-right:5px;';
+      const text = isStartDay ? escapeHtml(truncateForMonthLabel(ev.title)) : '&nbsp;';
+      return `<div class="month-event-label" style="background:${bg};${barStyle}">${text}</div>`;
+    }).join('');
+    const moreHtml = events.length > shownEvents.length
+      ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
       : '';
 
     cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${labelsHtml}${moreHtml}`;
