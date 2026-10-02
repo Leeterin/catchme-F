@@ -3946,8 +3946,8 @@
     padding-top:calc(20px + env(safe-area-inset-top));
     box-sizing:border-box;
     /* 헤더(고정) / 내용(스크롤) / 버튼 영역(고정)으로 세로 3단 분리해서, 내용이 짧아도
-       버튼이 항상 화면 맨 밑에 붙어있고, 내용이 길면 그 영역만 따로 스크롤되게 함 */
-    display:flex;
+       버튼이 항상 화면 맨 밑에 붙어있고, 내용이 길면 그 영역만 따로 스크롤되게 함 - 단,
+       평소엔 숨겨져 있어야 하므로 기본 display는 none, .active일 때만 flex로 전환 */
     flex-direction:column;
   }
   .event-form-view.active{ display:flex; }
