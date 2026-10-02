@@ -587,6 +587,28 @@
     font-size:13px;
   }
   .location-picker-search-input::placeholder{ color:rgba(255,255,255,0.55); }
+  /* 장소 정하기 - 지도 가운데 근처 추천 장소 칩 */
+  .location-picker-recommend-row{
+    display:flex;
+    gap:6px;
+    margin-top:8px;
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .location-picker-recommend-row::-webkit-scrollbar{ display:none; }
+  .location-picker-recommend-chip{
+    flex-shrink:0;
+    border:none;
+    border-radius:999px;
+    padding:6px 11px;
+    background:rgba(255,255,255,0.12);
+    color:#fff;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .location-picker-recommend-chip.active{ background:var(--accent); }
+  .location-suggest-item .meta{ font-size:10.5px; color:var(--accent); margin-top:2px; }
   .location-picker-map-area{
     position:relative;
     flex:1;
@@ -6040,6 +6062,14 @@
     </div>
     <div class="location-search-wrap location-picker-searchbar">
       <input class="location-picker-search-input" id="locationPickerInput" placeholder="장소명으로 검색" maxlength="60" autocomplete="off" />
+      <div class="location-picker-recommend-row" id="locationPickerRecommendRow">
+        <button type="button" class="location-picker-recommend-chip" data-rec="catchme">캐치미 추천</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="food">맛집</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="cafe">카페</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="bar">술집</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="play">놀거리</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="station">지하철역</button>
+      </div>
       <div class="location-suggest-list" id="locationPickerSuggestList"></div>
     </div>
     <div class="location-picker-map-area">
@@ -17588,6 +17618,7 @@ function closeLocationPicker(){
   clearTimeout(locationPickerDebounce);
   document.getElementById('locationPickerInput').value = '';
   document.getElementById('locationPickerSuggestList').classList.remove('show');
+  setLocationPickerRecommendChip(null);
   resetLocationPickerSelection();
 }
 
@@ -17700,8 +17731,114 @@ function searchLocationPickerSuggestions(query, opts){
   });
 }
 
+// 장소 추천 - 지금 지도 가운데 근처의 맛집/카페/술집/놀거리/지하철역, 또는 캐치미 유저들이 추천한 곳을 목록으로 보여줌
+// 고르면 검색 결과를 고른 것과 똑같이 핀이 찍히고 "선택완료"로 정할 수 있음
+const LOCATION_PICKER_RECOMMEND = {
+  food:    { label:'맛집', category:'FD6' },
+  cafe:    { label:'카페', category:'CE7' },
+  bar:     { label:'술집', keyword:'술집' },
+  play:    { label:'놀거리', keyword:'놀거리' },
+  station: { label:'지하철역', category:'SW8' },
+};
+function setLocationPickerRecommendChip(key){
+  document.querySelectorAll('#locationPickerRecommendRow .location-picker-recommend-chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.rec === key);
+  });
+}
+function formatPickerDistance(meters){
+  if(!(meters >= 0)) return '';
+  return meters < 1000 ? `${Math.round(meters)}m` : `${(meters / 1000).toFixed(1)}km`;
+}
+function renderLocationPickerRecommendList(items, emptyText){
+  const listEl = document.getElementById('locationPickerSuggestList');
+  if(!items.length){
+    listEl.innerHTML = `<div class="location-suggest-status">${escapeHtml(emptyText)}</div>`;
+    listEl._results = [];
+    return;
+  }
+  listEl.innerHTML = items.map((r, idx) => `
+    <div class="location-suggest-item" data-idx="${idx}">
+      <span class="pin">${ICO.pin}</span>
+      <span>
+        <div class="name">${escapeHtml(r.place_name)}</div>
+        <div class="addr">${escapeHtml(r.road_address_name || r.address_name || '')}</div>
+        ${r._meta ? `<div class="meta">${escapeHtml(r._meta)}</div>` : ''}
+      </span>
+    </div>
+  `).join('');
+  listEl._results = items;
+}
+async function showLocationPickerRecommend(key){
+  if(!locationPickerMapInstance) return;
+  const listEl = document.getElementById('locationPickerSuggestList');
+  setLocationPickerRecommendChip(key);
+  listEl.innerHTML = `<div class="location-suggest-status">이 근처 추천 장소를 찾는 중...</div>`;
+  listEl.classList.add('show');
+  const center = locationPickerMapInstance.getCenter();
+  const cLat = center.getLat(), cLon = center.getLng();
+
+  if(key === 'catchme'){
+    // 캐치미 유저들이 올린 맛집/카페/체험 추천 중 지도 가운데에서 3km 안에 있는 것 (좋아요/평점 높은 순)
+    const hasPosts = Object.values(FEED_POSTS).some(arr => arr.length);
+    if(!hasPosts) await loadFeedPostsFromServer();
+    const items = [];
+    Object.keys(FEED_POSTS).forEach(cat => {
+      FEED_POSTS[cat].forEach(p => {
+        if(typeof p.lat !== 'number' || typeof p.lon !== 'number') return;
+        const km = distanceKm(cLat, cLon, p.lat, p.lon);
+        if(km > 3) return;
+        const rating = p.avgRating != null ? p.avgRating : p.rating;
+        items.push({
+          place_name: p.title,
+          x: String(p.lon), y: String(p.lat),
+          road_address_name: p.address || p.location || '',
+          _meta: [FEED_CATEGORY_LABELS[cat], rating != null ? `★ ${Number(rating).toFixed(1)}` : '', p.likeCount ? `좋아요 ${p.likeCount}` : '', formatPickerDistance(km * 1000)].filter(Boolean).join(' · '),
+          _score: (p.likeCount || 0) * 2 + (rating || 0) - km,
+        });
+      });
+    });
+    items.sort((a, b) => b._score - a._score);
+    if(document.querySelector('#locationPickerRecommendRow .active')?.dataset.rec !== key) return;
+    renderLocationPickerRecommendList(items.slice(0, 10), '이 근처 3km 안에는 캐치미 유저 추천이 아직 없어요. 다른 칩을 눌러보세요.');
+    return;
+  }
+
+  const conf = LOCATION_PICKER_RECOMMEND[key];
+  if(!conf) return;
+  ensureKakaoMapsLoaded(() => {
+    const places = new kakao.maps.services.Places();
+    const opts = { location: new kakao.maps.LatLng(cLat, cLon), radius: 1500, sort: kakao.maps.services.SortBy.ACCURACY };
+    const done = (results, status) => {
+      // 그 사이 다른 칩을 눌렀으면 늦게 온 결과는 무시
+      if(document.querySelector('#locationPickerRecommendRow .active')?.dataset.rec !== key) return;
+      const ok = status === kakao.maps.services.Status.OK && results && results.length;
+      const items = ok ? results.slice(0, 10).map(r => ({
+        ...r,
+        _meta: [String(r.category_name || '').split('>').pop().trim(), formatPickerDistance(parseFloat(r.distance))].filter(Boolean).join(' · '),
+      })) : [];
+      renderLocationPickerRecommendList(items, `이 근처엔 ${conf.label} 추천 결과가 없어요. 지도를 옮긴 뒤 다시 눌러보세요.`);
+    };
+    if(conf.category) places.categorySearch(conf.category, done, opts);
+    else places.keywordSearch(conf.keyword, done, opts);
+  });
+}
+document.getElementById('locationPickerRecommendRow').addEventListener('click', (e) => {
+  const chip = e.target.closest('.location-picker-recommend-chip');
+  if(!chip) return;
+  const listEl = document.getElementById('locationPickerSuggestList');
+  // 이미 켜진 칩을 다시 누르면 목록을 닫음
+  if(chip.classList.contains('active') && listEl.classList.contains('show')){
+    setLocationPickerRecommendChip(null);
+    listEl.classList.remove('show');
+    return;
+  }
+  document.getElementById('locationPickerInput').value = '';
+  showLocationPickerRecommend(chip.dataset.rec);
+});
+
 document.getElementById('locationPickerInput').addEventListener('input', (e) => {
   const query = e.target.value.trim();
+  setLocationPickerRecommendChip(null);
   clearTimeout(locationPickerDebounce);
   if(query.length < 2){
     document.getElementById('locationPickerSuggestList').classList.remove('show');
@@ -17718,6 +17855,7 @@ document.getElementById('locationPickerSuggestList').addEventListener('click', (
   if(!picked) return;
 
   document.getElementById('locationPickerSuggestList').classList.remove('show');
+  setLocationPickerRecommendChip(null);
   const lat = parseFloat(picked.y), lon = parseFloat(picked.x);
   placeLocationPickerPin(lat, lon, picked.place_name);
 });
