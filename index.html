@@ -13035,8 +13035,9 @@ function colorForScheduleText(text){
   return shadeHexColor(COLOR_THEMES[activeThemeIndex].baseColor, percent);
 }
 
-// 여러 날짜의 일정 텍스트 배열을 보고, 실제로 일정이 있는 시간대만 골라냄(앞뒤로 정확히 1시간씩만
-// 여유를 둠 - 그 이상 넓히지 않음). 일정이 하나도 없으면 기본 범위(예: 9시~22시)를 그대로 씀
+// 여러 날짜의 일정 텍스트 배열을 보고, 실제로 일정이 있는 시간대만 골라냄(앞뒤로 1시간 여유).
+// 9~22시는 "평균적인 폭"의 기준일 뿐이라 그 폭만큼은 보이도록 넓히되(필요할 때만), 위치는 실제
+// 일정이 있는 시간대 기준으로 넓어짐. 일정이 하나도 없으면 기본 범위(9시~22시)를 그대로 씀
 function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour, hoursArr){
   const hours = hoursArr || HOURS;
   let minIdx = null, maxIdx = null;
@@ -13056,9 +13057,18 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
     // 일정이 하나도 없으면 기본 범위(9시~22시)를 그대로 보여줌
     return { minIdx: defaultMinIdx, maxIdx: defaultMaxIdx };
   }
-  // 일정이 있는 시간대 기준 위아래로 정확히 1시간씩만 빈 칸을 남김 (그 이상은 넓히지 않음)
+  // 일정이 있는 시간대 기준 위아래로 1시간씩 여유를 둠 - 이 1시간 버퍼가 전부이고, 아래에서
+  // 한 번 더 버퍼를 추가하지 않음(전에는 여기에 버퍼를 한 번 더 둬서, 한쪽이 이미 경계에 막혀
+  // 전체 폭이 이미 충분한 경우에도 반대쪽이 불필요하게 1시간 더 넓어지는 버그가 있었음)
   minIdx = Math.max(0, minIdx - 1);
   maxIdx = Math.min(hours.length - 1, maxIdx + 1);
+  const minSpan = defaultMaxIdx - defaultMinIdx + 1;
+  while((maxIdx - minIdx + 1) < minSpan){
+    let grew = false;
+    if(minIdx > 0){ minIdx--; grew = true; if((maxIdx - minIdx + 1) >= minSpan) break; }
+    if(maxIdx < hours.length - 1){ maxIdx++; grew = true; if((maxIdx - minIdx + 1) >= minSpan) break; }
+    if(!grew) break;
+  }
   return { minIdx, maxIdx };
 }
 
