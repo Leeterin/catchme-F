@@ -3947,6 +3947,18 @@
     padding-top:calc(20px + env(safe-area-inset-top));
     box-sizing:border-box;
   }
+  /* "추가하기"(및 삭제 등 하단 버튼들)를 화면 맨 밑에 고정 - 위쪽 내용(공개 설정 포함)은
+     그 위에서 자유롭게 스크롤되고, 버튼 영역만 항상 화면 하단에 붙어있게 함 */
+  .event-form-footer{
+    position:sticky;
+    bottom:0;
+    left:0; right:0;
+    margin:16px -18px calc(-20px - env(safe-area-inset-bottom)) -18px;
+    padding:12px 18px calc(12px + env(safe-area-inset-bottom));
+    background:var(--bg);
+    border-top:1px solid var(--line);
+    box-sizing:border-box;
+  }
   .event-form-view.active{ display:block; }
   .event-form-header{
     display:flex;
@@ -5727,13 +5739,15 @@
         <label>공개 설정 <span style="font-weight:400;color:var(--text-dim);">(그룹은 여러 개 동시에 선택할 수 있어요)</span></label>
         <div class="visibility-picker" id="visibilityPicker"></div>
       </div>
-      <button class="profile-chat-btn" id="eventFormSubmitBtn">추가하기</button>
-      <button type="button" id="availFineTuneBackBtn" style="display:none;width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">&larr; 다시 칸으로 선택하기</button>
-      <div id="recurringDeleteGroup" style="display:none;margin-top:10px;text-align:center;">
-        <button type="button" id="recurringDeleteTriggerBtn" style="border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;padding:6px 0;text-decoration:underline;">일정 삭제</button>
+      <div class="event-form-footer">
+        <button class="profile-chat-btn" id="eventFormSubmitBtn">추가하기</button>
+        <button type="button" id="availFineTuneBackBtn" style="display:none;width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">&larr; 다시 칸으로 선택하기</button>
+        <div id="recurringDeleteGroup" style="display:none;margin-top:10px;text-align:center;">
+          <button type="button" id="recurringDeleteTriggerBtn" style="border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;padding:6px 0;text-decoration:underline;">일정 삭제</button>
+        </div>
+        <button id="eventFormDeleteSingleBtn" style="display:none;width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">이 날짜만 삭제</button>
+        <button id="eventFormDeleteBtn" style="display:none;width:100%;margin-top:4px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">일정 삭제</button>
       </div>
-      <button id="eventFormDeleteSingleBtn" style="display:none;width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">이 날짜만 삭제</button>
-      <button id="eventFormDeleteBtn" style="display:none;width:100%;margin-top:4px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">일정 삭제</button>
     </div>
   </div>
 
