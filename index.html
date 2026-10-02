@@ -16927,6 +16927,15 @@ async function loadPinsFromServer(roomId, room){
 }
 
 let locationMsgIdCounter = 1;
+// 채팅 안의 작은 알림(시스템 알림) - 아이콘은 text에 섞지 않고 icon 키로 따로 들고 있다가 그릴 때만 붙임.
+// 예전엔 아이콘 SVG 마크업을 text에 넣어놓고 escape해서 그려서, 채팅에 "<svg ...>" 코드가 그대로 보였음
+function systemNoticeHTML(m){
+  const icon = m.icon && ICO[m.icon] ? ICO[m.icon] + ' ' : '';
+  // 예전에 아이콘 마크업이 text에 섞여 저장된 알림도 코드가 보이지 않게 마크업은 걸러냄
+  const text = String(m.text || '').replace(/<svg[\s\S]*?<\/svg>\s*/g, '');
+  return icon + escapeHtml(text);
+}
+
 function removePinnedLocation(pinId){
   const roomId = activeChatRoomId;
   const room = CHAT_ROOMS[roomId];
@@ -16944,7 +16953,8 @@ function removePinnedLocation(pinId){
     who: 'me',
     type: 'system-notice',
     id: 'sys' + (locationMsgIdCounter++),
-    text: `${ICO.pin} "${removedPlace}" 장소가 삭제됐어요.`,
+    icon: 'pin',
+    text: '약속 장소가 삭제됐어요',
     time: new Date(),
   });
 
@@ -17178,7 +17188,8 @@ function cancelReservation(m, restoreAvailability){
     who: 'me',
     type: 'system-notice',
     id: 'sys' + (locationMsgIdCounter++),
-    text: `${ICO.x} 예약이 취소됐어요 (${m.dateLabel} ${m.timeLabel})`,
+    icon: 'x',
+    text: `예약이 취소됐어요 (${m.dateLabel} ${m.timeLabel})`,
     time: new Date(),
   });
 
@@ -17223,7 +17234,8 @@ function cancelGroupTimeOption(roomId, msg, restoreAvailability){
     who: 'me',
     type: 'system-notice',
     id: 'sys' + (locationMsgIdCounter++),
-    text: `${ICO.x} 확정됐던 일정이 취소됐어요 (${winning.dateLabel} ${winning.timeLabel})`,
+    icon: 'x',
+    text: `확정됐던 일정이 취소됐어요 (${winning.dateLabel} ${winning.timeLabel})`,
     time: new Date(),
   });
 
@@ -18225,7 +18237,7 @@ function renderChatList(){
       } else if(last.type === 'hotplace'){
         previewText = `${ICO.pin} ${escapeHtml(last.location)} 근처 핫플 보기`;
       } else if(last.type === 'system-notice'){
-        previewText = last.text; // 이 텍스트 자체에 아이콘 마크업이 이미 섞여있어서 여기선 escape 안 함 (생성 시점에 처리)
+        previewText = systemNoticeHTML(last);
       } else if(last.type === 'image'){
         previewText = `${ICO.image} 사진`;
       } else {
@@ -19280,7 +19292,7 @@ function renderChatMessages(){
     } else if(m.type === 'system-notice'){
       // 장소 삭제/예약 취소 등 단순 알림 카드라 답장 기능은 필요 없음 (일부러 붙이지 않음)
       row.className = 'msg-row system-notice-row';
-      row.innerHTML = `<div class="system-notice-card">${escapeHtml(m.text)}</div>`;
+      row.innerHTML = `<div class="system-notice-card">${systemNoticeHTML(m)}</div>`;
     } else if(m.type === 'image'){
       const imgHtml = `<div class="msg-bubble msg-bubble-image"><img src="${m.imageUrl}" alt="사진" loading="lazy" /></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + imgHtml) : (imgHtml + metaHtml);
@@ -19339,7 +19351,7 @@ function getMsgPreviewText(m){
   if(m.type === 'location-recommend') return m.status === 'COMPLETED' ? '모임 장소 추천 결과' : (m.status === 'CANCELLED' ? '모임 장소 추천이 취소됐어요' : '모임 장소 추천 - 출발지를 입력해주세요');
   if(m.type === 'time-options-suggest') return '시간 제안';
   if(m.type === 'hotplace') return m.superseded ? '약속 장소가 변경됐어요' : '핫플 알림';
-  if(m.type === 'system-notice') return m.text || '알림';
+  if(m.type === 'system-notice') return String(m.text || '').replace(/<svg[\s\S]*?<\/svg>\s*/g, '') || '알림';
   if(m.type === 'image') return '사진';
   const t = (m.text || '').trim();
   return t.length > 40 ? t.slice(0, 40) + '…' : t;
