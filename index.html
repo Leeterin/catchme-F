@@ -13131,10 +13131,11 @@ function renderWeekView(){
   // 그룹 필터가 없으면 기존처럼 캐시(scheduleText, 전체 일정 기준)를 그대로 쓰고, 필터가 걸려있으면
   // 캐시 대신 그 날짜의 필터링된 일정만으로 시간대별 텍스트 배열을 새로 계산함
   const textsByDay = days.map(d => scheduleGroupFilter ? getFilteredScheduleTextForDate(d) : getScheduleText(dateKeyOf(d)));
-  // 범위 자체는 "이번 주 7일"이 아니라 "지금까지 등록해둔 전체 일정"(그룹 필터가 있으면 그 그룹 일정만)
-  // 기준으로 계산함(위 함수 참고) - 등록된 일정이 하나도 없으면 기본값 오전 9시~오후 10시만 보여주고,
-  // 일정을 등록해뒀으면 그 사람이 실제로 쓰는 시간대로 맞춰짐(앞뒤 1시간 여유, 필요하면 24시간까지도 늘어남)
-  const { minIdx, maxIdx } = computeVisibleHourRange([getMyOverallScheduleHourCoverage()], 9, 22, DAY_HOURS);
+  // 범위는 "지금 보고 있는 이번 주 7일"의 일정만 기준으로 계산함(그룹 필터가 있으면 그 그룹
+  // 일정만) - 다른 주의 일정이 이번 주 범위에 영향을 주지 않도록, 주를 넘길 때마다 그 주의
+  // textsByDay만 가지고 새로 계산함. 일정이 하나도 없으면 기본값 오전 9시~오후 10시를 보여주고,
+  // 일정이 있으면 그 시간대 기준으로 앞뒤 1시간 여유를 두고 넓어짐(필요하면 24시간까지도)
+  const { minIdx, maxIdx } = computeVisibleHourRange(textsByDay, 9, 22, DAY_HOURS);
   const visibleHours = DAY_HOURS.slice(minIdx, maxIdx + 1);
 
   // 시간 라벨 컬럼
