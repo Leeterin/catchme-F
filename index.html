@@ -17279,6 +17279,16 @@ async function acceptLocationSuggestMsg(m, room){
 let placeViewerMap = null;
 let placeViewerOverlays = [];
 let placeViewerState = null; // { roomId, items:[msg], idx }
+// 장소 제안 번호 - 이 방에서 올라온 순서대로 1, 2, 3... (누가 제안했든 이어서 매김)
+function locationSuggestNo(roomId, m){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return 0;
+  return (room.messages || []).filter(x => x.type === 'location-suggest').indexOf(m) + 1;
+}
+function locationSuggestTitle(roomId, m){
+  const no = locationSuggestNo(roomId, m);
+  return no ? `${no}. ${m.place}` : m.place;
+}
 function openPlaceSuggestionMap(roomId, focusMsgId){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
@@ -17307,7 +17317,7 @@ function openPlaceSuggestionMap(roomId, focusMsgId){
       kakao.maps.event.addListener(marker, 'click', () => selectPlaceViewerItem(idx, false));
       const label = document.createElement('div');
       label.className = 'place-viewer-label';
-      label.textContent = m.place;
+      label.textContent = locationSuggestTitle(roomId, m);
       label.addEventListener('click', () => selectPlaceViewerItem(idx, false));
       const overlay = new kakao.maps.CustomOverlay({ position: pos, content: label, yAnchor: 0, map: placeViewerMap });
       placeViewerOverlays.push(marker, overlay);
@@ -17329,9 +17339,9 @@ function selectPlaceViewerItem(idx, recenter){
   items.forEach((it, i) => { if(it._viewerLabel) it._viewerLabel.classList.toggle('on', i === idx); });
   if(recenter !== false && placeViewerMap) placeViewerMap.setCenter(new kakao.maps.LatLng(m.locationLat, m.locationLon));
   document.getElementById('placeViewerChipRow').innerHTML = items.length > 1 ? items.map((it, i) => `
-    <button type="button" class="location-picker-recommend-chip${i === idx ? ' active' : ''}" data-idx="${i}">${escapeHtml(it.place)}</button>
+    <button type="button" class="location-picker-recommend-chip${i === idx ? ' active' : ''}" data-idx="${i}">${escapeHtml(locationSuggestTitle(roomId, it))}</button>
   `).join('') : '';
-  document.getElementById('placeViewerName').textContent = `${m.place} 어때요?`;
+  document.getElementById('placeViewerName').textContent = `${locationSuggestTitle(roomId, m)} 어때요?`;
   const statusText = m.status === 'confirmed' ? '이 장소로 확정됐어요' : (m.status === 'pending' ? '' : '지금은 지난 제안이에요');
   document.getElementById('placeViewerAddr').textContent = [m.location, statusText].filter(Boolean).join(' · ');
   const room = CHAT_ROOMS[roomId];
@@ -17936,8 +17946,11 @@ function setLocationPickerSelected(label, lat, lon, addr){
 function renderLocationPickerCandidates(){
   const wrap = document.getElementById('locationPickerCandidates');
   wrap.hidden = !locationPickerCandidates.length;
+  // 번호는 이 방에 이미 올라온 제안 다음부터 이어서 (보내면 채팅 카드에 같은 번호로 붙음)
+  const room = locationPickerOpts && CHAT_ROOMS[locationPickerOpts.roomId];
+  const baseNo = room ? (room.messages || []).filter(x => x.type === 'location-suggest').length : 0;
   document.getElementById('locationPickerCandidateRow').innerHTML = locationPickerCandidates.map((c, idx) => `
-    <div class="location-picker-candidate"><span>${escapeHtml(c.label)}</span><button type="button" data-idx="${idx}" aria-label="빼기">&times;</button></div>
+    <div class="location-picker-candidate"><span>${baseNo + idx + 1}. ${escapeHtml(c.label)}</span><button type="button" data-idx="${idx}" aria-label="빼기">&times;</button></div>
   `).join('');
   document.getElementById('locationPickerSuggestSendBtn').textContent = `${locationPickerCandidates.length}곳 친구에게 제안하기`;
 }
@@ -19524,7 +19537,7 @@ function renderChatMessages(){
       const cardHtml = `
         <div class="reservation-card">
           <div class="reservation-card-header">${ICO.pin} 장소 제안 - 여기 어때요?</div>
-          <div class="reservation-card-time">${escapeHtml(m.place)}</div>
+          <div class="reservation-card-time">${escapeHtml(locationSuggestTitle(activeChatRoomId, m))}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           ${m.location ? `<div class="reservation-card-note">${escapeHtml(m.location)}</div>` : ''}
           <div class="reservation-card-status ${m.status}">${statusLabel}</div>
