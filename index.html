@@ -4900,20 +4900,6 @@
     background:var(--bg);
   }
 
-  /* 일정이 많아 세로로 길어지면 이 영역만 스크롤되고, 요일 헤더 줄은 위에 고정돼서 보이게 함 */
-  .my-week-grid-wrap{
-    max-height:50vh;
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
-  }
-  .my-week-grid-wrap .week-cal-day-head,
-  .my-week-grid-wrap .week-cal-headspacer{
-    position:sticky;
-    top:0;
-    z-index:2;
-    background:var(--bg);
-  }
-
   /* ---------------- 내 시간표 일주일 뷰 (블록형 캘린더) ---------------- */
   .week-cal-wrap{
     display:flex;
@@ -5652,7 +5638,7 @@
         </div>
         <div id="customColorList"></div>
       </div>
-      <div class="week-grid-wrap my-week-grid-wrap"><div class="week-grid" id="weekGrid"></div></div>
+      <div class="week-grid-wrap"><div class="week-grid" id="weekGrid"></div></div>
       <div class="agenda-list" id="weekAgenda"></div>
     </div>
 
