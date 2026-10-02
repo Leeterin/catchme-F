@@ -10671,7 +10671,7 @@ function withWaGwa(name){
   return `${name}${hasBatchim ? '과' : '와'}`;
 }
 
-const HOURS = Array.from({length:15}, (_,i) => 9+i); // 09시 ~ 23시 (1시간 단위, 15칸) - 친구 캘린더/매칭은 서버(MATCH_HOURS)랑 맞춰야 해서 이 범위 그대로 씀
+const HOURS = Array.from({length:24}, (_,i) => i); // 00시 ~ 23시 (1시간 단위, 24칸) - 친구 캘린더/매칭은 서버(MATCH_HOURS)랑 맞춰야 해서 이 범위 그대로 씀. 2026-10-05: 예약 가능 시간을 24시간 전체로 넓히기 위해 9~23시(15칸)에서 0~23시(24칸)로 확장함
 const DAY_HOURS = Array.from({length:24}, (_,i) => i); // 00시 ~ 23시 (개인 일정용 - 하루/일주일 뷰, 예약가능 표시는 이른 아침/새벽 일정도 다 보이게 전체 범위로 씀
 
 // 날짜를 문자열 키로 바꿈. toDateInputValue()랑 반드시 똑같은 형식(YYYY-MM-DD, 월을 1부터 셈)이어야
