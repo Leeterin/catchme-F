@@ -6361,7 +6361,7 @@
         <button type="button" id="bugReportSubmitBtn" class="mini-confirm-btn danger">보내기</button>
         <button type="button" id="bugReportCancelBtn" class="mini-confirm-btn">닫기</button>
       </div>
-      <button type="button" id="bugReportShakeOffBtn" style="display:block;margin:10px auto 0;border:none;background:none;color:var(--text-dim);font-size:11.5px;text-decoration:underline;cursor:pointer;" hidden>흔들어서 신고하기 끄기</button>
+      <button type="button" id="bugReportShakeOffBtn" style="display:block;margin:10px auto 0;border:none;background:none;color:var(--text-dim);font-size:11.5px;text-decoration:underline;cursor:pointer;">흔들어서 신고하기 끄기</button>
     </div>
   </div>
 
@@ -17317,7 +17317,7 @@ function openBugReport(source){
   document.getElementById('bugReportSub').textContent = source === 'shake'
     ? '폰이 흔들려서 열었어요. 문제가 있었다면 알려주세요.'
     : '어떤 문제가 있었는지 알려주세요.';
-  document.getElementById('bugReportShakeOffBtn').hidden = source !== 'shake';
+  updateBugReportShakeBtn();
   document.getElementById('bugReportInput').value = '';
   document.getElementById('bugReportIncludeInfo').checked = true;
   const first = document.querySelector('#bugReportCategoryList input[value="기능이 안 돼요"]');
@@ -17332,10 +17332,19 @@ document.getElementById('bugReportCancelBtn').addEventListener('click', () => go
 document.getElementById('bugReportOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'bugReportOverlay') goBackOrClose(closeBugReport);
 });
+// 신고 창 아래 버튼으로 흔들어서 신고하기를 켜고 끌 수 있음
+function updateBugReportShakeBtn(){
+  document.getElementById('bugReportShakeOffBtn').textContent = isShakeReportEnabled()
+    ? '흔들어서 신고하기 끄기' : '흔들어서 신고하기 켜기';
+}
 document.getElementById('bugReportShakeOffBtn').addEventListener('click', () => {
-  setShakeReportEnabled(false);
-  goBackOrClose(closeBugReport);
-  showToast('흔들어서 신고하기를 껐어요. 설정 > 앱 관리에서 다시 켤 수 있어요.');
+  const next = !isShakeReportEnabled();
+  setShakeReportEnabled(next);
+  if(next) requestShakePermissionIfNeeded();
+  updateBugReportShakeBtn();
+  const toggle = document.getElementById('shakeReportToggle');
+  if(toggle) toggle.classList.toggle('on', next);
+  showToast(next ? '이제 폰을 흔들면 오류 신고 창이 열려요.' : '흔들어서 신고하기를 껐어요. 언제든 다시 켤 수 있어요.');
 });
 document.getElementById('bugReportSubmitBtn').addEventListener('click', async () => {
   if(bugReportSending) return;
