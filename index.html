@@ -890,7 +890,11 @@
     margin-bottom:14px;
   }
   /* 예약 가능 시간 그리드 바로 아래 "공개 설정"이 너무 붙어 있어 좁아 보인다는 피드백으로 간격을 더 줌 */
-  #visibilityPickerGroup{ margin:22px -18px 0 -18px; padding:0 6px; box-sizing:border-box; }
+  /* 이전엔 좌우로 음수 마진(-18px)을 줘서 폭을 넓혔는데, 이 블록의 부모(.event-form-scroll)가
+     세로 스크롤(overflow-y:auto)이라서 브라우저가 가로축도 자동으로 "auto"(스크롤 가능)로 취급해버려,
+     음수 마진으로 튀어나온 왼쪽 부분(라벨 "공" 글자 등)이 스크롤 박스 밖으로 잘려서 안 보이는
+     문제가 있었음 - 가로로 안 튀어나오게 그냥 보통 여백만 쓰도록 수정 */
+  #visibilityPickerGroup{ margin:22px 0 0; }
   .location-search-results{
     position:absolute;
     top:100%;
