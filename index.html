@@ -682,6 +682,62 @@
     cursor:pointer;
   }
   .place-viewer-label.on{ background:var(--accent); color:#fff; }
+  .place-viewer-label.closed{ opacity:0.55; }
+  .place-vote-add-btn{ flex-shrink:0; height:32px; }
+  /* 장소 투표 - 지도 아래 후보 목록 */
+  .place-vote-sheet{
+    flex-shrink:0;
+    max-height:48%;
+    display:flex;
+    flex-direction:column;
+    background:var(--surface);
+    border-top:1px solid var(--line);
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    gap:8px;
+  }
+  .place-vote-head{ font-size:12px; font-weight:700; color:var(--text-dim); }
+  .place-vote-list{ overflow-y:auto; display:flex; flex-direction:column; gap:6px; min-height:0; }
+  .place-vote-row{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1.5px solid var(--line);
+    background:var(--surface);
+    cursor:pointer;
+  }
+  .place-vote-row.on{ border-color:var(--accent); }
+  .place-vote-row.closed{ opacity:0.55; }
+  .place-vote-info{ flex:1; min-width:0; }
+  .place-vote-name{ font-size:13.5px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .place-vote-sub{ font-size:11.5px; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .place-vote-bar{ height:4px; border-radius:2px; background:var(--surface-2); margin-top:6px; overflow:hidden; }
+  .place-vote-bar span{ display:block; height:100%; background:var(--accent); border-radius:2px; transition:width .2s; }
+  .place-vote-btn{
+    flex-shrink:0;
+    min-width:64px; height:34px;
+    padding:0 10px;
+    border-radius:10px;
+    border:1.5px solid var(--accent);
+    background:var(--surface);
+    color:var(--accent);
+    font-size:12.5px; font-weight:700;
+    cursor:pointer;
+  }
+  .place-vote-btn.voted{ background:var(--accent); color:#fff; }
+  .place-vote-btn:disabled{ opacity:0.5; cursor:default; }
+  .place-vote-status{ flex-shrink:0; font-size:12px; font-weight:700; color:var(--text-dim); }
+  .place-vote-status.confirmed{ color:var(--accent); }
+  .place-vote-fix-btn{
+    width:100%; height:42px;
+    border-radius:12px;
+    border:none;
+    background:var(--text);
+    color:var(--surface);
+    font-size:13.5px; font-weight:700;
+    cursor:pointer;
+  }
+  .place-vote-fix-btn.armed{ background:#F43F5E; color:#fff; }
+  .place-vote-fix-btn[hidden]{ display:none; }
   .location-picker-map-area{
     position:relative;
     flex:1;
@@ -6171,26 +6227,22 @@
     </div>
   </div>
 
-  <!-- 친구가 제안한 장소(들)를 지도로 보기 - 채팅의 "장소 제안" 카드에서 "지도에서 보기"로 열림 -->
+  <!-- 장소 투표 - 제안된 장소 후보들을 지도 + 목록으로 쫙 띄우고, 다 같이 투표하거나 투표 없이 바로 픽스.
+       상단 고정 카드의 "장소 정하기"(대기 중인 후보가 있을 때)와 채팅의 "장소 제안" 카드에서 열림 -->
   <div class="location-picker-full" id="placeViewerOverlay">
     <div class="location-picker-topbar">
       <button type="button" class="location-picker-close" id="placeViewerCloseBtn" aria-label="닫기">&times;</button>
-      <div class="location-picker-title">제안된 장소</div>
-      <span class="location-picker-topbar-spacer"></span>
-    </div>
-    <div class="location-picker-searchbar" style="padding-top:0;">
-      <div class="location-picker-recommend-row" id="placeViewerChipRow" style="margin-top:0;"></div>
+      <div class="location-picker-title">장소 정하기</div>
+      <button type="button" class="location-picker-add-btn place-vote-add-btn" id="placeViewerAddBtn">+ 장소 제안</button>
     </div>
     <div class="location-picker-map-area">
       <div id="placeViewerMap" style="width:100%;height:100%;"></div>
     </div>
-    <div class="location-picker-bottom-card">
-      <div class="location-picker-bottom-text">
-        <div class="location-picker-bottom-name" id="placeViewerName"></div>
-        <div class="location-picker-bottom-addr" id="placeViewerAddr"></div>
-      </div>
-      <div class="location-picker-bottom-btns">
-        <button type="button" class="profile-chat-btn" id="placeViewerAcceptBtn" hidden>이 장소로 수락</button>
+    <div class="place-vote-sheet">
+      <div class="place-vote-head" id="placeViewerHead"></div>
+      <div class="place-vote-list" id="placeViewerList"></div>
+      <div class="place-vote-foot">
+        <button type="button" class="place-vote-fix-btn" id="placeViewerFixBtn"></button>
       </div>
     </div>
   </div>
@@ -7624,13 +7676,17 @@ function connectRealtimeSocket(){
     if(message.type === 'LOCATION_SUGGEST'){
       const existing = room.messages.find(m => m._serverId === message.id);
       if(existing){
-        // 기존 장소제안 메시지의 상태(수락/거절/취소 등)만 갱신
+        // 기존 장소제안 메시지의 상태(투표/확정/취소 등)만 갱신 - 새 메시지가 아니니 안 읽음 수는 안 늘림
         Object.assign(existing, mapServerLocationSuggestMessage(message));
-      } else {
-        room.messages.push(mapServerLocationSuggestMessage(message));
+        if(existing.status !== 'pending') loadPinsFromServer(roomId, room); // 확정/취소로 핀이 바뀌었을 수 있으니 다시 불러옴
+        if(activeChatRoomId === roomId) renderChatMessages();
+        if(placeViewerState && placeViewerState.roomId === roomId) refreshPlaceViewer();
+        return;
       }
+      room.messages.push(mapServerLocationSuggestMessage(message));
       loadPinsFromServer(roomId, room); // 확정/취소로 핀이 바뀌었을 수 있으니 다시 불러옴
       touchRoom(roomId);
+      if(placeViewerState && placeViewerState.roomId === roomId) refreshPlaceViewer();
       if(activeChatRoomId === roomId){
         renderChatMessages();
         renderPinnedSchedule();
@@ -11529,8 +11585,20 @@ function mapServerLocationSuggestMessage(m){
     locationLat: l.locationLat,
     locationLon: l.locationLon,
     status: RESERVATION_STATUS_MAP[l.status] || 'pending',
+    voterIds: l.voterIds || [],
     time: m.createdAt,
   };
+}
+
+// 장소 제안 API 응답 반영 - 하나가 확정되면 다른 대기 후보들도 같이 마감되니, 서버가 준 바뀐 메시지들을 전부 덮어씀
+function applyLocationSuggestUpdates(room, data){
+  const list = (data && data.updatedMessages && data.updatedMessages.length) ? data.updatedMessages : (data && data.message ? [data.message] : []);
+  list.forEach(sm => {
+    const mapped = mapServerLocationSuggestMessage(sm);
+    const existing = room.messages.find(m => m._serverId === mapped._serverId);
+    if(existing) Object.assign(existing, mapped);
+    else room.messages.push(mapped);
+  });
 }
 
 const RECOMMEND_MODE_LABEL = { FAIR: '공평하게', FASTEST: '가장 빠르게', CONSIDERATE: '먼 사람 배려' };
@@ -17211,10 +17279,7 @@ async function fixHotplaceLocation(post){
       });
       // 이미 같은 장소로 대기 중인 제안이 있었으면, 서버가 새 메시지를 만드는 대신 그 제안을 그대로 확정 처리해서
       // 같은 id를 돌려줌 - 그때는 새로 push하지 않고 기존 메시지를 업데이트해서 카드가 중복되지 않게 함
-      const mapped = mapServerLocationSuggestMessage(data.message);
-      const existing = room.messages.find(m => m._serverId === mapped._serverId);
-      if(existing) Object.assign(existing, mapped);
-      else room.messages.push(mapped);
+      applyLocationSuggestUpdates(room, data);
       await loadPinsFromServer(roomId, room);
       touchRoom(roomId);
       renderChatMessages();
@@ -17253,7 +17318,7 @@ async function acceptLocationSuggestMsg(m, room){
   if(m._serverId){
     try {
       const data = await apiRequest(`/chats/location-suggestions/${m._serverId}/accept`, { method: 'POST' });
-      Object.assign(m, mapServerLocationSuggestMessage(data.message));
+      applyLocationSuggestUpdates(room, data);
       await loadPinsFromServer(roomId, room);
       renderChatMessages();
       renderPinnedSchedule();
@@ -17278,7 +17343,7 @@ async function acceptLocationSuggestMsg(m, room){
 // ---------- 제안된 장소 지도로 보기 - 이 방에서 답을 기다리는 장소 제안들을 한 지도에 다 띄우고, 눌러서 비교/수락 ----------
 let placeViewerMap = null;
 let placeViewerOverlays = [];
-let placeViewerState = null; // { roomId, items:[msg], idx }
+let placeViewerState = null; // { roomId, ids:Set, selectedId, pinned }
 // 장소 제안 번호 - 이 방에서 올라온 순서대로 1, 2, 3... (누가 제안했든 이어서 매김)
 function locationSuggestNo(roomId, m){
   const room = CHAT_ROOMS[roomId];
@@ -17289,82 +17354,258 @@ function locationSuggestTitle(roomId, m){
   const no = locationSuggestNo(roomId, m);
   return no ? `${no}. ${m.place}` : m.place;
 }
-function openPlaceSuggestionMap(roomId, focusMsgId){
+function myLocationVoterId(){
+  return currentUser ? currentUser.id : 'me';
+}
+function hasPendingLocationSuggests(room){
+  return !!(room && (room.messages || []).some(m => m.type === 'location-suggest' && m.status === 'pending'));
+}
+
+// ---------- 장소 정하기(투표) - 제안된 후보들을 지도 + 목록으로 쫙 띄우고, 다 같이 투표하거나 투표 없이 바로 픽스 ----------
+// 화면에 보여줄 후보 = 아직 투표 중인 후보 전부 + 이 화면을 연 뒤 마감/확정된 후보(결과를 보여주려고 남겨둠)
+function placeViewerItems(){
+  if(!placeViewerState) return [];
+  const room = CHAT_ROOMS[placeViewerState.roomId];
+  if(!room) return [];
+  return (room.messages || []).filter(m => m.type === 'location-suggest' && (m.status === 'pending' || placeViewerState.ids.has(m.id)));
+}
+function openPlaceSuggestionMap(roomId, focusMsgId, pinned){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
-  const withCoords = m => m.type === 'location-suggest' && typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
-  const focus = (room.messages || []).find(m => m.id === focusMsgId);
-  // 아직 답을 기다리는 제안들 + 지금 누른 제안(이미 확정/취소된 것이어도)
-  const items = (room.messages || []).filter(m => withCoords(m) && (m.status === 'pending' || m === focus));
-  if(!items.length) return;
-  placeViewerState = { roomId, items, idx: Math.max(0, items.indexOf(focus)) };
+  const ids = new Set((room.messages || []).filter(m => m.type === 'location-suggest' && (m.status === 'pending' || m.id === focusMsgId)).map(m => m.id));
+  if(!ids.size) return;
+  placeViewerState = { roomId, ids, selectedId: focusMsgId || null, pinned: pinned || null };
+  const items = placeViewerItems();
+  if(!placeViewerState.selectedId || !items.some(m => m.id === placeViewerState.selectedId)) placeViewerState.selectedId = items[0].id;
   document.getElementById('placeViewerOverlay').classList.add('show');
   pushViewState(closePlaceSuggestionMap);
+  resetPlaceViewerFixBtn();
+  renderPlaceViewerList();
   ensureKakaoMapsLoaded(() => {
+    if(!placeViewerState) return;
+    const withCoords = placeViewerItems().filter(m => typeof m.locationLat === 'number' && typeof m.locationLon === 'number');
     if(!placeViewerMap){
+      const c = withCoords[0];
       placeViewerMap = new kakao.maps.Map(document.getElementById('placeViewerMap'), {
-        center: new kakao.maps.LatLng(items[0].locationLat, items[0].locationLon),
+        center: new kakao.maps.LatLng(c ? c.locationLat : 37.5665, c ? c.locationLon : 126.978),
         level: 5,
       });
     }
-    placeViewerOverlays.forEach(o => o.setMap(null));
-    placeViewerOverlays = [];
-    const bounds = new kakao.maps.LatLngBounds();
-    items.forEach((m, idx) => {
-      const pos = new kakao.maps.LatLng(m.locationLat, m.locationLon);
-      bounds.extend(pos);
-      const marker = new kakao.maps.Marker({ position: pos, map: placeViewerMap });
-      kakao.maps.event.addListener(marker, 'click', () => selectPlaceViewerItem(idx, false));
-      const label = document.createElement('div');
-      label.className = 'place-viewer-label';
-      label.textContent = locationSuggestTitle(roomId, m);
-      label.addEventListener('click', () => selectPlaceViewerItem(idx, false));
-      const overlay = new kakao.maps.CustomOverlay({ position: pos, content: label, yAnchor: 0, map: placeViewerMap });
-      placeViewerOverlays.push(marker, overlay);
-      m._viewerLabel = label;
-    });
+    renderPlaceViewerMarkers();
     setTimeout(() => {
+      if(!placeViewerState) return;
       placeViewerMap.relayout();
-      if(items.length > 1) placeViewerMap.setBounds(bounds);
-      selectPlaceViewerItem(placeViewerState.idx, items.length === 1);
+      if(withCoords.length > 1){
+        const bounds = new kakao.maps.LatLngBounds();
+        withCoords.forEach(m => bounds.extend(new kakao.maps.LatLng(m.locationLat, m.locationLon)));
+        placeViewerMap.setBounds(bounds);
+      } else if(withCoords.length === 1){
+        placeViewerMap.setCenter(new kakao.maps.LatLng(withCoords[0].locationLat, withCoords[0].locationLon));
+      }
     }, 0);
   });
 }
-function selectPlaceViewerItem(idx, recenter){
+function renderPlaceViewerMarkers(){
+  if(!placeViewerMap || !placeViewerState || typeof kakao === 'undefined') return;
+  const { roomId, selectedId } = placeViewerState;
+  placeViewerOverlays.forEach(o => o.setMap(null));
+  placeViewerOverlays = [];
+  placeViewerItems().forEach(m => {
+    if(typeof m.locationLat !== 'number' || typeof m.locationLon !== 'number') return;
+    const pos = new kakao.maps.LatLng(m.locationLat, m.locationLon);
+    const marker = new kakao.maps.Marker({ position: pos, map: placeViewerMap });
+    kakao.maps.event.addListener(marker, 'click', () => selectPlaceViewerItem(m.id, false));
+    const label = document.createElement('div');
+    const votes = (m.voterIds || []).length;
+    label.className = 'place-viewer-label' + (m.id === selectedId ? ' on' : '') + (m.status !== 'pending' && m.status !== 'confirmed' ? ' closed' : '');
+    label.textContent = locationSuggestTitle(roomId, m) + (votes ? ` · ${votes}표` : '');
+    label.addEventListener('click', () => selectPlaceViewerItem(m.id, false));
+    const overlay = new kakao.maps.CustomOverlay({ position: pos, content: label, yAnchor: 0, map: placeViewerMap });
+    placeViewerOverlays.push(marker, overlay);
+  });
+}
+function renderPlaceViewerList(){
   if(!placeViewerState) return;
-  const { items, roomId } = placeViewerState;
-  const m = items[idx];
-  if(!m) return;
-  placeViewerState.idx = idx;
-  items.forEach((it, i) => { if(it._viewerLabel) it._viewerLabel.classList.toggle('on', i === idx); });
-  if(recenter !== false && placeViewerMap) placeViewerMap.setCenter(new kakao.maps.LatLng(m.locationLat, m.locationLon));
-  document.getElementById('placeViewerChipRow').innerHTML = items.length > 1 ? items.map((it, i) => `
-    <button type="button" class="location-picker-recommend-chip${i === idx ? ' active' : ''}" data-idx="${i}">${escapeHtml(locationSuggestTitle(roomId, it))}</button>
-  `).join('') : '';
-  document.getElementById('placeViewerName').textContent = `${locationSuggestTitle(roomId, m)} 어때요?`;
-  const statusText = m.status === 'confirmed' ? '이 장소로 확정됐어요' : (m.status === 'pending' ? '' : '지금은 지난 제안이에요');
-  document.getElementById('placeViewerAddr').textContent = [m.location, statusText].filter(Boolean).join(' · ');
+  const { roomId, selectedId } = placeViewerState;
   const room = CHAT_ROOMS[roomId];
-  document.getElementById('placeViewerAcceptBtn').hidden = !(room && m.who === 'other' && m.status === 'pending');
+  const items = placeViewerItems();
+  const me = myLocationVoterId();
+  const total = room ? getTotalParticipants(room) : 2;
+  const pending = items.filter(m => m.status === 'pending');
+  const voters = new Set();
+  pending.forEach(m => (m.voterIds || []).forEach(id => voters.add(id)));
+  const confirmed = items.find(m => m.status === 'confirmed');
+  document.getElementById('placeViewerHead').textContent = confirmed
+    ? `"${confirmed.place}"(으)로 정해졌어요`
+    : `후보 ${pending.length}곳 · ${total}명 중 ${voters.size}명 투표 · 모두 투표하면 1등으로 정해져요`;
+  const maxVotes = Math.max(1, ...items.map(m => (m.voterIds || []).length));
+  document.getElementById('placeViewerList').innerHTML = items.map(m => {
+    const votes = (m.voterIds || []).length;
+    const mine = (m.voterIds || []).includes(me);
+    const who = m.who === 'me' ? '내 제안' : '친구 제안';
+    const sub = [m.location, who].filter(Boolean).join(' · ');
+    const right = m.status === 'pending'
+      ? `<button type="button" class="place-vote-btn${mine ? ' voted' : ''}" data-vote="${escapeHtml(String(m.id))}">${mine ? '✓ ' : ''}${votes}표</button>`
+      : `<span class="place-vote-status ${m.status}">${m.status === 'confirmed' ? '확정' : (m.status === 'declined' ? '마감' : '취소됨')}</span>`;
+    return `
+      <div class="place-vote-row${m.id === selectedId ? ' on' : ''}${m.status !== 'pending' && m.status !== 'confirmed' ? ' closed' : ''}" data-id="${escapeHtml(String(m.id))}">
+        <div class="place-vote-info">
+          <div class="place-vote-name">${escapeHtml(locationSuggestTitle(roomId, m))}</div>
+          ${sub ? `<div class="place-vote-sub">${escapeHtml(sub)}</div>` : ''}
+          <div class="place-vote-bar"><span style="width:${Math.round(votes / maxVotes * 100)}%"></span></div>
+        </div>
+        ${right}
+      </div>`;
+  }).join('');
+  const sel = items.find(m => m.id === selectedId);
+  const fixBtn = document.getElementById('placeViewerFixBtn');
+  fixBtn.hidden = !(sel && sel.status === 'pending');
+  if(sel && !fixBtn.classList.contains('armed')) fixBtn.textContent = `투표 없이 "${locationSuggestTitle(roomId, sel)}"(으)로 픽스`;
+}
+function refreshPlaceViewer(){
+  if(!placeViewerState) return;
+  renderPlaceViewerList();
+  renderPlaceViewerMarkers();
+}
+function selectPlaceViewerItem(id, recenter){
+  if(!placeViewerState) return;
+  const m = placeViewerItems().find(x => x.id === id);
+  if(!m) return;
+  if(placeViewerState.selectedId !== id) resetPlaceViewerFixBtn();
+  placeViewerState.selectedId = id;
+  refreshPlaceViewer();
+  if(recenter !== false && placeViewerMap && typeof m.locationLat === 'number' && typeof m.locationLon === 'number'){
+    placeViewerMap.panTo(new kakao.maps.LatLng(m.locationLat, m.locationLon));
+  }
 }
 function closePlaceSuggestionMap(){
   document.getElementById('placeViewerOverlay').classList.remove('show');
   placeViewerState = null;
+  resetPlaceViewerFixBtn();
 }
-document.getElementById('placeViewerChipRow').addEventListener('click', (e) => {
-  const chip = e.target.closest('[data-idx]');
-  if(chip) selectPlaceViewerItem(parseInt(chip.dataset.idx, 10));
+
+// 장소 후보에 투표 (같은 후보를 다시 누르면 투표 취소, 다른 후보를 누르면 그쪽으로 옮김)
+async function voteLocationSuggestMsg(roomId, m){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || m.status !== 'pending') return;
+  const before = pendingLocationSuggestSet(room);
+  if(m._serverId){
+    try {
+      const data = await apiRequest(`/chats/location-suggestions/${m._serverId}/vote`, { method: 'POST' });
+      applyLocationSuggestUpdates(room, data);
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+  } else {
+    // 데모 방 - 내 표만 로컬에서 옮김
+    const me = myLocationVoterId();
+    const had = (m.voterIds || []).includes(me);
+    room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending') x.voterIds = (x.voterIds || []).filter(id => id !== me); });
+    if(!had) m.voterIds = [...(m.voterIds || []), me];
+  }
+  afterLocationSuggestChange(roomId, room, before);
+}
+// 투표 없이 이 후보로 바로 확정 (방 사람 누구나) - 다른 대기 후보들은 마감됨
+async function fixLocationSuggestMsg(roomId, m){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || m.status !== 'pending') return false;
+  const before = pendingLocationSuggestSet(room);
+  if(m._serverId){
+    try {
+      const data = await apiRequest(`/chats/location-suggestions/${m._serverId}/fix`, { method: 'POST' });
+      applyLocationSuggestUpdates(room, data);
+    } catch(err){
+      showToast(err.message);
+      return false;
+    }
+  } else {
+    room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending' && x !== m) x.status = 'declined'; });
+    m.status = 'confirmed';
+    addLocationOnlyPin(roomId, room, m.place, m.locationLat, m.locationLon, m.note, m.id);
+  }
+  afterLocationSuggestChange(roomId, room, before);
+  return true;
+}
+function pendingLocationSuggestSet(room){
+  return new Set((room.messages || []).filter(x => x.type === 'location-suggest' && x.status === 'pending'));
+}
+// 투표/픽스 뒤 화면 갱신 - 방금 이 동작으로 확정된 장소가 있으면(모두 투표해서 1등이 나왔거나 픽스) 핀 다시 불러오고 알려줌
+async function afterLocationSuggestChange(roomId, room, beforePending){
+  const confirmedNow = [...beforePending].find(x => x.status === 'confirmed');
+  if(confirmedNow && room.isRealRoom) await loadPinsFromServer(roomId, room);
+  touchRoom(roomId);
+  if(activeChatRoomId === roomId){
+    renderChatMessages();
+    renderPinnedSchedule();
+  }
+  renderChatList();
+  refreshHotplaceListsIfOpen();
+  refreshPlaceViewer();
+  if(confirmedNow){
+    if(placeViewerState) goBackOrClose(closePlaceSuggestionMap);
+    showToast(`"${confirmedNow.place}"(으)로 약속 장소가 정해졌어요!`);
+  }
+}
+
+// "투표 없이 픽스"는 되돌리기 어려우니 한 번 더 눌러야 확정 (3초 지나면 원래대로)
+let placeViewerFixTimer = null;
+function resetPlaceViewerFixBtn(){
+  clearTimeout(placeViewerFixTimer);
+  document.getElementById('placeViewerFixBtn').classList.remove('armed');
+}
+document.getElementById('placeViewerFixBtn').addEventListener('click', async () => {
+  if(!placeViewerState) return;
+  const { roomId, selectedId } = placeViewerState;
+  const m = placeViewerItems().find(x => x.id === selectedId);
+  if(!m || m.status !== 'pending') return;
+  const btn = document.getElementById('placeViewerFixBtn');
+  if(!btn.classList.contains('armed')){
+    btn.classList.add('armed');
+    btn.textContent = `한 번 더 누르면 "${m.place}"(으)로 확정돼요`;
+    clearTimeout(placeViewerFixTimer);
+    placeViewerFixTimer = setTimeout(() => { resetPlaceViewerFixBtn(); renderPlaceViewerList(); }, 3000);
+    return;
+  }
+  resetPlaceViewerFixBtn();
+  btn.disabled = true;
+  const ids = placeViewerState.ids;
+  ids.add(m.id);
+  await fixLocationSuggestMsg(roomId, m);
+  btn.disabled = false;
+});
+document.getElementById('placeViewerList').addEventListener('click', (e) => {
+  if(!placeViewerState) return;
+  const voteBtn = e.target.closest('[data-vote]');
+  const items = placeViewerItems();
+  if(voteBtn){
+    const m = items.find(x => String(x.id) === voteBtn.dataset.vote);
+    if(m){
+      voteBtn.disabled = true;
+      placeViewerState.selectedId = m.id;
+      voteLocationSuggestMsg(placeViewerState.roomId, m);
+    }
+    return;
+  }
+  const row = e.target.closest('[data-id]');
+  if(row){
+    const m = items.find(x => String(x.id) === row.dataset.id);
+    if(m) selectPlaceViewerItem(m.id, true);
+  }
 });
 document.getElementById('placeViewerCloseBtn').addEventListener('click', () => goBackOrClose(closePlaceSuggestionMap));
-document.getElementById('placeViewerAcceptBtn').addEventListener('click', async () => {
+// "+ 장소 제안" - 지도에서 장소를 골라 후보로 더 올림 (선택완료를 누르면 지금처럼 바로 그 장소로 정해짐)
+document.getElementById('placeViewerAddBtn').addEventListener('click', () => {
   if(!placeViewerState) return;
-  const room = CHAT_ROOMS[placeViewerState.roomId];
-  const m = placeViewerState.items[placeViewerState.idx];
-  if(!room || !m) return;
-  const ok = await acceptLocationSuggestMsg(m, room);
-  if(ok){
-    goBackOrClose(closePlaceSuggestionMap);
-    showToast(`"${m.place}"(으)로 약속 장소가 정해졌어요!`);
+  const { roomId, pinned } = placeViewerState;
+  const room = CHAT_ROOMS[roomId];
+  goBackOrClose(closePlaceSuggestionMap);
+  if(!room) return;
+  const pin = pinned || (room.pinnedSchedules || []).find(p => p.dateObj) || null;
+  if(pin){
+    changePinLocation(room, roomId, pin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
+  } else {
+    openLocationPicker('', null, null, (label, lat, lon) => fixHotplaceLocation({ place: label, location: '', lat, lon }), { roomId });
   }
 });
 
@@ -18013,7 +18254,7 @@ document.getElementById('locationPickerSuggestSendBtn').addEventListener('click'
   touchRoom(roomId);
   if(activeChatRoomId === roomId) renderChatMessages();
   renderChatList();
-  if(sent) showToast(failed.length ? `${sent}곳을 제안했어요. (${failed[0]})` : `${sent}곳을 친구에게 제안했어요. 친구가 지도로 보고 고를 수 있어요.`);
+  if(sent) showToast(failed.length ? `${sent}곳을 제안했어요. (${failed[0]})` : `${sent}곳을 제안했어요. "장소 정하기"에서 다 같이 투표할 수 있어요.`);
   else if(failed.length) showToast(failed[0]);
 });
 document.getElementById('locationPickerMeetRecommendBtn').addEventListener('click', () => {
@@ -18921,7 +19162,12 @@ function renderPinnedSchedule(){
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
         const roomId = activeChatRoomId;
-        // 바로 지도가 열림 - 지도 상단에 "모임 장소 추천받기", 아래에 "제안 후보 담기"가 있어서 거기서 다 할 수 있음
+        // 투표 중인 장소 후보가 있으면 후보 목록(투표/픽스) 화면부터, 없으면 바로 지도가 열림 - 지도 상단에
+        // "모임 장소 추천받기", 아래에 "제안 후보 담기"가 있어서 거기서 다 할 수 있음
+        if(hasPendingLocationSuggests(room)){
+          openPlaceSuggestionMap(roomId, null, pinned);
+          return;
+        }
         changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
       });
     }
@@ -19530,9 +19776,14 @@ function renderChatMessages(){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable)));
       }
     } else if(m.type === 'location-suggest'){
-      const statusLabel = m.status === 'confirmed' ? '장소로 확정됨' : (m.status === 'cancelled' ? '제안 취소됨' : '제안됨');
-      const showAccept = m.who === 'other' && m.status === 'pending';
-      const showCancel = m.who === 'me' && m.status === 'pending';
+      const voteCount = (m.voterIds || []).length;
+      const votedByMe = (m.voterIds || []).includes(myLocationVoterId());
+      const statusLabel = m.status === 'confirmed' ? '장소로 확정됨'
+        : (m.status === 'cancelled' || m.status === 'withdrawn') ? '제안 취소됨'
+        : m.status === 'declined' ? '다른 장소로 정해져 마감됨'
+        : (voteCount ? `투표 중 · ${voteCount}표` : '투표 중');
+      const isPending = m.status === 'pending';
+      const showCancel = m.who === 'me' && isPending;
       const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
       const cardHtml = `
         <div class="reservation-card">
@@ -19541,14 +19792,14 @@ function renderChatMessages(){
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           ${m.location ? `<div class="reservation-card-note">${escapeHtml(m.location)}</div>` : ''}
           <div class="reservation-card-status ${m.status}">${statusLabel}</div>
-          ${hasCoords ? `
+          ${isPending ? `
+            <div class="reservation-card-actions">
+              <button class="reservation-btn decline ls-map-btn">${ICO.pin} 후보 보기</button>
+              <button class="reservation-btn ${votedByMe ? 'decline' : 'accept'} ls-vote-btn">${votedByMe ? '✓ 투표함' : '투표하기'}</button>
+            </div>` : (hasCoords ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn decline ls-map-btn">${ICO.pin} 지도에서 보기</button>
-            </div>` : ''}
-          ${showAccept ? `
-            <div class="reservation-card-actions">
-              <button class="reservation-btn accept">수락</button>
-            </div>` : ''}
+            </div>` : '')}
           ${showCancel ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn decline ls-cancel-btn">제안 취소</button>
@@ -19556,9 +19807,8 @@ function renderChatMessages(){
         </div>
       `;
       row.innerHTML = m.who === 'me' ? (metaHtml + cardHtml) : (cardHtml + metaHtml);
-      if(showAccept){
-        row.querySelector('.reservation-btn.accept').addEventListener('click', () => acceptLocationSuggestMsg(m, room));
-      }
+      const voteBtn = row.querySelector('.ls-vote-btn');
+      if(voteBtn) voteBtn.addEventListener('click', () => { voteBtn.disabled = true; voteLocationSuggestMsg(activeChatRoomId, m); });
       const mapBtn = row.querySelector('.ls-map-btn');
       if(mapBtn) mapBtn.addEventListener('click', () => openPlaceSuggestionMap(activeChatRoomId, m.id));
       if(showCancel){
