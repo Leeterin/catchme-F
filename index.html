@@ -2922,6 +2922,16 @@
     background:var(--accent-soft);
     color:var(--accent);
   }
+  /* 고른 시작 시간을 5분 단위로 조절 */
+  .match-fine-list{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+  .match-fine-list:empty{ display:none; }
+  .match-fine-row{ border:1px solid var(--accent); background:var(--accent-soft); border-radius:10px; padding:8px 10px; }
+  .match-fine-head{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; font-weight:700; color:var(--accent); margin-bottom:6px; }
+  .match-fine-head button{ border:0; background:none; color:var(--text-dim); font-size:12px; cursor:pointer; padding:0 2px; }
+  .match-fine-mins{ display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; }
+  .match-fine-min{ padding:6px 0; border-radius:7px; border:1px solid var(--line); background:var(--surface); color:var(--text); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .match-fine-min.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .match-fine-min:disabled{ opacity:.35; cursor:default; }
 
   .time-option-list{
     display:flex;
@@ -21893,7 +21903,17 @@ function closeCalendarMatchView(){
 }
 document.getElementById('matchBackBtn').addEventListener('click', () => goBackOrClose(closeCalendarMatchView));
 
-let selectedGroupMatchSlots = []; // 그룹 매칭에서 체크로 골라둔 시간들 [{dateObj, startH, endH, dateLabel, timeLabel}]
+let selectedGroupMatchSlots = []; // 그룹 매칭에서 체크로 골라둔 시간들 [{key, dateObj, startMin, endMin, startH, endH, dateLabel, timeLabel}]
+function matchHm(min){ return `${String(Math.floor(min / 60)).padStart(2,'0')}:${String(min % 60).padStart(2,'0')}`; }
+// 슬롯의 시작(분)이 바뀌면 끝/라벨도 같이 맞춤 (만날 시간 길이는 그대로)
+function setMatchSlotStart(slot, startMin){
+  const dur = slot.endMin - slot.startMin;
+  slot.startMin = startMin;
+  slot.endMin = startMin + dur;
+  slot.startH = Math.floor(slot.startMin / 60);
+  slot.endH = Math.ceil(slot.endMin / 60);
+  slot.timeLabel = `${matchHm(slot.startMin)}-${matchHm(slot.endMin)}`;
+}
 
 async function runCalendarMatch(){
   const memberNames = getMatchMemberNames();
@@ -21970,7 +21990,7 @@ async function runCalendarMatch(){
       const startOptions = [];
       for(let s = r.startH; s + minHours <= r.endH; s++) startOptions.push(s);
       const chipsHtml = startOptions.map(s => `
-        <div class="match-start-chip" data-date="${day.date.toISOString()}" data-hour="${s}" data-end-hour="${s + minHours}">
+        <div class="match-start-chip" data-date="${day.date.toISOString()}" data-hour="${s}" data-end-hour="${s + minHours}" data-range-start="${r.startH}" data-range-end="${r.endH}">
           ${String(s).padStart(2,'0')}:00 시작
         </div>
       `).join('');
@@ -21978,6 +21998,7 @@ async function runCalendarMatch(){
         <div class="match-range-wide">
           <div class="match-range-wide-label">${String(r.startH).padStart(2,'0')}:00 - ${String(r.endH).padStart(2,'0')}:00 중 ${minHours}시간 골라주세요</div>
           <div class="match-start-chip-row">${chipsHtml}</div>
+          <div class="match-fine-list"></div>
         </div>
       `;
     }).join('');
@@ -22022,27 +22043,82 @@ function renderProposeSelectedBtn(){
 document.getElementById('matchSearchBtn').addEventListener('click', runCalendarMatch);
 
 // 매칭 결과의 시간대를 누르면 체크해서 여러 개 골라두는 방식 (1:1, 그룹 동일)
+// 시작 시간 칩(예: "18:00 시작")을 고르면 그 밑에 5분 단위 조절 줄이 생기고, 여러 개를 골라 같이 제안할 수 있음
 document.getElementById('matchPanelBody').addEventListener('click', (e) => {
+  if(!activeMatchGroupRoomId && !activeMatchFriendId) return;
+
+  const minBtn = e.target.closest('.match-fine-min');
+  if(minBtn){
+    if(minBtn.disabled) return;
+    const slot = selectedGroupMatchSlots.find(s => s.key === minBtn.dataset.key);
+    if(!slot) return;
+    setMatchSlotStart(slot, slot.baseH * 60 + parseInt(minBtn.dataset.min, 10));
+    renderMatchFineRows(minBtn.closest('.match-range-wide'));
+    return;
+  }
+  const removeBtn = e.target.closest('.match-fine-remove');
+  if(removeBtn){
+    const wide = removeBtn.closest('.match-range-wide');
+    selectedGroupMatchSlots = selectedGroupMatchSlots.filter(s => s.key !== removeBtn.dataset.key);
+    renderMatchFineRows(wide);
+    renderProposeSelectedBtn();
+    return;
+  }
+
   const row = e.target.closest('.match-range-row, .match-start-chip');
   if(!row) return;
-  if(!activeMatchGroupRoomId && !activeMatchFriendId) return;
 
   const dateObj = new Date(row.dataset.date);
   const hour = parseInt(row.dataset.hour, 10);
   const endHour = parseInt(row.dataset.endHour, 10);
   const dateLabel = `${dateObj.getMonth()+1}/${dateObj.getDate()}(${WEEKDAY_KO[dateObj.getDay()]})`;
-  const timeLabel = `${String(hour).padStart(2,'0')}:00-${String(endHour).padStart(2,'0')}:00`;
-  const idx = selectedGroupMatchSlots.findIndex(s => s.dateLabel === dateLabel && s.timeLabel === timeLabel);
+  const key = `${row.dataset.date}|${hour}`;
+  const idx = selectedGroupMatchSlots.findIndex(s => s.key === key);
 
   if(idx >= 0){
     selectedGroupMatchSlots.splice(idx, 1);
     row.classList.remove('checked');
   } else {
-    selectedGroupMatchSlots.push({ dateObj, startH: hour, endH: endHour, dateLabel, timeLabel });
+    const slot = { key, dateObj, dateLabel, baseH: hour, startMin: hour * 60, endMin: endHour * 60 };
+    if(row.classList.contains('match-start-chip')){
+      slot.rangeStartMin = parseInt(row.dataset.rangeStart, 10) * 60;
+      slot.rangeEndMin = parseInt(row.dataset.rangeEnd, 10) * 60;
+    }
+    setMatchSlotStart(slot, slot.startMin);
+    selectedGroupMatchSlots.push(slot);
     row.classList.add('checked');
   }
+  if(row.classList.contains('match-start-chip')) renderMatchFineRows(row.closest('.match-range-wide'));
   renderProposeSelectedBtn();
 });
+
+// 한 겹치는 시간대(칩 묶음) 아래에, 거기서 고른 시작 시간마다 5분 단위 조절 줄을 그림 + 칩 글자도 고른 분으로 바꿈
+function renderMatchFineRows(wide){
+  if(!wide) return;
+  const list = wide.querySelector('.match-fine-list');
+  const chips = [...wide.querySelectorAll('.match-start-chip')];
+  const slots = [];
+  chips.forEach(chip => {
+    const key = `${chip.dataset.date}|${chip.dataset.hour}`;
+    const slot = selectedGroupMatchSlots.find(s => s.key === key);
+    chip.classList.toggle('checked', !!slot);
+    chip.textContent = `${slot ? matchHm(slot.startMin) : String(chip.dataset.hour).padStart(2,'0') + ':00'} 시작`;
+    if(slot) slots.push(slot);
+  });
+  list.innerHTML = slots.map(slot => {
+    const dur = slot.endMin - slot.startMin;
+    const mins = [];
+    for(let m = 0; m < 60; m += 5){
+      const st = slot.baseH * 60 + m;
+      const ok = st >= slot.rangeStartMin && st + dur <= slot.rangeEndMin;
+      mins.push(`<button type="button" class="match-fine-min${st === slot.startMin ? ' on' : ''}" data-key="${slot.key}" data-min="${m}"${ok ? '' : ' disabled'}>:${String(m).padStart(2,'0')}</button>`);
+    }
+    return `<div class="match-fine-row">
+        <div class="match-fine-head"><span>${matchHm(slot.startMin)} ~ ${matchHm(slot.endMin)}</span><button type="button" class="match-fine-remove" data-key="${slot.key}">빼기</button></div>
+        <div class="match-fine-mins">${mins.join('')}</div>
+      </div>`;
+  }).join('');
+}
 
 // 체크해둔 여러 시간을 한 번에 그룹 채팅에 제안 (그룹원들이 그중에서 골라볼 수 있도록)
 async function proposeGroupTimeOptions(roomId, slots){
@@ -22055,8 +22131,8 @@ async function proposeGroupTimeOptions(roomId, slots){
         method: 'POST',
         body: JSON.stringify({
           options: slots.map(s => {
-            const startDate = new Date(s.dateObj); startDate.setHours(s.startH, 0, 0, 0);
-            const endDate = new Date(s.dateObj); endDate.setHours(s.endH, 0, 0, 0);
+            const startDate = new Date(s.dateObj); startDate.setHours(0, typeof s.startMin === 'number' ? s.startMin : s.startH * 60, 0, 0);
+            const endDate = new Date(s.dateObj); endDate.setHours(0, typeof s.endMin === 'number' ? s.endMin : s.endH * 60, 0, 0);
             return { start: startDate.toISOString(), end: endDate.toISOString() };
           }),
         }),
@@ -22086,7 +22162,7 @@ async function proposeGroupTimeOptions(roomId, slots){
     id: 'tsug' + (locationMsgIdCounter++),
     options: slots.map(s => ({
       dateLabel: s.dateLabel, timeLabel: s.timeLabel,
-      dateObj: s.dateObj, startH: s.startH, endH: s.endH,
+      dateObj: s.dateObj, startH: s.startH, endH: s.endH, startMin: s.startMin, endMin: s.endMin,
       votes: [], // 이 후보에 투표한 멤버 이름들 ('나' 포함)
     })),
     status: 'voting', // voting -> confirmed
@@ -22154,7 +22230,7 @@ function selectTimeOptionDirect(roomId, msg, optionIndex){
 
   msg.status = 'confirmed';
   msg._mockVotesTriggered = true; // 자동 시뮬레이션이 중복으로 다시 돌지 않게 막음
-  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startH * 60, winning.endH * 60, `${withWaGwa(room.name)} 약속`, roomId, msg.id);
+  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startMin ?? winning.startH * 60, winning.endMin ?? winning.endH * 60, `${withWaGwa(room.name)} 약속`, roomId, msg.id);
   addReservationPin(roomId, room, {
     dateLabel: winning.dateLabel, timeLabel: winning.timeLabel, note: null,
     dateObj: new Date(winning.dateObj), reservationMsgId: msg.id,
@@ -22224,7 +22300,7 @@ function checkTimeOptionsConsensus(roomId, msg){
   if(!winning) return;
 
   msg.status = 'confirmed';
-  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startH * 60, winning.endH * 60, `${room.name} 모임`, roomId, msg.id);
+  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startMin ?? winning.startH * 60, winning.endMin ?? winning.endH * 60, `${room.name} 모임`, roomId, msg.id);
   addReservationPin(roomId, room, {
     dateLabel: winning.dateLabel, timeLabel: winning.timeLabel, note: null,
     dateObj: new Date(winning.dateObj), reservationMsgId: msg.id,
