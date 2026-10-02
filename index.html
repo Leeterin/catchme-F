@@ -7180,18 +7180,19 @@ function connectRealtimeSocket(){
         loadScheduleFromServer(); // 확정/취소/거절/철회로 내 캘린더(특히 "예약중..." 홀드)가 바뀌었을 수 있으니 실시간으로 반영
       }
       touchRoom(roomId);
-      // 예약 취소는 상대방이 지금 이 방을 보고 있는 중이어도 카드만 조용히 "취소됨"으로 바뀌어서
-      // 모르고 지나치기 쉬웠음 - 방을 보고 있든 아니든 항상 구체적인 토스트를 띄워서 확실히 알아보게 함
-      if(mapped.status === 'cancelled' && settingsState.notif_message && !room.muted){
-        showToast(`${room.name}: ${mapped.dateLabel} ${mapped.timeLabel} 예약이 취소됐어요`);
-      }
       if(activeChatRoomId === roomId){
         renderChatMessages();
         markRoomRead(roomId); // 이 방을 이미 보고 있는 중에 도착한 메시지도 바로 "읽음" 처리해서 상대방 화면에 실시간으로 반영되게 함
+        // 예약 취소는 상대방이 지금 이 방을 보고 있는 중이어도 카드만 조용히 "취소됨"으로 바뀌어서
+        // 모르고 지나치기 쉬웠음 - 작게 떴다 사라지는 토스트 대신, 이미 쓰고 있던(방에 들어올 때 뜨는)
+        // "예약 가능으로 남기기" 팝업을 지금 이 자리에서 바로 띄워서 확실히 알아보고 넘어가게 함
+        if(mapped.status === 'cancelled') checkPendingRestoreAvailPrompts(roomId);
       } else {
         addIncomingMessageUnread(roomId);
-        if(mapped.status !== 'cancelled' && settingsState.notif_message && !room.muted){
-          showToast(`${room.name}: 예약 관련 알림이 있어요`);
+        if(settingsState.notif_message && !room.muted){
+          showToast(mapped.status === 'cancelled'
+            ? `${room.name}: ${mapped.dateLabel} ${mapped.timeLabel} 예약이 취소됐어요`
+            : `${room.name}: 예약 관련 알림이 있어요`);
         }
       }
       renderChatList();
