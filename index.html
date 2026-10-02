@@ -14472,6 +14472,17 @@ function attachLongPressPreview(el, dateObj, onClick){
   });
 }
 
+// 이 날짜/블록이 "예약하기"에서 이미 지난 시간대인지 확인 - 날짜 자체가 오늘보다 이전이거나,
+// 오늘이어도 이 블록이 끝나는 시각이 이미 지났으면 지난 걸로 쳐서 예약 목록에서 아예 빼버림
+function isFriendBlockPast(dateObj, block){
+  const dNum = dateKeyNum(dateObj);
+  const todayNum = dateKeyNum(TODAY);
+  if(dNum < todayNum) return true;
+  if(dNum > todayNum) return false;
+  const now = new Date();
+  return block.endHour * 60 <= (now.getHours() * 60 + now.getMinutes());
+}
+
 // 이 친구의 이 날짜 데이터가 서버에서 이미 도착해서 캐시에 있는지 확인 (데모 친구는 캐시 개념이 없어 항상 로드된 것으로 취급)
 function isFriendScheduleCached(friend, dateObj){
   if(!friend || !friend.username) return true;
@@ -14496,8 +14507,8 @@ function renderFriendToday(){
   list.innerHTML = '';
 
   let blocks = groupFriendScheduleBlocks(HOURS, sched, busyArr, titles);
-  // "예약하기" 모드에서는 예약 가능한 블록만 정리해서 보여주고, 나머지는 아예 뺌
-  if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable);
+  // "예약하기" 모드에서는 예약 가능한 블록만 정리해서 보여주고, 나머지는 아예 뺌 - 오늘인데 이미 지난 시간대도 마찬가지로 뺌
+  if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(friendDayFocusDate, b));
 
   if(blocks.length === 0){
     list.innerHTML = `<div class="day-event-empty">${friendCalendarMode === 'reserve' ? '이 날은 예약 가능한 시간이 없어요.' : '이 날은 등록된 일정이 없어요.'}</div>`;
@@ -14581,7 +14592,8 @@ function renderFriendWeek(){
 
     // 이 날짜 데이터가 아직 서버에서 도착 전이면, 있지도 않은 일정을 잠깐 지어내 보여주지 않고 그냥 빈 칸으로 둠
     let blocks = dayCached ? groupFriendScheduleBlocks(HOURS, sched, busyArr, titles) : [];
-    if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable);
+    // 예약하기 모드에서는 이미 지난 날짜/시간대 블록은 아예 목록에서 빼서 그리지도 않음
+    if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(d, b));
 
     blocks.forEach(b => {
       const startIdx = HOURS.indexOf(b.startHour);
@@ -14687,7 +14699,17 @@ function renderFriendMonthView(){
 
     let markupExtra = '';
     if(friendCalendarMode === 'reserve'){
-      const hasBookable = !isPast && dayInfo.bookable.some(Boolean);
+      // 오늘이면 예약 가능한 시간 중에서도 아직 안 지난 시간이 하나라도 있어야 "예약 가능" 표시를 함
+      let hasBookable = false;
+      if(!isPast){
+        const isTodayCell = dateKeyOf(cellDate) === dateKeyOf(TODAY);
+        const nowMin = isTodayCell ? (new Date().getHours() * 60 + new Date().getMinutes()) : -1;
+        hasBookable = monthData.hours.some((h, idx) => {
+          if(!dayInfo.bookable[idx]) return false;
+          if(!isTodayCell) return true;
+          return (h + 1) * 60 > nowMin;
+        });
+      }
       if(hasBookable) markupExtra = `<div class="month-event-label" style="background:var(--accent);color:#fff;">예약 가능</div>`;
     } else {
       const busyCount = dayInfo.busy.filter(Boolean).length;
@@ -14718,8 +14740,12 @@ function renderFriendMonthSelectedPanel(monthData){
   if(!dayInfo){ panel.innerHTML = ''; return; }
 
   let blocks = groupFriendScheduleBlocks(monthData.hours, dayInfo.bookable, dayInfo.busy, dayInfo.titles);
-  if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable);
-  if(isPast) blocks = blocks.map(b => ({ ...b, isBookable: false })); // 지난 날짜는 예약가능이었어도 클릭은 못 하게
+  if(friendCalendarMode === 'reserve'){
+    // 예약하기 모드에서는 날짜 전체가 지났든, 오늘이어도 그 시간이 이미 지났든 아예 목록에서 빼버림
+    blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(friendMonthSelectedDate, b));
+  } else if(isPast){
+    blocks = blocks.map(b => ({ ...b, isBookable: false })); // 캘린더 구경 모드에서는 지난 날짜 일정도 보여주되 클릭(예약)은 못 하게
+  }
 
   const cardsHtml = blocks.map(b => {
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
