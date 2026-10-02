@@ -13164,11 +13164,15 @@ function renderWeekView(){
     hourEl.textContent = `${h}시`;
     hourCol.appendChild(hourEl);
   });
-  // 맨 마지막 칸(예: 23시)이 끝나는 경계선에 "24시"처럼 끝나는 시각을 라벨로 한 번 더 표시
-  const endHourEl = document.createElement('div');
-  endHourEl.className = 'week-cal-hour week-cal-hour-end';
-  endHourEl.textContent = `${maxIdx >= DAY_HOURS.length - 1 ? 24 : DAY_HOURS[maxIdx + 1]}시`;
-  hourCol.appendChild(endHourEl);
+  // 범위가 실제로 하루 끝(자정)까지 닿은 경우에만 맨 마지막 칸 밑에 "24시" 경계 라벨을 추가함 -
+  // 기본 범위(예: 9~22시)처럼 중간에서 끊기는 경우는 애매한 "23시" 라벨이 또 다른 칸처럼
+  // 보여서 헷갈리니 넣지 않음
+  if(maxIdx >= DAY_HOURS.length - 1){
+    const endHourEl = document.createElement('div');
+    endHourEl.className = 'week-cal-hour week-cal-hour-end';
+    endHourEl.textContent = '24시';
+    hourCol.appendChild(endHourEl);
+  }
   wrap.appendChild(hourCol);
 
   // 요일별 컬럼
