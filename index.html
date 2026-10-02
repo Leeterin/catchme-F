@@ -3320,6 +3320,30 @@
     transition:width .3s ease;
   }
   .lr-collect-card .reservation-card-actions{ margin-top:8px; }
+  /* 채팅방 상단 "진행 중인 장소 추천" 바 */
+  .chat-active-recommend-bar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    padding:10px 12px;
+    margin-bottom:10px;
+    border-radius:12px;
+    border:1.5px solid var(--accent);
+    background:var(--accent-soft);
+    color:var(--text);
+    font-family:inherit;
+    font-size:12.5px;
+    text-align:left;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .chat-active-recommend-bar[hidden]{ display:none; }
+  .chat-active-recommend-bar svg{ width:16px; height:16px; color:var(--accent); flex-shrink:0; }
+  .chat-active-recommend-bar .car-text{ flex:1; min-width:0; }
+  .chat-active-recommend-bar .car-title{ font-weight:700; display:block; }
+  .chat-active-recommend-bar .car-sub{ color:var(--text-dim); font-size:11.5px; display:block; margin-top:1px; }
+  .chat-active-recommend-bar .car-go{ color:var(--accent); font-weight:700; font-size:12px; flex-shrink:0; }
   /* "장소 정하기" 선택 팝업의 선택지 버튼 (추천받기 / 직접 고르기) */
   .place-choice-option{
     display:block;
@@ -6277,6 +6301,11 @@
     </div>
   </div>
 
+  <!-- 진행 중인 모임 장소 추천 현황 시트 (상단 바 / "이미 진행 중" 안내에서 열림) -->
+  <div class="mini-confirm-overlay" id="activeRecommendOverlay">
+    <div class="mini-confirm-card" style="text-align:left;" id="activeRecommendCard"></div>
+  </div>
+
   <!-- 상단 고정 카드 "장소 정하기" - 모임 장소 추천받기를 먼저 추천하고, 직접 고르기도 선택 가능 -->
   <div class="mini-confirm-overlay" id="placeChoiceOverlay">
     <div class="mini-confirm-card" style="text-align:left;">
@@ -6471,6 +6500,8 @@
         <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" />
       </div>
       <div class="chat-pinned-schedule" id="chatPinnedSchedule" style="display:none;"></div>
+      <!-- 진행 중인 모임 장소 추천 - 카카오톡의 "진행 중인 투표"처럼 상단에 띄워두고, 누르면 현황/입력 시트가 열림 -->
+      <button type="button" class="chat-active-recommend-bar" id="chatActiveRecommendBar" hidden></button>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-bottom-fixed">
         <div class="chat-reply-preview-bar" id="chatReplyPreviewBar" style="display:none;">
@@ -7470,6 +7501,7 @@ function connectRealtimeSocket(){
       if(existing) Object.assign(existing, mapped);
       else room.messages.push(mapped);
       // 제출 인원 숫자만 바뀐 갱신이면 조용히 카드만 다시 그림 (안 읽음 배지/알림은 새 카드나 결과가 나왔을 때만)
+      applyRecommendCardToActive(roomId, mapped);
       const isNews = !existing || (prevStatus !== mapped.status && mapped.status === 'COMPLETED');
       if(isNews) touchRoom(roomId);
       if(activeChatRoomId === roomId){
@@ -7572,6 +7604,9 @@ function connectRealtimeSocket(){
   // 각자 그 카드의 "내 출발지 입력하기" 버튼으로 냄 - 그래서 예전처럼 알림/팝업을 따로 띄우지 않음
   realtimeSocket.on('locationRecommendCancelled', ({ roomId }) => {
     delete pendingLocationRecommendByRoom[roomId];
+    const room = CHAT_ROOMS[roomId];
+    if(room) room.activeRecommend = null;
+    if(activeChatRoomId === roomId) renderActiveRecommendBar();
   });
 
   // ---------- 모임 참여 신청 실시간 알림 ----------
@@ -18531,6 +18566,9 @@ function openChatRoom(id){
     room._pinsLoaded = true;
     loadPinsFromServer(id, room);
   }
+  // 진행 중인 모임 장소 추천이 있으면 상단 바로 띄움 (방에 들어올 때마다 최신 상태로)
+  renderActiveRecommendBar();
+  if(room.isRealRoom) loadActiveLocationRecommend(id);
 
   // 전에는 "한 번 불러온 적 있으면" 다시 안 불러왔는데, 그러면 소켓 알림을 못 받은 채(백그라운드,
   // 네트워크 끊김 등) 지나간 상태 변화(예: 상대방이 예약을 수락했는데 나만 그걸 실시간으로 못 받은
@@ -19787,13 +19825,159 @@ document.getElementById('extraMatchOption').addEventListener('click', () => {
 });
 
 // ---------- 다중 모임 자동 장소 추천 ----------
+// ---------- 진행 중인 모임 장소 추천 (카카오톡 "진행 중인 투표"처럼 상단 바 + 현황 시트) ----------
+// room.activeRecommend = { requestId, mode, totalMembers, respondedCount, iHaveResponded, isRequester } 또는 null
+async function loadActiveLocationRecommend(roomId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !room.isRealRoom) return null;
+  try {
+    const data = await apiRequest(`/chats/${roomId}/location-recommend/active`);
+    const a = data.active;
+    room.activeRecommend = a ? {
+      requestId: a.requestId, mode: a.mode, totalMembers: a.totalMembers,
+      respondedCount: a.respondedCount, iHaveResponded: !!a.iHaveResponded, isRequester: !!a.isRequester,
+    } : null;
+    if(a){
+      locationRecommendMyResponse[a.requestId] = !!a.iHaveResponded;
+      // 예전 버전에서 시작돼 카드가 없던 요청이면 서버가 지금 카드를 만들어서 같이 보내줌 - 채팅에도 넣어둠
+      if(a.message && !room.messages.some(x => x._serverId === a.message.id)){
+        room.messages.push(mapServerLocationRecommendMessage(a.message));
+        if(activeChatRoomId === roomId) renderChatMessages();
+      }
+    }
+    if(activeChatRoomId === roomId) renderActiveRecommendBar();
+    return room.activeRecommend;
+  } catch(err){
+    console.error('[location-recommend] active load failed:', err);
+    return null;
+  }
+}
+
+// 소켓으로 온 추천 카드 갱신을 상단 바 상태에도 반영
+function applyRecommendCardToActive(roomId, mapped){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  if(mapped.status === 'COLLECTING'){
+    const prev = room.activeRecommend && room.activeRecommend.requestId === mapped.requestId ? room.activeRecommend : null;
+    room.activeRecommend = {
+      requestId: mapped.requestId,
+      mode: mapped.mode,
+      totalMembers: prev ? prev.totalMembers : getTotalParticipants(room),
+      respondedCount: typeof mapped.respondedCount === 'number' ? mapped.respondedCount : (prev ? prev.respondedCount : null),
+      iHaveResponded: !!locationRecommendMyResponse[mapped.requestId] || mapped.who === 'me',
+      isRequester: mapped.who === 'me',
+    };
+  } else if(room.activeRecommend && room.activeRecommend.requestId === mapped.requestId){
+    room.activeRecommend = null;
+    if(document.getElementById('activeRecommendOverlay').classList.contains('show')) closeActiveRecommendSheet();
+  }
+  if(activeChatRoomId === roomId){
+    renderActiveRecommendBar();
+    if(document.getElementById('activeRecommendOverlay').classList.contains('show')) renderActiveRecommendSheet();
+  }
+}
+
+function renderActiveRecommendBar(){
+  const bar = document.getElementById('chatActiveRecommendBar');
+  const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
+  const a = room && room.activeRecommend;
+  if(!a){ bar.hidden = true; bar.innerHTML = ''; return; }
+  const modeLabel = RECOMMEND_MODE_LABEL[a.mode] || a.mode;
+  const total = a.totalMembers || getTotalParticipants(room);
+  const iDone = a.iHaveResponded || !!locationRecommendMyResponse[a.requestId];
+  bar.hidden = false;
+  bar.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    <span class="car-text">
+      <span class="car-title">진행 중인 모임 장소 추천 (${escapeHtml(modeLabel)})</span>
+      <span class="car-sub">${typeof a.respondedCount === 'number' ? `${a.respondedCount}/${total}명 제출` : '제출 현황 확인 중'} · ${iDone ? '나는 제출했어요' : '내 출발지를 아직 안 냈어요'}</span>
+    </span>
+    <span class="car-go">${iDone ? '보기' : '입력하기'} &#8250;</span>
+  `;
+}
+document.getElementById('chatActiveRecommendBar').addEventListener('click', () => openActiveRecommendSheet());
+
+function openActiveRecommendSheet(){
+  const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
+  if(!room || !room.activeRecommend) return;
+  renderActiveRecommendSheet();
+  document.getElementById('activeRecommendOverlay').classList.add('show');
+}
+function closeActiveRecommendSheet(){
+  document.getElementById('activeRecommendOverlay').classList.remove('show');
+}
+document.getElementById('activeRecommendOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'activeRecommendOverlay') closeActiveRecommendSheet();
+});
+
+function renderActiveRecommendSheet(){
+  const roomId = activeChatRoomId;
+  const room = roomId ? CHAT_ROOMS[roomId] : null;
+  const a = room && room.activeRecommend;
+  const card = document.getElementById('activeRecommendCard');
+  if(!a){ card.innerHTML = ''; return; }
+  const total = a.totalMembers || getTotalParticipants(room);
+  const responded = typeof a.respondedCount === 'number' ? a.respondedCount : null;
+  const pct = (responded !== null && total > 0) ? Math.min(100, Math.round(responded / total * 100)) : 0;
+  const iDone = a.iHaveResponded || !!locationRecommendMyResponse[a.requestId];
+  card.innerHTML = `
+    <div class="mini-confirm-title" style="margin-bottom:4px;">진행 중인 모임 장소 추천</div>
+    <div style="font-size:12px;color:var(--text-dim);">기준: ${escapeHtml(RECOMMEND_MODE_LABEL[a.mode] || a.mode)} · ${a.isRequester ? '내가 시작한 추천' : '다른 멤버가 시작한 추천'}</div>
+    <div class="lr-progress"><div class="lr-progress-fill" style="width:${pct}%"></div></div>
+    <div style="font-size:12.5px;margin-bottom:4px;">${responded !== null ? `${responded}/${total}명 제출` : '제출 현황 확인 중'} · 모두 내면 자동으로 추천돼요</div>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;">입력한 출발지는 다른 사람에게 공개되지 않아요.</div>
+    <div class="reservation-card-actions">
+      <button type="button" class="reservation-btn ${iDone ? 'decline' : 'accept'}" id="activeRecRespondBtn">${iDone ? '✓ 제출함 · 다시 입력' : '내 출발지 입력하기'}</button>
+    </div>
+    ${a.isRequester ? `
+    <div class="reservation-card-actions" style="margin-top:6px;">
+      <button type="button" class="reservation-btn decline" id="activeRecCompleteBtn"${responded !== null && responded < 2 ? ' disabled style="opacity:0.5;"' : ''}>지금 결과 보기</button>
+      <button type="button" class="reservation-btn cancel" id="activeRecCancelBtn">추천 취소</button>
+    </div>` : ''}
+    <div class="mini-confirm-actions">
+      <button type="button" class="mini-confirm-btn" id="activeRecCloseBtn">닫기</button>
+    </div>
+  `;
+  document.getElementById('activeRecCloseBtn').addEventListener('click', closeActiveRecommendSheet);
+  document.getElementById('activeRecRespondBtn').addEventListener('click', () => {
+    closeActiveRecommendSheet();
+    promptLocationRecommendResponse(roomId, a.requestId, a.mode);
+  });
+  const completeBtn = document.getElementById('activeRecCompleteBtn');
+  if(completeBtn) completeBtn.addEventListener('click', async () => {
+    try {
+      await apiRequest(`/chats/location-recommend/${a.requestId}/complete`, { method: 'POST' });
+      closeActiveRecommendSheet();
+    } catch(err){ showToast(err.message); }
+  });
+  const cancelBtn = document.getElementById('activeRecCancelBtn');
+  if(cancelBtn) cancelBtn.addEventListener('click', () => {
+    closeActiveRecommendSheet();
+    openCancelConfirm(async () => {
+      try {
+        await apiRequest(`/chats/location-recommend/${a.requestId}/cancel`, { method: 'POST' });
+        if(room.activeRecommend && room.activeRecommend.requestId === a.requestId) room.activeRecommend = null;
+        renderActiveRecommendBar();
+        showToast('모임 장소 추천을 취소했어요.');
+      } catch(err){ showToast(err.message); }
+    }, '진행 중인 모임 장소 추천을 취소할까요?');
+  });
+}
+
 // 추천 시작(기준 고르기 -> 내 출발지 입력 -> 채팅방에 투표형 카드 생성). 메뉴의 "모임 장소 추천받기"와
 // 상단 고정 카드의 "장소 정하기" 양쪽에서 씀. 그룹방/1:1방 모두 가능(실제 서버 방만)
-function startLocationRecommend(roomId){
+async function startLocationRecommend(roomId){
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
   if(!room.isRealRoom){
     showToast('모임 장소 추천은 실제 채팅방에서만 쓸 수 있어요.');
+    return;
+  }
+  // 이미 진행 중인 추천이 있으면 새로 시작하지 않고, 그 추천의 현황 시트를 바로 보여줌
+  const active = room.activeRecommend || await loadActiveLocationRecommend(roomId);
+  if(active){
+    showToast('이미 진행 중인 모임 장소 추천이 있어요. 여기서 확인하세요.');
+    openActiveRecommendSheet();
     return;
   }
   if(getTotalParticipants(room) < 2){
@@ -19863,13 +20047,26 @@ document.getElementById('recommendModeNextBtn').addEventListener('click', () => 
         const body = picked.savedLocationId
           ? { mode, savedLocationId: picked.savedLocationId }
           : { mode, address: picked.address, lat: picked.lat, lon: picked.lon };
-        const data = await apiRequest(`/chats/${roomId}/location-recommend`, {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
+        let data;
+        try {
+          data = await apiRequest(`/chats/${roomId}/location-recommend`, {
+            method: 'POST',
+            body: JSON.stringify(body),
+          });
+        } catch(err){
+          // 그 사이 다른 멤버가 먼저 시작했으면, 그 진행 중인 추천을 바로 보여줌
+          if(err.data && err.data.requestId){
+            await loadActiveLocationRecommend(roomId);
+            showToast('이미 진행 중인 모임 장소 추천이 있어요. 여기서 확인하세요.');
+            openActiveRecommendSheet();
+            return;
+          }
+          throw err;
+        }
         showToast('채팅방에 출발지 입력 카드를 올렸어요. 모두 제출하면 결과가 나와요.');
         pendingLocationRecommendByRoom[roomId] = data.requestId;
         locationRecommendMyResponse[data.requestId] = true;
+        if(data.message) applyRecommendCardToActive(roomId, mapServerLocationRecommendMessage(data.message));
         // 소켓으로도 오지만, 바로 보이도록 응답에 담긴 카드를 먼저 넣어둠 (같은 id면 중복으로 안 들어감)
         const room = CHAT_ROOMS[roomId];
         if(room && data.message && !room.messages.some(x => x._serverId === data.message.id)){
@@ -19902,7 +20099,9 @@ function promptLocationRecommendResponse(roomId, requestId, mode){
           body: JSON.stringify(body),
         });
         locationRecommendMyResponse[requestId] = true;
-        if(activeChatRoomId === roomId) renderChatMessages();
+        const r = CHAT_ROOMS[roomId];
+        if(r && r.activeRecommend && r.activeRecommend.requestId === requestId) r.activeRecommend.iHaveResponded = true;
+        if(activeChatRoomId === roomId){ renderChatMessages(); renderActiveRecommendBar(); }
         showToast(data.completed ? '출발지를 제출했어요. 결과가 나왔어요!' : '출발지를 제출했어요. 다른 멤버를 기다리는 중이에요.');
       } catch(err){
         showToast(err.message);
