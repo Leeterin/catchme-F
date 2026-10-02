@@ -13062,6 +13062,11 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
   // 전체 폭이 이미 충분한 경우에도 반대쪽이 불필요하게 1시간 더 넓어지는 버그가 있었음)
   minIdx = Math.max(0, minIdx - 1);
   maxIdx = Math.min(hours.length - 1, maxIdx + 1);
+  // 일정(+버퍼)이 이미 기본 범위(9~22시) 안에 다 들어온다면, 굳이 다른 위치로 넓힐 필요 없이
+  // 기본 범위를 그대로 보여줌 - 그래야 "평균 폭" 때문에 범위가 엉뚱하게 뒤로 밀리지 않음
+  if(minIdx >= defaultMinIdx && maxIdx <= defaultMaxIdx){
+    return { minIdx: defaultMinIdx, maxIdx: defaultMaxIdx };
+  }
   const minSpan = defaultMaxIdx - defaultMinIdx + 1;
   while((maxIdx - minIdx + 1) < minSpan){
     let grew = false;
