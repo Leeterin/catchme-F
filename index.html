@@ -3305,6 +3305,48 @@
     color:var(--cta);
   }
   .reservation-btn.cancel:hover{ background:rgba(255,107,74,0.1); }
+  /* 모임 장소 추천 - 카카오톡 투표처럼 채팅방에 남는 "출발지 모으기" 카드의 제출 현황 막대 */
+  .lr-progress{
+    height:6px;
+    border-radius:999px;
+    background:var(--surface-2);
+    overflow:hidden;
+    margin:8px 0 6px;
+  }
+  .lr-progress-fill{
+    height:100%;
+    border-radius:999px;
+    background:var(--accent);
+    transition:width .3s ease;
+  }
+  .lr-collect-card .reservation-card-actions{ margin-top:8px; }
+  /* "장소 정하기" 선택 팝업의 선택지 버튼 (추천받기 / 직접 고르기) */
+  .place-choice-option{
+    display:block;
+    width:100%;
+    text-align:left;
+    padding:12px 14px;
+    margin-bottom:8px;
+    border-radius:12px;
+    border:1.5px solid var(--line);
+    background:var(--surface);
+    color:var(--text);
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .place-choice-option.recommended{ border-color:var(--accent); background:var(--accent-soft); }
+  .place-choice-badge{
+    display:inline-block;
+    font-size:10.5px;
+    font-weight:700;
+    color:#FFFFFF;
+    background:var(--accent);
+    border-radius:999px;
+    padding:1px 7px;
+    margin-bottom:5px;
+  }
+  .place-choice-title{ display:block; font-size:14px; font-weight:700; margin-bottom:3px; }
+  .place-choice-desc{ display:block; font-size:12px; color:var(--text-dim); line-height:1.45; }
 
   .chat-input-row{
     display:flex;
@@ -6235,6 +6277,25 @@
     </div>
   </div>
 
+  <!-- 상단 고정 카드 "장소 정하기" - 모임 장소 추천받기를 먼저 추천하고, 직접 고르기도 선택 가능 -->
+  <div class="mini-confirm-overlay" id="placeChoiceOverlay">
+    <div class="mini-confirm-card" style="text-align:left;">
+      <div class="mini-confirm-title" style="margin-bottom:12px;">약속 장소 정하기</div>
+      <button type="button" class="place-choice-option recommended" id="placeChoiceRecommendBtn">
+        <span class="place-choice-badge">추천</span>
+        <span class="place-choice-title">모임 장소 추천받기</span>
+        <span class="place-choice-desc">각자 출발지를 내면, 모두에게 가까운 장소를 찾아드려요. 출발지는 서로 공개되지 않아요.</span>
+      </button>
+      <button type="button" class="place-choice-option" id="placeChoiceDirectBtn">
+        <span class="place-choice-title">직접 장소 고르기</span>
+        <span class="place-choice-desc">지도에서 검색하거나 핀을 찍어서 정해요.</span>
+      </button>
+      <div class="mini-confirm-actions">
+        <button type="button" id="placeChoiceCancelBtn" class="mini-confirm-btn danger">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 다중 모임 장소 추천 - 기준(모드) 선택 팝업 -->
   <div class="mini-confirm-overlay" id="recommendModeOverlay">
     <div class="mini-confirm-card" style="text-align:left;">
@@ -7401,19 +7462,28 @@ function connectRealtimeSocket(){
       return;
     }
     if(message.type === 'LOCATION_RECOMMEND'){
-      // 추천 결과 카드 - 이게 도착했다는 건 내가 요청했던 건(있었다면)은 다 끝났다는 뜻이므로 정리해둠
-      delete pendingLocationRecommendByRoom[roomId];
+      // 모임 장소 추천 카드 - 처음 오면 새 카드(출발지 모으는 중), 같은 id로 또 오면 제출 인원/결과/취소 갱신
+      const mapped = mapServerLocationRecommendMessage(message);
+      if(mapped.status !== 'COLLECTING') delete pendingLocationRecommendByRoom[roomId];
       const existing = room.messages.find(m => m._serverId === message.id);
-      if(!existing) room.messages.push(mapServerLocationRecommendMessage(message));
-      touchRoom(roomId);
+      const prevStatus = existing ? existing.status : null;
+      if(existing) Object.assign(existing, mapped);
+      else room.messages.push(mapped);
+      // 제출 인원 숫자만 바뀐 갱신이면 조용히 카드만 다시 그림 (안 읽음 배지/알림은 새 카드나 결과가 나왔을 때만)
+      const isNews = !existing || (prevStatus !== mapped.status && mapped.status === 'COMPLETED');
+      if(isNews) touchRoom(roomId);
       if(activeChatRoomId === roomId){
         renderChatMessages();
-        markRoomRead(roomId);
-      } else {
+        if(isNews) markRoomRead(roomId);
+      } else if(isNews && mapped.who !== 'me'){
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
-          showToast(`${room.name}: 모임 장소 추천 결과가 나왔어요`);
+          showToast(mapped.status === 'COMPLETED'
+            ? `${room.name}: 모임 장소 추천 결과가 나왔어요`
+            : `${room.name}: 모임 장소 추천 - 채팅방에서 출발지를 입력해주세요`);
         }
+      } else if(isNews && mapped.status === 'COMPLETED' && settingsState.notif_message && !room.muted){
+        showToast(`${room.name}: 모임 장소 추천 결과가 나왔어요`);
       }
       renderChatList();
       return;
@@ -7497,21 +7567,11 @@ function connectRealtimeSocket(){
     if(document.getElementById('panel-friends').classList.contains('active')) renderFriendsList();
   });
 
-  // ---------- 다중 모임 자동 장소 추천: 출발지 입력 요청 ----------
-  // 그룹방 멤버 중 누군가 "모임 장소 추천받기"를 시작하면, 나머지 멤버에게 각자 조용히(그룹방 메시지로
-  // 남기지 않고) 출발지를 물어봄 - 바로 입력창을 띄워서 그 자리에서 낼 수 있게 함
-  realtimeSocket.on('locationRecommendRequested', ({ roomId, requestId, mode }) => {
-    if(activeChatRoomId === roomId){
-      promptLocationRecommendResponse(roomId, requestId, mode);
-    } else {
-      const room = CHAT_ROOMS[roomId];
-      showToast(`${room ? room.name + ': ' : ''}모임 장소 추천 - 출발지를 입력해주세요`);
-      pendingLocationRecommendInbox[requestId] = { roomId, mode };
-    }
-  });
-  realtimeSocket.on('locationRecommendCancelled', ({ roomId, requestId }) => {
+  // ---------- 다중 모임 자동 장소 추천 ----------
+  // 출발지 입력 요청은 이제 채팅방에 카카오톡 투표 같은 카드(LOCATION_RECOMMEND, newMessage로 옴)로 뜨고,
+  // 각자 그 카드의 "내 출발지 입력하기" 버튼으로 냄 - 그래서 예전처럼 알림/팝업을 따로 띄우지 않음
+  realtimeSocket.on('locationRecommendCancelled', ({ roomId }) => {
     delete pendingLocationRecommendByRoom[roomId];
-    delete pendingLocationRecommendInbox[requestId];
   });
 
   // ---------- 모임 참여 신청 실시간 알림 ----------
@@ -7874,9 +7934,12 @@ const SETTINGS_MENU = [
 
 // 자주 쓰는 출발지(집/회사/학교/직접입력) - 다중 모임 장소 추천에서 바로 골라 쓸 수 있게 내 정보에 저장해둠
 let mySavedLocations = [];
-// 다중 모임 장소 추천 - 진행 중인 요청 추적용 (roomId -> requestId: 내가 이미 요청해둔 것 / requestId -> {roomId,mode}: 아직 출발지 안 낸, 다른 방에서 온 요청)
+// 다중 모임 장소 추천 - 진행 중인 요청 추적용 (roomId -> requestId: 내가 이미 요청해둔 것)
 const pendingLocationRecommendByRoom = {};
-const pendingLocationRecommendInbox = {};
+// 추천 카드별로 "내가 출발지를 이미 냈는지" (requestId -> true/false). 서버 카드에는 인원 수만 있어서
+// 처음 그릴 때 상태 API로 한 번 물어보고 기억해둠 (요청자 본인은 요청할 때 이미 냈으므로 항상 true)
+const locationRecommendMyResponse = {};
+const locationRecommendStatusLoading = new Set();
 async function loadSavedLocationsFromServer(){
   if(!authToken) return;
   try {
@@ -11235,8 +11298,9 @@ function mapServerLocationSuggestMessage(m){
 
 const RECOMMEND_MODE_LABEL = { FAIR: '공평하게', FASTEST: '가장 빠르게', CONSIDERATE: '먼 사람 배려' };
 
-// 서버의 LOCATION_RECOMMEND 메시지(다중 모임 자동 장소 추천 결과)를 로컬 카드 형식으로 변환.
-// 참가자 개별 출발지/개별 이동시간은 서버가 애초에 안 보내주므로, 여기서도 다룰 데이터 자체가 없음
+// 서버의 LOCATION_RECOMMEND 메시지(모임 장소 추천 카드)를 로컬 카드 형식으로 변환.
+// 카카오톡 투표처럼 요청한 순간 "출발지 모으는 중"(COLLECTING) 카드로 생기고, 다 모이면 같은 메시지가
+// 결과 카드(COMPLETED)로 바뀜. 참가자 개별 출발지/개별 이동시간은 서버가 애초에 안 보내줌(인원 수만 옴)
 function mapServerLocationRecommendMessage(m){
   const r = m.locationRecommend;
   return {
@@ -11245,6 +11309,10 @@ function mapServerLocationRecommendMessage(m){
     type: 'location-recommend',
     id: m.id,
     _serverId: m.id,
+    requestId: r.requestId || null,
+    status: r.status || (r.areaName ? 'COMPLETED' : 'COLLECTING'),
+    respondedCount: (typeof r.respondedCount === 'number') ? r.respondedCount : null,
+    mode: r.mode,
     areaName: r.areaName,
     lat: r.lat,
     lon: r.lon,
@@ -18117,7 +18185,10 @@ function renderPinnedSchedule(){
     const setLocBtn = card.querySelector('.pin-set-loc');
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
-        changePinLocation(room, activeChatRoomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon));
+        const roomId = activeChatRoomId;
+        const pickDirect = () => changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon));
+        // 장소를 정할 때는 항상 "모임 장소 추천받기"를 먼저 추천함 (직접 고르기도 그대로 가능)
+        openPlaceChoice(roomId, pickDirect);
       });
     }
 
@@ -18473,14 +18544,6 @@ function openChatRoom(id){
   document.getElementById('chatRoomView').classList.add('active');
   document.querySelector('.bottom-nav').style.display = 'none';
   pushViewState(closeChatRoomView);
-
-  // 이 방에 들어왔는데, 아직 출발지를 안 낸 "모임 장소 추천" 요청이 와있었으면 지금 바로 물어봄
-  const pendingEntry = Object.entries(pendingLocationRecommendInbox).find(([, v]) => v.roomId === id);
-  if(pendingEntry){
-    const [requestId, { mode }] = pendingEntry;
-    delete pendingLocationRecommendInbox[requestId];
-    promptLocationRecommendResponse(id, requestId, mode);
-  }
 }
 
 // 서버에서 온 메시지 하나(어떤 타입이든)를 로컬 카드 형식으로 변환. 방 전체 메시지를 불러올 때뿐 아니라,
@@ -18790,6 +18853,56 @@ function renderChatMessages(){
           <div class="reservation-card-note">${escapeHtml(m.location)}</div>
         </div>
       `;
+    } else if(m.type === 'location-recommend' && m.status !== 'COMPLETED'){
+      // 카카오톡 투표처럼 채팅방에 남는 "출발지 모으기" 카드 - 진행 중이면 각자 여기서 출발지를 냄
+      const total = getTotalParticipants(room);
+      const responded = typeof m.respondedCount === 'number' ? m.respondedCount : null;
+      const isRequester = m.who === 'me';
+      const isCollecting = m.status === 'COLLECTING';
+      if(isCollecting && isRequester && m.requestId) locationRecommendMyResponse[m.requestId] = true;
+      const iResponded = m.requestId ? locationRecommendMyResponse[m.requestId] : undefined;
+      if(isCollecting && m.requestId && iResponded === undefined) fetchLocationRecommendMyStatus(m.requestId);
+      const pct = (responded !== null && total > 0) ? Math.min(100, Math.round(responded / total * 100)) : 0;
+      let actionsHtml = '';
+      if(isCollecting){
+        const mainBtn = iResponded
+          ? `<button type="button" class="reservation-btn decline lr-respond-btn">✓ 제출함 · 다시 입력</button>`
+          : `<button type="button" class="reservation-btn accept lr-respond-btn">내 출발지 입력하기</button>`;
+        const requesterBtns = isRequester ? `
+          <div class="reservation-card-actions" style="margin-top:6px;">
+            <button type="button" class="reservation-btn decline lr-complete-btn"${responded !== null && responded < 2 ? ' disabled style="opacity:0.5;"' : ''}>지금 결과 보기</button>
+            <button type="button" class="reservation-btn cancel lr-cancel-btn">취소</button>
+          </div>` : '';
+        actionsHtml = `<div class="reservation-card-actions">${mainBtn}</div>${requesterBtns}`;
+      }
+      row.innerHTML = `
+        <div class="reservation-card lr-collect-card">
+          <div class="reservation-card-header">${ICO.pin} 모임 장소 추천 (${escapeHtml(m.modeLabel)})</div>
+          <div class="reservation-card-time">${isCollecting ? '각자 출발지를 입력해주세요' : '추천이 취소됐어요'}</div>
+          ${isCollecting ? `
+          <div class="lr-progress"><div class="lr-progress-fill" style="width:${pct}%"></div></div>
+          <div class="reservation-card-note">${responded !== null ? `${responded}/${total}명 제출` : '제출 현황 불러오는 중'} · 모두 내면 자동으로 추천돼요</div>` : ''}
+          <div class="reservation-card-note" style="color:var(--text-dim);font-size:11px;">입력한 출발지는 다른 사람에게 공개되지 않아요.</div>
+          ${actionsHtml}
+        </div>
+      `;
+      if(isCollecting){
+        row.querySelector('.lr-respond-btn').addEventListener('click', () => promptLocationRecommendResponse(activeChatRoomId, m.requestId, m.mode));
+        const completeBtn = row.querySelector('.lr-complete-btn');
+        if(completeBtn) completeBtn.addEventListener('click', async () => {
+          try {
+            await apiRequest(`/chats/location-recommend/${m.requestId}/complete`, { method: 'POST' });
+          } catch(err){ showToast(err.message); }
+        });
+        const cancelBtn = row.querySelector('.lr-cancel-btn');
+        if(cancelBtn) cancelBtn.addEventListener('click', () => {
+          openCancelConfirm(async () => {
+            try {
+              await apiRequest(`/chats/location-recommend/${m.requestId}/cancel`, { method: 'POST' });
+            } catch(err){ showToast(err.message); }
+          }, '모임 장소 추천을 취소할까요?');
+        });
+      }
     } else if(m.type === 'location-recommend'){
       const mapUrl = (typeof m.lat === 'number' && typeof m.lon === 'number')
         ? `https://map.kakao.com/link/map/${encodeURIComponent(m.areaName)},${m.lat},${m.lon}`
@@ -18973,7 +19086,7 @@ function getMsgPreviewText(m){
   if(m.type === 'reservation') return '예약 요청';
   if(m.type === 'location-suggest') return '장소 제안';
   if(m.type === 'location-fixed') return '장소 확정';
-  if(m.type === 'location-recommend') return '모임 장소 추천 결과';
+  if(m.type === 'location-recommend') return m.status === 'COMPLETED' ? '모임 장소 추천 결과' : (m.status === 'CANCELLED' ? '모임 장소 추천이 취소됐어요' : '모임 장소 추천 - 출발지를 입력해주세요');
   if(m.type === 'time-options-suggest') return '시간 제안';
   if(m.type === 'hotplace') return m.superseded ? '약속 장소가 변경됐어요' : '핫플 알림';
   if(m.type === 'system-notice') return m.text || '알림';
@@ -19569,7 +19682,7 @@ function updateChatExtraOptionForRoom(){
     option.dataset.mode = 'calendar';
     option.innerHTML = `${EXTRA_OPTION_ICON_CALENDAR}<span>캘린더 보기</span>`;
     reserveOption.style.display = '';
-    recommendOption.style.display = 'none'; // 1:1 채팅에서는 "장소 제안"(여기 어때요?)을 그대로 씀
+    recommendOption.style.display = (room && room.isRealRoom) ? '' : 'none'; // 1:1 실제 방에서도 두 사람 출발지로 추천받을 수 있음
   }
   document.getElementById('extraMuteOptionLabel').textContent = (room && room.muted) ? '알림 켜기' : '알림 끄기';
 }
@@ -19674,19 +19787,65 @@ document.getElementById('extraMatchOption').addEventListener('click', () => {
 });
 
 // ---------- 다중 모임 자동 장소 추천 ----------
-document.getElementById('extraRecommendLocationOption').addEventListener('click', () => {
-  document.getElementById('chatExtraDropdown').classList.remove('open');
-  const roomId = activeChatRoomId;
+// 추천 시작(기준 고르기 -> 내 출발지 입력 -> 채팅방에 투표형 카드 생성). 메뉴의 "모임 장소 추천받기"와
+// 상단 고정 카드의 "장소 정하기" 양쪽에서 씀. 그룹방/1:1방 모두 가능(실제 서버 방만)
+function startLocationRecommend(roomId){
   const room = roomId ? CHAT_ROOMS[roomId] : null;
-  if(!room || !room.isGroup || !room.isRealRoom) return;
-  if(!room.members || room.members.length < 2){
+  if(!room) return;
+  if(!room.isRealRoom){
+    showToast('모임 장소 추천은 실제 채팅방에서만 쓸 수 있어요.');
+    return;
+  }
+  if(getTotalParticipants(room) < 2){
     showToast('참가자가 2명 이상이어야 추천을 받을 수 있어요.');
     return;
   }
   document.querySelector('#recommendModeList input[value="FAIR"]').checked = true;
   document.getElementById('recommendModeOverlay').classList.add('show');
   document.getElementById('recommendModeNextBtn').dataset.roomId = roomId;
+}
+document.getElementById('extraRecommendLocationOption').addEventListener('click', () => {
+  document.getElementById('chatExtraDropdown').classList.remove('open');
+  startLocationRecommend(activeChatRoomId);
 });
+
+// 상단 고정 카드의 "장소 정하기"를 누르면, 항상 "모임 장소 추천받기"를 먼저 추천하고 직접 고르기도 고를 수 있게 함
+let placeChoiceAction = null;
+function openPlaceChoice(roomId, onPickDirect){
+  placeChoiceAction = { roomId, onPickDirect };
+  document.getElementById('placeChoiceOverlay').classList.add('show');
+}
+function closePlaceChoice(){
+  placeChoiceAction = null;
+  document.getElementById('placeChoiceOverlay').classList.remove('show');
+}
+document.getElementById('placeChoiceRecommendBtn').addEventListener('click', () => {
+  const action = placeChoiceAction;
+  closePlaceChoice();
+  if(action) startLocationRecommend(action.roomId);
+});
+document.getElementById('placeChoiceDirectBtn').addEventListener('click', () => {
+  const action = placeChoiceAction;
+  closePlaceChoice();
+  if(action && action.onPickDirect) action.onPickDirect();
+});
+document.getElementById('placeChoiceCancelBtn').addEventListener('click', closePlaceChoice);
+document.getElementById('placeChoiceOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'placeChoiceOverlay') closePlaceChoice();
+});
+
+// 추천 카드에서 "내가 이미 출발지를 냈는지" 서버에 한 번만 물어보고 기억함 (카드에는 인원 수만 있어서)
+async function fetchLocationRecommendMyStatus(requestId){
+  if(locationRecommendStatusLoading.has(requestId)) return;
+  locationRecommendStatusLoading.add(requestId);
+  try {
+    const data = await apiRequest(`/chats/location-recommend/${requestId}/status`);
+    locationRecommendMyResponse[requestId] = !!data.iHaveResponded;
+    if(activeChatRoomId) renderChatMessages();
+  } catch(err){
+    console.error('[location-recommend] status failed:', err);
+  }
+}
 document.getElementById('recommendModeCancelBtn').addEventListener('click', () => {
   document.getElementById('recommendModeOverlay').classList.remove('show');
 });
@@ -19708,8 +19867,17 @@ document.getElementById('recommendModeNextBtn').addEventListener('click', () => 
           method: 'POST',
           body: JSON.stringify(body),
         });
-        showToast('다른 멤버들에게 출발지를 요청했어요. 모두 제출하면 결과가 채팅방에 떠요.');
+        showToast('채팅방에 출발지 입력 카드를 올렸어요. 모두 제출하면 결과가 나와요.');
         pendingLocationRecommendByRoom[roomId] = data.requestId;
+        locationRecommendMyResponse[data.requestId] = true;
+        // 소켓으로도 오지만, 바로 보이도록 응답에 담긴 카드를 먼저 넣어둠 (같은 id면 중복으로 안 들어감)
+        const room = CHAT_ROOMS[roomId];
+        if(room && data.message && !room.messages.some(x => x._serverId === data.message.id)){
+          room.messages.push(mapServerLocationRecommendMessage(data.message));
+          touchRoom(roomId);
+          if(activeChatRoomId === roomId) renderChatMessages();
+          renderChatList();
+        }
       } catch(err){
         showToast(err.message);
       }
@@ -19717,8 +19885,7 @@ document.getElementById('recommendModeNextBtn').addEventListener('click', () => 
   });
 });
 
-// 다른 멤버가 추천을 요청하면 내 출발지를 입력해달라는 실시간 알림이 옴 - 바로 입력창을 띄움
-// (요청자 본인은 만들 때 이미 냈으므로 받지 않음 - notifyRoom이 요청자를 제외하고 보냄)
+// 채팅방의 장소 추천 카드에서 "내 출발지 입력하기"를 누르면 입력창을 띄움 (이미 냈으면 다시 내서 바꿀 수 있음)
 function promptLocationRecommendResponse(roomId, requestId, mode){
   const modeLabel = { FAIR: '공평하게', FASTEST: '가장 빠르게', CONSIDERATE: '먼 사람 배려' }[mode] || mode;
   openDepartureLocationPicker({
@@ -19734,6 +19901,8 @@ function promptLocationRecommendResponse(roomId, requestId, mode){
           method: 'POST',
           body: JSON.stringify(body),
         });
+        locationRecommendMyResponse[requestId] = true;
+        if(activeChatRoomId === roomId) renderChatMessages();
         showToast(data.completed ? '출발지를 제출했어요. 결과가 나왔어요!' : '출발지를 제출했어요. 다른 멤버를 기다리는 중이에요.');
       } catch(err){
         showToast(err.message);
