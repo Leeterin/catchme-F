@@ -5887,6 +5887,14 @@
   .inv-cell.best{ box-shadow:inset 0 0 0 2px #22C55E; }
   .inv-cell.confirmed{ background:#22C55E; background-image:none; color:#fff; }
   .inv-cell .inv-n{ opacity:0.85; }
+  .inv-fine{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+  .inv-fine-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:8px 12px; border-radius:11px; background:var(--surface-2); }
+  .inv-fine-row .d{ font-size:12.5px; font-weight:700; min-width:64px; }
+  .inv-fine-row .t{ color:var(--text-dim); font-size:12px; }
+  .inv-fine-sel{
+    padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--surface);
+    color:var(--text); font-size:13px; font-weight:700; font-family:'Roboto Mono',monospace;
+  }
   .inv-legend{ display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:var(--text-dim); margin-bottom:12px; }
   .inv-legend i{ display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:-1px; margin-right:4px; }
   .inv-people{ display:flex; flex-wrap:wrap; gap:6px; }
@@ -22393,6 +22401,8 @@ const inviteState = {
   error: '',
   draft: null,       // 만들기 화면 입력값
   myCells: new Set(),// 비회원 응답 화면에서 내가 고른 칸
+  myStartOff: {},    // 이어진 칸 묶음의 첫 칸 키 -> 그 시 안에서 시작 분 (예: 16시 칸 -> 45 = 16:45부터)
+  myEndOff: {},      // 이어진 칸 묶음의 마지막 칸 키 -> 그 시 안에서 끝 분 (5~60, 없으면 60 = 다음 정각까지)
   dirty: false,      // 고른 칸을 아직 제출 안 함
   submitted: false,
   guestName: '',
@@ -22449,7 +22459,11 @@ function inviteYmd(d){ return `${d.getFullYear()}-${invitePad(d.getMonth() + 1)}
 function inviteDateObj(s){ const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
 function inviteDateLabel(s){ const d = inviteDateObj(s); return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_KO[d.getDay()]})`; }
 function inviteCellKey(date, hour){ return `${date}|${invitePad(hour)}`; }
-function inviteRangeLabel(date, start, end){ return `${inviteDateLabel(date)} ${invitePad(start)}:00~${invitePad(end % 24)}:00`; }
+// 하루 중 몇 분 -> "16:45" (표시용은 24:00을 00:00으로, 서버 전송용은 24:00 그대로)
+function inviteHm(min){ return `${invitePad(Math.floor(min / 60) % 24)}:${invitePad(min % 60)}`; }
+function inviteHmRaw(min){ return `${invitePad(Math.floor(min / 60))}:${invitePad(min % 60)}`; }
+function inviteParseHm(s){ const [h, m] = String(s).split(':').map(Number); return h * 60 + m; }
+function inviteSelLabel(sel){ return `${inviteDateLabel(sel.date)} ${inviteHm(sel.sMin)}~${inviteHm(sel.eMin)}`; }
 function inviteConfirmedLabel(inv){
   if(!inv.confirmedStart) return '';
   const s = new Date(inv.confirmedStart);
@@ -22491,14 +22505,103 @@ function inviteCounts(inv, excludeMine){
   return map;
 }
 
-// 범위(같은 날짜 start~end시) 전체가 가능한 사람들
-function inviteAvailableFor(inv, sel){
-  return inv.responses.filter(r => {
-    for(let h = sel.start; h < sel.end; h++){
-      if(!r.cells.includes(inviteCellKey(sel.date, h))) return false;
-    }
-    return true;
+// 칸들 -> 날짜별로 이어진 칸 묶음 [{date, first, last}]
+function inviteCellBlocks(cells){
+  const byDate = {};
+  cells.forEach(c => { const [d, hh] = c.split('|'); (byDate[d] = byDate[d] || []).push(Number(hh)); });
+  const out = [];
+  Object.keys(byDate).sort().forEach(date => {
+    const hs = byDate[date].sort((a, b) => a - b);
+    let first = hs[0], prev = hs[0];
+    hs.slice(1).concat([null]).forEach(h => {
+      if(h !== null && h === prev + 1){ prev = h; return; }
+      out.push({ date, first, last: prev });
+      first = h; prev = h;
+    });
   });
+  return out;
+}
+
+// 한 사람이 되는 시간 (분 단위) [{date, s, e}] - 분 단위로 맞춘 값이 없으면 칸 그대로(정각~정각)
+function inviteResponseRanges(r){
+  const blocks = inviteCellBlocks(r.cells || []).map(b => ({ date: b.date, s: b.first * 60, e: (b.last + 1) * 60 }));
+  (r.ranges || []).forEach(x => {
+    const [date, a, b] = String(x).split('|');
+    const s = inviteParseHm(a), e = inviteParseHm(b);
+    const blk = blocks.find(k => k.date === date && s >= k.s && e <= k.e);
+    if(blk && s < e){ blk.s = s; blk.e = e; }
+  });
+  return blocks;
+}
+
+// 고른 범위(같은 날짜 sMin~eMin분) 전체가 가능한 사람들
+function inviteAvailableFor(inv, sel){
+  return inv.responses.filter(r => inviteResponseRanges(r).some(x => x.date === sel.date && x.s <= sel.sMin && x.e >= sel.eMin));
+}
+
+// 칸 단위로 고른 확정 범위를, 그 칸들이 다 되는 사람들이 실제로 되는 분 단위 시간으로 좁힘
+// (예: 16~19시를 골랐는데 보람이 16:45부터면 16:45~19:00)
+function inviteFitSel(inv, sel){
+  if(!sel) return sel;
+  let s = sel.start * 60, e = sel.end * 60;
+  inv.responses.forEach(r => {
+    const x = inviteResponseRanges(r).find(x => x.date === sel.date && x.s < sel.end * 60 && x.e > sel.start * 60);
+    if(!x || x.s >= sel.start * 60 + 60 || x.e <= sel.end * 60 - 60) return; // 칸이 다 되는 사람만
+    s = Math.max(s, x.s);
+    e = Math.min(e, x.e);
+  });
+  if(s >= e){ s = sel.start * 60; e = sel.end * 60; }
+  return { ...sel, sMin: s, eMin: e };
+}
+
+// 비회원 화면: 내가 고른 칸 묶음 + 분 단위로 맞춘 시작/끝
+function inviteMyBlocks(){
+  const st = inviteState;
+  return inviteCellBlocks([...st.myCells]).map(b => {
+    const s = b.first * 60 + (st.myStartOff[inviteCellKey(b.date, b.first)] || 0);
+    let e = b.last * 60 + (st.myEndOff[inviteCellKey(b.date, b.last)] || 60);
+    if(e <= s) e = Math.min(s + 5, (b.last + 1) * 60);
+    return { ...b, s, e };
+  });
+}
+function inviteSetMyRanges(ranges){
+  const st = inviteState;
+  st.myStartOff = {};
+  st.myEndOff = {};
+  (ranges || []).forEach(x => {
+    const [date, a, b] = String(x).split('|');
+    const s = inviteParseHm(a), e = inviteParseHm(b);
+    if(!(s < e)) return;
+    const fh = Math.floor(s / 60), lh = Math.ceil(e / 60) - 1;
+    if(s % 60) st.myStartOff[inviteCellKey(date, fh)] = s % 60;
+    if(e - lh * 60 !== 60) st.myEndOff[inviteCellKey(date, lh)] = e - lh * 60;
+  });
+}
+// 시작/끝이 정각이 아닌 칸은 되는 부분만 칠함 (칸은 위->아래가 시간 순서)
+function inviteMinePartialBg(key, blocks){
+  const [date, hh] = key.split('|');
+  const h = Number(hh);
+  const b = blocks.find(b => b.date === date && h >= b.first && h <= b.last);
+  if(!b) return '';
+  const a = Math.max(0, b.s - h * 60), z = Math.min(60, b.e - h * 60);
+  if(a === 0 && z === 60) return '';
+  const pa = (a / 60 * 100).toFixed(1), pz = (z / 60 * 100).toFixed(1);
+  return `linear-gradient(to bottom, var(--surface-2) 0 ${pa}%, var(--cta) ${pa}% ${pz}%, var(--surface-2) ${pz}% 100%)`;
+}
+
+function renderInviteFineHtml(){
+  const blocks = inviteMyBlocks();
+  if(!blocks.length) return '';
+  let html = '<div class="inv-sub-head"><b>분 단위로 맞추기</b><span>정각이 아니면 여기서 고쳐요</span></div><div class="inv-fine">';
+  blocks.forEach(b => {
+    let so = '', eo = '';
+    for(let m = b.first * 60; m < b.first * 60 + 60 && m < b.e; m += 5) so += `<option value="${m}"${m === b.s ? ' selected' : ''}>${inviteHm(m)}</option>`;
+    for(let m = b.last * 60 + 5; m <= b.last * 60 + 60; m += 5) if(m > b.s) eo += `<option value="${m}"${m === b.e ? ' selected' : ''}>${inviteHm(m)}</option>`;
+    html += `<div class="inv-fine-row"><span class="d">${inviteDateLabel(b.date)}</span>`
+      + `<select class="inv-fine-sel" data-fine="s" data-key="${inviteCellKey(b.date, b.first)}" aria-label="시작 시간">${so}</select><span class="t">부터</span>`
+      + `<select class="inv-fine-sel" data-fine="e" data-key="${inviteCellKey(b.date, b.last)}" aria-label="끝 시간">${eo}</select><span class="t">까지</span></div>`;
+  });
+  return html + '</div>';
 }
 
 // 가장 많은 사람이 되는 시간 - 최대 인원 칸이 이어지는 가장 긴 구간 (동점이면 앞 날짜/이른 시간)
@@ -22520,7 +22623,7 @@ function inviteBestBlock(inv){
     }
   });
   if(best) best.count = max;
-  return best;
+  return best ? inviteFitSel(inv, best) : null;
 }
 
 // ---------- 화면 열기/닫기 ----------
@@ -22687,6 +22790,7 @@ function applyInviteData(inv, resetMine){
   if(inviteState.mode === 'guest'){
     if(resetMine || !inviteState.dirty){
       inviteState.myCells = new Set(inv.myResponse ? inv.myResponse.cells : []);
+      inviteSetMyRanges(inv.myResponse ? inv.myResponse.ranges : []);
       inviteState.dirty = false;
     }
     // 만든 사람이 캘린더에서 지운 시간은 내 선택에서도 뺌
@@ -22699,7 +22803,8 @@ function applyInviteData(inv, resetMine){
     }
   } else {
     const sel = inviteState.confirmSel;
-    const valid = sel && inv.dates.includes(sel.date) && sel.start >= inv.startHour && sel.end <= inv.endHour;
+    const valid = sel && inv.dates.includes(sel.date) && sel.start >= inv.startHour && sel.end <= inv.endHour
+      && sel.sMin >= sel.start * 60 && sel.eMin <= sel.end * 60 && sel.sMin < sel.eMin;
     if(!valid) inviteState.confirmSel = inviteBestBlock(inv);
   }
 }
@@ -22898,6 +23003,7 @@ function renderInviteGridHtml(inv, mode){
   const st = inviteState;
   const counts = inviteCounts(inv, mode === 'guest');
   const max = Math.max(1, ...Object.values(counts));
+  const myBlocks = mode === 'guest' && inv.status === 'OPEN' ? inviteMyBlocks() : [];
   const isOpen = inv.status === 'OPEN';
   let confirmedCells = new Set();
   if(inv.status === 'CONFIRMED' && inv.confirmedStart){
@@ -22934,8 +23040,9 @@ function renderInviteGridHtml(inv, mode){
       if(open && !open.has(key)) cls += ' closed';
       if(confirmedCells.has(key)) cls += ' confirmed';
       else if(mode === 'guest' && st.myCells.has(key)) cls += ' mine';
+      const partial = mode === 'guest' && st.myCells.has(key) ? inviteMinePartialBg(key, myBlocks) : '';
       if(mode === 'manage' && isOpen && st.confirmSel && st.confirmSel.date === date && h >= st.confirmSel.start && h < st.confirmSel.end) cls += ' sel';
-      html += `<td class="${cls}" data-cell="${key}" style="--heat:${heat}">${n ? `<span class="inv-n">${n}</span>` : ''}</td>`;
+      html += `<td class="${cls}" data-cell="${key}" style="--heat:${heat}${partial ? `;background:${partial}` : ''}">${n ? `<span class="inv-n">${n}</span>` : ''}</td>`;
     });
     html += '</tr>';
   });
@@ -22987,6 +23094,15 @@ function renderInviteManageHtml(){
   html += renderInviteGridHtml(inv, 'manage');
   if(inv.status === 'OPEN' && n){
     html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>같은 날 다른 칸을 한 번 더 누르면 그 시간까지 늘어나요</span></div>`;
+    const sel = inviteState.confirmSel;
+    if(sel){
+      let so = '', eo = '';
+      for(let m = sel.start * 60; m < sel.eMin; m += 5) so += `<option value="${m}"${m === sel.sMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
+      for(let m = sel.sMin + 5; m <= sel.end * 60; m += 5) eo += `<option value="${m}"${m === sel.eMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
+      html += `<div class="inv-fine"><div class="inv-fine-row"><span class="d">${inviteDateLabel(sel.date)}</span>`
+        + `<select class="inv-fine-sel" data-fine="cs" aria-label="확정 시작 시간">${so}</select><span class="t">~</span>`
+        + `<select class="inv-fine-sel" data-fine="ce" aria-label="확정 끝 시간">${eo}</select><span class="t">분 단위로 맞추기</span></div></div>`;
+    }
   }
   if(n){
     const sel = inv.status === 'OPEN' ? inviteState.confirmSel : null;
@@ -22994,7 +23110,8 @@ function renderInviteManageHtml(){
     html += `<div class="inv-label">${sel ? '고른 시간에 되는 사람' : '응답한 사람'}</div><div class="inv-people">`
       + inv.responses.map(r => {
         const cls = okNames ? (okNames.has(r.name) ? ' ok' : ' no') : '';
-        return `<span class="inv-person${cls}">${escapeHtml(r.name)}${r.isMember ? ' · 회원' : ''}</span>`;
+        const times = sel ? inviteResponseRanges(r).filter(x => x.date === sel.date).map(x => `${inviteHm(x.s)}~${inviteHm(x.e)}`).join(', ') : '';
+        return `<span class="inv-person${cls}">${escapeHtml(r.name)}${r.isMember ? ' · 회원' : ''}${times ? ` · ${times}` : ''}</span>`;
       }).join('') + '</div>';
   }
   return html;
@@ -23070,7 +23187,8 @@ function renderInviteGuestHtml(){
     </div>
     <div class="inv-sub-head"><b>되는 시간 고르기</b><span>날짜/시간 이름을 누르면 한 줄 전체</span></div>
     ${renderInviteGridHtml(inv, 'guest')}
-    <div class="inv-legend"><span><i style="background:var(--cta)"></i>내가 고른 시간</span><span><i style="background:rgba(56,189,248,0.6)"></i>숫자 = 다른 친구들이 되는 인원</span>${openNow ? `<span><i style="background:repeating-linear-gradient(-45deg, transparent 0 3px, var(--line) 3px 4px);box-shadow:inset 0 0 0 1px var(--line)"></i>${creator}님이 안 되는 시간</span>` : ''}</div>`;
+    <div class="inv-legend"><span><i style="background:var(--cta)"></i>내가 고른 시간</span><span><i style="background:rgba(56,189,248,0.6)"></i>숫자 = 다른 친구들이 되는 인원</span>${openNow ? `<span><i style="background:repeating-linear-gradient(-45deg, transparent 0 3px, var(--line) 3px 4px);box-shadow:inset 0 0 0 1px var(--line)"></i>${creator}님이 안 되는 시간</span>` : ''}</div>
+    <div id="invFineBox">${renderInviteFineHtml()}</div>`;
   if(others.length){
     html += `<div class="inv-label">먼저 응답한 친구 ${others.length}명</div><div class="inv-people">`
       + others.map(r => `<span class="inv-person">${escapeHtml(r.name)}</span>`).join('') + '</div>';
@@ -23090,7 +23208,7 @@ function renderInviteFoot(){
       main = '<button type="button" class="inv-primary" data-act="share">친구들에게 링크 보내기</button>';
     } else {
       const ok = inviteAvailableFor(inv, sel).length;
-      const label = inviteRangeLabel(sel.date, sel.start, sel.end);
+      const label = inviteSelLabel(sel);
       main = st.armed === 'confirm'
         ? `<button type="button" class="inv-primary armed" data-act="confirm">한 번 더 누르면 ${escapeHtml(label)}로 확정돼요</button>`
         : `<button type="button" class="inv-primary" data-act="confirm"${st.busy ? ' disabled' : ''}>${escapeHtml(label)}로 확정 (${ok}/${inv.responses.length}명 가능)</button>`;
@@ -23114,16 +23232,23 @@ function renderInviteFoot(){
 function updateInviteGridClasses(){
   const st = inviteState;
   const inv = st.invite;
+  const myBlocks = st.mode === 'guest' ? inviteMyBlocks() : [];
   document.querySelectorAll('#inviteBody .inv-cell').forEach(td => {
     const key = td.dataset.cell;
     const [date, hh] = key.split('|');
     const h = Number(hh);
-    if(st.mode === 'guest') td.classList.toggle('mine', st.myCells.has(key));
+    if(st.mode === 'guest'){
+      const on = st.myCells.has(key);
+      td.classList.toggle('mine', on);
+      td.style.background = on ? inviteMinePartialBg(key, myBlocks) : '';
+    }
     if(st.mode === 'manage'){
       const sel = st.confirmSel;
       td.classList.toggle('sel', !!sel && inv.status === 'OPEN' && sel.date === date && h >= sel.start && h < sel.end);
     }
   });
+  const fine = document.getElementById('invFineBox');
+  if(fine && st.mode === 'guest') fine.innerHTML = renderInviteFineHtml();
 }
 
 function clearInviteArm(){
@@ -23150,6 +23275,8 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
     if(st.mode === 'guest'){
       if(cell.classList.contains('closed')){ showToast(`${inviteCreatorName(inv)}님이 안 되는 시간이에요.`); return; }
       if(st.myCells.has(key)) st.myCells.delete(key); else st.myCells.add(key);
+      delete st.myStartOff[key];
+      delete st.myEndOff[key];
       st.dirty = true;
       updateInviteGridClasses();
       renderInviteFoot();
@@ -23159,9 +23286,9 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
       const h = Number(hh);
       const sel = st.confirmSel;
       if(sel && sel.date === date && !sel.extended && !(h >= sel.start && h < sel.end)){
-        st.confirmSel = { date, start: Math.min(sel.start, h), end: Math.max(sel.end, h + 1), extended: true };
+        st.confirmSel = inviteFitSel(inv, { date, start: Math.min(sel.start, h), end: Math.max(sel.end, h + 1), extended: true });
       } else {
-        st.confirmSel = { date, start: h, end: h + 1, extended: false };
+        st.confirmSel = inviteFitSel(inv, { date, start: h, end: h + 1, extended: false });
       }
       clearInviteArm();
       renderInviteOverlay();
@@ -23260,6 +23387,26 @@ document.getElementById('inviteOverlay').addEventListener('input', (e) => {
 });
 
 document.getElementById('inviteOverlay').addEventListener('change', (e) => {
+  const fine = e.target.closest('.inv-fine-sel');
+  if(fine){
+    const st = inviteState;
+    const v = Number(fine.value);
+    const kind = fine.dataset.fine;
+    if(kind === 's' || kind === 'e'){
+      const key = fine.dataset.key;
+      const off = v - Number(key.split('|')[1]) * 60;
+      if(kind === 's'){ if(off) st.myStartOff[key] = off; else delete st.myStartOff[key]; }
+      else { if(off !== 60) st.myEndOff[key] = off; else delete st.myEndOff[key]; }
+      st.dirty = true;
+      updateInviteGridClasses();
+      renderInviteFoot();
+    } else if(st.confirmSel){
+      if(kind === 'cs') st.confirmSel.sMin = v; else st.confirmSel.eMin = v;
+      clearInviteArm();
+      renderInviteOverlay();
+    }
+    return;
+  }
   const d = inviteState.draft;
   if(!d) return;
   if(e.target.id === 'invStartHour' || e.target.id === 'invEndHour'){
@@ -23414,7 +23561,7 @@ async function submitInviteResponse(){
     if(!authToken) inviteStoreSet('catchme_guest_name', name);
     const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/respond`, {
       method: 'POST',
-      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, true), name, cells: [...st.myCells] }),
+      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, true), name, cells: [...st.myCells], ranges: inviteMyBlocks().map(b => `${b.date}|${inviteHmRaw(b.s)}|${inviteHmRaw(b.e)}`) }),
     });
     st.busy = false;
     st.submitted = true;
@@ -23442,7 +23589,7 @@ async function confirmInviteSelection(){
   try {
     const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/confirm`, {
       method: 'POST',
-      body: JSON.stringify({ date: sel.date, startHour: sel.start, endHour: sel.end }),
+      body: JSON.stringify({ date: sel.date, startHour: sel.start, endHour: sel.end, startMin: sel.sMin, endMin: sel.eMin }),
     });
     st.busy = false;
     applyInviteData(data.invite, true);
