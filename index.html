@@ -609,6 +609,79 @@
   }
   .location-picker-recommend-chip.active{ background:var(--accent); }
   .location-suggest-item .meta{ font-size:10.5px; color:var(--accent); margin-top:2px; }
+  /* 지도 상단 "모임 장소 추천받기" 버튼 (채팅방 약속 장소를 정할 때만 보임) */
+  .location-picker-recommend-meet{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    margin-bottom:8px;
+    padding:9px 12px;
+    border:none;
+    border-radius:12px;
+    background:var(--accent);
+    color:#fff;
+    font-size:12.5px;
+    font-weight:700;
+    text-align:left;
+    cursor:pointer;
+  }
+  .location-picker-recommend-meet[hidden]{ display:none; }
+  .location-picker-recommend-meet .sub{ font-weight:500; font-size:11px; opacity:0.85; margin-left:auto; }
+  /* 친구에게 제안할 장소 후보 목록 (여러 곳 담아서 한 번에 제안) */
+  .location-picker-candidates{
+    flex-shrink:0;
+    padding:10px 16px 0;
+    background:var(--surface);
+    border-top:1px solid var(--line);
+  }
+  .location-picker-candidates[hidden]{ display:none; }
+  .location-picker-candidates-title{ font-size:11.5px; color:var(--text-dim); font-weight:600; margin-bottom:6px; }
+  .location-picker-candidate-row{ display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; padding-bottom:2px; }
+  .location-picker-candidate-row::-webkit-scrollbar{ display:none; }
+  .location-picker-candidate{
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    gap:4px;
+    max-width:180px;
+    padding:6px 8px 6px 10px;
+    border-radius:999px;
+    background:var(--accent-soft);
+    color:var(--accent);
+    font-size:12px;
+    font-weight:600;
+  }
+  .location-picker-candidate span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .location-picker-candidate button{ border:none; background:none; color:inherit; font-size:15px; line-height:1; padding:0 2px; cursor:pointer; }
+  .location-picker-bottom-btns{ display:flex; gap:6px; flex-shrink:0; }
+  .location-picker-bottom-card .location-picker-add-btn{
+    height:40px;
+    padding:0 12px;
+    border-radius:10px;
+    border:1.5px solid var(--accent);
+    background:var(--surface);
+    color:var(--accent);
+    font-size:12.5px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .location-picker-add-btn:disabled{ opacity:0.4; cursor:default; }
+  .location-picker-add-btn[hidden]{ display:none; }
+  /* 제안된 장소 지도 보기 - 지도 위 장소 이름표 */
+  .place-viewer-label{
+    padding:4px 8px;
+    border-radius:8px;
+    background:#fff;
+    color:#17181D;
+    font-size:11px;
+    font-weight:700;
+    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+    white-space:nowrap;
+    transform:translateY(-44px);
+    cursor:pointer;
+  }
+  .place-viewer-label.on{ background:var(--accent); color:#fff; }
   .location-picker-map-area{
     position:relative;
     flex:1;
@@ -6061,6 +6134,9 @@
       <span class="location-picker-topbar-spacer"></span>
     </div>
     <div class="location-search-wrap location-picker-searchbar">
+      <button type="button" class="location-picker-recommend-meet" id="locationPickerMeetRecommendBtn" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> 모임 장소 추천받기<span class="sub">각자 출발지로 모두에게 가까운 곳 찾기 &#8250;</span>
+      </button>
       <input class="location-picker-search-input" id="locationPickerInput" placeholder="장소명으로 검색" maxlength="60" autocomplete="off" />
       <div class="location-picker-recommend-row" id="locationPickerRecommendRow">
         <button type="button" class="location-picker-recommend-chip" data-rec="catchme">캐치미 추천</button>
@@ -6078,12 +6154,44 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
       </button>
     </div>
+    <div class="location-picker-candidates" id="locationPickerCandidates" hidden>
+      <div class="location-picker-candidates-title">친구에게 제안할 장소</div>
+      <div class="location-picker-candidate-row" id="locationPickerCandidateRow"></div>
+      <button type="button" class="profile-chat-btn" id="locationPickerSuggestSendBtn" style="margin:8px 0 2px;">제안하기</button>
+    </div>
     <div class="location-picker-bottom-card" id="locationPickerBottomCard">
       <div class="location-picker-bottom-text">
         <div class="location-picker-bottom-name" id="locationPickerBottomName">지도를 눌러 위치를 찍어보세요</div>
         <div class="location-picker-bottom-addr" id="locationPickerBottomAddr"></div>
       </div>
-      <button type="button" class="profile-chat-btn" id="locationPickerConfirmBtn" disabled>선택완료</button>
+      <div class="location-picker-bottom-btns">
+        <button type="button" class="location-picker-add-btn" id="locationPickerAddCandidateBtn" disabled hidden>+ 제안 후보</button>
+        <button type="button" class="profile-chat-btn" id="locationPickerConfirmBtn" disabled>선택완료</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 친구가 제안한 장소(들)를 지도로 보기 - 채팅의 "장소 제안" 카드에서 "지도에서 보기"로 열림 -->
+  <div class="location-picker-full" id="placeViewerOverlay">
+    <div class="location-picker-topbar">
+      <button type="button" class="location-picker-close" id="placeViewerCloseBtn" aria-label="닫기">&times;</button>
+      <div class="location-picker-title">제안된 장소</div>
+      <span class="location-picker-topbar-spacer"></span>
+    </div>
+    <div class="location-picker-searchbar" style="padding-top:0;">
+      <div class="location-picker-recommend-row" id="placeViewerChipRow" style="margin-top:0;"></div>
+    </div>
+    <div class="location-picker-map-area">
+      <div id="placeViewerMap" style="width:100%;height:100%;"></div>
+    </div>
+    <div class="location-picker-bottom-card">
+      <div class="location-picker-bottom-text">
+        <div class="location-picker-bottom-name" id="placeViewerName"></div>
+        <div class="location-picker-bottom-addr" id="placeViewerAddr"></div>
+      </div>
+      <div class="location-picker-bottom-btns">
+        <button type="button" class="profile-chat-btn" id="placeViewerAcceptBtn" hidden>이 장소로 수락</button>
+      </div>
     </div>
   </div>
 
@@ -17139,6 +17247,117 @@ async function fixHotplaceLocation(post){
   showToast(`장소가 "${post.place}"(으)로 확정됐어요!`);
 }
 
+// 받은 장소 제안 수락 (채팅 카드의 "수락" / 제안 지도 보기의 "이 장소로 수락" 공용)
+async function acceptLocationSuggestMsg(m, room){
+  const roomId = Object.keys(CHAT_ROOMS).find(k => CHAT_ROOMS[k] === room) || activeChatRoomId;
+  if(m._serverId){
+    try {
+      const data = await apiRequest(`/chats/location-suggestions/${m._serverId}/accept`, { method: 'POST' });
+      Object.assign(m, mapServerLocationSuggestMessage(data.message));
+      await loadPinsFromServer(roomId, room);
+      renderChatMessages();
+      renderPinnedSchedule();
+      renderChatList();
+      refreshHotplaceListsIfOpen();
+      return true;
+    } catch(err){
+      showToast(err.message);
+      return false;
+    }
+  }
+  m.status = 'confirmed';
+  addLocationOnlyPin(roomId, room, m.place, null, null, m.note, m.id);
+  touchRoom(roomId);
+  renderChatMessages();
+  renderPinnedSchedule();
+  renderChatList();
+  refreshHotplaceListsIfOpen();
+  return true;
+}
+
+// ---------- 제안된 장소 지도로 보기 - 이 방에서 답을 기다리는 장소 제안들을 한 지도에 다 띄우고, 눌러서 비교/수락 ----------
+let placeViewerMap = null;
+let placeViewerOverlays = [];
+let placeViewerState = null; // { roomId, items:[msg], idx }
+function openPlaceSuggestionMap(roomId, focusMsgId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  const withCoords = m => m.type === 'location-suggest' && typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
+  const focus = (room.messages || []).find(m => m.id === focusMsgId);
+  // 아직 답을 기다리는 제안들 + 지금 누른 제안(이미 확정/취소된 것이어도)
+  const items = (room.messages || []).filter(m => withCoords(m) && (m.status === 'pending' || m === focus));
+  if(!items.length) return;
+  placeViewerState = { roomId, items, idx: Math.max(0, items.indexOf(focus)) };
+  document.getElementById('placeViewerOverlay').classList.add('show');
+  pushViewState(closePlaceSuggestionMap);
+  ensureKakaoMapsLoaded(() => {
+    if(!placeViewerMap){
+      placeViewerMap = new kakao.maps.Map(document.getElementById('placeViewerMap'), {
+        center: new kakao.maps.LatLng(items[0].locationLat, items[0].locationLon),
+        level: 5,
+      });
+    }
+    placeViewerOverlays.forEach(o => o.setMap(null));
+    placeViewerOverlays = [];
+    const bounds = new kakao.maps.LatLngBounds();
+    items.forEach((m, idx) => {
+      const pos = new kakao.maps.LatLng(m.locationLat, m.locationLon);
+      bounds.extend(pos);
+      const marker = new kakao.maps.Marker({ position: pos, map: placeViewerMap });
+      kakao.maps.event.addListener(marker, 'click', () => selectPlaceViewerItem(idx, false));
+      const label = document.createElement('div');
+      label.className = 'place-viewer-label';
+      label.textContent = m.place;
+      label.addEventListener('click', () => selectPlaceViewerItem(idx, false));
+      const overlay = new kakao.maps.CustomOverlay({ position: pos, content: label, yAnchor: 0, map: placeViewerMap });
+      placeViewerOverlays.push(marker, overlay);
+      m._viewerLabel = label;
+    });
+    setTimeout(() => {
+      placeViewerMap.relayout();
+      if(items.length > 1) placeViewerMap.setBounds(bounds);
+      selectPlaceViewerItem(placeViewerState.idx, items.length === 1);
+    }, 0);
+  });
+}
+function selectPlaceViewerItem(idx, recenter){
+  if(!placeViewerState) return;
+  const { items, roomId } = placeViewerState;
+  const m = items[idx];
+  if(!m) return;
+  placeViewerState.idx = idx;
+  items.forEach((it, i) => { if(it._viewerLabel) it._viewerLabel.classList.toggle('on', i === idx); });
+  if(recenter !== false && placeViewerMap) placeViewerMap.setCenter(new kakao.maps.LatLng(m.locationLat, m.locationLon));
+  document.getElementById('placeViewerChipRow').innerHTML = items.length > 1 ? items.map((it, i) => `
+    <button type="button" class="location-picker-recommend-chip${i === idx ? ' active' : ''}" data-idx="${i}">${escapeHtml(it.place)}</button>
+  `).join('') : '';
+  document.getElementById('placeViewerName').textContent = `${m.place} 어때요?`;
+  const statusText = m.status === 'confirmed' ? '이 장소로 확정됐어요' : (m.status === 'pending' ? '' : '지금은 지난 제안이에요');
+  document.getElementById('placeViewerAddr').textContent = [m.location, statusText].filter(Boolean).join(' · ');
+  const room = CHAT_ROOMS[roomId];
+  document.getElementById('placeViewerAcceptBtn').hidden = !(room && m.who === 'other' && m.status === 'pending');
+}
+function closePlaceSuggestionMap(){
+  document.getElementById('placeViewerOverlay').classList.remove('show');
+  placeViewerState = null;
+}
+document.getElementById('placeViewerChipRow').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-idx]');
+  if(chip) selectPlaceViewerItem(parseInt(chip.dataset.idx, 10));
+});
+document.getElementById('placeViewerCloseBtn').addEventListener('click', () => goBackOrClose(closePlaceSuggestionMap));
+document.getElementById('placeViewerAcceptBtn').addEventListener('click', async () => {
+  if(!placeViewerState) return;
+  const room = CHAT_ROOMS[placeViewerState.roomId];
+  const m = placeViewerState.items[placeViewerState.idx];
+  if(!room || !m) return;
+  const ok = await acceptLocationSuggestMsg(m, room);
+  if(ok){
+    goBackOrClose(closePlaceSuggestionMap);
+    showToast(`"${m.place}"(으)로 약속 장소가 정해졌어요!`);
+  }
+});
+
 // 내가 보낸 장소 제안 취소
 function cancelLocationSuggest(msg){
   if(msg._timeoutId) clearTimeout(msg._timeoutId);
@@ -17582,8 +17801,11 @@ let locationPickerSelected = null; // 검색으로 고르거나 지도에 핀 �
 let locationPickerMapInstance = null;
 let locationPickerMarker = null;
 let locationPickerGeocoder = null;
+// 채팅방 약속 장소를 정할 때만 씀: { roomId } - 상단 "모임 장소 추천받기"와 "친구에게 여러 곳 제안하기"가 켜짐
+let locationPickerOpts = null;
+let locationPickerCandidates = []; // 친구에게 제안할 후보 [{ label, addr, lat, lon }]
 
-function openLocationPicker(initialQuery, initialLat, initialLon, callback){
+function openLocationPicker(initialQuery, initialLat, initialLon, callback, opts){
   // 예전 호출부 호환: openLocationPicker(query, callback)처럼 좌표 없이 부르는 경우도 지원
   if(typeof initialLat === 'function'){
     callback = initialLat;
@@ -17591,6 +17813,11 @@ function openLocationPicker(initialQuery, initialLat, initialLon, callback){
     initialLon = null;
   }
   locationPickerCallback = callback;
+  locationPickerOpts = opts && opts.roomId ? opts : null;
+  locationPickerCandidates = [];
+  renderLocationPickerCandidates();
+  document.getElementById('locationPickerMeetRecommendBtn').hidden = !locationPickerOpts;
+  document.getElementById('locationPickerAddCandidateBtn').hidden = !locationPickerOpts;
   const input = document.getElementById('locationPickerInput');
   input.value = '';
   document.getElementById('locationPickerSuggestList').classList.remove('show');
@@ -17626,12 +17853,15 @@ function closeLocationPicker(){
   document.getElementById('locationPickerSuggestList').classList.remove('show');
   setLocationPickerRecommendChip(null);
   resetLocationPickerSelection();
+  locationPickerOpts = null;
+  locationPickerCandidates = [];
 }
 
 // 새로 열거나 닫을 때, 이전에 찍어둔 핀/선택완료 버튼 상태를 초기화
 function resetLocationPickerSelection(){
   locationPickerSelected = null;
   document.getElementById('locationPickerConfirmBtn').disabled = true;
+  document.getElementById('locationPickerAddCandidateBtn').disabled = true;
   document.getElementById('locationPickerBottomName').textContent = '지도를 눌러 위치를 찍어보세요';
   document.getElementById('locationPickerBottomAddr').textContent = '';
   if(locationPickerMarker){ locationPickerMarker.setMap(null); locationPickerMarker = null; }
@@ -17686,18 +17916,98 @@ function placeLocationPickerMarkerAt(lat, lon, opts){
 }
 
 // 검색으로 고른 장소 하나를 지도에 반영 + 핀을 찍고 하단 카드/선택완료 버튼을 활성화 (화면에 없던 곳이니 지도를 그 위치로 옮겨줌)
-function placeLocationPickerPin(lat, lon, label){
+function placeLocationPickerPin(lat, lon, label, addr){
   placeLocationPickerMarkerAt(lat, lon, { recenter:true });
-  setLocationPickerSelected(label, lat, lon);
+  setLocationPickerSelected(label, lat, lon, addr);
 }
 
 // 확정된 위치를 하단 카드에 표시하고 선택완료 버튼을 활성화
-function setLocationPickerSelected(label, lat, lon){
-  locationPickerSelected = { label, lat, lon };
+function setLocationPickerSelected(label, lat, lon, addr){
+  locationPickerSelected = { label, lat, lon, addr: addr || '' };
   document.getElementById('locationPickerBottomName').textContent = label;
-  document.getElementById('locationPickerBottomAddr').textContent = '이 위치로 정할까요?';
+  document.getElementById('locationPickerBottomAddr').textContent = addr && addr !== label
+    ? addr
+    : (locationPickerOpts ? '바로 정하거나, 후보로 담아 친구에게 제안할 수 있어요' : '이 위치로 정할까요?');
   document.getElementById('locationPickerConfirmBtn').disabled = false;
+  document.getElementById('locationPickerAddCandidateBtn').disabled = false;
 }
+
+// ---------- 친구에게 여러 장소 제안하기 (후보를 담아두고 한 번에 "장소 제안" 카드로 보냄) ----------
+function renderLocationPickerCandidates(){
+  const wrap = document.getElementById('locationPickerCandidates');
+  wrap.hidden = !locationPickerCandidates.length;
+  document.getElementById('locationPickerCandidateRow').innerHTML = locationPickerCandidates.map((c, idx) => `
+    <div class="location-picker-candidate"><span>${escapeHtml(c.label)}</span><button type="button" data-idx="${idx}" aria-label="빼기">&times;</button></div>
+  `).join('');
+  document.getElementById('locationPickerSuggestSendBtn').textContent = `${locationPickerCandidates.length}곳 친구에게 제안하기`;
+}
+document.getElementById('locationPickerCandidateRow').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-idx]');
+  if(!btn) return;
+  locationPickerCandidates.splice(parseInt(btn.dataset.idx, 10), 1);
+  renderLocationPickerCandidates();
+});
+document.getElementById('locationPickerAddCandidateBtn').addEventListener('click', () => {
+  const sel = locationPickerSelected;
+  if(!sel) return;
+  if(locationPickerCandidates.some(c => c.label === sel.label)){
+    showToast('이미 담은 장소예요.');
+    return;
+  }
+  if(locationPickerCandidates.length >= 5){
+    showToast('한 번에 5곳까지 제안할 수 있어요.');
+    return;
+  }
+  locationPickerCandidates.push({ ...sel });
+  renderLocationPickerCandidates();
+  showToast(`"${sel.label}"을(를) 후보에 담았어요. 다른 곳도 골라보세요.`);
+});
+document.getElementById('locationPickerSuggestSendBtn').addEventListener('click', async () => {
+  const opts = locationPickerOpts;
+  const list = locationPickerCandidates.slice();
+  if(!opts || !list.length) return;
+  const roomId = opts.roomId;
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  const btn = document.getElementById('locationPickerSuggestSendBtn');
+  btn.disabled = true;
+  let sent = 0;
+  const failed = [];
+  for(const c of list){
+    const place = c.label;
+    const location = c.addr && c.addr !== c.label ? c.addr : '';
+    if(room.isRealRoom){
+      try {
+        const data = await apiRequest(`/chats/${roomId}/location-suggestions`, {
+          method: 'POST',
+          body: JSON.stringify({ place, location, locationLat: c.lat, locationLon: c.lon }),
+        });
+        room.messages.push(mapServerLocationSuggestMessage(data.message));
+        sent++;
+      } catch(err){
+        failed.push(err.message);
+      }
+    } else {
+      room.messages.push({
+        who: 'me', type: 'location-suggest', id: 'lsug' + (locationMsgIdCounter++),
+        place, note: '', location, locationLat: c.lat, locationLon: c.lon, status: 'pending', time: new Date(),
+      });
+      sent++;
+    }
+  }
+  btn.disabled = false;
+  closeLocationPicker();
+  touchRoom(roomId);
+  if(activeChatRoomId === roomId) renderChatMessages();
+  renderChatList();
+  if(sent) showToast(failed.length ? `${sent}곳을 제안했어요. (${failed[0]})` : `${sent}곳을 친구에게 제안했어요. 친구가 지도로 보고 고를 수 있어요.`);
+  else if(failed.length) showToast(failed[0]);
+});
+document.getElementById('locationPickerMeetRecommendBtn').addEventListener('click', () => {
+  const opts = locationPickerOpts;
+  closeLocationPicker();
+  if(opts) startLocationRecommend(opts.roomId);
+});
 
 // 카카오 장소 검색(키워드 검색)으로 "강남역", "강남역 5번출구"처럼 실제로 등록된 장소들을 목록으로 보여줌
 function searchLocationPickerSuggestions(query, opts){
@@ -17863,7 +18173,7 @@ document.getElementById('locationPickerSuggestList').addEventListener('click', (
   document.getElementById('locationPickerSuggestList').classList.remove('show');
   setLocationPickerRecommendChip(null);
   const lat = parseFloat(picked.y), lon = parseFloat(picked.x);
-  placeLocationPickerPin(lat, lon, picked.place_name);
+  placeLocationPickerPin(lat, lon, picked.place_name, picked.road_address_name || picked.address_name || '');
 });
 
 document.getElementById('locationPickerConfirmBtn').addEventListener('click', () => {
@@ -18493,7 +18803,7 @@ let activeChatRoomId = null;
 // 핀의 장소를 새로 고르고(장소 선택 팝업), 서버 동기화 + "장소가 변경됐어요" 알림까지 처리하는 공용 로직.
 // 상단 고정 카드의 "장소 정하기" 버튼과, 약속 상세보기 화면의 "변경" 버튼이 같이 씀.
 // afterPicked(label, lat, lon)로 화면마다 다른 마무리 동작(핫플 열기, 상세보기 다시 그리기 등)을 넘김
-function changePinLocation(room, roomId, pin, afterPicked){
+function changePinLocation(room, roomId, pin, afterPicked, pickerOpts){
   openLocationPicker(pin.location || '', pin.locationLat, pin.locationLon, async (label, lat, lon) => {
     pin.location = label;
     pin.locationLat = lat;
@@ -18512,7 +18822,7 @@ function changePinLocation(room, roomId, pin, afterPicked){
     renderChatMessages();
     renderChatList();
     if(afterPicked) afterPicked(label, lat, lon);
-  });
+  }, pickerOpts);
 }
 
 function renderPinnedSchedule(){
@@ -18598,9 +18908,8 @@ function renderPinnedSchedule(){
     if(setLocBtn){
       setLocBtn.addEventListener('click', () => {
         const roomId = activeChatRoomId;
-        const pickDirect = () => changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon));
-        // 장소를 정할 때는 항상 "모임 장소 추천받기"를 먼저 추천함 (직접 고르기도 그대로 가능)
-        openPlaceChoice(roomId, pickDirect);
+        // 바로 지도가 열림 - 지도 상단에 "모임 장소 추천받기", 아래에 "제안 후보 담기"가 있어서 거기서 다 할 수 있음
+        changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
       });
     }
 
@@ -19211,13 +19520,18 @@ function renderChatMessages(){
       const statusLabel = m.status === 'confirmed' ? '장소로 확정됨' : (m.status === 'cancelled' ? '제안 취소됨' : '제안됨');
       const showAccept = m.who === 'other' && m.status === 'pending';
       const showCancel = m.who === 'me' && m.status === 'pending';
+      const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
       const cardHtml = `
         <div class="reservation-card">
           <div class="reservation-card-header">${ICO.pin} 장소 제안 - 여기 어때요?</div>
           <div class="reservation-card-time">${escapeHtml(m.place)}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
-          <div class="reservation-card-note">${escapeHtml(m.location)}</div>
+          ${m.location ? `<div class="reservation-card-note">${escapeHtml(m.location)}</div>` : ''}
           <div class="reservation-card-status ${m.status}">${statusLabel}</div>
+          ${hasCoords ? `
+            <div class="reservation-card-actions">
+              <button class="reservation-btn decline ls-map-btn">${ICO.pin} 지도에서 보기</button>
+            </div>` : ''}
           ${showAccept ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn accept">수락</button>
@@ -19230,30 +19544,10 @@ function renderChatMessages(){
       `;
       row.innerHTML = m.who === 'me' ? (metaHtml + cardHtml) : (cardHtml + metaHtml);
       if(showAccept){
-        row.querySelector('.reservation-btn.accept').addEventListener('click', async () => {
-          if(m._serverId){
-            try {
-              const data = await apiRequest(`/chats/location-suggestions/${m._serverId}/accept`, { method: 'POST' });
-              Object.assign(m, mapServerLocationSuggestMessage(data.message));
-              await loadPinsFromServer(activeChatRoomId, room);
-              renderChatMessages();
-              renderPinnedSchedule();
-              renderChatList();
-              refreshHotplaceListsIfOpen();
-            } catch(err){
-              showToast(err.message);
-            }
-            return;
-          }
-          m.status = 'confirmed';
-          addLocationOnlyPin(activeChatRoomId, room, m.place, null, null, m.note, m.id);
-          touchRoom(activeChatRoomId);
-          renderChatMessages();
-          renderPinnedSchedule();
-          renderChatList();
-          refreshHotplaceListsIfOpen();
-        });
+        row.querySelector('.reservation-btn.accept').addEventListener('click', () => acceptLocationSuggestMsg(m, room));
       }
+      const mapBtn = row.querySelector('.ls-map-btn');
+      if(mapBtn) mapBtn.addEventListener('click', () => openPlaceSuggestionMap(activeChatRoomId, m.id));
       if(showCancel){
         row.querySelector('.reservation-btn.decline').addEventListener('click', () => {
           cancelLocationSuggest(m);
