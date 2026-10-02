@@ -5802,6 +5802,33 @@
     -webkit-tap-highlight-color:transparent;
   }
   .inv-cell.readonly{ cursor:default; }
+  .inv-cell.closed{
+    background:var(--surface);
+    background-image:repeating-linear-gradient(-45deg, transparent 0 5px, var(--line) 5px 6px);
+    cursor:default;
+  }
+  .inv-src-tabs{ display:flex; gap:4px; padding:4px; border-radius:12px; background:var(--surface-2); margin-bottom:18px; }
+  .inv-src-tabs button{
+    flex:1; padding:9px 6px; border:0; border-radius:9px; background:transparent;
+    color:var(--text-dim); font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .inv-src-tabs button.on{ background:var(--surface); color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+  .inv-cal-days{ display:flex; flex-direction:column; gap:6px; }
+  .inv-cal-day{
+    display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+    padding:10px 12px; border-radius:11px; border:1px solid var(--line);
+    background:var(--surface); color:var(--text); cursor:pointer;
+  }
+  .inv-cal-day .ck{
+    flex-shrink:0; width:20px; height:20px; border-radius:6px; border:1.5px solid var(--line);
+    display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800;
+  }
+  .inv-cal-day.on{ border-color:#38BDF8; background:rgba(56,189,248,0.08); }
+  .inv-cal-day.on .ck{ background:#38BDF8; border-color:#38BDF8; }
+  .inv-cal-day .d{ font-size:13px; font-weight:700; min-width:64px; }
+  .inv-cal-day .r{ font-size:12.5px; color:var(--text-dim); line-height:1.45; }
+  .inv-cal-day.on .r{ color:var(--text); }
+  .inv-cal-all{ border:0; background:none; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; padding:0; }
   .inv-cell.mine{ background:var(--cta); background-image:none; color:#fff; }
   .inv-cell.sel{ box-shadow:inset 0 0 0 2px var(--cta); }
   .inv-cell.best{ box-shadow:inset 0 0 0 2px #22C55E; }
@@ -21963,9 +21990,26 @@ function inviteConfirmedLabel(inv){
   const hm = d => `${invitePad(d.getHours())}:${invitePad(d.getMinutes())}`;
   return `${s.getMonth() + 1}월 ${s.getDate()}일 (${WEEKDAY_KO[s.getDay()]}) ${hm(s)} ~ ${hm(e)}`;
 }
+// [14,15,16,19] -> "14:00~17:00, 19:00~20:00"
+function inviteHoursLabel(hours){
+  const sorted = [...hours].sort((a, b) => a - b);
+  const parts = [];
+  let start = null, prev = null;
+  sorted.concat([null]).forEach(h => {
+    if(h !== null && prev !== null && h === prev + 1){ prev = h; return; }
+    if(start !== null) parts.push(`${invitePad(start)}:00~${invitePad((prev + 1) % 24)}:00`);
+    start = h; prev = h;
+  });
+  return parts.join(', ');
+}
+// 캘린더 기준 링크면 지금 열려있는 칸 Set, 아니면 null(범위 안 전부 가능)
+function inviteOpenSet(inv){
+  return inv && inv.status === 'OPEN' && Array.isArray(inv.openCells) ? new Set(inv.openCells) : null;
+}
 function inviteDatesSummary(inv){
   const first = inviteDateLabel(inv.dates[0]);
   const more = inv.dates.length > 1 ? ` 외 ${inv.dates.length - 1}일` : '';
+  if(inv.fromCalendar) return `${first}${more} · 내 캘린더의 예약 가능 시간`;
   return `${first}${more} · ${invitePad(inv.startHour)}:00~${invitePad(inv.endHour % 24)}:00`;
 }
 function inviteCreatorName(inv){ return (inv.creator && inv.creator.name) || '친구'; }
@@ -22075,11 +22119,50 @@ function openInviteCreate(fromList){
   today.setHours(0, 0, 0, 0);
   const sat = new Date(today);
   sat.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7));
-  inviteState.draft = { dates: new Set([inviteYmd(sat)]), title: '', startHour: 10, endHour: 22 };
+  // 기본은 "내 캘린더의 예약 가능 시간"으로 - 직접 고르기는 탭으로 바꿀 수 있음
+  inviteState.draft = {
+    source: 'calendar',
+    dates: new Set([inviteYmd(sat)]), title: '', startHour: 10, endHour: 22,
+    calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
+    calDates: new Set(),
+    calError: '',
+  };
   inviteState.fromList = !!fromList;
   inviteState.mode = 'create';
   showInviteOverlay();
   renderInviteOverlay();
+  loadInviteCalendarDays();
+}
+
+async function loadInviteCalendarDays(){
+  const d = inviteState.draft;
+  try {
+    const data = await apiRequest('/invites/availability');
+    if(inviteState.draft !== d) return;
+    d.calDays = data.days || [];
+    d.calDates = new Set(d.calDays.slice(0, 14).map(x => x.date));
+  } catch(err) {
+    if(inviteState.draft !== d) return;
+    d.calDays = [];
+    d.calError = err.message || '예약 가능 시간을 불러오지 못했어요.';
+  }
+  if(inviteState.mode === 'create') renderInviteOverlay();
+}
+
+// 링크 화면을 닫고 "예약 가능 시간" 등록 화면으로 보냄
+function goRegisterAvailabilityFromInvite(){
+  const open = () => {
+    scheduleFocusDate = new Date();
+    openEventForm();
+    setEventTypeUI('available');
+  };
+  if(viewCloseStack.length > 0){
+    window.addEventListener('popstate', () => setTimeout(open, 0), { once: true });
+    history.back();
+  } else {
+    hideInviteOverlay();
+    open();
+  }
 }
 
 async function openInviteByToken(token, opts = {}){
@@ -22117,6 +22200,9 @@ function applyInviteData(inv, resetMine){
       inviteState.myCells = new Set(inv.myResponse ? inv.myResponse.cells : []);
       inviteState.dirty = false;
     }
+    // 만든 사람이 캘린더에서 지운 시간은 내 선택에서도 뺌
+    const open = inviteOpenSet(inv);
+    if(open) [...inviteState.myCells].forEach(k => { if(!open.has(k)) inviteState.myCells.delete(k); });
     if(!inviteState.guestName){
       inviteState.guestName = (inv.myResponse && inv.myResponse.name)
         || (currentUser && currentUser.name)
@@ -22170,7 +22256,11 @@ function renderInviteOverlay(){
   if(st.mode === 'create'){
     titleEl.textContent = '약속 링크 만들기';
     body.innerHTML = renderInviteCreateHtml();
-    foot.innerHTML = `<button type="button" class="inv-primary" data-act="create"${st.busy ? ' disabled' : ''}>${st.busy ? '만드는 중...' : '링크 만들기'}</button>`;
+    const d = st.draft;
+    const calBlocked = d.source === 'calendar' && (!d.calDays || d.calDates.size === 0);
+    const label = st.busy ? '만드는 중...'
+      : d.source === 'calendar' && d.calDates.size ? `예약 가능 시간 ${d.calDates.size}일로 링크 만들기` : '링크 만들기';
+    foot.innerHTML = `<button type="button" class="inv-primary" data-act="create"${st.busy || calBlocked ? ' disabled' : ''}>${label}</button>`;
     return;
   }
   if(st.mode === 'manage'){
@@ -22206,8 +22296,9 @@ function renderInviteListHtml(){
 }
 
 function inviteAutoTitle(draft){
-  if(draft.dates.size === 1){
-    const d = inviteDateObj([...draft.dates][0]);
+  const dates = draft.source === 'calendar' ? draft.calDates : draft.dates;
+  if(dates.size === 1){
+    const d = inviteDateObj([...dates][0]);
     return `${WEEKDAY_KO[d.getDay()]}요일에 만날 시간 골라줘!`;
   }
   return '언제 만날지 시간 골라줘!';
@@ -22232,11 +22323,17 @@ function renderInviteCreateHtml(){
     for(let h = from; h <= to; h++) html += `<option value="${h}"${h === sel ? ' selected' : ''}>${h === 24 ? '밤 12시' : `${h}시`}</option>`;
     return html;
   };
-  return `
+  const tabs = `<div class="inv-src-tabs">
+      <button type="button" data-act="src" data-src="calendar" class="${d.source === 'calendar' ? 'on' : ''}">내 캘린더 예약 가능 시간</button>
+      <button type="button" data-act="src" data-src="manual" class="${d.source === 'manual' ? 'on' : ''}">직접 고르기</button>
+    </div>`;
+  const titleHtml = `
     <div class="inv-section">
       <label class="inv-label" for="invTitleInput">친구에게 보낼 말</label>
       <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
-    </div>
+    </div>`;
+  if(d.source === 'calendar') return tabs + titleHtml + renderInviteCalendarPickHtml(d);
+  return tabs + titleHtml + `
     <div class="inv-section">
       <label class="inv-label">날짜 <small>· 여러 개 고를 수 있어요 (최대 14일)</small></label>
       <div class="inv-date-chips">${chips}</div>
@@ -22255,6 +22352,41 @@ function renderInviteCreateHtml(){
     </div>`;
 }
 
+function renderInviteCalendarPickHtml(d){
+  if(!d.calDays) return '<div class="inv-empty">내 캘린더에서 예약 가능 시간을 불러오는 중...</div>';
+  if(!d.calDays.length){
+    return `<div class="inv-card">
+        <div class="inv-card-title">${ICO.calendar} 앞으로 3주 안에 예약 가능 시간이 없어요</div>
+        <div class="inv-card-desc">${escapeHtml(d.calError || '캘린더에 "예약 가능 시간"을 등록해두면, 그 시간 그대로 친구에게 링크로 보낼 수 있어요.')}</div>
+        <div class="inv-share-btns" style="margin-top:12px;">
+          <button type="button" data-act="goAvail">예약 가능 시간 등록하기</button>
+          <button type="button" class="fill" data-act="src" data-src="manual">직접 고르기</button>
+        </div>
+      </div>`;
+  }
+  const allOn = d.calDays.slice(0, 14).every(x => d.calDates.has(x.date));
+  const rows = d.calDays.map(x => {
+    const on = d.calDates.has(x.date);
+    return `<button type="button" class="inv-cal-day${on ? ' on' : ''}" data-act="calDay" data-date="${x.date}">
+        <span class="ck">${on ? '&#10003;' : ''}</span>
+        <span class="d">${escapeHtml(inviteDateLabel(x.date))}</span>
+        <span class="r">${escapeHtml(inviteHoursLabel(x.hours))}</span>
+      </button>`;
+  }).join('');
+  return `
+    <div class="inv-section">
+      <div class="inv-sub-head">
+        <b style="font-size:12.5px;">보낼 날짜 <small style="font-weight:400;color:var(--text-dim);">· 최대 14일</small></b>
+        <button type="button" class="inv-cal-all" data-act="calAll">${allOn ? '모두 빼기' : '모두 고르기'}</button>
+      </div>
+      <div class="inv-cal-days">${rows}</div>
+    </div>
+    <div class="inv-card accent">
+      <div class="inv-card-title">${ICO.sparkle} 친구는 이 시간 안에서만 골라요</div>
+      <div class="inv-card-desc">새로 입력할 필요 없이 캘린더에 등록해둔 예약 가능 시간이 그대로 링크에 담겨요. 캘린더에서 시간을 바꾸면 링크에도 바로 반영돼요.</div>
+    </div>`;
+}
+
 function renderInviteGridHtml(inv, mode){
   const st = inviteState;
   const counts = inviteCounts(inv, mode === 'guest');
@@ -22269,27 +22401,37 @@ function renderInviteGridHtml(inv, mode){
       confirmedCells.add(inviteCellKey(inviteYmd(d), d.getHours()));
     }
   }
+  // 캘린더 기준 링크면 만든 사람이 안 되는 칸은 빗금(못 고름). 통째로 안 되는 날짜/시간 줄은 숨김
+  const open = inviteOpenSet(inv);
+  let dates = inv.dates;
+  let hours = [];
+  for(let h = inv.startHour; h < inv.endHour; h++) hours.push(h);
+  if(open && open.size){
+    dates = dates.filter(date => hours.some(h => open.has(inviteCellKey(date, h))));
+    hours = hours.filter(h => dates.some(date => open.has(inviteCellKey(date, h))));
+  }
   let html = '<div class="inv-grid-wrap"><table class="inv-grid"><thead><tr><th></th>';
-  inv.dates.forEach(date => {
+  dates.forEach(date => {
     const label = inviteDateLabel(date);
     html += `<th data-date="${date}">${label.replace('(', '<br>(')}</th>`;
   });
   html += '</tr></thead><tbody>';
-  for(let h = inv.startHour; h < inv.endHour; h++){
+  hours.forEach(h => {
     html += `<tr><th class="inv-hour" data-hour="${h}">${invitePad(h)}:00</th>`;
-    inv.dates.forEach(date => {
+    dates.forEach(date => {
       const key = inviteCellKey(date, h);
       const n = counts[key] || 0;
       const heat = n ? (0.15 + 0.6 * n / max).toFixed(2) : 0;
       let cls = 'inv-cell';
       if(!isOpen) cls += ' readonly';
+      if(open && !open.has(key)) cls += ' closed';
       if(confirmedCells.has(key)) cls += ' confirmed';
       else if(mode === 'guest' && st.myCells.has(key)) cls += ' mine';
       if(mode === 'manage' && isOpen && st.confirmSel && st.confirmSel.date === date && h >= st.confirmSel.start && h < st.confirmSel.end) cls += ' sel';
       html += `<td class="${cls}" data-cell="${key}" style="--heat:${heat}">${n ? `<span class="inv-n">${n}</span>` : ''}</td>`;
     });
     html += '</tr>';
-  }
+  });
   html += '</tbody></table></div>';
   return html;
 }
@@ -22319,7 +22461,9 @@ function renderInviteManageHtml(){
           <button type="button" data-act="copy">링크 복사</button>
           <button type="button" class="fill" data-act="share">공유하기</button>
         </div>
-        <div class="inv-card-desc" style="margin-top:8px;">받은 친구는 가입 없이 링크만 열면 가능한 시간을 고를 수 있어요.</div>
+        <div class="inv-card-desc" style="margin-top:8px;">${inv.fromCalendar
+          ? '친구는 가입 없이 링크를 열어, 내 캘린더의 예약 가능 시간 중에서 되는 시간을 골라요. 캘린더에서 시간을 바꾸면 링크에도 바로 반영돼요.'
+          : '받은 친구는 가입 없이 링크만 열면 가능한 시간을 고를 수 있어요.'}</div>
       </div>`;
   } else {
     html += '<div class="inv-card"><div class="inv-card-desc">이 약속은 취소됐어요. 링크를 열어도 더 이상 응답할 수 없어요.</div></div>';
@@ -22328,6 +22472,10 @@ function renderInviteManageHtml(){
   html += `<div class="inv-sub-head"><b>응답 ${n}명</b><span>${inv.status === 'OPEN' && n ? '칸을 눌러 확정할 시간을 골라요' : '칸의 숫자 = 가능한 인원'}</span></div>`;
   if(n === 0){
     html += '<div class="inv-card"><div class="inv-card-desc">아직 응답한 친구가 없어요. 링크를 보내면 응답이 올 때마다 알려드릴게요.</div></div>';
+  }
+  const openNow = inviteOpenSet(inv);
+  if(openNow && openNow.size === 0){
+    html += '<div class="inv-card"><div class="inv-card-desc">지금은 캘린더에 남은 예약 가능 시간이 없어서 친구들이 고를 칸이 없어요. 캘린더에서 예약 가능 시간을 다시 등록해주세요.</div></div>';
   }
   html += renderInviteGridHtml(inv, 'manage');
   if(inv.status === 'OPEN' && n){
@@ -22395,8 +22543,14 @@ function renderInviteGuestHtml(){
   let html = `<div class="inv-hero">
       <div class="inv-hero-eyebrow">${creator}님이 약속 시간을 물어봐요</div>
       <div class="inv-hero-title">${escapeHtml(inv.title)}</div>
-      <div class="inv-hero-sub">가입 없이 이름만 적고, 되는 시간을 모두 눌러주세요.</div>
+      <div class="inv-hero-sub">${inv.fromCalendar
+        ? `${creator}님이 되는 시간만 열려 있어요. 가입 없이 이름만 적고, 그중 나도 되는 시간을 모두 눌러주세요.`
+        : '가입 없이 이름만 적고, 되는 시간을 모두 눌러주세요.'}</div>
     </div>`;
+  const openNow = inviteOpenSet(inv);
+  if(openNow && openNow.size === 0){
+    return html + `<div class="inv-card"><div class="inv-card-desc">지금은 ${creator}님의 남은 시간이 없어요. ${creator}님에게 다른 시간을 물어봐 주세요.</div></div>`;
+  }
   if(st.submitted || (inv.myResponse && !st.dirty)){
     html += `<div class="inv-card done">
         <div class="inv-card-title">${ICO.check} ${st.submitted ? '보냈어요!' : '이미 보낸 응답이 있어요'}</div>
@@ -22409,7 +22563,7 @@ function renderInviteGuestHtml(){
     </div>
     <div class="inv-sub-head"><b>되는 시간 고르기</b><span>날짜/시간 이름을 누르면 한 줄 전체</span></div>
     ${renderInviteGridHtml(inv, 'guest')}
-    <div class="inv-legend"><span><i style="background:var(--cta)"></i>내가 고른 시간</span><span><i style="background:rgba(56,189,248,0.6)"></i>숫자 = 다른 친구들이 되는 인원</span></div>`;
+    <div class="inv-legend"><span><i style="background:var(--cta)"></i>내가 고른 시간</span><span><i style="background:rgba(56,189,248,0.6)"></i>숫자 = 다른 친구들이 되는 인원</span>${openNow ? `<span><i style="background:repeating-linear-gradient(-45deg, transparent 0 3px, var(--line) 3px 4px);box-shadow:inset 0 0 0 1px var(--line)"></i>${creator}님이 안 되는 시간</span>` : ''}</div>`;
   if(others.length){
     html += `<div class="inv-label">먼저 응답한 친구 ${others.length}명</div><div class="inv-people">`
       + others.map(r => `<span class="inv-person">${escapeHtml(r.name)}</span>`).join('') + '</div>';
@@ -22487,6 +22641,7 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
     if(!inv || inv.status !== 'OPEN') return;
     const key = cell.dataset.cell;
     if(st.mode === 'guest'){
+      if(cell.classList.contains('closed')){ showToast(`${inviteCreatorName(inv)}님이 안 되는 시간이에요.`); return; }
       if(st.myCells.has(key)) st.myCells.delete(key); else st.myCells.add(key);
       st.dirty = true;
       updateInviteGridClasses();
@@ -22510,12 +22665,15 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
   // 비회원 화면: 날짜/시간 머리글을 누르면 그 줄 전체를 한 번에 켜고 끔
   const head = e.target.closest('.inv-grid th[data-date], .inv-grid th[data-hour]');
   if(head && st.mode === 'guest' && inv && inv.status === 'OPEN'){
-    const keys = [];
+    let keys = [];
     if(head.dataset.date){
       for(let h = inv.startHour; h < inv.endHour; h++) keys.push(inviteCellKey(head.dataset.date, h));
     } else {
       inv.dates.forEach(d => keys.push(inviteCellKey(d, Number(head.dataset.hour))));
     }
+    const open = inviteOpenSet(inv);
+    if(open) keys = keys.filter(k => open.has(k));
+    if(!keys.length) return;
     const allOn = keys.every(k => st.myCells.has(k));
     keys.forEach(k => { if(allOn) st.myCells.delete(k); else st.myCells.add(k); });
     st.dirty = true;
@@ -22546,6 +22704,26 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
   if(act === 'new') openInviteCreate(true);
   else if(act === 'open') openInviteByToken(actEl.dataset.token, { fromList: true });
   else if(act === 'create') createInviteFromDraft();
+  else if(act === 'src' && st.draft){
+    st.draft.source = actEl.dataset.src;
+    renderInviteOverlay();
+  }
+  else if(act === 'calDay' && st.draft){
+    const ymd = actEl.dataset.date;
+    if(st.draft.calDates.has(ymd)) st.draft.calDates.delete(ymd);
+    else {
+      if(st.draft.calDates.size >= 14){ showToast('날짜는 최대 14일까지 고를 수 있어요.'); return; }
+      st.draft.calDates.add(ymd);
+    }
+    renderInviteOverlay();
+  }
+  else if(act === 'calAll' && st.draft){
+    const first = st.draft.calDays.slice(0, 14).map(x => x.date);
+    const allOn = first.every(x => st.draft.calDates.has(x));
+    st.draft.calDates = new Set(allOn ? [] : first);
+    renderInviteOverlay();
+  }
+  else if(act === 'goAvail') goRegisterAvailabilityFromInvite();
   else if(act === 'copy') copyInviteLink();
   else if(act === 'share') shareInviteLink();
   else if(act === 'submit') submitInviteResponse();
@@ -22599,7 +22777,9 @@ async function createInviteFromDraft(){
   try {
     const data = await apiRequest('/invites', {
       method: 'POST',
-      body: JSON.stringify({ title, dates: [...d.dates].sort(), startHour: d.startHour, endHour: d.endHour }),
+      body: JSON.stringify(d.source === 'calendar'
+        ? { title, dates: [...d.calDates].sort(), fromCalendar: true }
+        : { title, dates: [...d.dates].sort(), startHour: d.startHour, endHour: d.endHour }),
     });
     st.busy = false;
     st.token = data.invite.token;
