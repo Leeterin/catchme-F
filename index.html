@@ -19551,7 +19551,7 @@ function renderChatMessages(){
             </div>` : ''}
           ${showCancel ? `
             <div class="reservation-card-actions">
-              <button class="reservation-btn decline">제안 취소</button>
+              <button class="reservation-btn decline ls-cancel-btn">제안 취소</button>
             </div>` : ''}
         </div>
       `;
@@ -19562,7 +19562,7 @@ function renderChatMessages(){
       const mapBtn = row.querySelector('.ls-map-btn');
       if(mapBtn) mapBtn.addEventListener('click', () => openPlaceSuggestionMap(activeChatRoomId, m.id));
       if(showCancel){
-        row.querySelector('.reservation-btn.decline').addEventListener('click', () => {
+        row.querySelector('.ls-cancel-btn').addEventListener('click', () => {
           cancelLocationSuggest(m);
         });
       }
