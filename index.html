@@ -13758,15 +13758,24 @@ function renderWeekView(){
   wrap.appendChild(daysWrap);
   renderAgendaList('weekAgenda', weekEntries);
 
-  // 종일(00~24시)처럼 키가 아주 큰 일정이 있으면 그리드가 한없이 길어져서, 화면 맨 아래
-  // 항상 떠있는 탭바(.bottom-nav) 뒤로 내용이 가려 보였음. 그래서 그리드 자체 높이를 화면에
-  // 맞게 잘라서 내부적으로만 스크롤되게 하고, 페이지 전체는 더 이상 끝없이 길어지지 않게 함
+  // 종일(00~24시)처럼 키가 아주 큰 일정이 있을 때만 그리드가 한없이 길어져서 화면 맨 아래
+  // 항상 떠있는 탭바(.bottom-nav) 뒤로 내용이 가려 보이는 문제가 있었음. 그런데 평소(보통
+  // 9시~22시 정도) 범위는 전혀 그 정도로 길지 않으니, 그런 보통 때까지 다 똑같이 작게
+  // 잘라버리면 오히려 평소 보던 칸이 너무 작아짐. 그래서 "화면 한 번에 보기 충분히 넉넉한
+  // 높이"를 넘어설 때만(=진짜 비정상적으로 긴 경우만) 화면에 맞게 잘라서 내부 스크롤이 되게
+  // 하고, 그 이하(평소 경우)는 예전처럼 그냥 그대로 다 보여줌
   const gridWrap = document.getElementById('weekGridWrap');
   if(gridWrap){
-    const BOTTOM_NAV_RESERVE = 110; // 탭바 높이(약 86px) + 여유
-    const top = gridWrap.getBoundingClientRect().top;
-    const available = window.innerHeight - top - BOTTOM_NAV_RESERVE;
-    gridWrap.style.maxHeight = Math.max(240, available) + 'px';
+    const naturalHeightPx = WEEK_ROW_H * visibleHours.length;
+    const COMFORTABLE_MAX_PX = 620; // 대략 19시간 분량 - 보통 하루 범위는 이 안에 다 들어옴
+    if(naturalHeightPx > COMFORTABLE_MAX_PX){
+      const BOTTOM_NAV_RESERVE = 100; // 탭바 높이(약 86px) + 여유
+      const top = gridWrap.getBoundingClientRect().top;
+      const available = window.innerHeight - top - BOTTOM_NAV_RESERVE;
+      gridWrap.style.maxHeight = Math.max(360, Math.min(naturalHeightPx, available)) + 'px';
+    } else {
+      gridWrap.style.maxHeight = 'none';
+    }
   }
 }
 
