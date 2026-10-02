@@ -6342,6 +6342,29 @@
     </div>
   </div>
 
+  <!-- 앱 오류 신고 팝업 - 폰을 흔들거나 설정 메뉴 "오류 신고하기"로 열림 -->
+  <div class="mini-confirm-overlay" id="bugReportOverlay">
+    <div class="mini-confirm-card" style="text-align:left;max-height:86vh;overflow-y:auto;">
+      <div class="mini-confirm-title" style="margin-bottom:4px;">오류 신고하기</div>
+      <div id="bugReportSub" style="font-size:12px;color:var(--text-dim);margin-bottom:10px;text-align:center;">어떤 문제가 있었는지 알려주세요.</div>
+      <div class="report-reason-list" id="bugReportCategoryList">
+        <label class="report-reason-row"><input type="radio" name="bugReportCategory" value="기능이 안 돼요" checked /> 기능이 안 돼요</label>
+        <label class="report-reason-row"><input type="radio" name="bugReportCategory" value="화면이 이상해요" /> 화면이 이상해요</label>
+        <label class="report-reason-row"><input type="radio" name="bugReportCategory" value="느리거나 멈춰요" /> 느리거나 멈춰요</label>
+        <label class="report-reason-row"><input type="radio" name="bugReportCategory" value="기타" /> 기타</label>
+      </div>
+      <textarea class="search-input" id="bugReportInput" rows="4" placeholder="예) 채팅방에서 사진을 보내면 앱이 멈춰요" maxlength="2000" style="resize:none;margin-top:8px;"></textarea>
+      <label class="report-reason-row" style="font-size:12px;color:var(--text-dim);padding-top:2px;">
+        <input type="checkbox" id="bugReportIncludeInfo" checked /> 기기 정보와 최근 오류 기록 함께 보내기
+      </label>
+      <div class="mini-confirm-actions" style="margin-top:6px;">
+        <button type="button" id="bugReportSubmitBtn" class="mini-confirm-btn danger">보내기</button>
+        <button type="button" id="bugReportCancelBtn" class="mini-confirm-btn">닫기</button>
+      </div>
+      <button type="button" id="bugReportShakeOffBtn" style="display:block;margin:10px auto 0;border:none;background:none;color:var(--text-dim);font-size:11.5px;text-decoration:underline;cursor:pointer;" hidden>흔들어서 신고하기 끄기</button>
+    </div>
+  </div>
+
   <!-- 신고하기 팝업 - 리뷰/모임/사용자 공용 -->
   <div class="mini-confirm-overlay" id="reportOverlay">
     <div class="mini-confirm-card" style="text-align:left;">
@@ -6912,6 +6935,32 @@
 </div>
 
 <script>
+// ============================================================
+// 오류 신고용 최근 오류 기록 - 앱에서 난 에러를 최근 것만 조금 기억해뒀다가 "오류 신고하기"에 같이 붙여 보냄.
+// 다른 코드보다 먼저 실행돼야 처음부터 잡히므로 맨 위에 둠
+// ============================================================
+const recentAppErrors = [];
+function rememberAppError(text){
+  recentAppErrors.push(`[${new Date().toLocaleTimeString('ko-KR', { hour12: false })}] ${String(text).slice(0, 400)}`);
+  if(recentAppErrors.length > 15) recentAppErrors.shift();
+}
+window.addEventListener('error', (e) => {
+  rememberAppError(`${e.message || 'error'}${e.filename ? ` (${e.filename.split('/').pop()}:${e.lineno})` : ''}`);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  rememberAppError(`unhandled: ${r && (r.stack || r.message) || r}`);
+});
+(function(){
+  const origConsoleError = console.error;
+  console.error = function(...args){
+    try {
+      rememberAppError(args.map(a => (a && a.stack) ? a.stack : (typeof a === 'object' ? (() => { try { return JSON.stringify(a); } catch(_){ return String(a); } })() : String(a))).join(' '));
+    } catch(_){}
+    return origConsoleError.apply(console, args);
+  };
+})();
+
 // ============================================================
 // 전역 토스트 (alert 대신 사용)
 // ============================================================
@@ -7965,6 +8014,8 @@ const SETTINGS_MENU = [
   { id: 'chat', label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
   { id: 'notice', label: '공지사항', icon: '<path d="M3 11l18-5v12L3 14v-3Z"/><path d="M7 14v4a2 2 0 0 0 2 2h1v-6"/>' },
   { id: 'appmanage', label: '앱 관리', icon: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 8h.01M8 12h.01M8 16h.01M12 8h4M12 12h4M12 16h4"/>' },
+  // 상세 화면 없이 바로 오류 신고 팝업을 엶
+  { id: 'bugreport', label: '오류 신고하기', icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>', action: () => openBugReport('menu') },
 ];
 
 // 자주 쓰는 출발지(집/회사/학교/직접입력) - 다중 모임 장소 추천에서 바로 골라 쓸 수 있게 내 정보에 저장해둠
@@ -8199,7 +8250,7 @@ function renderSettingsMenu(){
       <div class="settings-menu-label">${item.label}</div>
       <div class="settings-menu-chevron">&#8250;</div>
     `;
-    row.addEventListener('click', () => openSettingsDetail(item.id));
+    row.addEventListener('click', () => item.action ? item.action() : openSettingsDetail(item.id));
     container.appendChild(row);
   });
 }
@@ -8389,6 +8440,11 @@ function openSettingsDetail(id){
           <button class="repeat-mode-btn${settingsState.default_schedule_view === 'month' ? ' active' : ''}" data-view="month" type="button">한달</button>
         </div>
       </div>
+      <div class="settings-toggle-row">
+        <div><div class="stt-label">흔들어서 오류 신고하기</div><div class="stt-sub">폰을 세게 흔들면 오류 신고 창이 열려요</div></div>
+        <div class="toggle${isShakeReportEnabled() ? ' on' : ''}" id="shakeReportToggle"><div class="knob"></div></div>
+      </div>
+      <div class="settings-simple-row"><span>오류 신고하기</span><button class="settings-action-btn" id="appmanageBugReportBtn">신고 &#8250;</button></div>
       <div class="settings-simple-row"><span>현재 버전</span><span class="value">1.0.0</span></div>
       <div class="settings-simple-row"><span>캐시 삭제</span><button class="settings-action-btn" id="clearCacheBtn">삭제</button></div>
       <div class="settings-simple-row"><span>이용약관</span><button class="settings-action-btn">보기 &#8250;</button></div>
@@ -8405,6 +8461,14 @@ function openSettingsDetail(id){
       });
     });
     document.getElementById('clearCacheBtn').addEventListener('click', clearLocalCaches);
+    document.getElementById('appmanageBugReportBtn').addEventListener('click', () => openBugReport('menu'));
+    document.getElementById('shakeReportToggle').addEventListener('click', (e) => {
+      const next = !isShakeReportEnabled();
+      setShakeReportEnabled(next);
+      e.currentTarget.classList.toggle('on', next);
+      if(next) requestShakePermissionIfNeeded();
+      showToast(next ? '이제 폰을 흔들면 오류 신고 창이 열려요.' : '흔들어서 오류 신고하기를 껐어요.');
+    });
     document.querySelector('#settingsDetailBody .settings-simple-row:nth-last-child(2) .settings-action-btn').addEventListener('click', () => openLegalPage('terms'));
     document.querySelector('#settingsDetailBody .settings-simple-row:last-child .settings-action-btn').addEventListener('click', () => openLegalPage('privacy'));
   }
@@ -17207,6 +17271,144 @@ document.getElementById('reportSubmitBtn').addEventListener('click', async () =>
     showToast(err.message);
   }
 });
+
+// ---------- 앱 오류 신고 (폰 흔들기 / 설정 메뉴) ----------
+// 신고에는 사용자가 쓴 설명 + (동의 시) 기기 정보와 최근 오류 기록만 붙임. 채팅 내용이나 일정 같은 개인 데이터는 넣지 않음
+let bugReportSending = false;
+
+function buildBugReportContext(){
+  const activePanel = document.querySelector('.tab-panel.active');
+  const settingsOpen = document.getElementById('settingsView') && document.getElementById('settingsView').style.display === 'block';
+  const platform = (window.Capacitor && typeof window.Capacitor.getPlatform === 'function') ? window.Capacitor.getPlatform() : 'web';
+  const lines = [
+    `화면: ${settingsOpen ? '설정' : (activePanel ? activePanel.id.replace('panel-', '') : '-')}${activeChatRoomId && document.body.classList.contains('chat-open') ? ` (채팅방 ${CHAT_ROOMS[activeChatRoomId] && CHAT_ROOMS[activeChatRoomId].isGroup ? '단톡' : '1:1'})` : ''}`,
+    `플랫폼: ${platform} · 화면 ${window.innerWidth}x${window.innerHeight} @${window.devicePixelRatio || 1}x`,
+    `시각: ${new Date().toLocaleString('ko-KR')}`,
+    `UA: ${navigator.userAgent}`,
+  ];
+  if(recentAppErrors.length){
+    lines.push('최근 오류:');
+    recentAppErrors.slice(-10).forEach(e => lines.push('  ' + e));
+  } else {
+    lines.push('최근 오류: 없음');
+  }
+  return lines.join('\n');
+}
+
+function openBugReport(source){
+  if(!authToken){
+    showToast('로그인 후 오류를 신고할 수 있어요.');
+    return;
+  }
+  const overlay = document.getElementById('bugReportOverlay');
+  if(overlay.classList.contains('show')) return;
+  document.getElementById('bugReportSub').textContent = source === 'shake'
+    ? '폰이 흔들려서 열었어요. 문제가 있었다면 알려주세요.'
+    : '어떤 문제가 있었는지 알려주세요.';
+  document.getElementById('bugReportShakeOffBtn').hidden = source !== 'shake';
+  document.getElementById('bugReportInput').value = '';
+  document.getElementById('bugReportIncludeInfo').checked = true;
+  const first = document.querySelector('#bugReportCategoryList input[value="기능이 안 돼요"]');
+  if(first) first.checked = true;
+  overlay.classList.add('show');
+  pushViewState(closeBugReport);
+}
+function closeBugReport(){
+  document.getElementById('bugReportOverlay').classList.remove('show');
+}
+document.getElementById('bugReportCancelBtn').addEventListener('click', () => goBackOrClose(closeBugReport));
+document.getElementById('bugReportOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'bugReportOverlay') goBackOrClose(closeBugReport);
+});
+document.getElementById('bugReportShakeOffBtn').addEventListener('click', () => {
+  setShakeReportEnabled(false);
+  goBackOrClose(closeBugReport);
+  showToast('흔들어서 신고하기를 껐어요. 설정 > 앱 관리에서 다시 켤 수 있어요.');
+});
+document.getElementById('bugReportSubmitBtn').addEventListener('click', async () => {
+  if(bugReportSending) return;
+  const text = document.getElementById('bugReportInput').value.trim();
+  if(!text){
+    showToast('어떤 문제가 있었는지 적어주세요.');
+    return;
+  }
+  const checked = document.querySelector('#bugReportCategoryList input[name="bugReportCategory"]:checked');
+  const includeInfo = document.getElementById('bugReportIncludeInfo').checked;
+  const detail = includeInfo ? `${text}\n\n---\n${buildBugReportContext()}` : text;
+  const btn = document.getElementById('bugReportSubmitBtn');
+  bugReportSending = true;
+  btn.disabled = true;
+  btn.textContent = '보내는 중...';
+  try {
+    await apiRequest('/reports', {
+      method: 'POST',
+      body: JSON.stringify({ targetType: 'BUG', reason: checked ? checked.value : '기타', detail }),
+    });
+    goBackOrClose(closeBugReport);
+    showToast('오류 신고가 접수됐어요. 고마워요!');
+  } catch(err){
+    showToast(err.message);
+  } finally {
+    bugReportSending = false;
+    btn.disabled = false;
+    btn.textContent = '보내기';
+  }
+});
+
+// 흔들어서 신고하기 켜짐/꺼짐 - 이 기기에만 저장 (기본은 켜짐)
+function isShakeReportEnabled(){
+  try { return localStorage.getItem('catchme_shake_report') !== 'off'; } catch(_){ return true; }
+}
+function setShakeReportEnabled(on){
+  try { localStorage.setItem('catchme_shake_report', on ? 'on' : 'off'); } catch(_){}
+}
+
+// 아이폰은 움직임 센서를 쓰려면 사용자가 화면을 탭한 순간에 권한을 요청해야 함 (안드로이드는 권한 필요 없음)
+function requestShakePermissionIfNeeded(){
+  if(typeof DeviceMotionEvent === 'undefined' || typeof DeviceMotionEvent.requestPermission !== 'function') return;
+  DeviceMotionEvent.requestPermission().then(state => {
+    try { localStorage.setItem('catchme_shake_perm', state); } catch(_){}
+  }).catch(() => {});
+}
+document.addEventListener('touchend', function askShakePermissionOnce(){
+  if(!authToken || !isShakeReportEnabled()) return; // 로그인 전이면 다음 탭에서 다시 시도
+  document.removeEventListener('touchend', askShakePermissionOnce);
+  let asked = null;
+  try { asked = localStorage.getItem('catchme_shake_perm'); } catch(_){}
+  if(asked !== 'denied') requestShakePermissionIfNeeded();
+});
+
+// 흔들기 감지 - 짧은 시간(1초) 안에 큰 움직임이 3번 이상 오면 흔든 걸로 봄. 걷거나 폰을 집어드는 정도로는 안 열리게 기준을 높게 잡음
+(function(){
+  const THRESHOLD = 24;   // 직전 측정값 대비 가속도 변화량(m/s²) 합
+  const HITS_NEEDED = 3;
+  const WINDOW_MS = 1000;
+  const COOLDOWN_MS = 4000;
+  let last = null;
+  let hits = [];
+  let lastTriggered = 0;
+  window.addEventListener('devicemotion', (e) => {
+    const a = e.accelerationIncludingGravity;
+    if(!a || a.x === null) return;
+    const now = Date.now();
+    if(last){
+      const delta = Math.abs(a.x - last.x) + Math.abs(a.y - last.y) + Math.abs(a.z - last.z);
+      if(delta > THRESHOLD){
+        hits = hits.filter(t => now - t < WINDOW_MS);
+        hits.push(now);
+        if(hits.length >= HITS_NEEDED && now - lastTriggered > COOLDOWN_MS){
+          hits = [];
+          lastTriggered = now;
+          if(authToken && isShakeReportEnabled() && document.visibilityState === 'visible'
+             && !document.querySelector('.mini-confirm-overlay.show')){
+            openBugReport('shake');
+          }
+        }
+      }
+    }
+    last = { x: a.x, y: a.y, z: a.z };
+  });
+})();
 
 // ---------- 정렬 옵션 선택 드롭다운 (소식/모임 공용) ----------
 function openSortPicker({ dropdownId, options, current, onSelect }){
