@@ -5175,7 +5175,8 @@
     border-radius:4px;
     white-space:nowrap;
     overflow:hidden;
-    /* 길면 "..." 없이 칸 끝에서 그냥 잘림 (가운데 정렬이어도 넘치면 앞부분부터 보이고 뒤가 잘림) */
+    /* 길면 JS(fitMonthLabelsByChars)가 칸에 들어가는 글자 수만큼만 남겨서, 글자가 반쯤 잘리거나
+       "..."이 붙지 않음 - 여기 clip은 측정 전 잠깐이나 혹시 모를 경우를 위한 안전장치 */
     text-overflow:clip;
     text-align:center;
     line-height:1.5;
@@ -6835,10 +6836,25 @@ function escapeHtml(str){
 }
 
 // 한달 캘린더의 날짜 칸이 긴 일정 제목 때문에 옆으로 넓어지지 않도록, 라벨에 쓸 제목을 앞 4글자로 잘라줌
-// 한달 보기 일정 띠에 넣을 텍스트 - 글자 수로 미리 자르지 않고 전체를 넣음. 칸보다 길면
-// CSS(.month-event-label, overflow:hidden + text-overflow:clip)가 칸 끝에서 "..." 없이 잘라줌
+// 한달 보기 일정 띠에 넣을 텍스트 - 일단 전체를 넣고, 그려진 뒤 fitMonthLabelsByChars()가
+// 칸 폭에 맞게 글자 단위로 잘라줌
 function truncateForMonthLabel(text){
   return text || '';
+}
+
+// 한달 보기 일정 띠가 칸보다 길면, 칸 안에 온전히 들어가는 글자 수만큼만 남김
+// (글자가 반쯤 잘려 보이거나 "..."이 붙지 않게). 화면에 보이는 상태에서 불러야 폭을 잴 수 있음
+function fitMonthLabelsByChars(container){
+  if(!container) return;
+  container.querySelectorAll('.month-event-label').forEach(el => {
+    if(el.scrollWidth <= el.clientWidth) return;
+    const chars = Array.from(el.textContent); // 이모지 같은 글자도 하나로 세도록 Array.from 사용
+    let n = chars.length;
+    while(n > 1 && el.scrollWidth > el.clientWidth){
+      n--;
+      el.textContent = chars.slice(0, n).join('');
+    }
+  });
 }
 
 // ---------- 브라우저/기기의 "뒤로가기"가 앱을 벗어나지 않고, 열려있는 화면을 닫도록 지원 ----------
@@ -14035,6 +14051,7 @@ function renderMonthSchedView(){
     grid.appendChild(cell);
   }
 
+  fitMonthLabelsByChars(grid);
   renderMonthSelectedPanel();
 }
 
@@ -15237,6 +15254,7 @@ function renderFriendMonthView(){
     grid.appendChild(cell);
   }
 
+  fitMonthLabelsByChars(grid);
   renderFriendMonthSelectedPanel(monthData);
 }
 
