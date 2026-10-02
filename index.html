@@ -4772,6 +4772,51 @@
   }
   .visibility-pick-btn.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .visibility-pick-btn.private.on{ border-color:var(--cta); color:var(--cta); background:rgba(255,107,74,0.1); }
+  /* 일정 폼 - 이 일정 하나에만 쓸 색 고르기 (자동 / 기본 팔레트 / 직접 고르기) */
+  .event-color-picker{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:8px;
+  }
+  .event-color-swatch{
+    width:28px;
+    height:28px;
+    border-radius:50%;
+    border:2px solid transparent;
+    box-shadow:0 0 0 1px var(--line);
+    padding:0;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+  .event-color-swatch.on{ border-color:var(--surface); box-shadow:0 0 0 2px var(--text); }
+  .event-color-auto{
+    height:28px;
+    padding:0 11px;
+    border-radius:999px;
+    border:1.5px solid var(--line);
+    background:var(--surface);
+    color:var(--text-dim);
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .event-color-auto.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  .event-color-custom{
+    position:relative;
+    overflow:hidden;
+    background:conic-gradient(#EF4444, #F59E0B, #22C55E, #38BDF8, #8B5CF6, #EC4899, #EF4444);
+  }
+  .event-color-custom input{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    opacity:0;
+    cursor:pointer;
+    border:none;
+    padding:0;
+  }
 
   .group-chip-picker{
     display:flex;
@@ -5748,6 +5793,10 @@
           <label>반복 종료일</label>
           <input type="hidden" id="eventFormUntil" />
           <button type="button" class="date-picker-btn" data-target="eventFormUntil">-</button>
+        </div>
+        <div class="mp-input-group">
+          <label>색상 <span style="font-weight:400;color:var(--text-dim);">(이 일정에만 적용돼요)</span></label>
+          <div class="event-color-picker" id="eventColorPicker"></div>
         </div>
       </div>
 
@@ -11674,6 +11723,7 @@ function syncEventCreateToServer(ev){
       eventType: ev.type,
       visibility: ev.visibility,
       sourceChatRoomId: ev.sourceChatRoomId || undefined,
+      color: ev.color || undefined,
       recurringWeekdays: recurringPayload ? recurringPayload.weekdays : undefined,
       recurringUntil: recurringPayload && recurringPayload.until ? dateKeyToDateAtMinutes(recurringPayload.until, 0).toISOString() : undefined,
     }),
@@ -11704,6 +11754,7 @@ function syncEventUpdateToServer(ev){
       status: ev.type === 'available' ? 'AVAILABLE' : 'BUSY',
       eventType: ev.type,
       visibility: ev.visibility,
+      color: ev.color || null,
       recurringWeekdays: recurringPayload ? recurringPayload.weekdays : [],
       recurringUntil: recurringPayload && recurringPayload.until ? dateKeyToDateAtMinutes(recurringPayload.until, 0).toISOString() : null,
       recurringExceptions: recurringPayload ? recurringPayload.exceptions : [],
@@ -11776,6 +11827,7 @@ async function loadScheduleFromServer(){
         isPendingHold: !!sev.isPendingHold,
         isReservationLinked: !!sev.isReservationLinked,
         sourceChatRoomId: sev.sourceChatRoomId || null,
+        color: sev.color || null,
       };
       const existing = SCHEDULE_EVENTS.find(e => e.serverId === sev.id);
       if(existing){
@@ -11926,10 +11978,11 @@ function deleteScheduleEventAndLinked(ev){
   resyncAllScheduleEvents();
 }
 
-function createScheduleEvent({ title, startMin, endMin, visibility, recurringWeekdays, until, dateKey, dateRange, type, linkGroupId }){
+function createScheduleEvent({ title, startMin, endMin, visibility, recurringWeekdays, until, dateKey, dateRange, type, linkGroupId, color }){
   const ev = {
     id: 'ev' + (scheduleEventIdCounter++),
     title, startMin, endMin,
+    color: color || null,
     visibility,
     type: type || 'busy',
     recurring: recurringWeekdays ? { weekdays: recurringWeekdays, until: until || null, exceptions: [] } : null,
@@ -11952,6 +12005,33 @@ let editingLinkedPieceIds = []; // 예전 방식(linkGroupId)으로 여러 날�
                                  // 지금 연 조각 말고 나머지 조각들의 id - 저장 시 하나로 합치면서 이 조각들은 정리함
 const formSelectedWeekdays = new Set();
 let formVisibility = { groupIds: [], private: false };
+let formColor = null; // 이 일정 하나에만 쓸 색("#RRGGBB") - null이면 테마 자동 색
+
+// 일정 폼에서 고를 수 있는 기본 색 팔레트 (그 외 색은 맨 끝 무지개 버튼으로 직접 고름)
+const EVENT_COLOR_PALETTE = ['#EF4444', '#F97316', '#F59E0B', '#22C55E', '#14B8A6', '#38BDF8', '#2563EB', '#8B5CF6', '#EC4899', '#64748B'];
+
+// 일정 폼의 색상 선택 UI를 formColor 상태에 맞게 다시 그림
+function renderEventColorPicker(){
+  const isCustom = !!formColor && !EVENT_COLOR_PALETTE.includes(formColor);
+  document.getElementById('eventColorPicker').innerHTML = `
+    <button type="button" class="event-color-auto${formColor ? '' : ' on'}" data-color="">자동</button>
+    ${EVENT_COLOR_PALETTE.map(c => `<button type="button" class="event-color-swatch${formColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}
+    <label class="event-color-swatch event-color-custom${isCustom ? ' on' : ''}" title="직접 고르기"${isCustom ? ` style="background:${formColor}"` : ''}>
+      <input type="color" id="eventColorCustomInput" value="${formColor || '#38BDF8'}" />
+    </label>
+  `;
+}
+document.getElementById('eventColorPicker').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-color]');
+  if(!btn) return;
+  formColor = btn.dataset.color || null;
+  renderEventColorPicker();
+});
+document.getElementById('eventColorPicker').addEventListener('change', (e) => {
+  if(e.target.id !== 'eventColorCustomInput') return;
+  formColor = e.target.value.toUpperCase();
+  renderEventColorPicker();
+});
 
 // 일정 폼의 공개설정 UI(전체공개/나만보기/그룹들 버튼)를 formVisibility 상태에 맞게 다시 그림
 function renderVisibilityPicker(){
@@ -12271,6 +12351,9 @@ function openEventForm(existingEvent){
     };
     renderVisibilityPicker();
 
+    formColor = existingEvent.color || null;
+    renderEventColorPicker();
+
     // "예약 가능" 일정을 수정할 때는, 원래 만들 때 쓰던 그리드 선택 화면으로 다시 열어서
     // 어떤 칸들이 선택되어 있었는지 그대로 보여줌 (setEventTypeUI가 그리드를 일단
     // 오늘 기준 주간/빈 선택으로 초기화해두므로, 그 다음에 실제 값으로 덮어씀)
@@ -12315,6 +12398,9 @@ function openEventForm(existingEvent){
 
     formVisibility = { groupIds: [], private: false };
     renderVisibilityPicker();
+
+    formColor = null;
+    renderEventColorPicker();
   }
 
   ['eventFormStartDate', 'eventFormEndDate', 'eventFormUntil'].forEach(refreshDateDisplay);
@@ -12976,6 +13062,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           ev.title = title;
           ev.type = formEventType;
           ev.visibility = { ...formVisibility };
+          ev.color = formColor;
           const prevExceptions = (ev.recurring && ev.recurring.exceptions) || [];
           ev.recurring = formRepeatMode === 'weekly' ? { weekdays: Array.from(formSelectedWeekdays), until, exceptions: prevExceptions } : null;
           ev.recurringAnchorDateKey = formRepeatMode === 'weekly' ? anchorForRecurring : null;
@@ -13013,6 +13100,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           dateRange: null,
           dateKey: formRepeatMode === 'weekly' ? dateKeyOf(scheduleFocusDate) : baseDateKey,
           type: formEventType,
+          color: formColor,
         });
         showToast('일정이 추가됐어요.');
       }
@@ -13495,6 +13583,12 @@ function colorForScheduleText(text){
   return shadeHexColor(COLOR_THEMES[activeThemeIndex].baseColor, percent);
 }
 
+// 일정 객체 기준 색 - 이 일정에 직접 고른 색이 있으면 그걸 쓰고, 없으면 예전처럼 일정 이름 기준 테마 색
+function colorForEvent(ev){
+  if(ev && ev.color) return ev.color;
+  return colorForScheduleText(ev ? ev.title : '');
+}
+
 // 여러 날짜의 일정 텍스트 배열을 보고, 실제로 일정이 있는 시간대만 골라냄(앞뒤로 1시간 여유).
 // 9~22시는 "평균적인 폭"의 기준일 뿐이라 그 폭만큼은 보이도록 넓히되(필요할 때만), 위치는 실제
 // 일정이 있는 시간대 기준으로 넓어짐. 일정이 하나도 없으면 기본 범위(9시~22시)를 그대로 씀
@@ -13685,7 +13779,7 @@ function renderWeekView(){
         block.className = 'week-cal-block' + (isPending ? ' pending' : '') + (isLinked ? ' linked' : '');
         block.style.top = (blockTopPx + 1) + 'px';
         block.style.height = (blockHeightPx - 2) + 'px';
-        if(!isPending && !isLinked) block.style.background = colorForScheduleText(text);
+        if(!isPending && !isLinked) block.style.background = matchedEv ? colorForEvent(matchedEv) : colorForScheduleText(text);
         block.title = `${d.getMonth()+1}/${d.getDate()} ${minutesToLabel(blockRange.startMin)}-${minutesToLabel(blockRange.endMin)} - ${text}`;
 
         const label = document.createElement('span');
@@ -13919,7 +14013,7 @@ function renderMonthSchedView(){
     const shownEvents = slots.filter(Boolean);
 
     const labelsHtml = shownEvents.map(ev => {
-      const bg = ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForScheduleText(ev.title));
+      const bg = ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForEvent(ev));
       const range = getEventMultiDayRange(ev);
       if(!range){
         return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(ev.title))}</div>`;
@@ -13970,7 +14064,7 @@ function renderMonthSelectedPanel(){
         const disp = getEventDisplayRangeForDate(ev, monthSelectedDate);
         return `
         <div class="month-selected-row${ev.isReservationLinked ? ' clickable' : ''}" data-ev="${ev.id}" ${ev.isReservationLinked ? `data-room="${ev.sourceChatRoomId}"` : ''}>
-          <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForScheduleText(ev.title))}"></span>
+          <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForEvent(ev))}"></span>
           <span class="month-selected-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</span>
           <span class="month-selected-text">${escapeHtml(ev.title)}</span>
           ${ev.isReservationLinked ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
