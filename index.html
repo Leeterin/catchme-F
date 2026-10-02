@@ -4868,6 +4868,19 @@
   }
   .avail-select-grid .week-hour-label,
   .avail-select-grid .week-head-cell{ user-select:none; }
+  /* 24시간으로 늘어난 뒤 스크롤해도 요일/날짜 헤더가 같이 밀려 올라가지 않도록, 이 그리드만 따로
+     스크롤되는 영역으로 만들고 헤더 행을 그 안에서 상단 고정(sticky)함 */
+  .avail-grid-wrap{
+    max-height:46vh;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .avail-select-grid .week-head-cell{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:var(--bg);
+  }
 
   /* ---------------- 내 시간표 일주일 뷰 (블록형 캘린더) ---------------- */
   .week-cal-wrap{
@@ -5696,7 +5709,7 @@
             <div class="schedule-nav-label" id="availWeekLabel">-</div>
             <button id="availWeekNext" type="button">&#8250;</button>
           </div>
-          <div class="week-grid-wrap"><div class="week-grid" id="availSelectGrid"></div></div>
+          <div class="week-grid-wrap avail-grid-wrap"><div class="week-grid" id="availSelectGrid"></div></div>
         </div>
       </div>
 
@@ -12142,7 +12155,7 @@ function renderAvailSelectGrid(){
   const grid = document.getElementById('availSelectGrid');
   grid.className = 'week-grid avail-select-grid';
   grid.innerHTML = '';
-  grid.appendChild(document.createElement('div'));
+  grid.appendChild(Object.assign(document.createElement('div'), { className: 'week-head-cell' })); // 모서리 빈 칸도 헤더줄과 같이 고정되게 같은 클래스를 줌
 
   days.forEach(d => {
     const head = document.createElement('div');
