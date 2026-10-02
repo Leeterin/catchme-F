@@ -5917,6 +5917,8 @@
   }
   .inv-signup-card ul{ margin:8px 0 14px; padding-left:18px; font-size:12.5px; line-height:1.7; color:var(--text); }
   .inv-empty{ text-align:center; color:var(--text-dim); font-size:12.5px; padding:20px 0; }
+  .inv-empty small{ font-size:11.5px; }
+  .inv-retry-btn{ border:1px solid var(--accent); background:var(--surface); color:var(--accent); border-radius:999px; padding:8px 18px; font-size:13px; font-weight:700; cursor:pointer; }
   .auth-invite-notice{
     display:none;
     margin-bottom:14px;
@@ -7585,6 +7587,15 @@ function showToast(message, duration = 2400){
 // 배포한 백엔드 주소로 바꾸면 바로 연결돼요. (로컬 테스트: http://localhost:4000/api)
 // ============================================================
 const API_BASE_URL = 'https://catchme-backend-d7vh.onrender.com/api';
+// 약속 링크(?invite=토큰)로 들어온 경우, 다른 초기화(로그인 복원 등)가 주소를 바꾸기 전에 토큰부터 잡아둠
+const STARTUP_INVITE_TOKEN = (() => {
+  try {
+    const fromQuery = new URLSearchParams(location.search).get('invite');
+    const fromHash = new URLSearchParams(location.hash.replace(/^#/, '')).get('invite');
+    const t = (fromQuery || fromHash || '').trim();
+    return /^[A-Za-z0-9_-]{6,64}$/.test(t) ? t : null;
+  } catch(e) { return null; }
+})();
 document.getElementById('apiBaseDisplay').textContent = API_BASE_URL;
 
 let authToken = null; // 새로고침하면 초기화됨 (이 아티팩트 환경은 localStorage를 쓸 수 없어요)
@@ -22514,14 +22525,35 @@ async function openInviteByToken(token, opts = {}){
   inviteState.dirty = false;
   inviteState.confirmSel = null;
   inviteState.mode = 'loading';
+  inviteState.loadingSlow = false;
   showInviteOverlay();
   renderInviteOverlay();
-  try {
-    await fetchInvite(true);
-  } catch(err) {
-    inviteState.mode = 'error';
-    inviteState.error = err.message;
+  // 서버(무료 호스팅)가 잠들어 있으면 첫 요청이 실패하거나 오래 걸림 - 몇 번 더 기다렸다 다시 시도함
+  const slowTimer = setTimeout(() => {
+    if(inviteState.token === token && inviteState.mode === 'loading'){ inviteState.loadingSlow = true; renderInviteOverlay(); }
+  }, 2500);
+  const waits = [3000, 6000, 10000, 15000];
+  for(let i = 0; ; i++){
+    try {
+      await fetchInvite(true);
+      break;
+    } catch(err) {
+      if(inviteState.token !== token) { clearTimeout(slowTimer); return; }
+      const isNetwork = !err.data; // 서버가 답을 준 오류(404 등)는 다시 해봐도 같음
+      if(isNetwork && i < waits.length){
+        inviteState.loadingSlow = true;
+        renderInviteOverlay();
+        await new Promise(r => setTimeout(r, waits[i]));
+        if(inviteState.token !== token) { clearTimeout(slowTimer); return; }
+        continue;
+      }
+      inviteState.mode = 'error';
+      inviteState.error = isNetwork ? '서버에 연결하지 못했어요. 잠시 뒤 링크를 다시 열어주세요.' : err.message;
+      break;
+    }
   }
+  clearTimeout(slowTimer);
+  if(inviteState.token !== token) return;
   renderInviteOverlay();
 }
 
@@ -22580,12 +22612,14 @@ function renderInviteOverlay(){
 
   if(st.mode === 'loading'){
     titleEl.textContent = '약속 잡기';
-    body.innerHTML = '<div class="inv-empty">불러오는 중...</div>';
+    body.innerHTML = st.loadingSlow
+      ? '<div class="inv-empty">약속을 불러오는 중이에요...<br><small>서버를 깨우는 중이라 30초 정도 걸릴 수 있어요.</small></div>'
+      : '<div class="inv-empty">불러오는 중...</div>';
     return;
   }
   if(st.mode === 'error'){
     titleEl.textContent = '약속 잡기';
-    body.innerHTML = `<div class="inv-empty">${escapeHtml(st.error || '초대 링크를 열 수 없어요.')}</div>`;
+    body.innerHTML = `<div class="inv-empty">${escapeHtml(st.error || '초대 링크를 열 수 없어요.')}</div>${st.token ? '<div style="text-align:center;margin-top:12px;"><button type="button" class="inv-retry-btn" data-act="retry">다시 시도</button></div>' : ''}`;
     return;
   }
   if(st.mode === 'list'){
@@ -23096,6 +23130,7 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
   else if(act === 'claim') claimInviteNow();
   else if(act === 'signup') goSignupFromInvite();
   else if(act === 'close') closeInviteOverlay();
+  else if(act === 'retry' && st.token) openInviteByToken(st.token, { fromList: st.fromList });
 });
 
 document.getElementById('inviteOverlay').addEventListener('input', (e) => {
@@ -23165,26 +23200,68 @@ function inviteShareText(inv){
   return `[CATCHME] ${inv.title}${where}\n${inviteCreatorName(inv)}님이 약속 시간을 물어보고 있어요. 가입 없이 링크에서 되는 시간만 눌러주세요!`;
 }
 
+// 눌린 그 순간(사용자 동작 안)에 바로 복사 - 아이폰 앱 화면(WKWebView)은 readonly 입력칸을 그냥 select()하면
+// 선택이 안 돼서 복사가 실패함. 잠깐 readonly를 풀고 setSelectionRange까지 해줘야 함
+function copyTextNow(text){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;top:0;left:-9999px;width:1px;height:1px;font-size:16px;border:0;padding:0;margin:0;opacity:0;';
+  ta.setAttribute('readonly', '');
+  document.body.appendChild(ta);
+  let ok = false;
+  try {
+    ta.removeAttribute('readonly');
+    ta.focus({ preventScroll: true });
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    ta.setAttribute('readonly', '');
+    ok = document.execCommand('copy');
+  } catch(e) { ok = false; }
+  ta.blur();
+  ta.remove();
+  try { window.getSelection().removeAllRanges(); } catch(e) {}
+  return ok;
+}
 async function copyInviteLink(){
   const inv = inviteState.invite;
   if(!inv) return;
-  const full = `${inviteShareText(inv)}\n${inviteLink(inv.token)}`;
-  let ok = false;
-  try {
-    await navigator.clipboard.writeText(full);
-    ok = true;
-  } catch(e) {
-    const ta = document.createElement('textarea');
-    ta.value = full;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    try { ok = document.execCommand('copy'); } catch(err) {}
-    ta.remove();
+  const link = inviteLink(inv.token);
+  const full = `${inviteShareText(inv)}\n${link}`;
+  let ok = copyTextNow(full);
+  if(!ok && navigator.clipboard && navigator.clipboard.writeText){
+    try {
+      await Promise.race([navigator.clipboard.writeText(full), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 1500))]);
+      ok = true;
+    } catch(e) {}
   }
-  showToast(ok ? '링크를 복사했어요. 카톡에 붙여넣어 보내보세요!' : '복사가 안 됐어요. 위 링크를 길게 눌러 복사해주세요.');
+  if(ok){
+    showToast('링크를 복사했어요. 카톡에 붙여넣어 보내보세요!');
+    return;
+  }
+  openInviteManualCopy(link);
+}
+// 자동 복사가 끝내 안 되면, 링크를 선택된 상태로 보여줘서 길게 눌러 직접 복사할 수 있게 함
+function openInviteManualCopy(link){
+  let ov = document.getElementById('invManualCopyOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'mini-confirm-overlay';
+    ov.id = 'invManualCopyOverlay';
+    ov.style.zIndex = '3500';
+    ov.innerHTML = `<div class="mini-confirm-card" style="text-align:left;">
+        <div class="mini-confirm-title" style="margin-bottom:6px;">링크를 길게 눌러 복사해주세요</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:10px;">이 기기에서는 자동 복사가 막혀 있어요.</div>
+        <textarea id="invManualCopyText" readonly rows="3" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font-size:16px;font-family:inherit;resize:none;"></textarea>
+        <div class="mini-confirm-actions"><button type="button" class="mini-confirm-btn" data-close="1">닫기</button></div>
+      </div>`;
+    ov.addEventListener('click', (e) => { if(e.target === ov || e.target.closest('[data-close]')) ov.classList.remove('show'); });
+    ov.querySelector('textarea').addEventListener('focus', (e) => { e.target.select(); e.target.setSelectionRange(0, e.target.value.length); });
+    document.body.appendChild(ov);
+  }
+  const ta = ov.querySelector('textarea');
+  ta.value = link;
+  ov.classList.add('show');
+  setTimeout(() => { try { ta.focus(); ta.select(); ta.setSelectionRange(0, link.length); } catch(e) {} }, 50);
 }
 
 async function shareInviteLink(){
@@ -23347,7 +23424,13 @@ async function claimPendingInvite(){
 function openInviteFromUrl(){
   let token = null;
   try { token = new URLSearchParams(location.search).get('invite'); } catch(e) {}
+  if(!token || !/^[A-Za-z0-9_-]{6,64}$/.test(token)) token = STARTUP_INVITE_TOKEN;
   if(!token || !/^[A-Za-z0-9_-]{6,64}$/.test(token)) return;
+  if(inviteState.token === token && document.getElementById('inviteOverlay').classList.contains('show')){
+    // 로그인 복원 전에 먼저 열어둔 경우 - 로그인된 상태로 한 번 더 불러와서 내 약속이면 응답 현황 화면으로 바꿈
+    if(authToken && inviteState.invite) fetchInvite(true).then(renderInviteOverlay).catch(() => {});
+    return;
+  }
   openInviteByToken(token);
 }
 
@@ -23390,8 +23473,10 @@ async function handleSocialLoginRedirect(){
 }
 
 // 페이지가 열릴 때 저장된 로그인 세션이 있으면 자동으로 복원
-handleSocialLoginRedirect().then(handled => {
-  if(!handled) tryRestoreSession();
+// 약속 링크로 들어왔으면 로그인 복원이 실패하든 말든 무조건 응답 화면을 띄움
+if(STARTUP_INVITE_TOKEN) openInviteFromUrl();
+handleSocialLoginRedirect().catch(() => false).then(handled => {
+  try { if(!handled) tryRestoreSession(); } catch(e) { console.error('[session restore]', e); }
   openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
 });
 </script>
