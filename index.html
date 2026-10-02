@@ -6158,6 +6158,39 @@
     </div>
   </div>
 
+  <!-- 출발지 주소 검색/선택 팝업 - 자주 쓰는 출발지 설정, 모임 장소 추천에서 내 출발지 낼 때 공용으로 씀 -->
+  <div class="mini-confirm-overlay" id="depLocPickerOverlay">
+    <div class="mini-confirm-card" style="text-align:left;">
+      <div class="mini-confirm-title" id="depLocPickerTitle" style="margin-bottom:10px;">출발지 입력</div>
+      <div id="depLocPickerSavedList" style="margin-bottom:10px;"></div>
+      <input type="text" class="search-input" id="depLocPickerInput" placeholder="주소나 장소명을 검색하세요 (예: 강남역)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+      <div class="location-search-results" id="depLocPickerResults" style="display:none;"></div>
+      <div id="depLocPickerPickedInfo" style="font-size:12px;color:var(--text-dim);margin-top:8px;"></div>
+      <input type="text" class="search-input" id="depLocPickerCustomNameInput" placeholder="이름 (예: 헬스장, 본가)" maxlength="10" style="display:none;margin-top:8px;" />
+      <div class="mini-confirm-actions" style="margin-top:14px;">
+        <button type="button" id="depLocPickerCancelBtn" class="mini-confirm-btn danger">취소</button>
+        <button type="button" id="depLocPickerSaveBtn" class="mini-confirm-btn">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 다중 모임 장소 추천 - 기준(모드) 선택 팝업 -->
+  <div class="mini-confirm-overlay" id="recommendModeOverlay">
+    <div class="mini-confirm-card" style="text-align:left;">
+      <div class="mini-confirm-title" style="margin-bottom:4px;">어떤 기준으로 추천할까요?</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:12px;">참가자들의 출발지 주소는 서로에게 공개되지 않아요.</div>
+      <div class="report-reason-list" id="recommendModeList">
+        <label class="report-reason-row"><input type="radio" name="recommendMode" value="FAIR" checked /> 공평하게 (이동시간 차이 최소화)</label>
+        <label class="report-reason-row"><input type="radio" name="recommendMode" value="FASTEST" /> 가장 빠르게 (전체 평균 최소화)</label>
+        <label class="report-reason-row"><input type="radio" name="recommendMode" value="CONSIDERATE" /> 먼 사람 배려 (최장 시간 최소화)</label>
+      </div>
+      <div class="mini-confirm-actions">
+        <button type="button" id="recommendModeCancelBtn" class="mini-confirm-btn danger">취소</button>
+        <button type="button" id="recommendModeNextBtn" class="mini-confirm-btn">다음</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 신고하기 팝업 - 리뷰/모임/사용자 공용 -->
   <div class="mini-confirm-overlay" id="reportOverlay">
     <div class="mini-confirm-card" style="text-align:left;">
@@ -6292,6 +6325,10 @@
             <div class="chat-extra-option" id="extraMatchOption">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
               <span>매칭하기</span>
+            </div>
+            <div class="chat-extra-option" id="extraRecommendLocationOption" style="display:none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+              <span>모임 장소 추천받기</span>
             </div>
             <div class="chat-extra-option" id="extraPastApptOption">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
@@ -7112,6 +7149,7 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   loadMeetupsFromServer();
   loadFeedPostsFromServer();
   loadSettingsFromServer();
+  loadSavedLocationsFromServer();
   connectRealtimeSocket();
 }
 
@@ -7285,6 +7323,24 @@ function connectRealtimeSocket(){
       renderChatList();
       return;
     }
+    if(message.type === 'LOCATION_RECOMMEND'){
+      // 추천 결과 카드 - 이게 도착했다는 건 내가 요청했던 건(있었다면)은 다 끝났다는 뜻이므로 정리해둠
+      delete pendingLocationRecommendByRoom[roomId];
+      const existing = room.messages.find(m => m._serverId === message.id);
+      if(!existing) room.messages.push(mapServerLocationRecommendMessage(message));
+      touchRoom(roomId);
+      if(activeChatRoomId === roomId){
+        renderChatMessages();
+        markRoomRead(roomId);
+      } else {
+        addIncomingMessageUnread(roomId);
+        if(settingsState.notif_message && !room.muted){
+          showToast(`${room.name}: 모임 장소 추천 결과가 나왔어요`);
+        }
+      }
+      renderChatList();
+      return;
+    }
     if(message.type !== 'TEXT') return;
 
     const mapped = {
@@ -7362,6 +7418,23 @@ function connectRealtimeSocket(){
     updateFriendsNavBadge();
     renderIncomingFriendRequests();
     if(document.getElementById('panel-friends').classList.contains('active')) renderFriendsList();
+  });
+
+  // ---------- 다중 모임 자동 장소 추천: 출발지 입력 요청 ----------
+  // 그룹방 멤버 중 누군가 "모임 장소 추천받기"를 시작하면, 나머지 멤버에게 각자 조용히(그룹방 메시지로
+  // 남기지 않고) 출발지를 물어봄 - 바로 입력창을 띄워서 그 자리에서 낼 수 있게 함
+  realtimeSocket.on('locationRecommendRequested', ({ roomId, requestId, mode }) => {
+    if(activeChatRoomId === roomId){
+      promptLocationRecommendResponse(roomId, requestId, mode);
+    } else {
+      const room = CHAT_ROOMS[roomId];
+      showToast(`${room ? room.name + ': ' : ''}모임 장소 추천 - 출발지를 입력해주세요`);
+      pendingLocationRecommendInbox[requestId] = { roomId, mode };
+    }
+  });
+  realtimeSocket.on('locationRecommendCancelled', ({ roomId, requestId }) => {
+    delete pendingLocationRecommendByRoom[roomId];
+    delete pendingLocationRecommendInbox[requestId];
   });
 
   // ---------- 모임 참여 신청 실시간 알림 ----------
@@ -7713,6 +7786,7 @@ document.getElementById('settingsBtn').addEventListener('click', openSettings);
 // ============================================================
 const SETTINGS_MENU = [
   { id: 'account', label: '내 계정', icon: '<circle cx="12" cy="7" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
+  { id: 'locations', label: '자주 쓰는 출발지', icon: '<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3Z" opacity="0"/><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>' },
   { id: 'privacy', label: '개인/보안', icon: '<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3Z"/>' },
   { id: 'notifications', label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
   { id: 'friends', label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
@@ -7720,6 +7794,86 @@ const SETTINGS_MENU = [
   { id: 'notice', label: '공지사항', icon: '<path d="M3 11l18-5v12L3 14v-3Z"/><path d="M7 14v4a2 2 0 0 0 2 2h1v-6"/>' },
   { id: 'appmanage', label: '앱 관리', icon: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 8h.01M8 12h.01M8 16h.01M12 8h4M12 12h4M12 16h4"/>' },
 ];
+
+// 자주 쓰는 출발지(집/회사/학교/직접입력) - 다중 모임 장소 추천에서 바로 골라 쓸 수 있게 내 정보에 저장해둠
+let mySavedLocations = [];
+// 다중 모임 장소 추천 - 진행 중인 요청 추적용 (roomId -> requestId: 내가 이미 요청해둔 것 / requestId -> {roomId,mode}: 아직 출발지 안 낸, 다른 방에서 온 요청)
+const pendingLocationRecommendByRoom = {};
+const pendingLocationRecommendInbox = {};
+async function loadSavedLocationsFromServer(){
+  if(!authToken) return;
+  try {
+    const data = await apiRequest('/profile/locations');
+    mySavedLocations = data.locations || [];
+  } catch(err){
+    console.error('[savedLocations] load failed:', err);
+  }
+}
+
+const FIXED_LOCATION_LABELS = [
+  { label: 'HOME', name: '집' },
+  { label: 'WORK', name: '회사' },
+  { label: 'SCHOOL', name: '학교' },
+];
+
+function renderSavedLocationsList(){
+  const fixedBox = document.getElementById('savedLocationsFixedList');
+  const customBox = document.getElementById('savedLocationsCustomList');
+  if(!fixedBox || !customBox) return; // 설정 화면을 안 보고 있으면(다른 화면으로 넘어간 뒤 비동기 응답이 와도) 아무 것도 안 함
+
+  fixedBox.innerHTML = FIXED_LOCATION_LABELS.map(({ label, name }) => {
+    const loc = mySavedLocations.find(l => l.label === label);
+    return `
+      <div class="settings-simple-row">
+        <span>${name}${loc ? `<div class="stt-sub" style="margin-top:2px;">${escapeHtml(loc.address)}</div>` : ''}</span>
+        <button class="settings-action-btn" data-fixed-label="${label}">${loc ? '수정' : '설정하기'}</button>
+      </div>
+    `;
+  }).join('');
+  fixedBox.querySelectorAll('[data-fixed-label]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const label = btn.dataset.fixedLabel;
+      const name = FIXED_LOCATION_LABELS.find(f => f.label === label).name;
+      openDepartureLocationPicker({
+        title: `${name} 주소 설정`,
+        showSaved: false,
+        requireCustomName: false,
+        onConfirm: async (picked) => {
+          try {
+            const data = await apiRequest('/profile/locations', {
+              method: 'POST',
+              body: JSON.stringify({ label, address: picked.address, lat: picked.lat, lon: picked.lon }),
+            });
+            const idx = mySavedLocations.findIndex(l => l.label === label);
+            if(idx >= 0) mySavedLocations[idx] = data.location; else mySavedLocations.push(data.location);
+            renderSavedLocationsList();
+            showToast('저장했어요.');
+          } catch(err){ showToast(err.message); }
+        },
+      });
+    });
+  });
+
+  const customLocations = mySavedLocations.filter(l => l.label === 'CUSTOM');
+  customBox.innerHTML = customLocations.length === 0
+    ? `<div class="settings-detail-desc">아직 추가한 장소가 없어요.</div>`
+    : customLocations.map(loc => `
+      <div class="settings-simple-row">
+        <span>${escapeHtml(loc.displayName)}<div class="stt-sub" style="margin-top:2px;">${escapeHtml(loc.address)}</div></span>
+        <button class="settings-action-btn danger" data-del-id="${loc.id}">삭제</button>
+      </div>
+    `).join('');
+  customBox.querySelectorAll('[data-del-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.delId;
+      try {
+        await apiRequest(`/profile/locations/${id}`, { method: 'DELETE' });
+        mySavedLocations = mySavedLocations.filter(l => l.id !== id);
+        renderSavedLocationsList();
+      } catch(err){ showToast(err.message); }
+    });
+  });
+}
 
 const settingsState = {
   priv_stranger_chat: false,
@@ -7955,6 +8109,34 @@ function openSettingsDetail(id){
     document.getElementById('logoutBtn').addEventListener('click', performLogout);
     body.querySelector('.settings-action-btn.danger').addEventListener('click', openDeleteAccountConfirm);
 
+  } else if(id === 'locations'){
+    body.innerHTML = `
+      <div class="settings-detail-desc">집/회사/학교처럼 자주 가는 출발지를 저장해두면, 다중 모임에서 "장소 추천받기"를 쓸 때 매번 주소를 검색하지 않고 바로 고를 수 있어요. 다른 참가자에게는 내 주소가 절대 공개되지 않아요.</div>
+      <div id="savedLocationsFixedList"></div>
+      <div class="settings-detail-desc" style="margin-top:14px;margin-bottom:8px;">직접 추가한 장소</div>
+      <div id="savedLocationsCustomList"></div>
+      <div class="settings-simple-row"><span>새 장소 추가</span><button class="settings-action-btn" id="addCustomLocationBtn">추가</button></div>
+    `;
+    renderSavedLocationsList();
+    document.getElementById('addCustomLocationBtn').addEventListener('click', () => {
+      openDepartureLocationPicker({
+        title: '새 출발지 추가',
+        showSaved: false,
+        requireCustomName: true,
+        onConfirm: async (picked) => {
+          try {
+            const data = await apiRequest('/profile/locations', {
+              method: 'POST',
+              body: JSON.stringify({ label: 'CUSTOM', customLabel: picked.customLabel, address: picked.address, lat: picked.lat, lon: picked.lon }),
+            });
+            mySavedLocations.push(data.location);
+            renderSavedLocationsList();
+            showToast('저장했어요.');
+          } catch(err){ showToast(err.message); }
+        },
+      });
+    });
+
   } else if(id === 'privacy'){
     body.innerHTML = `
       <div class="settings-detail-desc">CATCHME의 핵심 원칙은 프라이버시예요. 일정을 만들 때 고르는 "전체 공개"/"나만 보기"/그룹 설정에 따라, 볼 수 있는 사람에게만 그 일정의 제목까지 보여요.</div>
@@ -8118,6 +8300,107 @@ function ensureKakaoMapsLoaded(callback){
 function updateLocationBtnLabel(){
   document.getElementById('locationBtnLabel').textContent = communityCustomLocation || '위치 설정';
 }
+
+// ============================================================
+// 출발지 주소 검색/선택 공용 팝업 - "자주 쓰는 출발지" 설정과 "모임 장소 추천" 양쪽에서 재사용
+// ============================================================
+let depLocPickerState = null; // { picked: {address,lat,lon}|null, onConfirm, requireCustomName }
+let depLocPickerSearchTimer = null;
+
+// opts: { title, showSaved(저장된 출발지 목록을 선택지로 보여줄지), requireCustomName(이름 입력칸 보여줄지),
+//         onConfirm({address,lat,lon,customLabel?}) }
+function openDepartureLocationPicker(opts){
+  depLocPickerState = { picked: null, onConfirm: opts.onConfirm, requireCustomName: !!opts.requireCustomName };
+  document.getElementById('depLocPickerTitle').textContent = opts.title || '출발지 입력';
+  document.getElementById('depLocPickerInput').value = '';
+  document.getElementById('depLocPickerResults').style.display = 'none';
+  document.getElementById('depLocPickerPickedInfo').textContent = '';
+  const nameInput = document.getElementById('depLocPickerCustomNameInput');
+  nameInput.value = '';
+  nameInput.style.display = opts.requireCustomName ? 'block' : 'none';
+
+  const savedListBox = document.getElementById('depLocPickerSavedList');
+  savedListBox.innerHTML = '';
+  if(opts.showSaved && Array.isArray(mySavedLocations) && mySavedLocations.length > 0){
+    savedListBox.innerHTML = `
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">저장된 출발지에서 고르기</div>
+      <div class="repeat-toggle-row" id="depLocPickerSavedRow" style="flex-wrap:wrap;">
+        ${mySavedLocations.map(loc => `<button type="button" class="repeat-mode-btn" data-id="${loc.id}">${escapeHtml(loc.displayName)}</button>`).join('')}
+      </div>
+    `;
+    savedListBox.querySelectorAll('#depLocPickerSavedRow .repeat-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const loc = mySavedLocations.find(l => l.id === btn.dataset.id);
+        if(!loc) return;
+        savedListBox.querySelectorAll('.repeat-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+        depLocPickerState.picked = { address: loc.address, lat: loc.lat, lon: loc.lon, savedLocationId: loc.id };
+        document.getElementById('depLocPickerPickedInfo').textContent = `선택됨: ${loc.displayName} (${loc.address})`;
+      });
+    });
+  }
+
+  document.getElementById('depLocPickerOverlay').classList.add('show');
+}
+
+function closeDepartureLocationPicker(){
+  document.getElementById('depLocPickerOverlay').classList.remove('show');
+  depLocPickerState = null;
+}
+
+document.getElementById('depLocPickerInput').addEventListener('input', () => {
+  const input = document.getElementById('depLocPickerInput');
+  const resultsBox = document.getElementById('depLocPickerResults');
+  const val = input.value.trim();
+  clearTimeout(depLocPickerSearchTimer);
+  if(!val){ resultsBox.style.display = 'none'; return; }
+  depLocPickerSearchTimer = setTimeout(() => {
+    ensureKakaoMapsLoaded(() => {
+      const places = new kakao.maps.services.Places();
+      places.keywordSearch(val, (results, status) => {
+        if(status !== kakao.maps.services.Status.OK || results.length === 0){
+          resultsBox.style.display = 'none';
+          return;
+        }
+        resultsBox.innerHTML = results.slice(0, 6).map((r, i) => `
+          <div class="location-search-result-row" data-idx="${i}">
+            <div class="location-search-result-name">${escapeHtml(r.place_name)}</div>
+            <div class="location-search-result-addr">${escapeHtml(r.road_address_name || r.address_name)}</div>
+          </div>
+        `).join('');
+        resultsBox.style.display = 'block';
+        resultsBox.querySelectorAll('.location-search-result-row').forEach(row => {
+          row.addEventListener('click', () => {
+            const r = results[parseInt(row.dataset.idx, 10)];
+            const address = r.road_address_name || r.address_name || r.place_name;
+            input.value = r.place_name;
+            resultsBox.style.display = 'none';
+            if(depLocPickerState){
+              depLocPickerState.picked = { address, lat: parseFloat(r.y), lon: parseFloat(r.x) };
+              document.getElementById('depLocPickerPickedInfo').textContent = `선택됨: ${r.place_name} (${address})`;
+            }
+          });
+        });
+      });
+    });
+  }, 300);
+});
+
+document.getElementById('depLocPickerCancelBtn').addEventListener('click', closeDepartureLocationPicker);
+document.getElementById('depLocPickerSaveBtn').addEventListener('click', () => {
+  if(!depLocPickerState || !depLocPickerState.picked){
+    showToast('출발지를 검색하거나 저장된 장소 중에서 골라주세요.');
+    return;
+  }
+  const customLabel = document.getElementById('depLocPickerCustomNameInput').value.trim();
+  if(depLocPickerState.requireCustomName && !customLabel){
+    showToast('이름을 입력해주세요. (예: 헬스장, 본가)');
+    return;
+  }
+  const onConfirm = depLocPickerState.onConfirm;
+  const picked = { ...depLocPickerState.picked, customLabel: customLabel || null };
+  closeDepartureLocationPicker();
+  onConfirm(picked);
+});
 
 // 두 좌표 사이 거리(km) - 하버사인 공식
 function distanceKmClient(lat1, lon1, lat2, lon2){
@@ -10869,6 +11152,29 @@ function mapServerLocationSuggestMessage(m){
     locationLat: l.locationLat,
     locationLon: l.locationLon,
     status: RESERVATION_STATUS_MAP[l.status] || 'pending',
+    time: m.createdAt,
+  };
+}
+
+const RECOMMEND_MODE_LABEL = { FAIR: '공평하게', FASTEST: '가장 빠르게', CONSIDERATE: '먼 사람 배려' };
+
+// 서버의 LOCATION_RECOMMEND 메시지(다중 모임 자동 장소 추천 결과)를 로컬 카드 형식으로 변환.
+// 참가자 개별 출발지/개별 이동시간은 서버가 애초에 안 보내주므로, 여기서도 다룰 데이터 자체가 없음
+function mapServerLocationRecommendMessage(m){
+  const r = m.locationRecommend;
+  return {
+    who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
+    senderId: m.senderId,
+    type: 'location-recommend',
+    id: m.id,
+    _serverId: m.id,
+    areaName: r.areaName,
+    lat: r.lat,
+    lon: r.lon,
+    modeLabel: RECOMMEND_MODE_LABEL[r.mode] || r.mode,
+    avgMinutes: r.avgMinutes,
+    maxMinutes: r.maxMinutes,
+    participants: r.participants,
     time: m.createdAt,
   };
 }
@@ -18050,6 +18356,14 @@ function openChatRoom(id){
   document.getElementById('chatRoomView').classList.add('active');
   document.querySelector('.bottom-nav').style.display = 'none';
   pushViewState(closeChatRoomView);
+
+  // 이 방에 들어왔는데, 아직 출발지를 안 낸 "모임 장소 추천" 요청이 와있었으면 지금 바로 물어봄
+  const pendingEntry = Object.entries(pendingLocationRecommendInbox).find(([, v]) => v.roomId === id);
+  if(pendingEntry){
+    const [requestId, { mode }] = pendingEntry;
+    delete pendingLocationRecommendInbox[requestId];
+    promptLocationRecommendResponse(id, requestId, mode);
+  }
 }
 
 // 서버에서 온 메시지 하나(어떤 타입이든)를 로컬 카드 형식으로 변환. 방 전체 메시지를 불러올 때뿐 아니라,
@@ -18059,6 +18373,7 @@ function mapServerMessageToLocal(m, room){
   if(m.type === 'TIME_PROPOSAL') return mapServerTimeProposalMessage(m, room);
   if(m.type === 'LOCATION_SUGGEST') return mapServerLocationSuggestMessage(m);
   if(m.type === 'LOCATION_NOTICE') return mapServerLocationNoticeMessage(m);
+  if(m.type === 'LOCATION_RECOMMEND') return mapServerLocationRecommendMessage(m);
   if(m.type === 'IMAGE') return mapServerImageMessage(m);
   return {
     who: (currentUser && m.senderId === currentUser.id) ? 'me' : 'other',
@@ -18358,6 +18673,19 @@ function renderChatMessages(){
           <div class="reservation-card-note">${escapeHtml(m.location)}</div>
         </div>
       `;
+    } else if(m.type === 'location-recommend'){
+      const mapUrl = (typeof m.lat === 'number' && typeof m.lon === 'number')
+        ? `https://map.kakao.com/link/map/${encodeURIComponent(m.areaName)},${m.lat},${m.lon}`
+        : null;
+      row.innerHTML = `
+        <div class="reservation-card">
+          <div class="reservation-card-header">${ICO.pin} 모임 장소 추천 (${escapeHtml(m.modeLabel)})</div>
+          <div class="reservation-card-time">${escapeHtml(m.areaName)}</div>
+          <div class="reservation-card-note">참가자 ${m.participants}명 · 평균 ${m.avgMinutes}분 · 최장 ${m.maxMinutes}분 (대중교통 기준)</div>
+          <div class="reservation-card-note" style="color:var(--text-dim);font-size:11px;">참가자 개별 출발지는 공개되지 않아요.</div>
+          ${mapUrl ? `<div class="reservation-card-actions"><a href="${mapUrl}" target="_blank" rel="noopener" class="reservation-btn accept" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">지도에서 보기</a></div>` : ''}
+        </div>
+      `;
     } else if(m.type === 'hotplace'){
       if(m.superseded){
         // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 카드 - 다른 시스템 알림처럼 작게만 표시함
@@ -18528,6 +18856,7 @@ function getMsgPreviewText(m){
   if(m.type === 'reservation') return '예약 요청';
   if(m.type === 'location-suggest') return '장소 제안';
   if(m.type === 'location-fixed') return '장소 확정';
+  if(m.type === 'location-recommend') return '모임 장소 추천 결과';
   if(m.type === 'time-options-suggest') return '시간 제안';
   if(m.type === 'hotplace') return m.superseded ? '약속 장소가 변경됐어요' : '핫플 알림';
   if(m.type === 'system-notice') return m.text || '알림';
@@ -19113,14 +19442,17 @@ function updateChatExtraOptionForRoom(){
   const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
   const option = document.getElementById('extraCalendarOption');
   const reserveOption = document.getElementById('extraReserveOption');
+  const recommendOption = document.getElementById('extraRecommendLocationOption');
   if(room && room.isGroup){
     option.dataset.mode = 'members';
     option.innerHTML = `${EXTRA_OPTION_ICON_MEMBERS}<span>멤버보기</span>`;
     reserveOption.style.display = 'none'; // 그룹은 "매칭하기"로 시간을 맞추는 방식이라, 개별 예약하기는 안 보여줌
+    recommendOption.style.display = room.isRealRoom ? '' : 'none'; // 실제 서버 방(참가자 출발지를 모을 수 있는 방)에서만 보임
   } else {
     option.dataset.mode = 'calendar';
     option.innerHTML = `${EXTRA_OPTION_ICON_CALENDAR}<span>캘린더 보기</span>`;
     reserveOption.style.display = '';
+    recommendOption.style.display = 'none'; // 1:1 채팅에서는 "장소 제안"(여기 어때요?)을 그대로 씀
   }
   document.getElementById('extraMuteOptionLabel').textContent = (room && room.muted) ? '알림 켜기' : '알림 끄기';
 }
@@ -19223,6 +19555,75 @@ document.getElementById('extraMatchOption').addEventListener('click', () => {
   }
   openCalendarMatch(friendId);
 });
+
+// ---------- 다중 모임 자동 장소 추천 ----------
+document.getElementById('extraRecommendLocationOption').addEventListener('click', () => {
+  document.getElementById('chatExtraDropdown').classList.remove('open');
+  const roomId = activeChatRoomId;
+  const room = roomId ? CHAT_ROOMS[roomId] : null;
+  if(!room || !room.isGroup || !room.isRealRoom) return;
+  if(!room.members || room.members.length < 2){
+    showToast('참가자가 2명 이상이어야 추천을 받을 수 있어요.');
+    return;
+  }
+  document.querySelector('#recommendModeList input[value="FAIR"]').checked = true;
+  document.getElementById('recommendModeOverlay').classList.add('show');
+  document.getElementById('recommendModeNextBtn').dataset.roomId = roomId;
+});
+document.getElementById('recommendModeCancelBtn').addEventListener('click', () => {
+  document.getElementById('recommendModeOverlay').classList.remove('show');
+});
+document.getElementById('recommendModeNextBtn').addEventListener('click', () => {
+  const roomId = document.getElementById('recommendModeNextBtn').dataset.roomId;
+  const mode = document.querySelector('#recommendModeList input[name="recommendMode"]:checked').value;
+  document.getElementById('recommendModeOverlay').classList.remove('show');
+
+  openDepartureLocationPicker({
+    title: '내 출발지 입력',
+    showSaved: true,
+    requireCustomName: false,
+    onConfirm: async (picked) => {
+      try {
+        const body = picked.savedLocationId
+          ? { mode, savedLocationId: picked.savedLocationId }
+          : { mode, address: picked.address, lat: picked.lat, lon: picked.lon };
+        const data = await apiRequest(`/chats/${roomId}/location-recommend`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        showToast('다른 멤버들에게 출발지를 요청했어요. 모두 제출하면 결과가 채팅방에 떠요.');
+        pendingLocationRecommendByRoom[roomId] = data.requestId;
+      } catch(err){
+        showToast(err.message);
+      }
+    },
+  });
+});
+
+// 다른 멤버가 추천을 요청하면 내 출발지를 입력해달라는 실시간 알림이 옴 - 바로 입력창을 띄움
+// (요청자 본인은 만들 때 이미 냈으므로 받지 않음 - notifyRoom이 요청자를 제외하고 보냄)
+function promptLocationRecommendResponse(roomId, requestId, mode){
+  const modeLabel = { FAIR: '공평하게', FASTEST: '가장 빠르게', CONSIDERATE: '먼 사람 배려' }[mode] || mode;
+  openDepartureLocationPicker({
+    title: `모임 장소 추천 - 내 출발지 입력 (${modeLabel})`,
+    showSaved: true,
+    requireCustomName: false,
+    onConfirm: async (picked) => {
+      try {
+        const body = picked.savedLocationId
+          ? { savedLocationId: picked.savedLocationId }
+          : { address: picked.address, lat: picked.lat, lon: picked.lon };
+        const data = await apiRequest(`/chats/location-recommend/${requestId}/respond`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        showToast(data.completed ? '출발지를 제출했어요. 결과가 나왔어요!' : '출발지를 제출했어요. 다른 멤버를 기다리는 중이에요.');
+      } catch(err){
+        showToast(err.message);
+      }
+    },
+  });
+}
 
 document.getElementById('extraLeaveOption').addEventListener('click', () => {
   document.getElementById('chatExtraDropdown').classList.remove('open');
