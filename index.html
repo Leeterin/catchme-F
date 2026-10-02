@@ -5744,7 +5744,7 @@
 
       <div id="availableGridGroup" style="display:none;">
         <div class="mp-input-group">
-          <label>예약 가능 시간 선택 <span style="font-weight:400;color:var(--text-dim);">(빈 칸을 누르거나 쓸어서 여러 칸 한번에 선택돼요)</span></label>
+          <label>예약 가능 시간 선택 <span style="font-weight:400;color:var(--text-dim);">(빈 칸을 하나씩 눌러서 선택하세요)</span></label>
           <div class="schedule-nav" style="margin-bottom:8px;">
             <button id="availWeekPrev" type="button">&#8249;</button>
             <div class="schedule-nav-label" id="availWeekLabel">-</div>
@@ -12641,11 +12641,27 @@ function renderAvailSelectGrid(){
         cell.addEventListener('mouseenter', () => {
           if(availDragging) paintAvailCell(cell, cellKey, availPaintValue);
         });
+        // 모바일: 예전엔 터치가 닿는 순간 바로 드래그선택 모드로 들어가서(preventDefault도 걸려서)
+        // 스크롤하려고 셀 위를 스쳐도 그 칸이 켜져버렸음. 그래서 터치는 드래그선택을 포기하고,
+        // "거의 움직이지 않고 뗐을 때"(=탭)만 그 칸 하나를 토글하도록 바꿈 - 스크롤은 그냥 자연스럽게 되게 둠.
+        let touchStartX = 0, touchStartY = 0, touchMoved = false;
         cell.addEventListener('touchstart', (e) => {
-          e.preventDefault();
-          availDragging = true;
-          availPaintValue = !availSelectedCells.has(cellKey);
-          paintAvailCell(cell, cellKey, availPaintValue);
+          const t = e.touches[0];
+          touchStartX = t.clientX;
+          touchStartY = t.clientY;
+          touchMoved = false;
+        }, { passive: true });
+        cell.addEventListener('touchmove', (e) => {
+          const t = e.touches[0];
+          if(Math.abs(t.clientX - touchStartX) > 10 || Math.abs(t.clientY - touchStartY) > 10){
+            touchMoved = true;
+          }
+        }, { passive: true });
+        cell.addEventListener('touchend', (e) => {
+          if(!touchMoved){
+            e.preventDefault(); // 탭으로 처리할 때만 막아서, 뒤따라오는 합성 mousedown/click으로 두 번 토글되는 걸 방지
+            paintAvailCell(cell, cellKey, !availSelectedCells.has(cellKey));
+          }
         }, { passive: false });
       } else {
         // 이미 다른 일정 있어서 선택 못 하는 칸: PC에서는 마우스 올리면 무슨 일정인지 말풍선으로 보여주고 떼면 사라짐,
@@ -12691,16 +12707,7 @@ function hideCellHoverTooltip(){
   document.getElementById('cellHoverTooltip').classList.remove('show');
 }
 
-document.addEventListener('mouseup', () => { availDragging = false; });
-document.addEventListener('touchend', () => { availDragging = false; });
-document.getElementById('availSelectGrid').addEventListener('touchmove', (e) => {
-  if(!availDragging) return;
-  const touch = e.touches[0];
-  const el = document.elementFromPoint(touch.clientX, touch.clientY);
-  if(el && el.dataset && el.dataset.cellKey && el.classList.contains('week-cell') && !el.classList.contains('occupied')){
-    paintAvailCell(el, el.dataset.cellKey, availPaintValue);
-  }
-});
+document.addEventListener('mouseup', () => { availDragging = false; }); // 마우스(PC)는 기존처럼 드래그로 여러 칸 선택 가능
 
 document.getElementById('availWeekPrev').addEventListener('click', () => {
   availGridWeekStart.setDate(availGridWeekStart.getDate() - 7);
