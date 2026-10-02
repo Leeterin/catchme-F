@@ -4811,6 +4811,24 @@
     gap:8px;
   }
 
+  .app-confirm-overlay{
+    position:fixed; inset:0; z-index:9700; background:rgba(15,16,20,0.45);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .app-confirm-overlay[hidden]{ display:none; }
+  .app-confirm-card{
+    width:100%; max-width:320px; padding:20px 18px 14px; border-radius:18px;
+    background:var(--surface); color:var(--text); box-shadow:0 18px 44px rgba(0,0,0,0.25);
+  }
+  .app-confirm-title{ font-size:15.5px; font-weight:800; margin-bottom:8px; }
+  .app-confirm-msg{ font-size:13px; color:var(--text-dim); line-height:1.5; white-space:pre-line; margin-bottom:16px; }
+  .app-confirm-msg b{ color:var(--text); }
+  .app-confirm-btns{ display:flex; gap:8px; }
+  .app-confirm-btns button{
+    flex:1; padding:11px 0; border-radius:12px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--text); font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .app-confirm-btns button.yes{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .custom-picker-overlay{
     position:fixed;
     inset:0;
@@ -6534,6 +6552,18 @@
       </div>
     </div>
 
+  </div>
+
+  <!-- 공용 확인 팝업 ("정말 이 장소로 정할까요?" 등) - appConfirm()으로 띄움 -->
+  <div class="app-confirm-overlay" id="appConfirmOverlay" hidden>
+    <div class="app-confirm-card" role="dialog" aria-modal="true" aria-labelledby="appConfirmTitle">
+      <div class="app-confirm-title" id="appConfirmTitle"></div>
+      <div class="app-confirm-msg" id="appConfirmMsg"></div>
+      <div class="app-confirm-btns">
+        <button type="button" id="appConfirmNo">아니요</button>
+        <button type="button" class="yes" id="appConfirmYes">네</button>
+      </div>
+    </div>
   </div>
 
   <!-- 커스텀 날짜 선택 팝업 -->
@@ -17945,19 +17975,59 @@ function systemNoticeHTML(m){
   return icon + escapeHtml(text);
 }
 
+// 공용 확인 팝업 - "네"를 누르면 true, "아니요"/바깥을 누르면 false
+// (브라우저 기본 confirm()은 앱 웹뷰에서 안 뜨거나 모양이 달라서 직접 만든 팝업을 씀)
+let appConfirmResolve = null;
+function appConfirm({ title, html, yesText, noText }){
+  const ov = document.getElementById('appConfirmOverlay');
+  if(appConfirmResolve) appConfirmResolve(false);
+  document.getElementById('appConfirmTitle').textContent = title || '';
+  document.getElementById('appConfirmMsg').innerHTML = html || '';
+  document.getElementById('appConfirmYes').textContent = yesText || '네';
+  document.getElementById('appConfirmNo').textContent = noText || '아니요';
+  ov.hidden = false;
+  return new Promise(resolve => { appConfirmResolve = resolve; });
+}
+function closeAppConfirm(result){
+  document.getElementById('appConfirmOverlay').hidden = true;
+  const r = appConfirmResolve;
+  appConfirmResolve = null;
+  if(r) r(result);
+}
+document.getElementById('appConfirmYes').addEventListener('click', () => closeAppConfirm(true));
+document.getElementById('appConfirmNo').addEventListener('click', () => closeAppConfirm(false));
+document.getElementById('appConfirmOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'appConfirmOverlay') closeAppConfirm(false);
+});
+
+// 이 방에서 "장소만" 정해둔 핀들(장소 제안 수락 등으로 생긴 것)을 지움 - keepPin은 남김.
+// 약속 카드에서 장소를 새로 고르거나 삭제했을 때, 예전에 정해졌던 장소가 다시 튀어나오지 않게 하려고 씀
+function dropRoomPlaceOnlyPins(room, keepPin){
+  const olds = (room.pinnedSchedules || []).filter(p => p !== keepPin && !p.dateLabel && p.location);
+  if(!olds.length) return;
+  room.pinnedSchedules = room.pinnedSchedules.filter(p => !olds.includes(p));
+  olds.forEach(p => syncPinDeleteToServer(room, p));
+}
+
 function removePinnedLocation(pinId){
   const roomId = activeChatRoomId;
   const room = CHAT_ROOMS[roomId];
   if(!room || !room.pinnedSchedules) return;
   const pin = room.pinnedSchedules.find(p => p.id === pinId);
-  if(!pin || !pin.location) return;
+  if(!pin) return;
+  // 카드에 보이는 장소가 이 핀 자체 장소가 아니라 "장소만 정해둔 핀"에서 온 것일 수도 있음
+  const hasPlaceOnly = room.pinnedSchedules.some(p => p !== pin && !p.dateLabel && p.location);
+  if(!pin.location && !hasPlaceOnly) return;
 
-  const removedPlace = pin.location;
-  pin.location = null;
-  pin.locationAddress = null;
-  pin.locationLat = null;
-  pin.locationLon = null;
-  syncPinLocationUpdateToServer(room, pin);
+  if(pin.location){
+    pin.location = null;
+    pin.locationAddress = null;
+    pin.locationLat = null;
+    pin.locationLon = null;
+    syncPinLocationUpdateToServer(room, pin);
+  }
+  // 예전에 정해졌던 장소가 대신 다시 뜨지 않도록 같이 지움
+  if(pin.dateLabel) dropRoomPlaceOnlyPins(room, null);
 
   room.messages.push({
     who: 'me',
@@ -19021,6 +19091,12 @@ document.getElementById('locationPickerSuggestSendBtn').addEventListener('click'
   const roomId = opts.roomId;
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
+  const ok = await appConfirm({
+    title: list.length > 1 ? `이 ${list.length}곳을 제안할까요?` : '이 장소를 제안할까요?',
+    html: list.map(c => `<b>${escapeHtml(c.label)}</b>`).join('\n') + '\n\n친구가 수락하면 약속 장소로 정해져요.',
+    yesText: '네, 제안할게요',
+  });
+  if(!ok) return;
   const btn = document.getElementById('locationPickerSuggestSendBtn');
   btn.disabled = true;
   let sent = 0;
@@ -19228,12 +19304,21 @@ document.getElementById('locationPickerSuggestList').addEventListener('click', (
   placeLocationPickerPin(lat, lon, picked.place_name, picked.road_address_name || picked.address_name || '');
 });
 
-document.getElementById('locationPickerConfirmBtn').addEventListener('click', () => {
+document.getElementById('locationPickerConfirmBtn').addEventListener('click', async () => {
   if(!locationPickerSelected){
     showToast('지도에서 위치를 먼저 찍어주세요.');
     return;
   }
   const { label, lat, lon, addr } = locationPickerSelected;
+  // 채팅방 약속 장소를 정할 때는 한 번 더 물어봄
+  if(locationPickerOpts){
+    const ok = await appConfirm({
+      title: '이 장소로 정할까요?',
+      html: `<b>${escapeHtml(label)}</b>${addr && addr !== label ? `\n${escapeHtml(addr)}` : ''}\n\n정하면 예전에 정해진 장소는 없어지고 이 장소만 남아요.`,
+      yesText: '네, 정할게요',
+    });
+    if(!ok || locationPickerSelected === null) return;
+  }
   const cb = locationPickerCallback;
   closeLocationPicker();
   if(cb) cb(label, lat, lon, addr || '');
@@ -19861,6 +19946,8 @@ function changePinLocation(room, roomId, pin, afterPicked, pickerOpts){
     pin.locationAddress = addr && addr !== label ? addr : null;
     pin.locationLat = lat;
     pin.locationLon = lon;
+    // 새로 고른 장소만 남기고, 예전에 정해졌던 장소(장소만 있는 핀)는 지움
+    dropRoomPlaceOnlyPins(room, pin.dateLabel ? null : pin);
     const syncResult = await syncPinLocationUpdateToServer(room, pin);
     if(syncResult && syncResult.message){
       // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨).
@@ -19967,7 +20054,7 @@ function renderPinnedSchedule(){
         <button type="button" class="pin-action-btn pin-set-loc${location ? ' has-loc' : ''}">${location
           ? `<span class="pin-loc-name">${ICO.pin} ${escapeHtml(location)}</span>${locationAddress ? `<span class="pin-loc-addr">${escapeHtml(locationAddress)}</span>` : ''}`
           : '장소 정하기'}</button>
-        ${pinned.location ? `<button type="button" class="pin-action-btn danger pin-remove-loc">장소 삭제</button>` : ''}
+        ${location ? `<button type="button" class="pin-action-btn danger pin-remove-loc">장소 삭제</button>` : ''}
         ${!dateObj ? `<button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>` : ''}
       </div>
     `;
