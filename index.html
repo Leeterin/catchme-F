@@ -3959,7 +3959,7 @@
   .event-form-footer{
     flex-shrink:0;
     margin:16px -18px 0 -18px;
-    padding:12px 6px calc(12px + env(safe-area-inset-bottom));
+    padding:12px 6px calc(2px + env(safe-area-inset-bottom));
     background:var(--bg);
     border-top:1px solid var(--line);
     box-sizing:border-box;
@@ -13052,8 +13052,8 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
     maxIdx: hi < hours.length - 1 ? hi + 1 : hi,
   });
   if(minIdx === null){
-    // 일정이 하나도 없으면 기본 범위(예: 9시~22시)를 보여주되, 위아래로 1시간씩 더 여유를 둠
-    return padEdges(defaultMinIdx, defaultMaxIdx);
+    // 일정이 하나도 없으면 기본 범위(9시~22시)를 그대로 보여줌 - 이 경우는 더 넓히지 않음
+    return { minIdx: defaultMinIdx, maxIdx: defaultMaxIdx };
   }
   // 일정이 있는 시간대에 앞뒤 1시간씩 여유를 둠
   minIdx = Math.max(0, minIdx - 1);
