@@ -5058,6 +5058,7 @@
     color:var(--accent);
     align-items:center;
     justify-content:center;
+    line-height:1;
   }
   .month-event-label{
     font-size:8.5px;
@@ -10711,10 +10712,10 @@ function getScheduleBookable(key){
 }
 
 // 예약이 확정되면 내 캘린더(월간)와 시간표(하루)에 실제 일정으로 등록
-function applyReservationToMyCalendar(dateObj, startHour, endHour, title, roomId, reservationMsgId){
+function applyReservationToMyCalendar(dateObj, startMin, endMin, title, roomId, reservationMsgId){
   // 확정된 시간과 겹치는 "예약 가능" 일정을 정리 (겹치는 부분만 잘라내고, 남는 앞뒤 시간은 그대로 예약 가능으로 남겨둠)
   const dateKey = dateKeyOf(dateObj);
-  const newStartMin = startHour * 60, newEndMin = endHour * 60;
+  const newStartMin = startMin, newEndMin = endMin;
   const toRemove = [];
   const toAdd = [];
   SCHEDULE_EVENTS.forEach(ev => {
@@ -10883,6 +10884,15 @@ function parseTimeLabelHours(label){
   if(!match) return null;
   return { startHour: parseInt(match[1], 10), endHour: parseInt(match[2], 10) };
 }
+// 위 함수와 같은 포맷(HH:MM-HH:MM)에서 분까지 그대로 뽑아냄 - 분 단위 예약 시간을 캘린더에 그대로 반영할 때 씀
+function parseTimeLabelMinutes(label){
+  const match = label.match(/^(\d+):(\d+)-(\d+):(\d+)/);
+  if(!match) return null;
+  return {
+    startMin: parseInt(match[1], 10) * 60 + parseInt(match[2], 10),
+    endMin: parseInt(match[3], 10) * 60 + parseInt(match[4], 10),
+  };
+}
 
 // ============================================================
 // 시간표 이벤트 시스템 (카드형 일정 + 공개설정 + 요일 반복)
@@ -10901,8 +10911,51 @@ function dateKeyNum(d){
   return d.getFullYear() * 10000 + d.getMonth() * 100 + d.getDate();
 }
 
+// 두 날짜가 (시:분과 상관없이, 그 날짜 자체로) 며칠 차이나는지 - dateKeyNum은 정렬 비교용일 뿐 그 값끼리
+// 뺄셈으로 "일수 차이"를 구할 수는 없어서(예: 1/31과 2/1) 실제 ms 차이로 따로 계산함.
+// 한국은 서머타임(DST)이 없어서 이 방식으로 계산해도 날짜 경계에서 어긋나지 않음.
+function daysBetween(a, b){
+  const MS_PER_DAY = 86400000;
+  const an = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
+  const bn = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
+  return Math.round((bn - an) / MS_PER_DAY);
+}
+// 날짜에 일수를 더한 새 Date를 반환 (원본은 건드리지 않음)
+function addDaysToDate(d, days){
+  const r = new Date(d);
+  r.setDate(r.getDate() + days);
+  return r;
+}
+
+// 여러 날짜에 걸치는(자정을 넘기는) 일정은 endMin이 1440을 넘는 "시작일 자정 기준 절대 분"으로 저장됨
+// (예: 10/3 15:00~10/4 17:00 이면 dateKey=10/3, startMin=900, endMin=1440+1020=2460).
+// 절대 endMin 하나를 놓고, 특정 날짜 하나를 기준으로 봤을 때 실제로 보여줘야 할 시작~종료(분)을 계산함:
+// - 하루짜리 일정(endMin<=1440)은 원래 값 그대로
+// - 시작일: 실제 시작 시각 ~ 24:00(자정)
+// - 중간일(시작일도 종료일도 아닌 날): 00:00 ~ 24:00(하루 종일)
+// - 종료일: 00:00 ~ 실제 종료 시각
+function getEventDisplayRangeForDate(ev, dateObj){
+  if(!ev.dateKey || ev.endMin <= 1440){
+    return { startMin: ev.startMin, endMin: ev.endMin };
+  }
+  const baseDate = parseDateInputValue(ev.dateKey);
+  const offset = daysBetween(baseDate, dateObj);
+  const lastOffset = Math.floor((ev.endMin - 1) / 1440);
+  if(offset <= 0) return { startMin: ev.startMin, endMin: 1440 };
+  if(offset >= lastOffset) return { startMin: 0, endMin: ev.endMin - lastOffset * 1440 };
+  return { startMin: 0, endMin: 1440 };
+}
+
+// 여러 날짜에 걸치는 일정의 절대 endMin(시작일 자정 기준 분)을, 실제 "종료 날짜"와 "종료 시각(그 날 00:00부터 몇 분)"으로 되돌림
+// - 일정 수정 화면에 실제 종료 날짜/시간을 다시 채워 넣을 때 씀 (하루짜리 일정도 dayOffset=0으로 자연스럽게 처리됨)
+function splitAbsoluteEndMin(baseDateKey, absEndMin){
+  const dayOffset = Math.floor(absEndMin / 1440);
+  const timeOfDayMin = absEndMin % 1440;
+  return { dateKey: dateKeyOf(addDaysToDate(parseDateInputValue(baseDateKey), dayOffset)), timeOfDayMin };
+}
+
 // 특정 날짜에 해당하는 일정(단발성 + 요일반복 포함)을 시간순으로 반환
-// 이벤트가 특정 날짜에 적용되는지 판정 (요일반복 / 날짜범위 / 단일날짜 3가지 방식 지원)
+// 이벤트가 특정 날짜에 적용되는지 판정 (요일반복 / 날짜범위 / 단일날짜 3가지 방식 지원, 단일날짜는 여러 날에 걸치는 경우도 포함)
 function eventAppliesToDate(ev, dNum, dow, key){
   if(ev.recurring){
     return ev.recurring.weekdays.includes(dow)
@@ -10911,6 +10964,12 @@ function eventAppliesToDate(ev, dNum, dow, key){
   }
   if(ev.dateRange){
     return dNum >= dateKeyNum(ev.dateRange.start) && dNum <= dateKeyNum(ev.dateRange.end);
+  }
+  if(ev.dateKey && ev.endMin > 1440){
+    const baseDate = parseDateInputValue(ev.dateKey);
+    const lastOffset = Math.floor((ev.endMin - 1) / 1440);
+    const endDNum = dateKeyNum(addDaysToDate(baseDate, lastOffset));
+    return dNum >= dateKeyNum(baseDate) && dNum <= endDNum;
   }
   return ev.dateKey === key;
 }
@@ -10921,7 +10980,7 @@ function getEventsForDate(dateObj){
   const dNum = dateKeyNum(dateObj);
   return SCHEDULE_EVENTS
     .filter(ev => eventAppliesToDate(ev, dNum, dow, key))
-    .sort((a, b) => a.startMin - b.startMin);
+    .sort((a, b) => getEventDisplayRangeForDate(a, dateObj).startMin - getEventDisplayRangeForDate(b, dateObj).startMin);
 }
 
 // SCHEDULE_EVENTS 전체를 기준으로 시간 단위 배열(scheduleData/scheduleText/scheduleBookable)을 다시 계산
@@ -10946,8 +11005,9 @@ function resyncAllScheduleEvents(){
       if(!eventAppliesToDate(ev, dNum, dow, key)) return;
 
       const texts = getScheduleText(key);
-      const startH = Math.floor(ev.startMin / 60);
-      const endH = Math.max(startH + 1, Math.ceil(ev.endMin / 60));
+      const disp = getEventDisplayRangeForDate(ev, d);
+      const startH = Math.floor(disp.startMin / 60);
+      const endH = Math.max(startH + 1, Math.ceil(disp.endMin / 60));
 
       if(ev.type === 'available'){
         const bookable = getScheduleBookable(key);
@@ -11077,6 +11137,7 @@ function renderDayView(){
   }
 
   events.forEach(ev => {
+    const disp = getEventDisplayRangeForDate(ev, scheduleFocusDate);
     if(ev.isPendingHold){
       // 예약 요청 보내고 상대 응답을 기다리는 중 - 수정/삭제/공개설정 없이 상태만 보여줌 (채팅에서 취소하면 자동으로 사라짐)
       const pendingCard = document.createElement('div');
@@ -11086,7 +11147,7 @@ function renderDayView(){
         <div class="day-event-actions">
           <button class="day-event-goto-chat-icon" title="채팅에서 확인"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>
         </div>` : ''}
-        <div class="day-event-time">${minutesToLabel(ev.startMin)}-${minutesToLabel(ev.endMin)}</div>
+        <div class="day-event-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</div>
         <div class="day-event-title">${escapeHtml(ev.title)}</div>
         <div class="day-event-pending-note">상대의 응답을 기다리는 중이에요</div>
       `;
@@ -11112,7 +11173,7 @@ function renderDayView(){
       <div class="day-event-actions">
         ${actionsHtml}
       </div>
-      <div class="day-event-time">${minutesToLabel(ev.startMin)}-${minutesToLabel(ev.endMin)}</div>
+      <div class="day-event-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</div>
       <div class="day-event-title">${escapeHtml(ev.title)}</div>
       <div class="day-event-tags">
         ${visibilityButtonsHtml(ev.visibility, 'day-event-tag')}
@@ -11288,10 +11349,13 @@ async function loadScheduleFromServer(){
       const dateRange = (isAllDays && sev.recurringUntil)
         ? { start: startD, end: new Date(sev.recurringUntil) }
         : null;
+      // 자정을 넘기는(여러 날짜에 걸치는) 일정은 endTime이 startTime보다 며칠 뒤일 수 있음 - 그 날수만큼 1440을 더해서
+      // "시작일 자정 기준 절대 분"으로 되돌려야 원래 범위가 유지됨(반복/기간지정 일정은 이 보정이 필요 없음)
+      const spansDays = (!isRecurring && !dateRange) ? daysBetween(startD, endD) : 0;
       const fields = {
         title: sev.title,
         startMin: startD.getHours() * 60 + startD.getMinutes(),
-        endMin: endD.getHours() * 60 + endD.getMinutes(),
+        endMin: spansDays * 1440 + endD.getHours() * 60 + endD.getMinutes(),
         visibility: sev.visibility,
         type: sev.eventType,
         recurring,
@@ -11320,9 +11384,9 @@ async function loadScheduleFromServer(){
 // 데모(가짜 친구) 방에서 예약 요청을 보내면, 내 캘린더에 "예약중..." 홀드를 로컬로만 만들어둠 (서버 동기화 없음 - 데모 전용)
 // 예약 요청을 보내면 내 캘린더에 "예약중..." 홀드를 만듦. 겹치는 "예약 가능" 일정이 있으면 그 부분만 잘라내고
 // (앞뒤로 남는 시간은 그대로 예약 가능으로 유지) 그 자리에 홀드를 넣음. (데모 방 전용 - 서버 동기화 없음)
-function createPendingHoldLocal(dateObj, startHour, endHour, reservationMsgId, friendName){
+function createPendingHoldLocal(dateObj, startMin, endMin, reservationMsgId, friendName){
   const dateKey = dateKeyOf(dateObj);
-  const newStartMin = startHour * 60, newEndMin = endHour * 60;
+  const newStartMin = startMin, newEndMin = endMin;
 
   // 겹치는 "예약 가능" 일정을 찾아서 잘라냄 (겹치는 부분만 없애고 남는 앞뒤는 그대로 둠)
   for(let i = SCHEDULE_EVENTS.length - 1; i >= 0; i--){
@@ -11469,6 +11533,8 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
 let formRepeatMode = 'once';
 let formEventType = 'busy';
 let editingEventId = null;
+let editingLinkedPieceIds = []; // 예전 방식(linkGroupId)으로 여러 날짜 조각으로 쪼개져 저장된 일정을 수정할 때,
+                                 // 지금 연 조각 말고 나머지 조각들의 id - 저장 시 하나로 합치면서 이 조각들은 정리함
 const formSelectedWeekdays = new Set();
 let formVisibility = { groupIds: [], private: false };
 
@@ -11698,6 +11764,7 @@ function setEventTypeUI(type){
 // 신규 추가: openEventForm() / 수정: openEventForm(기존이벤트객체)
 function openEventForm(existingEvent){
   editingEventId = existingEvent ? existingEvent.id : null;
+  editingLinkedPieceIds = [];
   document.getElementById('dayEventList').style.display = 'none';
   document.getElementById('eventFormView').classList.add('active');
   document.getElementById('eventFormHeaderTitle').textContent = existingEvent ? '일정 수정' : '일정 추가';
@@ -11710,8 +11777,6 @@ function openEventForm(existingEvent){
   if(existingEvent){
     setEventTypeUI(existingEvent.type || 'busy');
     document.getElementById('eventFormTitle').value = existingEvent.title;
-    document.getElementById('eventFormStart').value = minutesToLabel(existingEvent.startMin);
-    document.getElementById('eventFormEnd').value = minutesToLabel(existingEvent.endMin);
 
     formRepeatMode = existingEvent.recurring ? 'weekly' : 'once';
     document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === formRepeatMode));
@@ -11720,13 +11785,37 @@ function openEventForm(existingEvent){
     document.getElementById('eventFormDateRangeRow').style.display = formRepeatMode === 'once' ? 'flex' : 'none';
 
     if(existingEvent.dateRange){
+      document.getElementById('eventFormStart').value = minutesToLabel(existingEvent.startMin);
+      document.getElementById('eventFormEnd').value = minutesToLabel(existingEvent.endMin);
       document.getElementById('eventFormStartDate').value = toDateInputValue(existingEvent.dateRange.start);
       document.getElementById('eventFormEndDate').value = toDateInputValue(existingEvent.dateRange.end);
     } else if(existingEvent.dateKey){
-      const single = toDateInputValue(parseDateInputValue(existingEvent.dateKey));
-      document.getElementById('eventFormStartDate').value = single;
-      document.getElementById('eventFormEndDate').value = single;
+      // 여러 날짜에 걸치는(자정을 넘기는) 일정이나, 예전 방식(linkGroupId)으로 여러 조각으로 쪼개져 저장된 일정도
+      // 전부 "시작일~종료일, 시작시각~종료시각"의 하나의 연속된 일정으로 재구성해서 보여줌 - 어느 조각/날짜에서
+      // 수정을 열었든 항상 전체 일정이 그대로 나오고, 저장하면 전체가 하나로 합쳐져서 수정됨
+      let effStartMin = existingEvent.startMin;
+      let effEndMin = existingEvent.endMin;
+      let effStartDateKey = existingEvent.dateKey;
+      if(existingEvent.linkGroupId){
+        const group = SCHEDULE_EVENTS
+          .filter(e => e.linkGroupId === existingEvent.linkGroupId)
+          .sort((a, b) => dateKeyNum(parseDateInputValue(a.dateKey)) - dateKeyNum(parseDateInputValue(b.dateKey)));
+        if(group.length > 1){
+          const first = group[0], last = group[group.length - 1];
+          effStartDateKey = first.dateKey;
+          effStartMin = first.startMin;
+          effEndMin = daysBetween(parseDateInputValue(first.dateKey), parseDateInputValue(last.dateKey)) * 1440 + last.endMin;
+          editingLinkedPieceIds = group.filter(e => e.id !== existingEvent.id).map(e => e.id);
+        }
+      }
+      const split = splitAbsoluteEndMin(effStartDateKey, effEndMin);
+      document.getElementById('eventFormStart').value = minutesToLabel(effStartMin);
+      document.getElementById('eventFormEnd').value = minutesToLabel(split.timeOfDayMin);
+      document.getElementById('eventFormStartDate').value = effStartDateKey;
+      document.getElementById('eventFormEndDate').value = split.dateKey;
     } else {
+      document.getElementById('eventFormStart').value = minutesToLabel(existingEvent.startMin);
+      document.getElementById('eventFormEnd').value = minutesToLabel(existingEvent.endMin);
       document.getElementById('eventFormStartDate').value = toDateInputValue(scheduleFocusDate);
       document.getElementById('eventFormEndDate').value = toDateInputValue(scheduleFocusDate);
     }
@@ -11775,6 +11864,7 @@ function closeEventForm(){
   document.getElementById('eventFormView').classList.remove('active');
   document.getElementById('dayEventList').style.display = '';
   editingEventId = null;
+  editingLinkedPieceIds = [];
   closeAllCustomPopups();
   closeDeleteConfirmOverlay();
 }
@@ -12283,26 +12373,34 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
 
   const [sh, sm] = startStr.split(':').map(Number);
   const [eh, em] = endStr.split(':').map(Number);
-  const startMin = sh * 60 + sm;
-  const endMin = eh * 60 + em;
+  const startMinOfDay = sh * 60 + sm;
+  const endMinOfDay = eh * 60 + em;
 
-  // 반복 없음(once) 모드에서 종료 시간이 시작 시간보다 빠르면, "자정을 넘기는 일정"(예: 저녁 4시 ~ 다음날 새벽 3시)일 수 있으니
-  // 종료 날짜가 시작 날짜보다 뒤인지까지 같이 봐서 판단함. 자정을 넘기는 일정은 날짜별로 쪼개서 등록해야 해서(첫날은 시작시간~자정,
-  // 마지막날은 자정~종료시간, 그 사이는 하루 종일) dateRange(반복 창)와는 별도로 처리함 - 아래 overnightDateRange가 채워지면 그 경로를 탐.
-  let overnightDateRange = null;
-  if(formRepeatMode === 'once' && endMin <= startMin){
+  // 'once' 모드는 시작/종료 날짜가 다르면(자정을 넘기든, 그냥 여러 날짜에 걸치든) 항상 "하나의 연속된 일정"으로 취급함 -
+  // endMin을 "시작일 자정 기준 절대 분"(1440을 넘을 수 있음)으로 저장해서, 여러 날짜에 걸쳐도 내부적으로는
+  // 레코드 하나로만 남게 함(날짜별로 쪼개서 여러 레코드로 저장하지 않음). 시작 날짜 = 종료 날짜면 기존처럼 하루짜리 일정.
+  let startMin = startMinOfDay;
+  let endMin = endMinOfDay;
+  let baseDateKey = null;
+  if(formRepeatMode === 'once'){
     const startDateStr = document.getElementById('eventFormStartDate').value;
     const endDateStr = document.getElementById('eventFormEndDate').value;
-    if(startDateStr && endDateStr){
-      const rangeStart = parseDateInputValue(startDateStr);
-      const rangeEnd = parseDateInputValue(endDateStr);
-      if(dateKeyNum(rangeEnd) > dateKeyNum(rangeStart)){
-        overnightDateRange = { start: rangeStart, end: rangeEnd };
-      }
+    if(!startDateStr || !endDateStr){ showToast('시작/종료 날짜를 선택해주세요.'); return; }
+    const rangeStart = parseDateInputValue(startDateStr);
+    const rangeEnd = parseDateInputValue(endDateStr);
+    const dayOffset = daysBetween(rangeStart, rangeEnd);
+    if(dayOffset < 0){ showToast('종료 날짜는 시작 날짜보다 뒤여야 해요.'); return; }
+    baseDateKey = startDateStr;
+    if(dayOffset === 0){
+      if(endMinOfDay <= startMinOfDay){ showToast('종료 시간은 시작 시간보다 뒤여야 해요.'); return; }
+    } else {
+      endMin = dayOffset * 1440 + endMinOfDay;
     }
+  } else if(endMin <= startMin){
+    showToast('종료 시간은 시작 시간보다 뒤여야 해요.');
+    return;
   }
 
-  if(endMin <= startMin && !overnightDateRange){ showToast('종료 시간은 시작 시간보다 뒤여야 해요.'); return; }
   if(formRepeatMode === 'weekly' && formSelectedWeekdays.size === 0){
     showToast('반복할 요일을 선택해주세요.');
     return;
@@ -12316,64 +12414,43 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     until = new Date(uy, um - 1, ud);
   }
 
-  let dateRange = null;
-  if(formRepeatMode === 'once' && !overnightDateRange){
-    const startDateStr = document.getElementById('eventFormStartDate').value;
-    const endDateStr = document.getElementById('eventFormEndDate').value;
-    if(!startDateStr || !endDateStr){ showToast('시작/종료 날짜를 선택해주세요.'); return; }
-    const rangeStart = parseDateInputValue(startDateStr);
-    const rangeEnd = parseDateInputValue(endDateStr);
-    if(dateKeyNum(rangeEnd) < dateKeyNum(rangeStart)){
-      showToast('종료 날짜는 시작 날짜보다 뒤여야 해요.');
-      return;
-    }
-    dateRange = { start: rangeStart, end: rangeEnd };
-  }
-
-  // 이 일정이 적용될 날짜(들)와, 그 날짜의 실제 시간 범위를 구함(자정 넘기는 일정은 날짜별로 범위가 다름:
+  // 이 일정이 적용될 날짜(들)와, 그 날짜의 실제 시간 범위를 구함(여러 날짜에 걸치는 일정은 날짜별로 범위가 다름:
   // 첫날은 시작시간~자정, 마지막날은 자정~종료시간, 그 사이는 하루 종일). 이미 겹치는 일정이 있는지 확인해서 경고함(막지는 않고, 계속할지 물어봄)
   let dailyWindows;
   if(formRepeatMode === 'weekly'){
     dailyWindows = Array.from(formSelectedWeekdays).map(dow => {
       const d = new Date(scheduleFocusDate);
       d.setDate(d.getDate() + (dow - d.getDay() + 7) % 7);
-      return { key: dateKeyOf(d), winStart: startMin, winEnd: endMin };
+      return { date: d, winStart: startMin, winEnd: endMin };
     });
-  } else if(overnightDateRange){
-    dailyWindows = [];
-    const cursor = new Date(overnightDateRange.start);
-    let count = 0;
-    while(cursor <= overnightDateRange.end && count < 31){
-      const isFirst = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.start);
-      const isLast = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.end);
-      dailyWindows.push({ key: dateKeyOf(cursor), winStart: isFirst ? startMin : 0, winEnd: isLast ? endMin : 1440 });
-      cursor.setDate(cursor.getDate() + 1);
-      count++;
-    }
-  } else if(formRepeatMode === 'once' && dateRange){
-    dailyWindows = [];
-    const cursor = new Date(dateRange.start);
-    let count = 0;
-    while(cursor <= dateRange.end && count < 31){
-      dailyWindows.push({ key: dateKeyOf(cursor), winStart: startMin, winEnd: endMin });
-      cursor.setDate(cursor.getDate() + 1);
-      count++;
-    }
   } else {
-    dailyWindows = [{ key: dateKeyOf(scheduleFocusDate), winStart: startMin, winEnd: endMin }];
+    dailyWindows = [];
+    const baseDate = parseDateInputValue(baseDateKey);
+    const lastOffset = endMin > 1440 ? Math.floor((endMin - 1) / 1440) : 0;
+    for(let offset = 0; offset <= lastOffset; offset++){
+      dailyWindows.push({
+        date: addDaysToDate(baseDate, offset),
+        winStart: offset === 0 ? startMin : 0,
+        winEnd: offset === lastOffset ? (endMin - lastOffset * 1440) : 1440,
+      });
+    }
   }
 
   let overlapFound = null;
-  for(const { key, winStart, winEnd } of dailyWindows){
-    const dayEvents = getEventsForDate(parseDateInputValue(key));
-    const found = dayEvents.find(ev => ev.id !== editingEventId && ev.startMin < winEnd && ev.endMin > winStart);
-    if(found){ overlapFound = { dateKey: key, event: found }; break; }
+  for(const { date, winStart, winEnd } of dailyWindows){
+    const dayEvents = getEventsForDate(date);
+    const found = dayEvents.find(ev => {
+      if(ev.id === editingEventId || editingLinkedPieceIds.includes(ev.id)) return false;
+      const disp = getEventDisplayRangeForDate(ev, date);
+      return disp.startMin < winEnd && disp.endMin > winStart;
+    });
+    if(found){ overlapFound = { date, event: found, disp: getEventDisplayRangeForDate(found, date) }; break; }
   }
   if(overlapFound){
-    const d = parseDateInputValue(overlapFound.dateKey);
+    const d = overlapFound.date;
     const label = `${d.getMonth()+1}/${d.getDate()}(${WEEKDAY_KO[d.getDay()]})`;
     openScheduleOverlapConfirm(
-      `${label}에 이미 "${overlapFound.event.title}" (${minutesToLabel(overlapFound.event.startMin)}-${minutesToLabel(overlapFound.event.endMin)}) 일정이 있어요. 그래도 추가할까요?`,
+      `${label}에 이미 "${overlapFound.event.title}" (${minutesToLabel(overlapFound.disp.startMin)}-${minutesToLabel(overlapFound.disp.endMin)}) 일정이 있어요. 그래도 추가할까요?`,
       proceedEventFormSubmit
     );
     return;
@@ -12381,7 +12458,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   proceedEventFormSubmit();
 
   // 겹침 확인 팝업에서 "그래도 추가"를 눌렀을 때(또는 애초에 안 겹쳐서 바로) 실제로 일정을 만들거나 수정함
-  // (title/startMin/endMin/until/dateRange를 그대로 참조해야 해서, 위에서 바로 호출하지 않고 이 시점에 정의해둔 함수를 씀)
+  // (title/startMin/endMin/until/baseDateKey를 그대로 참조해야 해서, 위에서 바로 호출하지 않고 이 시점에 정의해둔 함수를 씀)
   function proceedEventFormSubmit(){
     try {
       if(editingEventId){
@@ -12398,80 +12475,39 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           const prevExceptions = (ev.recurring && ev.recurring.exceptions) || [];
           ev.recurring = formRepeatMode === 'weekly' ? { weekdays: Array.from(formSelectedWeekdays), until, exceptions: prevExceptions } : null;
           ev.recurringAnchorDateKey = formRepeatMode === 'weekly' ? anchorForRecurring : null;
-          if(overnightDateRange){
-            // 자정을 넘기는 일정으로 바뀐 경우 - 수정 중이던 이 이벤트는 첫째 날(시작시간~자정) 몫으로 남기고,
-            // 나머지 날짜(마지막 날은 자정~종료시간, 그 사이는 하루 종일)는 새 이벤트로 추가함 - 이미 묶여있던
-            // linkGroupId가 있으면 그대로 쓰고, 없으면 새로 만들어서 이 조각들을 전부 같은 그룹으로 묶음
-            ev.startMin = startMin;
-            ev.endMin = 1440;
-            ev.dateRange = null;
-            ev.dateKey = dateKeyOf(overnightDateRange.start);
-            ev.linkGroupId = ev.linkGroupId || makeLinkGroupId();
-            resyncAllScheduleEvents();
-            syncEventUpdateToServer(ev);
-            const cursor = new Date(overnightDateRange.start);
-            cursor.setDate(cursor.getDate() + 1);
-            let count = 1;
-            while(cursor <= overnightDateRange.end && count < 31){
-              const isLast = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.end);
-              createScheduleEvent({
-                title, startMin: 0, endMin: isLast ? endMin : 1440,
-                visibility: { ...formVisibility },
-                recurringWeekdays: null, until: null, dateRange: null,
-                dateKey: dateKeyOf(cursor),
-                type: formEventType,
-                linkGroupId: ev.linkGroupId,
-              });
-              cursor.setDate(cursor.getDate() + 1);
-              count++;
-            }
-          } else {
-            // 자정 넘기는 일정이 아닌 보통 일정으로 바뀐 거면, 예전에 묶여있던 조각들과는 더 이상 상관없으니
-            // linkGroupId를 풀어둠(안 그러면 나중에 다른 조각을 지울 때 이 일정까지 같이 지워질 수 있음)
-            ev.startMin = startMin;
-            ev.endMin = endMin;
-            ev.dateRange = formRepeatMode === 'once' ? dateRange : null;
-            ev.dateKey = (formRepeatMode === 'weekly' || dateRange) ? null : dateKeyOf(scheduleFocusDate);
-            ev.linkGroupId = null;
-            resyncAllScheduleEvents();
-            syncEventUpdateToServer(ev);
+          ev.startMin = startMin;
+          ev.endMin = endMin;
+          ev.dateRange = null;
+          ev.dateKey = formRepeatMode === 'weekly' ? null : baseDateKey;
+          // 수정하고 나면 이 레코드 하나가 전체 일정을 나타내므로, 예전 방식(linkGroupId)의 묶음이었더라도 더 이상 필요 없음
+          ev.linkGroupId = null;
+
+          // 예전 방식으로 여러 날짜 조각으로 쪼개져 저장돼 있던 일정을 수정 중이었다면,
+          // 지금 이 하나의 레코드로 합쳐졌으니 나머지 조각들은 삭제함
+          if(editingLinkedPieceIds.length){
+            editingLinkedPieceIds.forEach(pieceId => {
+              const idx = SCHEDULE_EVENTS.findIndex(e => e.id === pieceId);
+              if(idx >= 0){
+                const piece = SCHEDULE_EVENTS[idx];
+                SCHEDULE_EVENTS.splice(idx, 1);
+                if(piece.serverId) syncEventDeleteToServer(piece);
+              }
+            });
+            editingLinkedPieceIds = [];
           }
+
+          resyncAllScheduleEvents();
+          syncEventUpdateToServer(ev);
         }
         showToast('일정을 수정했어요.');
-      } else if(overnightDateRange){
-        // 자정을 넘기는 일정 - 날짜별로 쪼개서 각각 등록함 (예: 저녁 4시~다음날 새벽 3시 -> 첫날 16:00~24:00 + 다음날 00:00~03:00,
-        // 여러 날에 걸치면 중간 날짜들은 00:00~24:00 하루 종일로 채움) - 조각들을 같은 linkGroupId로 묶어서,
-        // 나중에 어느 조각에서 삭제 버튼을 누르든 묶인 조각 전부가 한 번에 지워지게 함
-        const overnightLinkGroupId = makeLinkGroupId();
-        const cursor = new Date(overnightDateRange.start);
-        let count = 0;
-        while(cursor <= overnightDateRange.end && count < 31){
-          const isFirst = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.start);
-          const isLast = dateKeyNum(cursor) === dateKeyNum(overnightDateRange.end);
-          createScheduleEvent({
-            title,
-            startMin: isFirst ? startMin : 0,
-            endMin: isLast ? endMin : 1440,
-            visibility: { ...formVisibility },
-            recurringWeekdays: null,
-            until: null,
-            dateRange: null,
-            dateKey: dateKeyOf(cursor),
-            type: formEventType,
-            linkGroupId: overnightLinkGroupId,
-          });
-          cursor.setDate(cursor.getDate() + 1);
-          count++;
-        }
-        showToast('일정이 추가됐어요.');
       } else {
         createScheduleEvent({
           title, startMin, endMin,
           visibility: { ...formVisibility },
           recurringWeekdays: formRepeatMode === 'weekly' ? Array.from(formSelectedWeekdays) : null,
           until,
-          dateRange,
-          dateKey: dateKeyOf(scheduleFocusDate),
+          dateRange: null,
+          dateKey: formRepeatMode === 'weekly' ? dateKeyOf(scheduleFocusDate) : baseDateKey,
           type: formEventType,
         });
         showToast('일정이 추가됐어요.');
@@ -12988,10 +13024,24 @@ function getMyOverallScheduleHourCoverage(){
   const coverage = DAY_HOURS.map(() => '');
   SCHEDULE_EVENTS.filter(eventMatchesScheduleGroupFilter).forEach(ev => {
     const startH = Math.floor(ev.startMin / 60);
-    const endH = Math.max(startH + 1, Math.ceil(ev.endMin / 60));
-    for(let h = startH; h < endH; h++){
-      const idx = DAY_HOURS.indexOf(h);
-      if(idx >= 0) coverage[idx] = ev.title || '1';
+    if(ev.endMin <= 1440){
+      const endH = Math.max(startH + 1, Math.ceil(ev.endMin / 60));
+      for(let h = startH; h < endH; h++){
+        const idx = DAY_HOURS.indexOf(h);
+        if(idx >= 0) coverage[idx] = ev.title || '1';
+      }
+    } else {
+      // 여러 날짜에 걸치는 일정 - 시작일의 "시작시간~24시"와 종료일의 "0시~종료시간" 두 구간을 모두 반영
+      for(let h = startH; h < 24; h++){
+        const idx = DAY_HOURS.indexOf(h);
+        if(idx >= 0) coverage[idx] = ev.title || '1';
+      }
+      const tailMin = ev.endMin % 1440;
+      const tailEndH = tailMin === 0 ? 24 : Math.max(1, Math.ceil(tailMin / 60));
+      for(let h = 0; h < tailEndH; h++){
+        const idx = DAY_HOURS.indexOf(h);
+        if(idx >= 0) coverage[idx] = ev.title || '1';
+      }
     }
   });
   return coverage;
@@ -13003,8 +13053,9 @@ function getMyOverallScheduleHourCoverage(){
 function getFilteredScheduleTextForDate(d){
   const texts = DAY_HOURS.map(() => '');
   filterEventsByScheduleGroup(getEventsForDate(d)).forEach(ev => {
-    const startH = Math.floor(ev.startMin / 60);
-    const endH = Math.max(startH + 1, Math.ceil(ev.endMin / 60));
+    const disp = getEventDisplayRangeForDate(ev, d);
+    const startH = Math.floor(disp.startMin / 60);
+    const endH = Math.max(startH + 1, Math.ceil(disp.endMin / 60));
     for(let h = startH; h < endH; h++){
       const idx = DAY_HOURS.indexOf(h);
       if(idx >= 0) texts[idx] = ev.title;
@@ -13084,7 +13135,7 @@ function renderWeekView(){
         while(j + 1 <= maxIdx && texts[j+1] === text) j++;
 
         // 이 블록이 몇 시부터 몇 시까지인지로, 실제 일정 객체를 찾음 (수정/삭제에 필요)
-        const matchedEv = dayEvents.find(ev => ev.title === text && Math.floor(ev.startMin / 60) === DAY_HOURS[i]) || null;
+        const matchedEv = dayEvents.find(ev => ev.title === text && Math.floor(getEventDisplayRangeForDate(ev, d).startMin / 60) === DAY_HOURS[i]) || null;
         const isPending = !!(matchedEv && matchedEv.isPendingHold);
         const isLinked = !!(matchedEv && matchedEv.isReservationLinked);
 
@@ -13312,10 +13363,11 @@ function renderMonthSelectedPanel(){
     ? `<div class="month-selected-empty">등록된 일정이 없어요.</div>`
     : events.map(ev => {
         const isSpecial = ev.isPendingHold || ev.isReservationLinked; // 이 둘은 채팅에서만 관리되는 일정이라 여기서 수정/삭제 안 함
+        const disp = getEventDisplayRangeForDate(ev, monthSelectedDate);
         return `
         <div class="month-selected-row${ev.isReservationLinked ? ' clickable' : ''}" data-ev="${ev.id}" ${ev.isReservationLinked ? `data-room="${ev.sourceChatRoomId}"` : ''}>
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForScheduleText(ev.title))}"></span>
-          <span class="month-selected-time">${minutesToLabel(ev.startMin)}-${minutesToLabel(ev.endMin)}</span>
+          <span class="month-selected-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</span>
           <span class="month-selected-text">${escapeHtml(ev.title)}</span>
           ${ev.isReservationLinked ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
           ${isSpecial ? '' : `
@@ -14620,13 +14672,14 @@ function openFriendReserve(dateObj, hour){
   const windowStartHour = HOURS[startIdx];
   const windowEndHour = HOURS[endIdx] + 1; // 이 구간에서 예약 가능한 마지막 순간(종료시간으로 고를 수 있는 최대값)
 
-  friendReserveContext = { date: dateObj, friendId: friend.id, windowStartHour, windowEndHour };
+  // 예약 요청 시간은 분 단위까지 고를 수 있어야 해서, 창(window) 경계도 분 단위로 들고 있음(시간 경계를 *60한 것 뿐)
+  friendReserveContext = { date: dateObj, friendId: friend.id, windowStartMin: windowStartHour * 60, windowEndMin: windowEndHour * 60 };
 
   document.getElementById('friendReserveTitle').textContent = `${friend.name}님에게 예약 요청`;
   document.getElementById('friendReserveDateLabel').textContent =
     `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 ${WEEKDAY_KO[dateObj.getDay()]}요일`;
 
-  updateFriendReserveStartOptions(hour);
+  updateFriendReserveStartOptions(hour * 60);
   document.getElementById('friendReserveNoteInput').value = '';
   resetLocationPicker();
 
@@ -14637,34 +14690,34 @@ function openFriendReserve(dateObj, hour){
   pushViewState(closeFriendReserveView);
 }
 
-// 예약 가능한 구간(windowStartHour~windowEndHour) 안에서 시작 시간 선택지를 채움
-function updateFriendReserveStartOptions(defaultHour){
-  const { windowStartHour, windowEndHour } = friendReserveContext;
+// 예약 가능한 구간(windowStartMin~windowEndMin, 분 단위) 안에서 5분 단위로 시작 시간 선택지를 채움
+function updateFriendReserveStartOptions(defaultMin){
+  const { windowStartMin, windowEndMin } = friendReserveContext;
   const startSelect = document.getElementById('friendReserveStartSelect');
   let opts = '';
-  for(let h = windowStartHour; h < windowEndHour; h++){
-    opts += `<option value="${h}">${String(h).padStart(2,'0')}:00</option>`;
+  for(let m = windowStartMin; m < windowEndMin; m += 5){
+    opts += `<option value="${m}">${minutesToLabel(m)}</option>`;
   }
   startSelect.innerHTML = opts;
-  startSelect.value = (defaultHour !== undefined) ? defaultHour : windowStartHour;
+  startSelect.value = (defaultMin !== undefined) ? defaultMin : windowStartMin;
   refreshSelectDisplay('friendReserveStartSelect');
   updateFriendReserveEndOptions();
 }
 
-// 방금 고른 시작 시간보다 늦은 시간들 중, 예약 가능한 구간 안에서만 종료 시간 선택지를 채움
+// 방금 고른 시작 시간보다 늦은 시간들 중, 예약 가능한 구간 안에서 5분 단위로 종료 시간 선택지를 채움
 function updateFriendReserveEndOptions(){
-  const { windowEndHour } = friendReserveContext;
-  const startHour = parseInt(document.getElementById('friendReserveStartSelect').value, 10);
+  const { windowEndMin } = friendReserveContext;
+  const startMin = parseInt(document.getElementById('friendReserveStartSelect').value, 10);
   const endSelect = document.getElementById('friendReserveEndSelect');
   const prevEnd = endSelect.value ? parseInt(endSelect.value, 10) : null;
 
   let opts = '';
-  for(let h = startHour + 1; h <= windowEndHour; h++){
-    opts += `<option value="${h}">${String(h).padStart(2,'0')}:00</option>`;
+  for(let m = startMin + 5; m <= windowEndMin; m += 5){
+    opts += `<option value="${m}">${minutesToLabel(m)}</option>`;
   }
   endSelect.innerHTML = opts;
   // 이전에 고른 종료시간이 새 시작시간 기준으로도 여전히 유효하면 그대로 유지, 아니면 1시간 뒤로 기본값
-  endSelect.value = (prevEnd && prevEnd > startHour && prevEnd <= windowEndHour) ? prevEnd : Math.min(startHour + 1, windowEndHour);
+  endSelect.value = (prevEnd && prevEnd > startMin && prevEnd <= windowEndMin) ? prevEnd : Math.min(startMin + 60, windowEndMin);
   refreshSelectDisplay('friendReserveEndSelect');
 }
 document.getElementById('friendReserveStartSelect').addEventListener('change', updateFriendReserveEndOptions);
@@ -14743,8 +14796,8 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   const friend = FRIENDS.find(f => f.id === friendId);
   if(!friend) return;
 
-  const startHour = parseInt(document.getElementById('friendReserveStartSelect').value, 10);
-  const endHour = parseInt(document.getElementById('friendReserveEndSelect').value, 10);
+  const startMin = parseInt(document.getElementById('friendReserveStartSelect').value, 10);
+  const endMin = parseInt(document.getElementById('friendReserveEndSelect').value, 10);
   const note = document.getElementById('friendReserveNoteInput').value.trim();
   // 검색해서 실제로 고른 주소면 좌표까지 저장, 그냥 텍스트만 입력하고 안 골랐으면 텍스트만 저장 (비워두면 "장소 미정")
   const typedLocation = document.getElementById('friendReserveLocationInput').value.trim();
@@ -14752,17 +14805,21 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   const locationLat = friendReserveLocationPicked ? friendReserveLocationPicked.lat : null;
   const locationLon = friendReserveLocationPicked ? friendReserveLocationPicked.lon : null;
 
-  if(endHour <= startHour){
+  if(endMin <= startMin){
     showToast('종료 시간은 시작 시간보다 늦어야 해요.');
     return;
   }
 
   // 내가 신청하려는 이 시간이 내 캘린더의 다른 일정과 겹치는지 확인 (본인 일정 만들 때와 동일한 방식의 확인 팝업)
-  const myStartMin = startHour * 60, myEndMin = endHour * 60;
-  const myOverlap = getEventsForDate(date).find(ev => ev.type !== 'available' && ev.startMin < myEndMin && ev.endMin > myStartMin);
+  const myOverlap = getEventsForDate(date).find(ev => {
+    if(ev.type === 'available') return false;
+    const disp = getEventDisplayRangeForDate(ev, date);
+    return disp.startMin < endMin && disp.endMin > startMin;
+  });
   if(myOverlap){
+    const myOverlapDisp = getEventDisplayRangeForDate(myOverlap, date);
     openScheduleOverlapConfirm(
-      `이 날 ${minutesToLabel(myOverlap.startMin)}-${minutesToLabel(myOverlap.endMin)}에 이미 "${myOverlap.title}" 일정이 있어요. 그래도 예약 신청할까요?`,
+      `이 날 ${minutesToLabel(myOverlapDisp.startMin)}-${minutesToLabel(myOverlapDisp.endMin)}에 이미 "${myOverlap.title}" 일정이 있어요. 그래도 예약 신청할까요?`,
       proceedReservationSubmit
     );
     return;
@@ -14770,10 +14827,8 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   proceedReservationSubmit();
 
   async function proceedReservationSubmit(){
-  const endMin = 0;
-
   const dateLabel = `${date.getMonth()+1}/${date.getDate()}(${WEEKDAY_KO[date.getDay()]})`;
-  const timeLabel = `${String(startHour).padStart(2,'0')}:00-${String(endHour).padStart(2,'0')}:${String(endMin).padStart(2,'0')}`;
+  const timeLabel = `${minutesToLabel(startMin)}-${minutesToLabel(endMin)}`;
 
   submitBtn.disabled = true;
   let roomId;
@@ -14791,9 +14846,9 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
 
   if(room.isRealRoom){
     const startDate = new Date(date);
-    startDate.setHours(startHour, 0, 0, 0);
+    startDate.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
     const endDate = new Date(date);
-    endDate.setHours(endHour, endMin, 0, 0);
+    endDate.setHours(Math.floor(endMin / 60), endMin % 60, 0, 0);
     try {
       const data = await apiRequest(`/chats/${roomId}/reservations`, {
         method: 'POST',
@@ -14830,7 +14885,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
     time: new Date(),
   };
   CHAT_ROOMS[roomId].messages.push(reservationMsg);
-  createPendingHoldLocal(date, startHour, endHour, reservationMsg.id, friend.name);
+  createPendingHoldLocal(date, startMin, endMin, reservationMsg.id, friend.name);
   touchRoom(roomId);
   renderChatList();
   refreshActiveScheduleView();
@@ -14840,7 +14895,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
     if(reservationMsg.status !== 'pending') return; // 그 사이에 철회됐으면 무시
     reservationMsg.status = 'confirmed';
     clearPendingHoldLocal(reservationMsg.id);
-    applyReservationToMyCalendar(date, startHour, endHour, `${withWaGwa(friend.name)} 약속${note ? ' - ' + note : ''}`, roomId, reservationMsg.id);
+    applyReservationToMyCalendar(date, startMin, endMin, `${withWaGwa(friend.name)} 약속${note ? ' - ' + note : ''}`, roomId, reservationMsg.id);
     addReservationPin(roomId, CHAT_ROOMS[roomId], {
       dateLabel, timeLabel, note, location, locationLat, locationLon,
       dateObj: new Date(date), reservationMsgId: reservationMsg.id,
@@ -17800,6 +17855,7 @@ function renderChatMessages(){
               Object.assign(m, mapServerReservationMessage(data.message));
               await loadPinsFromServer(activeChatRoomId, room);
               loadScheduleFromServer(); // 확정되면서 서버에서 정리된 "예약 가능" 등이 내 캘린더에도 바로 반영되게
+              if(m.location) addHotplaceNoticeMessage(activeChatRoomId, m.location, m.locationLat, m.locationLon);
               renderChatMessages();
               renderChatList();
             } catch(err){
@@ -17811,10 +17867,10 @@ function renderChatMessages(){
           m.status = 'confirmed';
 
           const parsedDate = parseDateLabelToDate(m.dateLabel);
-          const parsedHours = parseTimeLabelHours(m.timeLabel);
-          if(parsedDate && parsedHours){
+          const parsedMinutes = parseTimeLabelMinutes(m.timeLabel);
+          if(parsedDate && parsedMinutes){
             applyReservationToMyCalendar(
-              parsedDate, parsedHours.startHour, parsedHours.endHour,
+              parsedDate, parsedMinutes.startMin, parsedMinutes.endMin,
               `${withWaGwa(room.name)} 약속${m.note ? ' - ' + m.note : ''}`,
               roomId, m.id
             );
@@ -19180,7 +19236,7 @@ function selectTimeOptionDirect(roomId, msg, optionIndex){
 
   msg.status = 'confirmed';
   msg._mockVotesTriggered = true; // 자동 시뮬레이션이 중복으로 다시 돌지 않게 막음
-  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startH, winning.endH, `${withWaGwa(room.name)} 약속`, roomId, msg.id);
+  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startH * 60, winning.endH * 60, `${withWaGwa(room.name)} 약속`, roomId, msg.id);
   addReservationPin(roomId, room, {
     dateLabel: winning.dateLabel, timeLabel: winning.timeLabel, note: null,
     dateObj: new Date(winning.dateObj), reservationMsgId: msg.id,
@@ -19250,7 +19306,7 @@ function checkTimeOptionsConsensus(roomId, msg){
   if(!winning) return;
 
   msg.status = 'confirmed';
-  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startH, winning.endH, `${room.name} 모임`, roomId, msg.id);
+  applyReservationToMyCalendar(new Date(winning.dateObj), winning.startH * 60, winning.endH * 60, `${room.name} 모임`, roomId, msg.id);
   addReservationPin(roomId, room, {
     dateLabel: winning.dateLabel, timeLabel: winning.timeLabel, note: null,
     dateObj: new Date(winning.dateObj), reservationMsgId: msg.id,
