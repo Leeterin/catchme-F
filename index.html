@@ -13046,9 +13046,14 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
   const fallbackMaxIdx = hours.indexOf(fallbackEndHour);
   const defaultMinIdx = fallbackMinIdx >= 0 ? fallbackMinIdx : 0;
   const defaultMaxIdx = fallbackMaxIdx >= 0 ? fallbackMaxIdx : hours.length - 1;
+  // 맨 위/아래로 항상 빈 칸이 최소 1시간은 남도록(가능한 경우) 끝에서 한 번 더 여유를 둠
+  const padEdges = (lo, hi) => ({
+    minIdx: lo > 0 ? lo - 1 : lo,
+    maxIdx: hi < hours.length - 1 ? hi + 1 : hi,
+  });
   if(minIdx === null){
-    // 일정이 하나도 없으면 기본 범위(예: 9시~22시)를 그대로 보여줌
-    return { minIdx: defaultMinIdx, maxIdx: defaultMaxIdx };
+    // 일정이 하나도 없으면 기본 범위(예: 9시~22시)를 보여주되, 위아래로 1시간씩 더 여유를 둠
+    return padEdges(defaultMinIdx, defaultMaxIdx);
   }
   // 일정이 있는 시간대에 앞뒤 1시간씩 여유를 둠
   minIdx = Math.max(0, minIdx - 1);
@@ -13064,7 +13069,9 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
     if(maxIdx < hours.length - 1){ maxIdx++; grew = true; if((maxIdx - minIdx + 1) >= minSpan) break; }
     if(!grew) break;
   }
-  return { minIdx, maxIdx };
+  // 위에서 구한 범위 맨 끝에 한 번 더 1시간 여유를 둬서, 그래프 맨 위/아래 칸이 항상
+  // (0시/23시에 바짝 붙은 경우가 아니라면) 빈 칸으로 남도록 함
+  return padEdges(minIdx, maxIdx);
 }
 
 // 일주일 시간표에 보여줄 시간 범위를 계산하기 위한 재료 - "화면에 지금 보이는 7일"만 보고 범위를
