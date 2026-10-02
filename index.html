@@ -112,6 +112,19 @@
     transition:border-color .15s ease, color .15s ease;
   }
   .icon-btn:hover{ border-color:var(--accent); color:var(--accent); }
+  .new-chat-wrap{ position:relative; flex-shrink:0; }
+  .new-chat-menu{
+    position:absolute; top:42px; right:0; z-index:50; min-width:210px;
+    display:flex; flex-direction:column; padding:6px; border-radius:14px;
+    background:var(--surface); border:1px solid var(--line); box-shadow:0 10px 28px rgba(0,0,0,0.16);
+  }
+  .new-chat-menu button{
+    display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%;
+    padding:10px 12px; border:0; border-radius:10px; background:transparent; color:var(--text); text-align:left; cursor:pointer;
+  }
+  .new-chat-menu button:hover{ background:var(--surface-2); }
+  .new-chat-menu b{ font-size:13.5px; }
+  .new-chat-menu span{ font-size:11.5px; color:var(--text-dim); }
   .icon-btn svg{ width:19px; height:19px; flex-shrink:0; }
   .icon-btn.login{
     background:var(--accent);
@@ -7033,9 +7046,15 @@
           <h2>채팅</h2>
           <p class="desc">약속방별 대화와 친구 개인 채팅이 여기 모여요.</p>
         </div>
-        <button class="icon-btn" id="newGroupBtn" title="새 모임 만들기">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/></svg>
-        </button>
+        <div class="new-chat-wrap">
+          <button class="icon-btn" id="newGroupBtn" title="새 채팅" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><line x1="12" y1="7" x2="12" y2="13"/><line x1="9" y1="10" x2="15" y2="10"/></svg>
+          </button>
+          <div class="new-chat-menu" id="newChatMenu" hidden>
+            <button type="button" data-new-chat="dm"><b>친구랑 채팅하기</b><span>친구 한 명과 1:1 대화</span></button>
+            <button type="button" data-new-chat="group"><b>모임 만들기</b><span>약속을 잡을 모임방 (1:1·단톡)</span></button>
+          </div>
+        </div>
       </div>
       <div id="chatListContainer"></div>
     </div>
@@ -7159,10 +7178,10 @@
     <div class="calendar-match-view" id="newGroupView">
       <div class="match-panel-header">
         <button class="profile-back" id="newGroupBackBtn">&#8249;</button>
-        <span>새 모임 만들기</span>
+        <span id="newGroupTitle">새 모임 만들기</span>
       </div>
       <input type="text" class="search-input" id="newGroupNameInput" placeholder="모임 이름" maxlength="30" />
-      <div class="hotplace-list-desc">함께할 친구를 골라주세요.</div>
+      <div class="hotplace-list-desc" id="newGroupDesc">함께할 친구를 골라주세요.</div>
       <div id="newGroupFriendList"></div>
       <button class="profile-chat-btn" id="newGroupCreateBtn" style="margin-top:14px;">만들기</button>
     </div>
@@ -21251,15 +21270,24 @@ let activeGroupMembersRoomId = null;
 
 // ---------- 채팅방 목록: 새 모임(그룹) 만들기 ----------
 let selectedNewGroupUsernames = [];
+// 'group' = 모임 만들기(친구 여러 명 골라서 모임방, 1명이면 1:1 모임), 'dm' = 친구랑 채팅하기(한 명 누르면 바로 1:1 대화방)
+// 여러 명 단톡은 모임으로만 만들 수 있음
+let newChatMode = 'group';
 
-function openNewGroupView(){
+function openNewGroupView(mode){
+  newChatMode = mode === 'dm' ? 'dm' : 'group';
+  const isDm = newChatMode === 'dm';
+  document.getElementById('newGroupTitle').textContent = isDm ? '친구랑 채팅하기' : '새 모임 만들기';
+  document.getElementById('newGroupDesc').textContent = isDm ? '대화할 친구를 눌러주세요.' : '함께할 친구를 골라주세요.';
+  document.getElementById('newGroupNameInput').style.display = isDm ? 'none' : '';
+  document.getElementById('newGroupCreateBtn').style.display = isDm ? 'none' : '';
   document.getElementById('newGroupNameInput').value = '';
   selectedNewGroupUsernames = [];
   const list = document.getElementById('newGroupFriendList');
   const realFriends = FRIENDS.filter(f => f.id !== DEMO_FRIEND.id);
 
   if(realFriends.length === 0){
-    list.innerHTML = `<div class="search-empty">같이 모임을 만들 친구가 없어요. 먼저 친구를 추가해보세요.</div>`;
+    list.innerHTML = `<div class="search-empty">${isDm ? '대화할' : '같이 모임을 만들'} 친구가 없어요. 먼저 친구를 추가해보세요.</div>`;
   } else {
     list.innerHTML = realFriends.map(f => `
       <div class="search-result-row" style="cursor:pointer;" data-username="${escapeHtml(f.username)}">
@@ -21274,12 +21302,46 @@ function openNewGroupView(){
   document.querySelector('.bottom-nav').style.display = 'none';
   pushViewState(closeNewGroupView);
 }
-document.getElementById('newGroupBtn').addEventListener('click', openNewGroupView);
+function setNewChatMenu(open){
+  document.getElementById('newChatMenu').hidden = !open;
+  document.getElementById('newGroupBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+document.getElementById('newGroupBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  setNewChatMenu(document.getElementById('newChatMenu').hidden);
+});
+document.getElementById('newChatMenu').addEventListener('click', (e) => {
+  const item = e.target.closest('[data-new-chat]');
+  if(!item) return;
+  setNewChatMenu(false);
+  openNewGroupView(item.dataset.newChat);
+});
+document.addEventListener('click', (e) => {
+  if(!e.target.closest('.new-chat-wrap')) setNewChatMenu(false);
+});
 
-document.getElementById('newGroupFriendList').addEventListener('click', (e) => {
+let newDmOpening = false;
+document.getElementById('newGroupFriendList').addEventListener('click', async (e) => {
   const row = e.target.closest('.search-result-row');
   if(!row || !row.dataset.username) return;
   const username = row.dataset.username;
+  if(newChatMode === 'dm'){
+    // 이미 1:1 대화방이 있으면 그 방을, 없으면 새로 만들어서 바로 엶
+    const friend = FRIENDS.find(f => f.username === username);
+    if(!friend || newDmOpening) return;
+    newDmOpening = true;
+    try {
+      const roomId = await resolveFriendRoomId(friend);
+      document.getElementById('newGroupView').classList.remove('active');
+      showTab('chat');
+      openChatRoom(roomId);
+    } catch(err){
+      showToast(err.message);
+    } finally {
+      newDmOpening = false;
+    }
+    return;
+  }
   const idx = selectedNewGroupUsernames.indexOf(username);
   if(idx >= 0){
     selectedNewGroupUsernames.splice(idx, 1);
