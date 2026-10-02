@@ -13064,11 +13064,14 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
     });
   });
   const fallbackMinIdx = hours.indexOf(fallbackStartHour);
-  const fallbackMaxIdx = hours.indexOf(fallbackEndHour);
+  const fallbackMaxIdxRaw = hours.indexOf(fallbackEndHour);
   const defaultMinIdx = fallbackMinIdx >= 0 ? fallbackMinIdx : 0;
-  const defaultMaxIdx = fallbackMaxIdx >= 0 ? fallbackMaxIdx : hours.length - 1;
+  // fallbackEndHour(예: 22)는 "그 시각까지"라는 경계 시각이지, 그 시각 자체가 칸으로 하나 더
+  // 있는 게 아님 - 그래서 실제 마지막 칸은 그 한 시간 전(21시 칸, 21~22시)이 되도록 1을 뺌
+  // (9~22시 기본 템플릿이면 9시~21시 칸까지 총 13칸이고, 그 아래 경계선에 "22시"라고 표시됨)
+  const defaultMaxIdx = fallbackMaxIdxRaw >= 0 ? Math.max(defaultMinIdx, fallbackMaxIdxRaw - 1) : hours.length - 1;
   if(minIdx === null){
-    // 일정이 하나도 없으면 기본 범위(9시~22시)를 그대로 보여줌
+    // 일정이 하나도 없으면 기본 범위(9시~21시 칸, 경계는 22시)를 그대로 보여줌
     return { minIdx: defaultMinIdx, maxIdx: defaultMaxIdx };
   }
   // 일정이 있는 시간대 기준 위아래로 1시간씩 여유를 둠 - 이 1시간 버퍼가 전부이고, 아래에서
@@ -13181,15 +13184,12 @@ function renderWeekView(){
     hourEl.textContent = `${h}시`;
     hourCol.appendChild(hourEl);
   });
-  // 범위가 실제로 하루 끝(자정)까지 닿은 경우에만 맨 마지막 칸 밑에 "24시" 경계 라벨을 추가함 -
-  // 기본 범위(예: 9~22시)처럼 중간에서 끊기는 경우는 애매한 "23시" 라벨이 또 다른 칸처럼
-  // 보여서 헷갈리니 넣지 않음
-  if(maxIdx >= DAY_HOURS.length - 1){
-    const endHourEl = document.createElement('div');
-    endHourEl.className = 'week-cal-hour week-cal-hour-end';
-    endHourEl.textContent = '24시';
-    hourCol.appendChild(endHourEl);
-  }
+  // 맨 마지막 칸이 끝나는 경계 시각을 항상 라벨로 한 번 더 표시함(예: 마지막 칸이 21시면
+  // 그 밑 경계선에 "22시", 자정까지 닿았으면 "24시")
+  const endHourEl = document.createElement('div');
+  endHourEl.className = 'week-cal-hour week-cal-hour-end';
+  endHourEl.textContent = `${maxIdx >= DAY_HOURS.length - 1 ? 24 : DAY_HOURS[maxIdx + 1]}시`;
+  hourCol.appendChild(endHourEl);
   wrap.appendChild(hourCol);
 
   // 요일별 컬럼
