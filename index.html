@@ -5225,10 +5225,15 @@
   .avail-select-grid .week-head-cell{ user-select:none; }
   /* 24시간으로 늘어난 뒤 스크롤해도 요일/날짜 헤더가 같이 밀려 올라가지 않도록, 이 그리드만 따로
      스크롤되는 영역으로 만들고 헤더 행을 그 안에서 상단 고정(sticky)함 */
-  .avail-grid-wrap{
-    max-height:46vh;
-    overflow-y:auto;
-    -webkit-overflow-scrolling:touch;
+  /* 예약 가능 시간 표는 따로 스크롤되는 상자 없이 일정 추가 화면 전체와 한 번에 스크롤됨
+     (상자 안 스크롤과 화면 스크롤이 겹쳐서 같이 움직이던 문제) - 날짜 줄은 화면 위에 붙어서 따라옴 */
+  .avail-grid-wrap{ overflow:visible; }
+  .avail-select-grid .week-cell{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+  .avail-select-grid.touch-dragging .week-cell:not(.occupied){ outline:1px dashed var(--accent); outline-offset:-1px; }
+  .avail-early-toggle{
+    display:block; width:100%; margin-bottom:6px; padding:8px 0;
+    border:1px dashed var(--line); border-radius:10px; background:transparent;
+    color:var(--text-dim); font-size:12px; font-weight:700; cursor:pointer;
   }
   .avail-select-grid .week-head-cell{
     position:sticky;
@@ -6392,12 +6397,13 @@
 
       <div id="availableGridGroup" style="display:none;">
         <div class="mp-input-group">
-          <label>예약 가능 시간 선택 <span style="font-weight:400;color:var(--text-dim);">(빈 칸을 하나씩 눌러서 선택하세요)</span></label>
+          <label>예약 가능 시간 선택 <span style="font-weight:400;color:var(--text-dim);">(탭하면 한 칸, 꾹 누른 채 밀면 여러 칸)</span></label>
           <div class="schedule-nav" style="margin-bottom:8px;">
             <button id="availWeekPrev" type="button">&#8249;</button>
             <div class="schedule-nav-label" id="availWeekLabel">-</div>
             <button id="availWeekNext" type="button">&#8250;</button>
           </div>
+          <button type="button" class="avail-early-toggle" id="availEarlyToggle">새벽 시간 보기 (0~8시)</button>
           <div class="week-grid-wrap avail-grid-wrap"><div class="week-grid" id="availSelectGrid"></div></div>
         </div>
       </div>
@@ -13133,6 +13139,10 @@ function renderVisibilityPicker(){
 // 예약 가능 시간 - 주간 그리드 다중 선택 상태
 let availGridWeekStart = null;
 const availSelectedCells = new Set(); // "dateKey::hourIndex"
+const AVAIL_EARLY_END = 9; // 0~8시(새벽)는 기본으로 접어둠
+let availShowEarly = false;
+// 모바일: 꾹 누르면(0.35초) 드래그 선택 모드 - 그 뒤로 미는 동안은 스크롤 대신 지나가는 칸을 칠함
+const availTouchDrag = { timer: null, active: false, used: false, value: true, x: 0, y: 0 };
 let availDragging = false;
 let availPaintValue = false;
 
@@ -13792,7 +13802,15 @@ function renderAvailSelectGrid(){
     grid.appendChild(head);
   });
 
+  // 새벽 칸을 이미 골라뒀으면(수정 중 등) 접지 않고 보여줌
+  const earlyPicked = [...availSelectedCells].some(k => HOURS[Number(k.split('::')[1])] < AVAIL_EARLY_END);
+  const showEarly = availShowEarly || earlyPicked;
+  const earlyBtn = document.getElementById('availEarlyToggle');
+  earlyBtn.textContent = showEarly ? '새벽 시간 접기 (0~8시)' : '새벽 시간 보기 (0~8시)';
+  earlyBtn.hidden = earlyPicked;
+
   HOURS.forEach((h, rowIdx) => {
+    if(!showEarly && h < AVAIL_EARLY_END) return; // rowIdx는 원래 순서 그대로 둬서 칸 키가 바뀌지 않게 함
     const label = document.createElement('div');
     label.className = 'week-hour-label';
     label.textContent = `${h}시`;
@@ -13848,6 +13866,7 @@ function renderAvailSelectGrid(){
           }
         }, { passive: true });
         cell.addEventListener('touchend', (e) => {
+          if(availTouchDrag.used){ e.preventDefault(); return; } // 꾹 눌러 드래그 선택한 경우는 탭 토글 안 함
           if(!touchMoved){
             e.preventDefault(); // 탭으로 처리할 때만 막아서, 뒤따라오는 합성 mousedown/click으로 두 번 토글되는 걸 방지
             paintAvailCell(cell, cellKey, !availSelectedCells.has(cellKey));
@@ -13896,6 +13915,59 @@ function positionCellHoverTooltip(clientX, clientY){
 function hideCellHoverTooltip(){
   document.getElementById('cellHoverTooltip').classList.remove('show');
 }
+
+(function setupAvailTouchDrag(){
+  const grid = document.getElementById('availSelectGrid');
+  const cellAt = (x, y) => {
+    const el = document.elementFromPoint(x, y);
+    const cell = el && el.closest('#availSelectGrid .week-cell');
+    return cell && !cell.classList.contains('occupied') ? cell : null;
+  };
+  const stop = () => {
+    clearTimeout(availTouchDrag.timer);
+    availTouchDrag.timer = null;
+    availTouchDrag.active = false;
+    grid.classList.remove('touch-dragging');
+  };
+  grid.addEventListener('touchstart', (e) => {
+    stop();
+    availTouchDrag.used = false;
+    if(e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const cell = cellAt(t.clientX, t.clientY);
+    if(!cell) return;
+    availTouchDrag.x = t.clientX;
+    availTouchDrag.y = t.clientY;
+    availTouchDrag.timer = setTimeout(() => {
+      availTouchDrag.timer = null;
+      availTouchDrag.active = true;
+      availTouchDrag.used = true;
+      availTouchDrag.value = !availSelectedCells.has(cell.dataset.cellKey);
+      paintAvailCell(cell, cell.dataset.cellKey, availTouchDrag.value);
+      grid.classList.add('touch-dragging');
+      try { if(navigator.vibrate) navigator.vibrate(15); } catch(err) {}
+    }, 350);
+  }, { passive: true });
+  grid.addEventListener('touchmove', (e) => {
+    const t = e.touches[0];
+    if(availTouchDrag.timer && (Math.abs(t.clientX - availTouchDrag.x) > 10 || Math.abs(t.clientY - availTouchDrag.y) > 10)){
+      clearTimeout(availTouchDrag.timer); // 꾹 누르기 전에 움직이면 그냥 스크롤
+      availTouchDrag.timer = null;
+      return;
+    }
+    if(!availTouchDrag.active) return;
+    e.preventDefault(); // 드래그 선택 중에는 화면이 안 움직이게
+    const cell = cellAt(t.clientX, t.clientY);
+    if(cell) paintAvailCell(cell, cell.dataset.cellKey, availTouchDrag.value);
+  }, { passive: false });
+  grid.addEventListener('touchend', stop);
+  grid.addEventListener('touchcancel', stop);
+})();
+
+document.getElementById('availEarlyToggle').addEventListener('click', () => {
+  availShowEarly = !availShowEarly;
+  renderAvailSelectGrid();
+});
 
 document.addEventListener('mouseup', () => { availDragging = false; }); // 마우스(PC)는 기존처럼 드래그로 여러 칸 선택 가능
 
