@@ -4821,7 +4821,11 @@
   }
   .group-member-row:last-child{ border-bottom:none; }
 
-  .week-grid-wrap{ overflow-x:auto; }
+  /* overflow-x:auto만 주고 overflow-y를 안 적으면, 브라우저가 "한쪽 축이라도 visible이 아니면
+     반대쪽도 visible일 수 없다"는 규칙 때문에 overflow-y를 자동으로 auto로 취급해버려서, 의도한
+     적 없는데도 이 영역이 세로로도 스크롤 가능한 상태가 되고 iOS에서 터치로 당기면 고무줄처럼
+     흔들리는 원인이 됐음(헤더까지 같이 딸려서 움직이는 것처럼 보임) - 명시적으로 막아줌 */
+  .week-grid-wrap{ overflow-x:auto; overflow-y:hidden; }
   .week-grid{
     display:grid;
     grid-template-columns:30px repeat(7,minmax(34px,1fr));
