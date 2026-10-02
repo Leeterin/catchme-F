@@ -12236,6 +12236,12 @@ function renderAvailSelectGrid(){
     days.push(d);
   }
 
+  // 기존 "예약 가능" 일정을 수정하는 중이면, 지금 수정 중인 일정 자신은 "이미 다른 일정이 있어서 선택 불가"
+  // 판정에서 제외함 - 안 그러면 원래 선택돼 있던 칸들을 다시 눌러서 꺼버릴(칸별로 예약 취소) 수가 없음
+  const editingExcludeIds = editingEventId ? new Set([editingEventId, ...editingLinkedPieceIds]) : null;
+  const dayEventsCache = {};
+  days.forEach(d => { dayEventsCache[dateKeyOf(d)] = getEventsForDate(d); });
+
   const grid = document.getElementById('availSelectGrid');
   grid.className = 'week-grid avail-select-grid';
   grid.innerHTML = '';
@@ -12257,8 +12263,17 @@ function renderAvailSelectGrid(){
     days.forEach(d => {
       const key = dateKeyOf(d);
       const texts = getScheduleText(key);
-      const occupied = !!(texts[h] && texts[h].trim()); // texts는 실제 시각(0~23시) 기준으로 인덱싱되므로, 그리드 행번호(rowIdx)가 아니라 실제 시각(h)으로 찾아야 함
-      const alreadyAvailable = texts[h] === '예약 가능'; // 이미 예약 가능으로 등록된 칸은 따로 구분해서 한눈에 보이게 함
+      // 이 시각을 실제로 차지하는 "다른"(지금 수정 중인 자기 자신 제외) 일정이 있는지 직접 찾음 -
+      // texts만 보면 자기 자신이 차지한 칸도 그냥 "occupied"로 보여서, 수정 중엔 그 칸을 다시 못 누르게 돼버림
+      const blockingEv = (dayEventsCache[key] || []).find(ev => {
+        if(editingExcludeIds && editingExcludeIds.has(ev.id)) return false;
+        const disp = getEventDisplayRangeForDate(ev, d);
+        const evStartH = Math.floor(disp.startMin / 60);
+        const evEndH = Math.max(evStartH + 1, Math.ceil(disp.endMin / 60));
+        return h >= evStartH && h < evEndH;
+      });
+      const occupied = !!blockingEv; // texts는 실제 시각(0~23시) 기준으로 인덱싱되므로, 그리드 행번호(rowIdx)가 아니라 실제 시각(h)으로 찾아야 함
+      const alreadyAvailable = !!blockingEv && blockingEv.type === 'available'; // 이미 예약 가능으로 등록된 칸은 따로 구분해서 한눈에 보이게 함
       const cellKey = `${key}::${rowIdx}`;
 
       const cell = document.createElement('div');
@@ -12287,7 +12302,7 @@ function renderAvailSelectGrid(){
       } else {
         // 이미 다른 일정 있어서 선택 못 하는 칸: PC에서는 마우스 올리면 무슨 일정인지 말풍선으로 보여주고 떼면 사라짐,
         // 모바일에서는 탭하면 토스트 알림으로 알려줌.
-        const occupiedTitle = alreadyAvailable ? '이미 예약 가능으로 등록돼 있어요' : ((texts[h] && texts[h].trim()) || '일정이 있어요');
+        const occupiedTitle = alreadyAvailable ? '이미 예약 가능으로 등록돼 있어요' : ((blockingEv && blockingEv.title) || (texts[h] && texts[h].trim()) || '일정이 있어요');
         cell.addEventListener('mouseenter', (e) => showCellHoverTooltip(occupiedTitle, e.clientX, e.clientY));
         cell.addEventListener('mousemove', (e) => positionCellHoverTooltip(e.clientX, e.clientY));
         cell.addEventListener('mouseleave', hideCellHoverTooltip);
