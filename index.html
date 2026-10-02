@@ -2932,6 +2932,10 @@
   .match-fine-min{ padding:6px 0; border-radius:7px; border:1px solid var(--line); background:var(--surface); color:var(--text); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
   .match-fine-min.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .match-fine-min:disabled{ opacity:.35; cursor:default; }
+  .match-fine-sub{ font-size:11.5px; font-weight:700; color:var(--text-dim); margin:8px 0 4px; }
+  .match-fine-hours{ display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px; }
+  .match-fine-hour{ padding:5px 10px; border-radius:7px; border:1px solid var(--line); background:var(--surface); color:var(--text); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .match-fine-hour.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
 
   .time-option-list{
     display:flex;
@@ -21905,14 +21909,24 @@ document.getElementById('matchBackBtn').addEventListener('click', () => goBackOr
 
 let selectedGroupMatchSlots = []; // 그룹 매칭에서 체크로 골라둔 시간들 [{key, dateObj, startMin, endMin, startH, endH, dateLabel, timeLabel}]
 function matchHm(min){ return `${String(Math.floor(min / 60)).padStart(2,'0')}:${String(min % 60).padStart(2,'0')}`; }
-// 슬롯의 시작(분)이 바뀌면 끝/라벨도 같이 맞춤 (만날 시간 길이는 그대로)
+function syncMatchSlotLabel(slot){
+  slot.startH = Math.floor(slot.startMin / 60);
+  slot.endH = Math.ceil(slot.endMin / 60);
+  slot.timeLabel = `${matchHm(slot.startMin)}-${matchHm(slot.endMin)}`;
+}
+// 슬롯의 시작(분)이 바뀌면 끝도 같이 맞춤 (만날 시간 길이는 그대로, 겹치는 시간 밖으로 나가면 끝만 당김)
 function setMatchSlotStart(slot, startMin){
   const dur = slot.endMin - slot.startMin;
   slot.startMin = startMin;
   slot.endMin = startMin + dur;
-  slot.startH = Math.floor(slot.startMin / 60);
-  slot.endH = Math.ceil(slot.endMin / 60);
-  slot.timeLabel = `${matchHm(slot.startMin)}-${matchHm(slot.endMin)}`;
+  if(typeof slot.rangeEndMin === 'number' && slot.endMin > slot.rangeEndMin) slot.endMin = slot.rangeEndMin;
+  syncMatchSlotLabel(slot);
+}
+// 끝나는 시간만 따로 바꿈 (시작보다 최소 5분 뒤 ~ 겹치는 시간 끝까지)
+function setMatchSlotEnd(slot, endMin){
+  const max = typeof slot.rangeEndMin === 'number' ? slot.rangeEndMin : endMin;
+  slot.endMin = Math.max(slot.startMin + 5, Math.min(endMin, max));
+  syncMatchSlotLabel(slot);
 }
 
 async function runCalendarMatch(){
@@ -22052,8 +22066,18 @@ document.getElementById('matchPanelBody').addEventListener('click', (e) => {
     if(minBtn.disabled) return;
     const slot = selectedGroupMatchSlots.find(s => s.key === minBtn.dataset.key);
     if(!slot) return;
-    setMatchSlotStart(slot, slot.baseH * 60 + parseInt(minBtn.dataset.min, 10));
+    if(minBtn.dataset.end) setMatchSlotEnd(slot, parseInt(minBtn.dataset.end, 10));
+    else setMatchSlotStart(slot, slot.baseH * 60 + parseInt(minBtn.dataset.min, 10));
     renderMatchFineRows(minBtn.closest('.match-range-wide'));
+    return;
+  }
+  const hourBtn = e.target.closest('.match-fine-hour');
+  if(hourBtn){
+    const slot = selectedGroupMatchSlots.find(s => s.key === hourBtn.dataset.key);
+    if(!slot) return;
+    // 끝 시(時)를 바꾸면 지금 고른 분은 유지 (범위 밖이면 가능한 쪽으로 맞춤)
+    setMatchSlotEnd(slot, parseInt(hourBtn.dataset.hour, 10) * 60 + (slot.endMin % 60));
+    renderMatchFineRows(hourBtn.closest('.match-range-wide'));
     return;
   }
   const removeBtn = e.target.closest('.match-fine-remove');
@@ -22106,16 +22130,32 @@ function renderMatchFineRows(wide){
     if(slot) slots.push(slot);
   });
   list.innerHTML = slots.map(slot => {
-    const dur = slot.endMin - slot.startMin;
     const mins = [];
     for(let m = 0; m < 60; m += 5){
       const st = slot.baseH * 60 + m;
-      const ok = st >= slot.rangeStartMin && st + dur <= slot.rangeEndMin;
+      const ok = st >= slot.rangeStartMin && st + 5 <= slot.rangeEndMin;
       mins.push(`<button type="button" class="match-fine-min${st === slot.startMin ? ' on' : ''}" data-key="${slot.key}" data-min="${m}"${ok ? '' : ' disabled'}>:${String(m).padStart(2,'0')}</button>`);
+    }
+    // 끝나는 시간: 시(時) 고르고 그 안에서 5분 단위
+    const endLo = slot.startMin + 5, endHi = slot.rangeEndMin;
+    const endHour = Math.floor(slot.endMin / 60);
+    const hours = [];
+    for(let h = Math.floor(endLo / 60); h * 60 <= endHi; h++){
+      hours.push(`<button type="button" class="match-fine-hour${h === endHour ? ' on' : ''}" data-key="${slot.key}" data-hour="${h}">${String(h).padStart(2,'0')}시</button>`);
+    }
+    const endMins = [];
+    for(let m = 0; m < 60; m += 5){
+      const en = endHour * 60 + m;
+      const ok = en >= endLo && en <= endHi;
+      endMins.push(`<button type="button" class="match-fine-min${en === slot.endMin ? ' on' : ''}" data-key="${slot.key}" data-end="${en}"${ok ? '' : ' disabled'}>:${String(m).padStart(2,'0')}</button>`);
     }
     return `<div class="match-fine-row">
         <div class="match-fine-head"><span>${matchHm(slot.startMin)} ~ ${matchHm(slot.endMin)}</span><button type="button" class="match-fine-remove" data-key="${slot.key}">빼기</button></div>
+        <div class="match-fine-sub">시작 (${String(slot.baseH).padStart(2,'0')}시)</div>
         <div class="match-fine-mins">${mins.join('')}</div>
+        <div class="match-fine-sub">끝</div>
+        <div class="match-fine-hours">${hours.join('')}</div>
+        <div class="match-fine-mins">${endMins.join('')}</div>
       </div>`;
   }).join('');
 }
