@@ -13041,14 +13041,22 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
   const defaultMinIdx = fallbackMinIdx >= 0 ? fallbackMinIdx : 0;
   const defaultMaxIdx = fallbackMaxIdx >= 0 ? fallbackMaxIdx : hours.length - 1;
   if(minIdx === null){
-    minIdx = defaultMinIdx;
-    maxIdx = defaultMaxIdx;
-  } else {
-    // 일정이 있는 시간대(±1시간 여유)와 기본 범위(예: 9시~22시) 중 "더 넓은 쪽"을 합쳐서 씀 -
-    // 일정이 기본 범위 안에만 있을 때(예: 이번 주에 저녁 약속 하나뿐)도 기본 범위 밑으로
-    // 쪼그라들지 않고, 기본 범위를 벗어나는 일정이 있을 때만 그만큼 더 넓어지게 함
-    minIdx = Math.min(defaultMinIdx, Math.max(0, minIdx - 1));
-    maxIdx = Math.max(defaultMaxIdx, Math.min(hours.length - 1, maxIdx + 1));
+    // 일정이 하나도 없으면 기본 범위(예: 9시~22시)를 그대로 보여줌
+    return { minIdx: defaultMinIdx, maxIdx: defaultMaxIdx };
+  }
+  // 일정이 있는 시간대에 앞뒤 1시간씩 여유를 둠
+  minIdx = Math.max(0, minIdx - 1);
+  maxIdx = Math.min(hours.length - 1, maxIdx + 1);
+  // 9~22시는 그냥 "평균적인 폭(몇 시간을 보여줄지)"의 기준일 뿐, 실제 그 시간대로 고정할
+  // 필요는 없음 - 그 폭(예: 14시간)만큼은 보이도록 넓히되, 위치는 실제 일정이 있는 시간대를
+  // 기준으로 앞뒤로 넓어지게 함(예: 새벽 2시 일정 하나뿐이면 9~22시가 아니라 새벽 시간대
+  // 기준으로 넓어짐 - 상관없는 저녁 시간대를 억지로 끌어오지 않음)
+  const minSpan = defaultMaxIdx - defaultMinIdx + 1;
+  while((maxIdx - minIdx + 1) < minSpan){
+    let grew = false;
+    if(minIdx > 0){ minIdx--; grew = true; if((maxIdx - minIdx + 1) >= minSpan) break; }
+    if(maxIdx < hours.length - 1){ maxIdx++; grew = true; if((maxIdx - minIdx + 1) >= minSpan) break; }
+    if(!grew) break;
   }
   return { minIdx, maxIdx };
 }
