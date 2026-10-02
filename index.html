@@ -17994,6 +17994,8 @@ function renderChatList(){
   sortedEntries.forEach(([id, room]) => {
     const last = room.messages[room.messages.length - 1];
     let previewText = '';
+    // 미리보기 만들다가 한 방에서 에러가 나도 나머지 채팅방은 목록에 다 보이도록 방마다 따로 감쌈
+    try {
     if(last){
       if(last.type === 'reservation'){
         const statusLabel = last.status === 'confirmed' ? '예약 확정됨' : (last.status === 'declined' ? '거절됨' : (last.status === 'cancelled' ? '취소됨' : (last.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
@@ -18006,14 +18008,18 @@ function renderChatList(){
       } else if(last.type === 'time-suggest'){
         previewText = `${ICO.calendar} ${last.dateLabel} ${last.timeLabel} 제안`;
       } else if(last.type === 'time-options-suggest'){
+        // 채팅 목록(/chats)의 마지막 메시지 미리보기에는 후보 목록(options)이 빈 배열로 와서,
+        // 후보가 없을 때도 터지지 않게 해야 함 (예전엔 여기서 에러가 나서 이 방 아래의 채팅방들이 전부 안 보였음)
         if(last.status === 'confirmed'){
           const winning = last.options.find(o => o.votes.length >= getTotalParticipants(room)) || last.options[0];
-          previewText = `${ICO.check} ${winning.dateLabel} ${winning.timeLabel}로 확정`;
+          previewText = winning ? `${ICO.check} ${winning.dateLabel} ${winning.timeLabel}로 확정` : `${ICO.check} 약속 시간이 확정됐어요`;
         } else if(last.status === 'cancelled'){
           previewText = `${ICO.x} 확정된 일정이 취소됨`;
         } else {
-          previewText = `${ICO.calendar} 시간 후보 ${last.options.length}개 제안`;
+          previewText = last.options.length ? `${ICO.calendar} 시간 후보 ${last.options.length}개 제안` : `${ICO.calendar} 시간 후보 투표`;
         }
+      } else if(last.type === 'location-recommend'){
+        previewText = `${ICO.pin} ${escapeHtml(last.status === 'COMPLETED' ? `모임 장소 추천 결과${last.areaName ? ' - ' + last.areaName : ''}` : (last.status === 'CANCELLED' ? '모임 장소 추천 취소됨' : '모임 장소 추천 - 출발지 입력 중'))}`;
       } else if(last.type === 'hotplace'){
         previewText = `${ICO.pin} ${escapeHtml(last.location)} 근처 핫플 보기`;
       } else if(last.type === 'system-notice'){
@@ -18023,6 +18029,10 @@ function renderChatList(){
       } else {
         previewText = escapeHtml(last.text);
       }
+    }
+    } catch(err){
+      console.error('[chat list preview]', err);
+      previewText = '';
     }
     const noPrefixTypes = last && (last.type === 'hotplace' || last.type === 'system-notice');
     const preview = last
