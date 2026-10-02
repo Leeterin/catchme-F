@@ -5175,7 +5175,8 @@
     border-radius:4px;
     white-space:nowrap;
     overflow:hidden;
-    text-overflow:ellipsis;
+    /* 길면 "..." 없이 칸 끝에서 그냥 잘림 (가운데 정렬이어도 넘치면 앞부분부터 보이고 뒤가 잘림) */
+    text-overflow:clip;
     text-align:center;
     line-height:1.5;
     width:100%;
@@ -6834,9 +6835,10 @@ function escapeHtml(str){
 }
 
 // 한달 캘린더의 날짜 칸이 긴 일정 제목 때문에 옆으로 넓어지지 않도록, 라벨에 쓸 제목을 앞 4글자로 잘라줌
+// 한달 보기 일정 띠에 넣을 텍스트 - 글자 수로 미리 자르지 않고 전체를 넣음. 칸보다 길면
+// CSS(.month-event-label, overflow:hidden + text-overflow:clip)가 칸 끝에서 "..." 없이 잘라줌
 function truncateForMonthLabel(text){
-  const t = text || '';
-  return t.slice(0, 5);
+  return text || '';
 }
 
 // ---------- 브라우저/기기의 "뒤로가기"가 앱을 벗어나지 않고, 열려있는 화면을 닫도록 지원 ----------
