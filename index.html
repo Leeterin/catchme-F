@@ -3025,6 +3025,20 @@
     cursor:pointer;
   }
   .chat-pinned-schedule .pin-action-btn:hover{ background:var(--accent-soft); }
+  .chat-pinned-schedule .pin-set-loc.has-loc{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:2px;
+    text-align:left;
+    max-width:100%;
+  }
+  .chat-pinned-schedule .pin-loc-addr{
+    font-size:10.5px;
+    font-weight:500;
+    color:var(--text-dim);
+    word-break:keep-all;
+  }
   .chat-pinned-schedule .pin-action-btn.danger{
     border-color:var(--cta);
     color:var(--cta);
@@ -17373,6 +17387,7 @@ function syncPinCreateToServer(roomId, room, pin){
       timeLabel: pin.timeLabel || null,
       note: pin.note || null,
       location: pin.location || null,
+      locationAddress: pin.locationAddress || null,
       locationLat: typeof pin.locationLat === 'number' ? pin.locationLat : null,
       locationLon: typeof pin.locationLon === 'number' ? pin.locationLon : null,
       sourceMessageId: pin.reservationMsgId || pin.sourceMsgId || null,
@@ -17389,6 +17404,7 @@ async function syncPinLocationUpdateToServer(room, pin){
       method: 'PATCH',
       body: JSON.stringify({
         location: pin.location || null,
+        locationAddress: pin.locationAddress || null,
         locationLat: typeof pin.locationLat === 'number' ? pin.locationLat : null,
         locationLon: typeof pin.locationLon === 'number' ? pin.locationLon : null,
       }),
@@ -17416,6 +17432,7 @@ async function loadPinsFromServer(roomId, room){
       timeLabel: p.timeLabel,
       note: p.note,
       location: p.location,
+      locationAddress: p.locationAddress || null,
       locationLat: p.locationLat,
       locationLon: p.locationLon,
       sourceMsgId: p.sourceMessageId,
@@ -17447,6 +17464,7 @@ function removePinnedLocation(pinId){
 
   const removedPlace = pin.location;
   pin.location = null;
+  pin.locationAddress = null;
   pin.locationLat = null;
   pin.locationLon = null;
   syncPinLocationUpdateToServer(room, pin);
@@ -18725,10 +18743,10 @@ document.getElementById('locationPickerConfirmBtn').addEventListener('click', ()
     showToast('지도에서 위치를 먼저 찍어주세요.');
     return;
   }
-  const { label, lat, lon } = locationPickerSelected;
+  const { label, lat, lon, addr } = locationPickerSelected;
   const cb = locationPickerCallback;
   closeLocationPicker();
-  if(cb) cb(label, lat, lon);
+  if(cb) cb(label, lat, lon, addr || '');
 });
 
 document.getElementById('locationPickerCloseBtn').addEventListener('click', closeLocationPicker);
@@ -19348,8 +19366,9 @@ let activeChatRoomId = null;
 // 상단 고정 카드의 "장소 정하기" 버튼과, 약속 상세보기 화면의 "변경" 버튼이 같이 씀.
 // afterPicked(label, lat, lon)로 화면마다 다른 마무리 동작(핫플 열기, 상세보기 다시 그리기 등)을 넘김
 function changePinLocation(room, roomId, pin, afterPicked, pickerOpts){
-  openLocationPicker(pin.location || '', pin.locationLat, pin.locationLon, async (label, lat, lon) => {
+  openLocationPicker(pin.location || '', pin.locationLat, pin.locationLon, async (label, lat, lon, addr) => {
     pin.location = label;
+    pin.locationAddress = addr && addr !== label ? addr : null;
     pin.locationLat = lat;
     pin.locationLon = lon;
     const syncResult = await syncPinLocationUpdateToServer(room, pin);
@@ -19367,6 +19386,24 @@ function changePinLocation(room, roomId, pin, afterPicked, pickerOpts){
     renderChatList();
     if(afterPicked) afterPicked(label, lat, lon);
   }, pickerOpts);
+}
+
+// 고정 카드에 보여줄 장소 주소 - 저장된 주소가 있으면 그걸, 없으면(예전에 정한 장소) 좌표로 한 번만 주소를 찾아서 채움
+function pinnedLocationAddress(pin){
+  if(pin.locationAddress && pin.locationAddress !== pin.location) return pin.locationAddress;
+  if(pin._geoAddress !== undefined) return pin._geoAddress && pin._geoAddress !== pin.location ? pin._geoAddress : '';
+  if(typeof pin.locationLat !== 'number' || typeof pin.locationLon !== 'number') return '';
+  const svc = window.kakao && kakao.maps && kakao.maps.services;
+  if(!svc || !svc.Geocoder) return '';
+  pin._geoAddress = '';
+  try {
+    new svc.Geocoder().coord2Address(pin.locationLon, pin.locationLat, (result, status) => {
+      if(status !== svc.Status.OK || !result[0]) return;
+      pin._geoAddress = result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name;
+      renderPinnedSchedule();
+    });
+  } catch(e) {}
+  return '';
 }
 
 function renderPinnedSchedule(){
@@ -19414,9 +19451,15 @@ function renderPinnedSchedule(){
   listEl.className = 'pin-list' + (room.pinnedCollapsed ? ' collapsed' : '');
   el.appendChild(listEl);
 
+  // 날짜 없이 "장소만" 확정된 핀(장소 투표/픽스로 정해진 곳) - 장소가 아직 비어있는 일정 카드엔 이 장소를 대신 보여줌
+  const placeOnlyPin = [...room.pinnedSchedules].reverse().find(p => !p.dateLabel && p.location);
+
   // 확정된 예약/장소가 여러 개면 전부 카드로 보여줌
   pins.forEach(pinned => {
-    const { dateLabel, timeLabel, note, location, dateObj } = pinned;
+    const { dateLabel, timeLabel, note, dateObj } = pinned;
+    const placePin = pinned.location ? pinned : placeOnlyPin;
+    const location = placePin ? placePin.location : null;
+    const locationAddress = placePin ? pinnedLocationAddress(placePin) : '';
 
     const card = document.createElement('div');
     card.className = 'pin-card';
@@ -19431,8 +19474,10 @@ function renderPinnedSchedule(){
       </div>
       <div class="pin-actions">
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 일정 보기</button>` : ''}
-        <button type="button" class="pin-action-btn pin-set-loc">${location ? ICO.pin + ' ' + escapeHtml(location) : '장소 정하기'}</button>
-        ${location ? `<button type="button" class="pin-action-btn danger pin-remove-loc">장소 삭제</button>` : ''}
+        <button type="button" class="pin-action-btn pin-set-loc${location ? ' has-loc' : ''}">${location
+          ? `<span class="pin-loc-name">${ICO.pin} ${escapeHtml(location)}</span>${locationAddress ? `<span class="pin-loc-addr">${escapeHtml(locationAddress)}</span>` : ''}`
+          : '장소 정하기'}</button>
+        ${pinned.location ? `<button type="button" class="pin-action-btn danger pin-remove-loc">장소 삭제</button>` : ''}
         ${!dateObj ? `<button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>` : ''}
       </div>
     `;
