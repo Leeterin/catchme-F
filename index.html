@@ -323,6 +323,10 @@
     border:1px solid var(--line);
     border-radius:20px;
     padding:20px 18px;
+    /* 하단 탭바(.bottom-nav)가 position:sticky로 화면 맨 아래에 항상 떠있어서, 내용이 길어지면
+       (예: 종일(00~24시) 예약 가능 막대처럼 키가 큰 블록) 탭바 뒤로 겹쳐 보일 수 있었음.
+       탭바 높이만큼 아래쪽에 여유 공간을 둬서 스크롤해도 내용이 탭바에 가려지지 않게 함 */
+    padding-bottom:calc(20px + 86px);
     flex:1;
     display:none;
     box-shadow:0 2px 14px rgba(23,24,29,0.05);
@@ -4831,6 +4835,11 @@
      적 없는데도 이 영역이 세로로도 스크롤 가능한 상태가 되고 iOS에서 터치로 당기면 고무줄처럼
      흔들리는 원인이 됐음(헤더까지 같이 딸려서 움직이는 것처럼 보임) - 명시적으로 막아줌 */
   .week-grid-wrap{ overflow-x:auto; overflow-y:hidden; }
+  /* 실제 "일주일" 캘린더 그리드 전용 - 종일(00~24시)처럼 키가 아주 큰 일정이 있으면 페이지 전체가
+     한없이 길어져서, 화면 맨 아래 항상 떠있는 탭바(.bottom-nav) 뒤로 내용이 가려 보였음. 그래서 이
+     그리드는 화면에 맞는 높이로 자체 스크롤되게 하고(최대 높이는 JS에서 매번 계산해서 넣어줌),
+     페이지 자체는 더 이상 끝없이 길어지지 않게 함 */
+  #weekGridWrap{ overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .week-grid{
     display:grid;
     grid-template-columns:30px repeat(7,minmax(34px,1fr));
@@ -5655,7 +5664,7 @@
         </div>
         <div id="customColorList"></div>
       </div>
-      <div class="week-grid-wrap"><div class="week-grid" id="weekGrid"></div></div>
+      <div class="week-grid-wrap" id="weekGridWrap"><div class="week-grid" id="weekGrid"></div></div>
       <div class="agenda-list" id="weekAgenda"></div>
     </div>
 
@@ -13748,6 +13757,17 @@ function renderWeekView(){
 
   wrap.appendChild(daysWrap);
   renderAgendaList('weekAgenda', weekEntries);
+
+  // 종일(00~24시)처럼 키가 아주 큰 일정이 있으면 그리드가 한없이 길어져서, 화면 맨 아래
+  // 항상 떠있는 탭바(.bottom-nav) 뒤로 내용이 가려 보였음. 그래서 그리드 자체 높이를 화면에
+  // 맞게 잘라서 내부적으로만 스크롤되게 하고, 페이지 전체는 더 이상 끝없이 길어지지 않게 함
+  const gridWrap = document.getElementById('weekGridWrap');
+  if(gridWrap){
+    const BOTTOM_NAV_RESERVE = 110; // 탭바 높이(약 86px) + 여유
+    const top = gridWrap.getBoundingClientRect().top;
+    const available = window.innerHeight - top - BOTTOM_NAV_RESERVE;
+    gridWrap.style.maxHeight = Math.max(240, available) + 'px';
+  }
 }
 
 // 일주일 뷰에서 일정 블록 바깥을 누르면 열려있던 수정/삭제 버튼을 닫음
