@@ -13022,14 +13022,19 @@ function computeVisibleHourRange(textsArrays, fallbackStartHour, fallbackEndHour
       }
     });
   });
+  const fallbackMinIdx = hours.indexOf(fallbackStartHour);
+  const fallbackMaxIdx = hours.indexOf(fallbackEndHour);
+  const defaultMinIdx = fallbackMinIdx >= 0 ? fallbackMinIdx : 0;
+  const defaultMaxIdx = fallbackMaxIdx >= 0 ? fallbackMaxIdx : hours.length - 1;
   if(minIdx === null){
-    const fallbackMinIdx = hours.indexOf(fallbackStartHour);
-    const fallbackMaxIdx = hours.indexOf(fallbackEndHour);
-    minIdx = fallbackMinIdx >= 0 ? fallbackMinIdx : 0;
-    maxIdx = fallbackMaxIdx >= 0 ? fallbackMaxIdx : hours.length - 1;
+    minIdx = defaultMinIdx;
+    maxIdx = defaultMaxIdx;
   } else {
-    minIdx = Math.max(0, minIdx - 1);
-    maxIdx = Math.min(hours.length - 1, maxIdx + 1);
+    // 일정이 있는 시간대(±1시간 여유)와 기본 범위(예: 9시~22시) 중 "더 넓은 쪽"을 합쳐서 씀 -
+    // 일정이 기본 범위 안에만 있을 때(예: 이번 주에 저녁 약속 하나뿐)도 기본 범위 밑으로
+    // 쪼그라들지 않고, 기본 범위를 벗어나는 일정이 있을 때만 그만큼 더 넓어지게 함
+    minIdx = Math.min(defaultMinIdx, Math.max(0, minIdx - 1));
+    maxIdx = Math.max(defaultMaxIdx, Math.min(hours.length - 1, maxIdx + 1));
   }
   return { minIdx, maxIdx };
 }
