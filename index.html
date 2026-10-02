@@ -5587,6 +5587,266 @@
     opacity:1;
     transform:translateX(-50%) translateY(0);
   }
+  /* ---------------- 약속 초대 링크 (비회원 참여) ---------------- */
+  .invite-top-btn{
+    height:36px;
+    padding:0 12px;
+    border-radius:10px;
+    border:1px solid var(--accent);
+    background:var(--accent-soft);
+    color:var(--accent);
+    font-size:12.5px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    gap:5px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .invite-top-btn svg{ width:15px; height:15px; flex-shrink:0; }
+  .invite-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:3400;
+    background:var(--bg);
+    flex-direction:column;
+  }
+  .invite-overlay.show{ display:flex; }
+  .invite-overlay .location-picker-topbar{ background:var(--surface); color:var(--text); border-bottom:1px solid var(--line); }
+  .invite-overlay .location-picker-close{ background:var(--surface-2); color:var(--text); }
+  .invite-body{
+    flex:1;
+    overflow-y:auto;
+    padding:16px 16px 24px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .invite-foot{
+    flex-shrink:0;
+    padding:10px 16px calc(12px + env(safe-area-inset-bottom));
+    background:var(--surface);
+    border-top:1px solid var(--line);
+  }
+  .invite-foot:empty{ display:none; }
+  .inv-primary{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:14px;
+    background:var(--accent);
+    color:#fff;
+    font-size:14.5px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .inv-primary.cta{ background:var(--cta); }
+  .inv-primary.armed{ background:var(--cta); }
+  .inv-primary:disabled{ opacity:0.45; cursor:default; }
+  .inv-text-btn{
+    display:block;
+    width:100%;
+    margin-top:6px;
+    padding:8px;
+    border:none;
+    background:none;
+    color:var(--text-dim);
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .inv-text-btn.danger.armed{ color:#E5484D; font-weight:700; }
+  .inv-hero{ margin-bottom:16px; }
+  .inv-hero-eyebrow{ font-size:12px; color:var(--accent); font-weight:700; margin-bottom:6px; }
+  .inv-hero-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:21px;
+    font-weight:700;
+    line-height:1.3;
+    word-break:keep-all;
+  }
+  .inv-hero-sub{ font-size:12.5px; color:var(--text-dim); margin-top:6px; line-height:1.5; }
+  .inv-section{ margin-bottom:18px; }
+  .inv-label{ display:block; font-size:12.5px; font-weight:700; margin-bottom:8px; }
+  .inv-label small{ font-weight:400; color:var(--text-dim); }
+  .inv-input{
+    width:100%;
+    padding:12px 14px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--text);
+    font-size:14px;
+  }
+  .inv-input:focus{ outline:none; border-color:var(--accent); }
+  .inv-date-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .inv-date-chip{
+    min-width:58px;
+    padding:8px 6px;
+    border-radius:10px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--text);
+    font-size:12px;
+    line-height:1.3;
+    cursor:pointer;
+    text-align:center;
+  }
+  .inv-date-chip .wd{ display:block; font-size:10.5px; color:var(--text-dim); }
+  .inv-date-chip.sat .wd{ color:#3B82F6; }
+  .inv-date-chip.sun .wd{ color:#E5484D; }
+  .inv-date-chip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .inv-date-chip.on .wd{ color:rgba(255,255,255,0.85); }
+  .inv-range{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); }
+  .inv-range select{
+    flex:1;
+    padding:11px 10px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--text);
+    font-size:14px;
+  }
+  .inv-card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  .inv-card.accent{ border-color:var(--accent); background:var(--accent-soft); }
+  .inv-card.done{ border-color:#22C55E; background:rgba(34,197,94,0.1); }
+  .inv-card-title{ font-size:13.5px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+  .inv-card-desc{ font-size:12.5px; color:var(--text-dim); line-height:1.55; }
+  .inv-share-link{
+    margin:10px 0;
+    padding:10px 12px;
+    border-radius:10px;
+    background:var(--surface);
+    border:1px dashed var(--line);
+    font-family:'Roboto Mono',monospace;
+    font-size:11.5px;
+    word-break:break-all;
+    user-select:all;
+    -webkit-user-select:all;
+  }
+  .inv-share-btns{ display:flex; gap:8px; }
+  .inv-share-btns button{
+    flex:1;
+    padding:11px;
+    border-radius:12px;
+    border:1px solid var(--accent);
+    background:var(--surface);
+    color:var(--accent);
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .inv-share-btns button.fill{ background:var(--accent); color:#fff; }
+  .inv-sub-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:4px 0 8px; }
+  .inv-sub-head b{ font-size:13.5px; }
+  .inv-sub-head span{ font-size:11.5px; color:var(--text-dim); text-align:right; }
+  .inv-grid-wrap{
+    overflow-x:auto;
+    border:1px solid var(--line);
+    border-radius:14px;
+    background:var(--surface);
+    padding:6px;
+    margin-bottom:12px;
+  }
+  .inv-grid{ border-collapse:separate; border-spacing:3px; margin:0 auto; }
+  .inv-grid th{
+    font-size:11px;
+    font-weight:600;
+    color:var(--text-dim);
+    padding:2px 4px;
+    white-space:nowrap;
+    line-height:1.25;
+  }
+  .inv-grid thead th{ cursor:pointer; }
+  .inv-grid th.inv-hour{
+    position:sticky;
+    left:0;
+    background:var(--surface);
+    text-align:right;
+    font-family:'Roboto Mono',monospace;
+    font-weight:400;
+    font-size:10.5px;
+    cursor:pointer;
+  }
+  .inv-cell{
+    min-width:46px;
+    height:30px;
+    border-radius:7px;
+    background:var(--surface-2);
+    background-image:linear-gradient(rgba(56,189,248,var(--heat,0)), rgba(56,189,248,var(--heat,0)));
+    text-align:center;
+    font-size:11px;
+    font-weight:700;
+    color:var(--text);
+    cursor:pointer;
+    user-select:none;
+    -webkit-user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .inv-cell.readonly{ cursor:default; }
+  .inv-cell.mine{ background:var(--cta); background-image:none; color:#fff; }
+  .inv-cell.sel{ box-shadow:inset 0 0 0 2px var(--cta); }
+  .inv-cell.best{ box-shadow:inset 0 0 0 2px #22C55E; }
+  .inv-cell.confirmed{ background:#22C55E; background-image:none; color:#fff; }
+  .inv-cell .inv-n{ opacity:0.85; }
+  .inv-legend{ display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:var(--text-dim); margin-bottom:12px; }
+  .inv-legend i{ display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:-1px; margin-right:4px; }
+  .inv-people{ display:flex; flex-wrap:wrap; gap:6px; }
+  .inv-person{
+    padding:5px 10px;
+    border-radius:999px;
+    background:var(--surface-2);
+    font-size:12px;
+  }
+  .inv-person.me{ background:var(--accent-soft); color:var(--accent); font-weight:700; }
+  .inv-person.ok{ background:rgba(34,197,94,0.14); color:#16A34A; }
+  .inv-person.no{ opacity:0.45; text-decoration:line-through; }
+  .inv-list-item{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px 14px;
+    margin-bottom:8px;
+    color:var(--text);
+    cursor:pointer;
+  }
+  .inv-list-item .t{ font-size:14px; font-weight:700; display:flex; justify-content:space-between; gap:8px; align-items:center; }
+  .inv-list-item .s{ font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .inv-badge{ flex-shrink:0; font-size:11px; font-weight:700; padding:3px 8px; border-radius:999px; background:var(--accent-soft); color:var(--accent); }
+  .inv-badge.done{ background:rgba(34,197,94,0.14); color:#16A34A; }
+  .inv-badge.off{ background:var(--surface-2); color:var(--text-dim); }
+  .inv-confirmed-big{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:19px;
+    font-weight:700;
+    margin:6px 0 2px;
+  }
+  .inv-signup-card{
+    border-radius:16px;
+    padding:16px;
+    background:linear-gradient(135deg, var(--accent-soft), rgba(255,107,74,0.12));
+    border:1px solid var(--line);
+    margin-bottom:14px;
+  }
+  .inv-signup-card ul{ margin:8px 0 14px; padding-left:18px; font-size:12.5px; line-height:1.7; color:var(--text); }
+  .inv-empty{ text-align:center; color:var(--text-dim); font-size:12.5px; padding:20px 0; }
+  .auth-invite-notice{
+    display:none;
+    margin-bottom:14px;
+    padding:10px 12px;
+    border-radius:12px;
+    background:var(--accent-soft);
+    color:var(--text);
+    font-size:12.5px;
+    line-height:1.5;
+  }
   /* ---------------- 회원가입 / 로그인 게이트 ---------------- */
   .auth-gate{
     position:fixed;
@@ -5741,6 +6001,8 @@
         <span>CATCHME</span>
       </div>
 
+      <div class="auth-invite-notice" id="authInviteNotice"></div>
+
       <div class="auth-tabs">
         <button class="auth-tab active" data-mode="login" type="button">로그인</button>
         <button class="auth-tab" data-mode="signup" type="button">회원가입</button>
@@ -5803,6 +6065,10 @@
       <span class="brand-name">CATCHME</span>
     </div>
     <div class="top-actions">
+      <button class="invite-top-btn" id="inviteTopBtn" type="button" title="약속 링크 만들기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        약속 잡기
+      </button>
       <button class="icon-btn login" id="myProfileBtn" title="내 프로필">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </button>
@@ -7120,6 +7386,17 @@
     </div>
   </div>
 
+  <!-- 약속 초대 링크 - 만들기/응답 현황/확정(만든 사람), 비회원 응답 화면(링크로 들어온 사람) -->
+  <div class="invite-overlay" id="inviteOverlay">
+    <div class="location-picker-topbar">
+      <button type="button" class="location-picker-close" id="inviteCloseBtn" aria-label="닫기">&times;</button>
+      <div class="location-picker-title" id="inviteTopTitle">약속 잡기</div>
+      <div class="location-picker-topbar-spacer"></div>
+    </div>
+    <div class="invite-body" id="inviteBody"></div>
+    <div class="invite-foot" id="inviteFoot"></div>
+  </div>
+
   <div class="global-toast" id="globalToast"></div>
 
 </div>
@@ -7559,6 +7836,7 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   loadSettingsFromServer();
   loadSavedLocationsFromServer();
   connectRealtimeSocket();
+  claimPendingInvite();
 }
 
 // ---------- 실시간 메시지 (Socket.io) ----------
@@ -7795,6 +8073,18 @@ function connectRealtimeSocket(){
   });
 
   // 상대방이 채팅방을 읽었다는 실시간 알림 - 내가 보낸 메시지들의 "읽음" 표시를 그 시각까지 바로 갱신함
+  // 약속 초대 링크 - 내가 만든 약속에 친구가 응답했거나, 내가 응답한 약속이 확정됐을 때
+  realtimeSocket.on('inviteUpdated', ({ token, title, name, kind }) => {
+    if(kind === 'confirmed'){
+      showToast(`'${title}' 약속 시간이 정해졌어요! 내 캘린더에 담았어요.`, 3000);
+      loadScheduleFromServer();
+    } else if(kind === 'responded'){
+      showToast(`${name}님이 '${title}'에 되는 시간을 보냈어요.`);
+    }
+    if(inviteState.token === token) refreshOpenInvite();
+    else if(inviteState.mode === 'list') loadMyInvites().then(() => { if(inviteState.mode === 'list') renderInviteOverlay(); });
+  });
+
   realtimeSocket.on('roomRead', ({ roomId, userId, lastReadAt }) => {
     const room = CHAT_ROOMS[roomId];
     if(!room || !room.messages) return;
@@ -21547,6 +21837,933 @@ function checkTimeOptionsConsensus(roomId, msg){
   ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt => header.addEventListener(evt, stopHeaderScrollUp));
 })();
 
+// ============================================================
+// 약속 초대 링크 (비회원 참여)
+// ------------------------------------------------------------
+// 만든 사람: 날짜/시간 범위를 골라 링크를 만들고 카톡 등으로 보냄 -> 응답 현황(칸별 가능 인원)을 보고 확정.
+// 링크를 받은 사람: 회원가입 없이 이름 + 가능한 1시간 칸만 눌러서 제출.
+// 시간이 확정된 뒤에만 링크 화면에서 CATCHME 가입을 권함(가입하면 그 약속이 내 캘린더에 담김).
+// 칸 표기는 서버와 같은 "YYYY-MM-DD|HH"
+// ============================================================
+const INVITE_SITE_URL = 'https://catchme-29rt.onrender.com/';
+const inviteState = {
+  mode: null,        // 'list' | 'create' | 'manage' | 'guest' | 'loading' | 'error'
+  fromList: false,   // 목록에서 들어온 화면이면 왼쪽 위 버튼이 "목록으로"
+  token: null,
+  invite: null,
+  error: '',
+  draft: null,       // 만들기 화면 입력값
+  myCells: new Set(),// 비회원 응답 화면에서 내가 고른 칸
+  dirty: false,      // 고른 칸을 아직 제출 안 함
+  submitted: false,
+  guestName: '',
+  confirmSel: null,  // 만든 사람이 확정하려고 고른 범위 {date, start, end, extended}
+  myInvites: [],
+  armTimer: null,
+  armed: null,       // 'confirm' | 'cancel' - 두 번 눌러야 실행되는 버튼
+  busy: false,
+};
+const inviteMemStore = {};
+
+function inviteStoreGet(key, fallback){
+  try {
+    const v = localStorage.getItem(key);
+    if(v) return JSON.parse(v);
+  } catch(e) {}
+  return key in inviteMemStore ? inviteMemStore[key] : fallback;
+}
+function inviteStoreSet(key, val){
+  inviteMemStore[key] = val;
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
+}
+function inviteStoreRemove(key){
+  delete inviteMemStore[key];
+  try { localStorage.removeItem(key); } catch(e) {}
+}
+
+// 비회원이 자기 응답을 나중에 다시 고칠 수 있도록, 링크(토큰)마다 브라우저에 저장해두는 랜덤 키
+function inviteGuestKey(token, create){
+  const keys = inviteStoreGet('catchme_invite_keys', {});
+  if(keys[token] || !create) return keys[token] || null;
+  let key = '';
+  try {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    key = Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+  } catch(e) {
+    while(key.length < 32) key += Math.random().toString(36).slice(2);
+    key = key.slice(0, 32);
+  }
+  keys[token] = key;
+  inviteStoreSet('catchme_invite_keys', keys);
+  return key;
+}
+
+function inviteLink(token){
+  const isWebHost = /^https?:$/.test(location.protocol) && location.hostname && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  const base = isWebHost ? location.origin + location.pathname : INVITE_SITE_URL;
+  return base + '?invite=' + encodeURIComponent(token);
+}
+
+function invitePad(n){ return String(n).padStart(2, '0'); }
+function inviteYmd(d){ return `${d.getFullYear()}-${invitePad(d.getMonth() + 1)}-${invitePad(d.getDate())}`; }
+function inviteDateObj(s){ const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function inviteDateLabel(s){ const d = inviteDateObj(s); return `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_KO[d.getDay()]})`; }
+function inviteCellKey(date, hour){ return `${date}|${invitePad(hour)}`; }
+function inviteRangeLabel(date, start, end){ return `${inviteDateLabel(date)} ${invitePad(start)}:00~${invitePad(end % 24)}:00`; }
+function inviteConfirmedLabel(inv){
+  if(!inv.confirmedStart) return '';
+  const s = new Date(inv.confirmedStart);
+  const e = new Date(inv.confirmedEnd);
+  const hm = d => `${invitePad(d.getHours())}:${invitePad(d.getMinutes())}`;
+  return `${s.getMonth() + 1}월 ${s.getDate()}일 (${WEEKDAY_KO[s.getDay()]}) ${hm(s)} ~ ${hm(e)}`;
+}
+function inviteDatesSummary(inv){
+  const first = inviteDateLabel(inv.dates[0]);
+  const more = inv.dates.length > 1 ? ` 외 ${inv.dates.length - 1}일` : '';
+  return `${first}${more} · ${invitePad(inv.startHour)}:00~${invitePad(inv.endHour % 24)}:00`;
+}
+function inviteCreatorName(inv){ return (inv.creator && inv.creator.name) || '친구'; }
+
+// 칸별 가능 인원 (비회원 화면에서는 내 응답은 빼고 "다른 사람" 수만 셈 - 내 칸은 따로 색칠)
+function inviteCounts(inv, excludeMine){
+  const map = {};
+  inv.responses.forEach(r => {
+    if(excludeMine && r.mine) return;
+    r.cells.forEach(c => { map[c] = (map[c] || 0) + 1; });
+  });
+  return map;
+}
+
+// 범위(같은 날짜 start~end시) 전체가 가능한 사람들
+function inviteAvailableFor(inv, sel){
+  return inv.responses.filter(r => {
+    for(let h = sel.start; h < sel.end; h++){
+      if(!r.cells.includes(inviteCellKey(sel.date, h))) return false;
+    }
+    return true;
+  });
+}
+
+// 가장 많은 사람이 되는 시간 - 최대 인원 칸이 이어지는 가장 긴 구간 (동점이면 앞 날짜/이른 시간)
+function inviteBestBlock(inv){
+  if(!inv.responses.length) return null;
+  const counts = inviteCounts(inv, false);
+  const max = Math.max(0, ...Object.values(counts));
+  if(max === 0) return null;
+  let best = null;
+  inv.dates.forEach(date => {
+    let runStart = null;
+    for(let h = inv.startHour; h <= inv.endHour; h++){
+      const hit = h < inv.endHour && (counts[inviteCellKey(date, h)] || 0) === max;
+      if(hit && runStart === null) runStart = h;
+      if(!hit && runStart !== null){
+        if(!best || h - runStart > best.end - best.start) best = { date, start: runStart, end: h, extended: true };
+        runStart = null;
+      }
+    }
+  });
+  if(best) best.count = max;
+  return best;
+}
+
+// ---------- 화면 열기/닫기 ----------
+function showInviteOverlay(){
+  const el = document.getElementById('inviteOverlay');
+  if(el.classList.contains('show')) return;
+  el.classList.add('show');
+  pushViewState(hideInviteOverlay);
+}
+function hideInviteOverlay(){
+  document.getElementById('inviteOverlay').classList.remove('show');
+  inviteState.mode = null;
+  clearInviteArm();
+  // 링크로 들어왔던 주소(?invite=...)는 화면을 닫으면 정리
+  if(/[?&]invite=/.test(location.search)){
+    try { history.replaceState(history.state, '', location.pathname); } catch(e) {}
+  }
+}
+function closeInviteOverlay(){ goBackOrClose(hideInviteOverlay); }
+
+document.getElementById('inviteCloseBtn').addEventListener('click', () => {
+  if(inviteState.fromList && (inviteState.mode === 'create' || inviteState.mode === 'manage')){
+    openInviteList();
+    return;
+  }
+  closeInviteOverlay();
+});
+
+document.getElementById('inviteTopBtn').addEventListener('click', () => {
+  if(!authToken) return;
+  inviteState.fromList = false;
+  openInviteList(true);
+});
+
+async function loadMyInvites(){
+  if(!authToken) return;
+  try {
+    const data = await apiRequest('/invites');
+    inviteState.myInvites = data.invites || [];
+  } catch(err) {
+    console.error('[invites] 목록 불러오기 실패:', err);
+  }
+}
+
+async function openInviteList(firstOpen){
+  inviteState.mode = 'list';
+  inviteState.token = null;
+  inviteState.invite = null;
+  showInviteOverlay();
+  renderInviteOverlay();
+  await loadMyInvites();
+  if(inviteState.mode !== 'list') return;
+  if(firstOpen && inviteState.myInvites.length === 0){
+    openInviteCreate(true);
+    return;
+  }
+  renderInviteOverlay();
+}
+
+function openInviteCreate(fromList){
+  // 기본값: 다가오는 토요일 하루, 오전 10시 ~ 밤 10시
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const sat = new Date(today);
+  sat.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7));
+  inviteState.draft = { dates: new Set([inviteYmd(sat)]), title: '', startHour: 10, endHour: 22 };
+  inviteState.fromList = !!fromList;
+  inviteState.mode = 'create';
+  showInviteOverlay();
+  renderInviteOverlay();
+}
+
+async function openInviteByToken(token, opts = {}){
+  inviteState.token = token;
+  inviteState.invite = null;
+  inviteState.fromList = !!opts.fromList;
+  inviteState.submitted = false;
+  inviteState.dirty = false;
+  inviteState.confirmSel = null;
+  inviteState.mode = 'loading';
+  showInviteOverlay();
+  renderInviteOverlay();
+  try {
+    await fetchInvite(true);
+  } catch(err) {
+    inviteState.mode = 'error';
+    inviteState.error = err.message;
+  }
+  renderInviteOverlay();
+}
+
+async function fetchInvite(resetMine){
+  const token = inviteState.token;
+  const gk = inviteGuestKey(token, false);
+  const data = await apiRequest(`/invites/${encodeURIComponent(token)}${gk ? `?guestKey=${encodeURIComponent(gk)}` : ''}`);
+  if(inviteState.token !== token) return;
+  applyInviteData(data.invite, resetMine);
+}
+
+function applyInviteData(inv, resetMine){
+  inviteState.invite = inv;
+  inviteState.mode = inv.isCreator ? 'manage' : 'guest';
+  if(inviteState.mode === 'guest'){
+    if(resetMine || !inviteState.dirty){
+      inviteState.myCells = new Set(inv.myResponse ? inv.myResponse.cells : []);
+      inviteState.dirty = false;
+    }
+    if(!inviteState.guestName){
+      inviteState.guestName = (inv.myResponse && inv.myResponse.name)
+        || (currentUser && currentUser.name)
+        || inviteStoreGet('catchme_guest_name', '') || '';
+    }
+  } else {
+    const sel = inviteState.confirmSel;
+    const valid = sel && inv.dates.includes(sel.date) && sel.start >= inv.startHour && sel.end <= inv.endHour;
+    if(!valid) inviteState.confirmSel = inviteBestBlock(inv);
+  }
+}
+
+async function refreshOpenInvite(){
+  if(!inviteState.token || !document.getElementById('inviteOverlay').classList.contains('show')) return;
+  try {
+    await fetchInvite(false);
+    renderInviteOverlay();
+  } catch(err) {}
+}
+
+// ---------- 그리기 ----------
+function renderInviteOverlay(){
+  const body = document.getElementById('inviteBody');
+  const foot = document.getElementById('inviteFoot');
+  const titleEl = document.getElementById('inviteTopTitle');
+  const closeBtn = document.getElementById('inviteCloseBtn');
+  const keepScroll = body.scrollTop;
+  const gridWrap = body.querySelector('.inv-grid-wrap');
+  const keepGridScroll = gridWrap ? gridWrap.scrollLeft : 0;
+  const backToList = inviteState.fromList && (inviteState.mode === 'create' || inviteState.mode === 'manage');
+  closeBtn.innerHTML = backToList ? '&#8249;' : '&times;';
+  foot.innerHTML = '';
+  const st = inviteState;
+
+  if(st.mode === 'loading'){
+    titleEl.textContent = '약속 잡기';
+    body.innerHTML = '<div class="inv-empty">불러오는 중...</div>';
+    return;
+  }
+  if(st.mode === 'error'){
+    titleEl.textContent = '약속 잡기';
+    body.innerHTML = `<div class="inv-empty">${escapeHtml(st.error || '초대 링크를 열 수 없어요.')}</div>`;
+    return;
+  }
+  if(st.mode === 'list'){
+    titleEl.textContent = '약속 잡기';
+    body.innerHTML = renderInviteListHtml();
+    foot.innerHTML = '<button type="button" class="inv-primary" data-act="new">+ 새 약속 링크 만들기</button>';
+    return;
+  }
+  if(st.mode === 'create'){
+    titleEl.textContent = '약속 링크 만들기';
+    body.innerHTML = renderInviteCreateHtml();
+    foot.innerHTML = `<button type="button" class="inv-primary" data-act="create"${st.busy ? ' disabled' : ''}>${st.busy ? '만드는 중...' : '링크 만들기'}</button>`;
+    return;
+  }
+  if(st.mode === 'manage'){
+    titleEl.textContent = '약속 응답 현황';
+    body.innerHTML = renderInviteManageHtml();
+  } else if(st.mode === 'guest'){
+    titleEl.textContent = 'CATCHME 약속';
+    body.innerHTML = renderInviteGuestHtml();
+  }
+  renderInviteFoot();
+  body.scrollTop = keepScroll;
+  const newWrap = body.querySelector('.inv-grid-wrap');
+  if(newWrap) newWrap.scrollLeft = keepGridScroll;
+}
+
+function renderInviteListHtml(){
+  const list = inviteState.myInvites;
+  const intro = `<div class="inv-hero">
+      <div class="inv-hero-title">링크 하나로 약속 시간 잡기</div>
+      <div class="inv-hero-sub">날짜만 골라 링크를 보내면, CATCHME에 가입 안 한 친구도 링크를 열어 가능한 시간을 바로 골라줄 수 있어요.</div>
+    </div>`;
+  if(!list.length) return intro + '<div class="inv-empty">아직 만든 약속 링크가 없어요.</div>';
+  return intro + '<div class="inv-label">내가 만든 약속</div>' + list.map(inv => {
+    const badge = inv.status === 'CONFIRMED' ? '<span class="inv-badge done">확정</span>'
+      : inv.status === 'CANCELLED' ? '<span class="inv-badge off">취소됨</span>'
+      : `<span class="inv-badge">응답 ${inv.responses.length}명</span>`;
+    const sub = inv.status === 'CONFIRMED' ? inviteConfirmedLabel(inv) : inviteDatesSummary(inv);
+    return `<button type="button" class="inv-list-item" data-act="open" data-token="${escapeHtml(inv.token)}">
+        <div class="t"><span>${escapeHtml(inv.title)}</span>${badge}</div>
+        <div class="s">${escapeHtml(sub)}</div>
+      </button>`;
+  }).join('');
+}
+
+function inviteAutoTitle(draft){
+  if(draft.dates.size === 1){
+    const d = inviteDateObj([...draft.dates][0]);
+    return `${WEEKDAY_KO[d.getDay()]}요일에 만날 시간 골라줘!`;
+  }
+  return '언제 만날지 시간 골라줘!';
+}
+
+function renderInviteCreateHtml(){
+  const d = inviteState.draft;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let chips = '';
+  for(let i = 0; i < 21; i++){
+    const day = new Date(today);
+    day.setDate(today.getDate() + i);
+    const ymd = inviteYmd(day);
+    const wd = day.getDay();
+    const cls = (d.dates.has(ymd) ? ' on' : '') + (wd === 6 ? ' sat' : wd === 0 ? ' sun' : '');
+    const top = i === 0 ? '오늘' : i === 1 ? '내일' : WEEKDAY_KO[wd];
+    chips += `<button type="button" class="inv-date-chip${cls}" data-date="${ymd}"><span class="wd">${top}</span>${day.getMonth() + 1}/${day.getDate()}</button>`;
+  }
+  const hourOpts = (from, to, sel) => {
+    let html = '';
+    for(let h = from; h <= to; h++) html += `<option value="${h}"${h === sel ? ' selected' : ''}>${h === 24 ? '밤 12시' : `${h}시`}</option>`;
+    return html;
+  };
+  return `
+    <div class="inv-section">
+      <label class="inv-label" for="invTitleInput">친구에게 보낼 말</label>
+      <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
+    </div>
+    <div class="inv-section">
+      <label class="inv-label">날짜 <small>· 여러 개 고를 수 있어요 (최대 14일)</small></label>
+      <div class="inv-date-chips">${chips}</div>
+    </div>
+    <div class="inv-section">
+      <label class="inv-label">시간 범위 <small>· 친구들은 이 안에서 1시간 단위로 골라요</small></label>
+      <div class="inv-range">
+        <select id="invStartHour">${hourOpts(0, 23, d.startHour)}</select>
+        <span>~</span>
+        <select id="invEndHour">${hourOpts(1, 24, d.endHour)}</select>
+      </div>
+    </div>
+    <div class="inv-card accent">
+      <div class="inv-card-title">${ICO.sparkle} 친구는 가입 없이 참여해요</div>
+      <div class="inv-card-desc">링크를 받은 친구는 이름만 적고 가능한 시간을 눌러서 보내면 끝이에요. 다 모이면 여기서 가장 많이 되는 시간으로 확정할 수 있어요.</div>
+    </div>`;
+}
+
+function renderInviteGridHtml(inv, mode){
+  const st = inviteState;
+  const counts = inviteCounts(inv, mode === 'guest');
+  const max = Math.max(1, ...Object.values(counts));
+  const isOpen = inv.status === 'OPEN';
+  let confirmedCells = new Set();
+  if(inv.status === 'CONFIRMED' && inv.confirmedStart){
+    const s = new Date(inv.confirmedStart);
+    const e = new Date(inv.confirmedEnd);
+    for(let t = s.getTime(); t < e.getTime(); t += 3600000){
+      const d = new Date(t);
+      confirmedCells.add(inviteCellKey(inviteYmd(d), d.getHours()));
+    }
+  }
+  let html = '<div class="inv-grid-wrap"><table class="inv-grid"><thead><tr><th></th>';
+  inv.dates.forEach(date => {
+    const label = inviteDateLabel(date);
+    html += `<th data-date="${date}">${label.replace('(', '<br>(')}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+  for(let h = inv.startHour; h < inv.endHour; h++){
+    html += `<tr><th class="inv-hour" data-hour="${h}">${invitePad(h)}:00</th>`;
+    inv.dates.forEach(date => {
+      const key = inviteCellKey(date, h);
+      const n = counts[key] || 0;
+      const heat = n ? (0.15 + 0.6 * n / max).toFixed(2) : 0;
+      let cls = 'inv-cell';
+      if(!isOpen) cls += ' readonly';
+      if(confirmedCells.has(key)) cls += ' confirmed';
+      else if(mode === 'guest' && st.myCells.has(key)) cls += ' mine';
+      if(mode === 'manage' && isOpen && st.confirmSel && st.confirmSel.date === date && h >= st.confirmSel.start && h < st.confirmSel.end) cls += ' sel';
+      html += `<td class="${cls}" data-cell="${key}" style="--heat:${heat}">${n ? `<span class="inv-n">${n}</span>` : ''}</td>`;
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function renderInviteManageHtml(){
+  const inv = inviteState.invite;
+  const link = inviteLink(inv.token);
+  const n = inv.responses.length;
+  let html = `<div class="inv-hero">
+      <div class="inv-hero-eyebrow">${inv.status === 'CONFIRMED' ? '확정된 약속' : inv.status === 'CANCELLED' ? '취소된 약속' : '응답 받는 중'}</div>
+      <div class="inv-hero-title">${escapeHtml(inv.title)}</div>
+      <div class="inv-hero-sub">${escapeHtml(inviteDatesSummary(inv))}</div>
+    </div>`;
+
+  if(inv.status === 'CONFIRMED'){
+    html += `<div class="inv-card done">
+        <div class="inv-card-title">${ICO.check} 약속이 확정됐어요</div>
+        <div class="inv-confirmed-big">${escapeHtml(inviteConfirmedLabel(inv))}</div>
+        <div class="inv-card-desc">내 캘린더에 담았어요. 친구들은 같은 링크에서 확정된 시간을 볼 수 있어요.</div>
+        <div class="inv-share-btns" style="margin-top:10px;"><button type="button" data-act="share">확정 소식 다시 보내기</button></div>
+      </div>`;
+  } else if(inv.status === 'OPEN'){
+    html += `<div class="inv-card accent">
+        <div class="inv-card-title">${ICO.pin} 이 링크를 친구들에게 보내주세요</div>
+        <div class="inv-share-link">${escapeHtml(link)}</div>
+        <div class="inv-share-btns">
+          <button type="button" data-act="copy">링크 복사</button>
+          <button type="button" class="fill" data-act="share">공유하기</button>
+        </div>
+        <div class="inv-card-desc" style="margin-top:8px;">받은 친구는 가입 없이 링크만 열면 가능한 시간을 고를 수 있어요.</div>
+      </div>`;
+  } else {
+    html += '<div class="inv-card"><div class="inv-card-desc">이 약속은 취소됐어요. 링크를 열어도 더 이상 응답할 수 없어요.</div></div>';
+  }
+
+  html += `<div class="inv-sub-head"><b>응답 ${n}명</b><span>${inv.status === 'OPEN' && n ? '칸을 눌러 확정할 시간을 골라요' : '칸의 숫자 = 가능한 인원'}</span></div>`;
+  if(n === 0){
+    html += '<div class="inv-card"><div class="inv-card-desc">아직 응답한 친구가 없어요. 링크를 보내면 응답이 올 때마다 알려드릴게요.</div></div>';
+  }
+  html += renderInviteGridHtml(inv, 'manage');
+  if(inv.status === 'OPEN' && n){
+    html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>같은 날 다른 칸을 한 번 더 누르면 그 시간까지 늘어나요</span></div>`;
+  }
+  if(n){
+    const sel = inv.status === 'OPEN' ? inviteState.confirmSel : null;
+    const okNames = sel ? new Set(inviteAvailableFor(inv, sel).map(r => r.name)) : null;
+    html += `<div class="inv-label">${sel ? '고른 시간에 되는 사람' : '응답한 사람'}</div><div class="inv-people">`
+      + inv.responses.map(r => {
+        const cls = okNames ? (okNames.has(r.name) ? ' ok' : ' no') : '';
+        return `<span class="inv-person${cls}">${escapeHtml(r.name)}${r.isMember ? ' · 회원' : ''}</span>`;
+      }).join('') + '</div>';
+  }
+  return html;
+}
+
+function renderInviteGuestHtml(){
+  const st = inviteState;
+  const inv = st.invite;
+  const creator = escapeHtml(inviteCreatorName(inv));
+
+  if(inv.status === 'CANCELLED'){
+    return `<div class="inv-hero"><div class="inv-hero-eyebrow">${creator}님의 약속</div><div class="inv-hero-title">${escapeHtml(inv.title)}</div></div>
+      <div class="inv-card"><div class="inv-card-desc">이 약속은 취소됐어요.</div></div>`;
+  }
+
+  if(inv.status === 'CONFIRMED'){
+    const mine = inv.myResponse;
+    const mineIsLinked = inv.responses.some(r => r.mine && r.isMember);
+    let html = `<div class="inv-hero"><div class="inv-hero-eyebrow">${creator}님의 약속</div><div class="inv-hero-title">${escapeHtml(inv.title)}</div></div>
+      <div class="inv-card done">
+        <div class="inv-card-title">${ICO.check} 약속 시간이 정해졌어요</div>
+        <div class="inv-confirmed-big">${escapeHtml(inviteConfirmedLabel(inv))}</div>
+        <div class="inv-card-desc">${creator}님 포함 ${inv.responses.length + 1}명이 함께해요.</div>
+      </div>`;
+    if(authToken){
+      if(mineIsLinked){
+        html += `<div class="inv-card"><div class="inv-card-desc">${ICO.calendar} 이 약속은 내 캘린더에 담겨 있어요.</div></div>`;
+      } else if(mine){
+        html += `<div class="inv-card accent">
+            <div class="inv-card-desc" style="margin-bottom:10px;">이 약속을 내 CATCHME 캘린더에 담을 수 있어요.</div>
+            <button type="button" class="inv-primary" data-act="claim">내 캘린더에 담기</button>
+          </div>`;
+      }
+    } else {
+      // 확정된 다음에만 가입을 권함
+      html += `<div class="inv-signup-card">
+          <div class="inv-card-title">이 약속, 잊지 않게 담아둘까요?</div>
+          <ul>
+            ${mine ? '<li>가입하면 이 약속이 <b>내 캘린더에 자동으로</b> 담겨요</li>' : '<li>약속을 캘린더에 모아 관리할 수 있어요</li>'}
+            <li>다음엔 친구 일정에서 <b>비는 시간을 바로</b> 보고 약속을 잡을 수 있어요</li>
+            <li>장소 정하기, 투표까지 채팅방 하나로 끝나요</li>
+          </ul>
+          <button type="button" class="inv-primary cta" data-act="signup">${mine ? 'CATCHME 가입하고 캘린더에 담기' : 'CATCHME 시작하기'}</button>
+          <button type="button" class="inv-text-btn" data-act="close">괜찮아요</button>
+        </div>`;
+    }
+    html += renderInviteGridHtml(inv, 'guest');
+    return html;
+  }
+
+  // 응답 받는 중 - 가입 이야기는 꺼내지 않고, 이름 + 시간 고르기만
+  const others = inv.responses.filter(r => !r.mine);
+  let html = `<div class="inv-hero">
+      <div class="inv-hero-eyebrow">${creator}님이 약속 시간을 물어봐요</div>
+      <div class="inv-hero-title">${escapeHtml(inv.title)}</div>
+      <div class="inv-hero-sub">가입 없이 이름만 적고, 되는 시간을 모두 눌러주세요.</div>
+    </div>`;
+  if(st.submitted || (inv.myResponse && !st.dirty)){
+    html += `<div class="inv-card done">
+        <div class="inv-card-title">${ICO.check} ${st.submitted ? '보냈어요!' : '이미 보낸 응답이 있어요'}</div>
+        <div class="inv-card-desc">${creator}님이 시간을 정하면 이 링크에서 바로 확인할 수 있어요. 바뀐 게 있으면 칸을 고쳐서 다시 보내면 돼요.</div>
+      </div>`;
+  }
+  html += `<div class="inv-section">
+      <label class="inv-label" for="invGuestName">내 이름</label>
+      <input id="invGuestName" class="inv-input" maxlength="20" placeholder="친구들이 알아볼 수 있는 이름" value="${escapeHtml(st.guestName)}" />
+    </div>
+    <div class="inv-sub-head"><b>되는 시간 고르기</b><span>날짜/시간 이름을 누르면 한 줄 전체</span></div>
+    ${renderInviteGridHtml(inv, 'guest')}
+    <div class="inv-legend"><span><i style="background:var(--cta)"></i>내가 고른 시간</span><span><i style="background:rgba(56,189,248,0.6)"></i>숫자 = 다른 친구들이 되는 인원</span></div>`;
+  if(others.length){
+    html += `<div class="inv-label">먼저 응답한 친구 ${others.length}명</div><div class="inv-people">`
+      + others.map(r => `<span class="inv-person">${escapeHtml(r.name)}</span>`).join('') + '</div>';
+  }
+  return html;
+}
+
+function renderInviteFoot(){
+  const st = inviteState;
+  const foot = document.getElementById('inviteFoot');
+  const inv = st.invite;
+  if(!inv){ foot.innerHTML = ''; return; }
+  if(st.mode === 'manage' && inv.status === 'OPEN'){
+    const sel = st.confirmSel;
+    let main;
+    if(!inv.responses.length || !sel){
+      main = '<button type="button" class="inv-primary" data-act="share">친구들에게 링크 보내기</button>';
+    } else {
+      const ok = inviteAvailableFor(inv, sel).length;
+      const label = inviteRangeLabel(sel.date, sel.start, sel.end);
+      main = st.armed === 'confirm'
+        ? `<button type="button" class="inv-primary armed" data-act="confirm">한 번 더 누르면 ${escapeHtml(label)}로 확정돼요</button>`
+        : `<button type="button" class="inv-primary" data-act="confirm"${st.busy ? ' disabled' : ''}>${escapeHtml(label)}로 확정 (${ok}/${inv.responses.length}명 가능)</button>`;
+    }
+    foot.innerHTML = main + `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite">${st.armed === 'cancel' ? '한 번 더 누르면 약속이 취소돼요' : '약속 취소하기'}</button>`;
+    return;
+  }
+  if(st.mode === 'guest' && inv.status === 'OPEN'){
+    const n = st.myCells.size;
+    const label = st.busy ? '보내는 중...'
+      : n === 0 ? '되는 시간을 눌러 골라주세요'
+      : (inv.myResponse ? `고친 시간 ${n}칸 다시 보내기` : `되는 시간 ${n}칸 보내기`);
+    const disabled = st.busy || n === 0 || (inv.myResponse && !st.dirty && !st.nameDirty);
+    foot.innerHTML = `<button type="button" class="inv-primary" data-act="submit"${disabled ? ' disabled' : ''}>${escapeHtml(label)}</button>`;
+    return;
+  }
+  foot.innerHTML = '';
+}
+
+// 칸 색만 바꿔서(전체를 다시 그리지 않아서) 스크롤 위치가 튀지 않게 함
+function updateInviteGridClasses(){
+  const st = inviteState;
+  const inv = st.invite;
+  document.querySelectorAll('#inviteBody .inv-cell').forEach(td => {
+    const key = td.dataset.cell;
+    const [date, hh] = key.split('|');
+    const h = Number(hh);
+    if(st.mode === 'guest') td.classList.toggle('mine', st.myCells.has(key));
+    if(st.mode === 'manage'){
+      const sel = st.confirmSel;
+      td.classList.toggle('sel', !!sel && inv.status === 'OPEN' && sel.date === date && h >= sel.start && h < sel.end);
+    }
+  });
+}
+
+function clearInviteArm(){
+  clearTimeout(inviteState.armTimer);
+  inviteState.armTimer = null;
+  inviteState.armed = null;
+}
+function armInviteButton(kind){
+  clearInviteArm();
+  inviteState.armed = kind;
+  inviteState.armTimer = setTimeout(() => { inviteState.armed = null; renderInviteFoot(); }, 3000);
+  renderInviteFoot();
+}
+
+// ---------- 입력 처리 ----------
+document.getElementById('inviteOverlay').addEventListener('click', (e) => {
+  const st = inviteState;
+  const inv = st.invite;
+
+  const cell = e.target.closest('.inv-cell');
+  if(cell){
+    if(!inv || inv.status !== 'OPEN') return;
+    const key = cell.dataset.cell;
+    if(st.mode === 'guest'){
+      if(st.myCells.has(key)) st.myCells.delete(key); else st.myCells.add(key);
+      st.dirty = true;
+      updateInviteGridClasses();
+      renderInviteFoot();
+    } else if(st.mode === 'manage'){
+      if(!inv.responses.length) return;
+      const [date, hh] = key.split('|');
+      const h = Number(hh);
+      const sel = st.confirmSel;
+      if(sel && sel.date === date && !sel.extended && !(h >= sel.start && h < sel.end)){
+        st.confirmSel = { date, start: Math.min(sel.start, h), end: Math.max(sel.end, h + 1), extended: true };
+      } else {
+        st.confirmSel = { date, start: h, end: h + 1, extended: false };
+      }
+      clearInviteArm();
+      renderInviteOverlay();
+    }
+    return;
+  }
+
+  // 비회원 화면: 날짜/시간 머리글을 누르면 그 줄 전체를 한 번에 켜고 끔
+  const head = e.target.closest('.inv-grid th[data-date], .inv-grid th[data-hour]');
+  if(head && st.mode === 'guest' && inv && inv.status === 'OPEN'){
+    const keys = [];
+    if(head.dataset.date){
+      for(let h = inv.startHour; h < inv.endHour; h++) keys.push(inviteCellKey(head.dataset.date, h));
+    } else {
+      inv.dates.forEach(d => keys.push(inviteCellKey(d, Number(head.dataset.hour))));
+    }
+    const allOn = keys.every(k => st.myCells.has(k));
+    keys.forEach(k => { if(allOn) st.myCells.delete(k); else st.myCells.add(k); });
+    st.dirty = true;
+    updateInviteGridClasses();
+    renderInviteFoot();
+    return;
+  }
+
+  const chip = e.target.closest('.inv-date-chip');
+  if(chip && st.mode === 'create'){
+    const ymd = chip.dataset.date;
+    if(st.draft.dates.has(ymd)){
+      if(st.draft.dates.size === 1){ showToast('날짜를 하나 이상 골라주세요.'); return; }
+      st.draft.dates.delete(ymd);
+    } else {
+      if(st.draft.dates.size >= 14){ showToast('날짜는 최대 14일까지 고를 수 있어요.'); return; }
+      st.draft.dates.add(ymd);
+    }
+    chip.classList.toggle('on', st.draft.dates.has(ymd));
+    const input = document.getElementById('invTitleInput');
+    if(input) input.placeholder = inviteAutoTitle(st.draft);
+    return;
+  }
+
+  const actEl = e.target.closest('[data-act]');
+  if(!actEl) return;
+  const act = actEl.dataset.act;
+  if(act === 'new') openInviteCreate(true);
+  else if(act === 'open') openInviteByToken(actEl.dataset.token, { fromList: true });
+  else if(act === 'create') createInviteFromDraft();
+  else if(act === 'copy') copyInviteLink();
+  else if(act === 'share') shareInviteLink();
+  else if(act === 'submit') submitInviteResponse();
+  else if(act === 'confirm'){
+    if(st.armed === 'confirm') confirmInviteSelection();
+    else armInviteButton('confirm');
+  }
+  else if(act === 'cancelInvite'){
+    if(st.armed === 'cancel') cancelInviteNow();
+    else armInviteButton('cancel');
+  }
+  else if(act === 'claim') claimInviteNow();
+  else if(act === 'signup') goSignupFromInvite();
+  else if(act === 'close') closeInviteOverlay();
+});
+
+document.getElementById('inviteOverlay').addEventListener('input', (e) => {
+  const st = inviteState;
+  if(e.target.id === 'invTitleInput' && st.draft) st.draft.title = e.target.value;
+  if(e.target.id === 'invGuestName'){
+    st.guestName = e.target.value;
+    st.nameDirty = true;
+    renderInviteFoot();
+  }
+});
+
+document.getElementById('inviteOverlay').addEventListener('change', (e) => {
+  const d = inviteState.draft;
+  if(!d) return;
+  if(e.target.id === 'invStartHour' || e.target.id === 'invEndHour'){
+    const s = Number(document.getElementById('invStartHour').value);
+    const en = Number(document.getElementById('invEndHour').value);
+    if(s >= en){
+      showToast('끝나는 시간이 시작 시간보다 늦어야 해요.');
+      e.target.value = String(e.target.id === 'invStartHour' ? d.startHour : d.endHour);
+      return;
+    }
+    d.startHour = s;
+    d.endHour = en;
+  }
+});
+
+// ---------- 서버 요청 ----------
+async function createInviteFromDraft(){
+  const st = inviteState;
+  const d = st.draft;
+  if(st.busy) return;
+  const title = (d.title || '').trim() || inviteAutoTitle(d);
+  st.busy = true;
+  renderInviteFoot();
+  try {
+    const data = await apiRequest('/invites', {
+      method: 'POST',
+      body: JSON.stringify({ title, dates: [...d.dates].sort(), startHour: d.startHour, endHour: d.endHour }),
+    });
+    st.busy = false;
+    st.token = data.invite.token;
+    st.confirmSel = null;
+    applyInviteData(data.invite, true);
+    st.myInvites = [data.invite, ...st.myInvites];
+    renderInviteOverlay();
+    document.getElementById('inviteBody').scrollTop = 0;
+    showToast('링크가 만들어졌어요! 친구들에게 보내보세요.');
+  } catch(err) {
+    st.busy = false;
+    renderInviteFoot();
+    showToast(err.message);
+  }
+}
+
+function inviteShareText(inv){
+  if(inv.status === 'CONFIRMED'){
+    return `[CATCHME] ${inv.title}\n약속 시간이 정해졌어요: ${inviteConfirmedLabel(inv)}`;
+  }
+  return `[CATCHME] ${inv.title}\n${inviteCreatorName(inv)}님이 약속 시간을 물어보고 있어요. 가입 없이 링크에서 되는 시간만 눌러주세요!`;
+}
+
+async function copyInviteLink(){
+  const inv = inviteState.invite;
+  if(!inv) return;
+  const full = `${inviteShareText(inv)}\n${inviteLink(inv.token)}`;
+  let ok = false;
+  try {
+    await navigator.clipboard.writeText(full);
+    ok = true;
+  } catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = full;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch(err) {}
+    ta.remove();
+  }
+  showToast(ok ? '링크를 복사했어요. 카톡에 붙여넣어 보내보세요!' : '복사가 안 됐어요. 위 링크를 길게 눌러 복사해주세요.');
+}
+
+async function shareInviteLink(){
+  const inv = inviteState.invite;
+  if(!inv) return;
+  if(navigator.share){
+    try {
+      await navigator.share({ title: inv.title, text: inviteShareText(inv), url: inviteLink(inv.token) });
+      return;
+    } catch(e) {
+      if(e && e.name === 'AbortError') return;
+    }
+  }
+  copyInviteLink();
+}
+
+async function submitInviteResponse(){
+  const st = inviteState;
+  const inv = st.invite;
+  if(st.busy || !inv) return;
+  const name = (st.guestName || '').trim();
+  if(!name){
+    showToast('이름을 적어주세요.');
+    const input = document.getElementById('invGuestName');
+    if(input) input.focus();
+    return;
+  }
+  if(st.myCells.size === 0){ showToast('되는 시간을 하나 이상 골라주세요.'); return; }
+  st.busy = true;
+  renderInviteFoot();
+  try {
+    if(!authToken) inviteStoreSet('catchme_guest_name', name);
+    const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, true), name, cells: [...st.myCells] }),
+    });
+    st.busy = false;
+    st.submitted = true;
+    st.nameDirty = false;
+    applyInviteData(data.invite, true);
+    renderInviteOverlay();
+    document.getElementById('inviteBody').scrollTop = 0;
+    showToast(`보냈어요! ${inviteCreatorName(inv)}님이 시간을 정하면 이 링크에서 볼 수 있어요.`, 3000);
+  } catch(err) {
+    st.busy = false;
+    showToast(err.message);
+    renderInviteFoot();
+    refreshOpenInvite(); // 그 사이 확정/취소됐을 수 있음
+  }
+}
+
+async function confirmInviteSelection(){
+  const st = inviteState;
+  const inv = st.invite;
+  const sel = st.confirmSel;
+  clearInviteArm();
+  if(st.busy || !inv || !sel) return;
+  st.busy = true;
+  renderInviteFoot();
+  try {
+    const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ date: sel.date, startHour: sel.start, endHour: sel.end }),
+    });
+    st.busy = false;
+    applyInviteData(data.invite, true);
+    st.myInvites = st.myInvites.map(x => x.token === data.invite.token ? data.invite : x);
+    renderInviteOverlay();
+    document.getElementById('inviteBody').scrollTop = 0;
+    showToast('약속이 확정됐어요! 내 캘린더에 담았어요.', 3000);
+    if(typeof loadScheduleFromServer === 'function') loadScheduleFromServer();
+  } catch(err) {
+    st.busy = false;
+    showToast(err.message);
+    renderInviteFoot();
+  }
+}
+
+async function cancelInviteNow(){
+  const st = inviteState;
+  const inv = st.invite;
+  clearInviteArm();
+  if(st.busy || !inv) return;
+  st.busy = true;
+  try {
+    const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/cancel`, { method: 'POST' });
+    st.busy = false;
+    applyInviteData(data.invite, true);
+    st.myInvites = st.myInvites.map(x => x.token === data.invite.token ? data.invite : x);
+    renderInviteOverlay();
+    showToast('약속을 취소했어요.');
+  } catch(err) {
+    st.busy = false;
+    showToast(err.message);
+    renderInviteFoot();
+  }
+}
+
+async function claimInviteNow(){
+  const inv = inviteState.invite;
+  if(!inv || !authToken) return;
+  try {
+    const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/claim`, {
+      method: 'POST',
+      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, false) || '' }),
+    });
+    applyInviteData(data.invite, true);
+    renderInviteOverlay();
+    if(data.addedToCalendar){
+      showToast('내 캘린더에 담았어요!');
+      if(typeof loadScheduleFromServer === 'function') loadScheduleFromServer();
+    }
+  } catch(err) {
+    showToast(err.message);
+  }
+}
+
+// 확정된 약속 화면에서 "가입하기" - 가입/로그인을 마치면 그 응답을 계정에 연결하고 캘린더에 담음
+function goSignupFromInvite(){
+  const inv = inviteState.invite;
+  if(!inv) return;
+  const gk = inviteGuestKey(inv.token, false);
+  if(inv.myResponse && gk){
+    inviteStoreSet('catchme_pending_invite_claim', { token: inv.token, guestKey: gk, title: inv.title });
+  }
+  const notice = document.getElementById('authInviteNotice');
+  notice.textContent = inv.myResponse
+    ? `가입하면 '${inv.title}' 약속(${inviteConfirmedLabel(inv)})이 내 캘린더에 바로 담겨요.`
+    : 'CATCHME에 오신 걸 환영해요! 가입하고 다음 약속은 더 쉽게 잡아보세요.';
+  notice.style.display = 'block';
+  closeInviteOverlay();
+  document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'signup'));
+  showAuthForm('authFormSignup');
+  const nameInput = document.getElementById('signupName');
+  if(nameInput && !nameInput.value && inviteState.guestName) nameInput.value = inviteState.guestName.trim();
+}
+
+// 로그인/가입 직후 - 링크에서 가입을 눌렀던 약속이 있으면 계정에 연결
+async function claimPendingInvite(){
+  const notice = document.getElementById('authInviteNotice');
+  if(notice) notice.style.display = 'none';
+  const pending = inviteStoreGet('catchme_pending_invite_claim', null);
+  if(!pending || !authToken) return;
+  inviteStoreRemove('catchme_pending_invite_claim');
+  try {
+    const data = await apiRequest(`/invites/${encodeURIComponent(pending.token)}/claim`, {
+      method: 'POST',
+      body: JSON.stringify({ guestKey: pending.guestKey }),
+    });
+    if(data.addedToCalendar){
+      showToast(`'${pending.title}' 약속을 내 캘린더에 담았어요!`, 3200);
+      if(typeof loadScheduleFromServer === 'function') loadScheduleFromServer();
+    }
+  } catch(err) {
+    console.error('[invites] 가입 후 약속 연결 실패:', err);
+  }
+}
+
+// 주소에 ?invite=토큰 이 있으면(친구가 보낸 링크로 들어온 경우) 로그인 여부와 상관없이 바로 응답 화면을 띄움
+function openInviteFromUrl(){
+  let token = null;
+  try { token = new URLSearchParams(location.search).get('invite'); } catch(e) {}
+  if(!token || !/^[A-Za-z0-9_-]{6,64}$/.test(token)) return;
+  openInviteByToken(token);
+}
+
 // ---------- 카카오/네이버 소셜 로그인 ----------
 document.getElementById('kakaoLoginBtn').addEventListener('click', () => {
   window.location.href = API_BASE_URL + '/auth/kakao/login';
@@ -21588,6 +22805,7 @@ async function handleSocialLoginRedirect(){
 // 페이지가 열릴 때 저장된 로그인 세션이 있으면 자동으로 복원
 handleSocialLoginRedirect().then(handled => {
   if(!handled) tryRestoreSession();
+  openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
 });
 </script>
 
