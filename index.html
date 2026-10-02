@@ -6125,7 +6125,8 @@
     <div class="mini-confirm-card">
       <div class="mini-confirm-title" id="reservationCancelConfirmTitle">예약을 취소하시겠습니까?</div>
       <div class="mini-confirm-actions">
-        <button type="button" id="reservationCancelConfirmYesBtn" class="mini-confirm-btn danger">예</button>
+        <button type="button" id="reservationCancelConfirmKeepBtn" class="mini-confirm-btn">예약 가능 일정 남겨두기</button>
+        <button type="button" id="reservationCancelConfirmDeleteBtn" class="mini-confirm-btn danger">그냥 삭제하기</button>
         <button type="button" id="reservationCancelConfirmNoBtn" class="mini-confirm-btn">아니오</button>
       </div>
     </div>
@@ -16329,13 +16330,13 @@ function withdrawReservation(m){
   showToast('예약 요청을 취소했어요.');
 }
 
-function cancelReservation(m){
+function cancelReservation(m, restoreAvailability){
   const roomId = activeChatRoomId;
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
 
   if(m._serverId){
-    apiRequest(`/chats/messages/${m._serverId}/cancel`, { method: 'POST' })
+    apiRequest(`/chats/messages/${m._serverId}/cancel`, { method: 'POST', body: JSON.stringify({ restoreAvailability }) })
       .then(async (data) => {
         Object.assign(m, mapServerReservationMessage(data.message));
         await loadPinsFromServer(roomId, room);
@@ -16374,12 +16375,12 @@ function cancelReservation(m){
 }
 
 // 그룹 투표로 확정된 시간을 취소
-function cancelGroupTimeOption(roomId, msg){
+function cancelGroupTimeOption(roomId, msg, restoreAvailability){
   const room = CHAT_ROOMS[roomId];
   if(!room || msg.status !== 'confirmed') return;
 
   if(msg._serverId){
-    apiRequest(`/chats/time-proposals/${msg._serverId}/cancel`, { method: 'POST' })
+    apiRequest(`/chats/time-proposals/${msg._serverId}/cancel`, { method: 'POST', body: JSON.stringify({ restoreAvailability }) })
       .then(async (data) => {
         Object.assign(msg, mapServerTimeProposalMessage(data.message, room));
         await loadPinsFromServer(roomId, room);
@@ -16493,11 +16494,15 @@ document.getElementById('reservationCancelConfirmNoBtn').addEventListener('click
 document.getElementById('reservationCancelConfirmOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'reservationCancelConfirmOverlay') closeReservationCancelConfirm();
 });
-document.getElementById('reservationCancelConfirmYesBtn').addEventListener('click', () => {
+// 취소하면서 이 시간을 "예약 가능"으로 다시 남겨둘지(keepAvailable=true), 그냥 삭제만 할지(false)를
+// 사용자가 직접 고르게 함 - 꽉 채워서 예약했다가 취소해도 예약 가능이 안 돌아오던 문제를 사용자 선택으로 해결
+function runPendingCancel(keepAvailable){
   const action = pendingCancelAction;
   closeReservationCancelConfirm();
-  if(action) action();
-});
+  if(action) action(keepAvailable);
+}
+document.getElementById('reservationCancelConfirmKeepBtn').addEventListener('click', () => runPendingCancel(true));
+document.getElementById('reservationCancelConfirmDeleteBtn').addEventListener('click', () => runPendingCancel(false));
 
 // ---------- 장소 정하기: 카카오톡 위치 공유처럼 지도를 꽉 채워서 검색하거나 직접 핀을 찍어서 고름 ----------
 let locationPickerCallback = null; // (label, lat, lon) => void - 장소를 고른 뒤 실행할 콜백
@@ -17999,7 +18004,7 @@ function renderChatMessages(){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => withdrawReservation(m));
       }
       if(showConfirmedExtras){
-        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm(() => cancelReservation(m)));
+        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable)));
       }
     } else if(m.type === 'location-suggest'){
       const statusLabel = m.status === 'confirmed' ? '장소로 확정됨' : (m.status === 'cancelled' ? '제안 취소됨' : '제안됨');
@@ -18108,7 +18113,7 @@ function renderChatMessages(){
           viewDayFromChat(parseDateLabelToDate(winning.dateLabel));
         });
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => {
-          openCancelConfirm(() => cancelGroupTimeOption(activeChatRoomId, m));
+          openCancelConfirm((keepAvailable) => cancelGroupTimeOption(activeChatRoomId, m, keepAvailable));
         });
       } else if(m.status === 'cancelled'){
         row.innerHTML = `
