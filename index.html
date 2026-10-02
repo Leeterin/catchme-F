@@ -21967,7 +21967,11 @@ async function runCalendarMatch(){
       const data = await apiRequest(`/events/match?${qs}`);
       dayResults = (data.days || []).map(d => ({
         date: parseDateInputValue(d.date),
-        ranges: d.ranges.map(r => ({ startH: r.startHour, endH: r.endHour })),
+        // 서버가 5분 단위로 계산 (예: 8:25까지만 예약 가능이면 8:25에서 끝남)
+        ranges: d.ranges.map(r => ({
+          startMin: typeof r.startMin === 'number' ? r.startMin : r.startHour * 60,
+          endMin: typeof r.endMin === 'number' ? r.endMin : r.endHour * 60,
+        })),
       }));
     } catch(err){
       body.innerHTML = `<div class="search-empty">매칭 계산에 실패했어요: ${err.message}</div>`;
@@ -21980,7 +21984,8 @@ async function runCalendarMatch(){
     const cursor = new Date(startDate);
     let safety = 0;
     while(cursor <= endDate && safety < 62){
-      const ranges = computeMatchRangesForDate(cursor, memberNames).filter(r => (r.endH - r.startH) >= minHours);
+      const ranges = computeMatchRangesForDate(cursor, memberNames).filter(r => (r.endH - r.startH) >= minHours)
+        .map(r => ({ startMin: r.startH * 60, endMin: r.endH * 60 }));
       if(ranges.length > 0){
         dayResults.push({ date: new Date(cursor), ranges });
       }
@@ -21998,27 +22003,29 @@ async function runCalendarMatch(){
   body.innerHTML = dayResults.map(day => {
     const dateLabel = `${day.date.getMonth()+1}/${day.date.getDate()}(${WEEKDAY_KO[day.date.getDay()]})`;
     const rangesHtml = day.ranges.map(r => {
-      const span = r.endH - r.startH;
-      if(span <= minHours){
+      const dur = minHours * 60;
+      const span = r.endMin - r.startMin;
+      if(span <= dur){
         // 겹치는 시간이 원하는 만날 시간이랑 딱 맞거나 더 짧으면(이론상 필터 때문에 더 짧을 일은 없음) 그대로 한 칸으로
         return `
-          <div class="match-range-row checkable" data-date="${day.date.toISOString()}" data-hour="${r.startH}" data-end-hour="${r.endH}">
+          <div class="match-range-row checkable" data-date="${day.date.toISOString()}" data-start-min="${r.startMin}" data-end-min="${r.endMin}">
             <span class="match-range-check"></span>
-            <span>${String(r.startH).padStart(2,'0')}:00 - ${String(r.endH).padStart(2,'0')}:00</span>
+            <span>${matchHm(r.startMin)} - ${matchHm(r.endMin)}</span>
           </div>
         `;
       }
       // 겹치는 시간이 원하는 만날 시간보다 길면, "몇 시부터 만날지" 시작 시간을 여러 개로 쪼개서 골라 고를 수 있게 함
-      const startOptions = [];
-      for(let s = r.startH; s + minHours <= r.endH; s++) startOptions.push(s);
+      // 첫 칩은 겹치는 시간의 시작(정각이 아니어도 그대로, 예: 06:50), 그다음부터는 정각마다
+      const startOptions = [r.startMin];
+      for(let s = (Math.floor(r.startMin / 60) + 1) * 60; s + dur <= r.endMin; s += 60) startOptions.push(s);
       const chipsHtml = startOptions.map(s => `
-        <div class="match-start-chip" data-date="${day.date.toISOString()}" data-hour="${s}" data-end-hour="${s + minHours}" data-range-start="${r.startH}" data-range-end="${r.endH}">
-          ${String(s).padStart(2,'0')}:00 시작
+        <div class="match-start-chip" data-date="${day.date.toISOString()}" data-start-min="${s}" data-end-min="${s + dur}" data-range-start-min="${r.startMin}" data-range-end-min="${r.endMin}">
+          ${matchHm(s)} 시작
         </div>
       `).join('');
       return `
         <div class="match-range-wide">
-          <div class="match-range-wide-label">${String(r.startH).padStart(2,'0')}:00 - ${String(r.endH).padStart(2,'0')}:00 중 ${minHours}시간 골라주세요</div>
+          <div class="match-range-wide-label">${matchHm(r.startMin)} - ${matchHm(r.endMin)} 중 ${minHours}시간 골라주세요</div>
           <div class="match-start-chip-row">${chipsHtml}</div>
           <div class="match-fine-list"></div>
         </div>
@@ -22101,20 +22108,20 @@ document.getElementById('matchPanelBody').addEventListener('click', (e) => {
   if(!row) return;
 
   const dateObj = new Date(row.dataset.date);
-  const hour = parseInt(row.dataset.hour, 10);
-  const endHour = parseInt(row.dataset.endHour, 10);
+  const startMin = parseInt(row.dataset.startMin, 10);
+  const endMin = parseInt(row.dataset.endMin, 10);
   const dateLabel = `${dateObj.getMonth()+1}/${dateObj.getDate()}(${WEEKDAY_KO[dateObj.getDay()]})`;
-  const key = `${row.dataset.date}|${hour}`;
+  const key = `${row.dataset.date}|${startMin}`;
   const idx = selectedGroupMatchSlots.findIndex(s => s.key === key);
 
   if(idx >= 0){
     selectedGroupMatchSlots.splice(idx, 1);
     row.classList.remove('checked');
   } else {
-    const slot = { key, dateObj, dateLabel, baseH: hour, startMin: hour * 60, endMin: endHour * 60 };
+    const slot = { key, dateObj, dateLabel, baseH: Math.floor(startMin / 60), startMin, endMin };
     if(row.classList.contains('match-start-chip')){
-      slot.rangeStartMin = parseInt(row.dataset.rangeStart, 10) * 60;
-      slot.rangeEndMin = parseInt(row.dataset.rangeEnd, 10) * 60;
+      slot.rangeStartMin = parseInt(row.dataset.rangeStartMin, 10);
+      slot.rangeEndMin = parseInt(row.dataset.rangeEndMin, 10);
     }
     setMatchSlotStart(slot, slot.startMin);
     selectedGroupMatchSlots.push(slot);
@@ -22131,10 +22138,10 @@ function renderMatchFineRows(wide){
   const chips = [...wide.querySelectorAll('.match-start-chip')];
   const slots = [];
   chips.forEach(chip => {
-    const key = `${chip.dataset.date}|${chip.dataset.hour}`;
+    const key = `${chip.dataset.date}|${chip.dataset.startMin}`;
     const slot = selectedGroupMatchSlots.find(s => s.key === key);
     chip.classList.toggle('checked', !!slot);
-    chip.textContent = `${slot ? matchHm(slot.startMin) : String(chip.dataset.hour).padStart(2,'0') + ':00'} 시작`;
+    chip.textContent = `${matchHm(slot ? slot.startMin : parseInt(chip.dataset.startMin, 10))} 시작`;
     if(slot) slots.push(slot);
   });
   list.innerHTML = slots.map(slot => {
