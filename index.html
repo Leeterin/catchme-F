@@ -23298,11 +23298,13 @@ function copyTextNow(text){
   try { window.getSelection().removeAllRanges(); } catch(e) {}
   return ok;
 }
-async function copyInviteLink(){
+async function copyInviteLink(withText){
   const inv = inviteState.invite;
   if(!inv) return;
+  // "링크 복사"는 주소만 복사함 - 안내 문장까지 같이 복사하면 브라우저 주소창에 붙여넣었을 때 링크가 안 열림
+  // (안내 문장은 "공유하기"로 보낼 때만 같이 붙음)
   const link = inviteLink(inv.token);
-  const full = `${inviteShareText(inv)}\n${link}`;
+  const full = withText ? `${inviteShareText(inv)}\n\n${link}` : link;
   let ok = copyTextNow(full);
   if(!ok && navigator.clipboard && navigator.clipboard.writeText){
     try {
@@ -23351,7 +23353,7 @@ async function shareInviteLink(){
       if(e && e.name === 'AbortError') return;
     }
   }
-  copyInviteLink();
+  copyInviteLink(true); // 공유 창이 없는 기기(앱 화면 등)는 안내 문장+링크를 복사해서 카톡에 붙여넣게 함
 }
 
 async function submitInviteResponse(){
