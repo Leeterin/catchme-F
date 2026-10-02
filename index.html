@@ -13222,17 +13222,24 @@ function renderWeekView(){
         let j = i;
         while(j + 1 <= maxIdx && texts[j+1] === text) j++;
 
-        // 이 블록이 몇 시부터 몇 시까지인지로, 실제 일정 객체를 찾음 (수정/삭제에 필요)
+        // 이 블록이 몇 시부터 몇 시까지인지로, 실제 일정 객체를 찾음 (수정/삭제에 필요하고,
+        // 정각이 아닌 분 단위 시작/종료를 에브리타임처럼 정확히 반영하는 데도 씀)
         const matchedEv = dayEvents.find(ev => ev.title === text && Math.floor(getEventDisplayRangeForDate(ev, d).startMin / 60) === DAY_HOURS[i]) || null;
         const isPending = !!(matchedEv && matchedEv.isPendingHold);
         const isLinked = !!(matchedEv && matchedEv.isReservationLinked);
 
+        // 블록의 실제 분 단위 시작/종료 - 매칭된 실제 일정이 있으면 그 정확한 시각을 쓰고(예: 9시10분~10시면
+        // 그만큼만 작게 표시), 못 찾은 드문 경우엔 예전처럼 정시 경계로 계산함
+        const blockRange = matchedEv ? getEventDisplayRangeForDate(matchedEv, d) : { startMin: DAY_HOURS[i] * 60, endMin: (DAY_HOURS[j] + 1) * 60 };
+        const blockTopPx = (blockRange.startMin / 60 - minIdx) * WEEK_ROW_H;
+        const blockHeightPx = (blockRange.endMin - blockRange.startMin) / 60 * WEEK_ROW_H;
+
         const block = document.createElement('div');
         block.className = 'week-cal-block' + (isPending ? ' pending' : '') + (isLinked ? ' linked' : '');
-        block.style.top = ((i - minIdx) * WEEK_ROW_H + 1) + 'px';
-        block.style.height = ((j - i + 1) * WEEK_ROW_H - 2) + 'px';
+        block.style.top = (blockTopPx + 1) + 'px';
+        block.style.height = (blockHeightPx - 2) + 'px';
         if(!isPending && !isLinked) block.style.background = colorForScheduleText(text);
-        block.title = `${d.getMonth()+1}/${d.getDate()} ${DAY_HOURS[i]}:00-${DAY_HOURS[j]+1}:00 - ${text}`;
+        block.title = `${d.getMonth()+1}/${d.getDate()} ${minutesToLabel(blockRange.startMin)}-${minutesToLabel(blockRange.endMin)} - ${text}`;
 
         const label = document.createElement('span');
         label.textContent = text;
