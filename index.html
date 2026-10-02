@@ -3962,7 +3962,8 @@
   }
   .event-form-footer{
     flex-shrink:0;
-    margin:16px -18px 0 -18px;
+    /* 바로 위 입력창(공개 설정 등)이랑 버튼 사이에 공간이 많이 떠보인다는 피드백으로 위쪽 여백을 줄임 */
+    margin:4px -18px 0 -18px;
     padding:12px 6px calc(2px + env(safe-area-inset-bottom));
     background:var(--bg);
     border-top:1px solid var(--line);
@@ -11609,6 +11610,9 @@ let availPaintValue = false;
 // 예약 가능 시간 - 그리드에서 고른 걸 분 단위로 세부 조정하는 단계
 let availFineTuneMode = false;
 let availFineTuneBlocks = []; // [{ dateKey, startMin, endMin }]
+// 기존 "예약 가능" 일정을 수정하려고 열었을 때, 원래 가지고 있던 정확한 분 단위 시작/종료 시간들
+// (그리드는 "시" 단위로만 칸을 선택하므로, 세부조정 화면을 처음 열 때 이 값이 있으면 반올림하지 않고 그대로 살려씀)
+let editingOriginalAvailBlocks = []; // [{ dateKey, startMin, endMin }]
 
 // 선택된 칸들("dateKey::hourIndex")을 날짜별로 모아서, 같은 날 연속된 시간은 하나의 블록으로 합침
 function computeAvailBlocksFromSelection(){
@@ -11659,6 +11663,20 @@ function openAvailFineTune(){
     showToast('예약 가능으로 표시할 시간을 하나 이상 선택해주세요.');
     return;
   }
+  // 수정 중이던 원래 블록이 지금 선택된 그리드 칸(시 단위)과 같은 시간대를 가리키면,
+  // 그리드 때문에 반올림된 "시" 단위 값 대신 원래 쓰던 정확한 분 단위 시작/종료 시간을 그대로 되살림
+  availFineTuneBlocks.forEach(block => {
+    const orig = editingOriginalAvailBlocks.find(o => {
+      if(o.dateKey !== block.dateKey) return false;
+      const startH = Math.floor(o.startMin / 60);
+      const endH = Math.max(startH + 1, Math.ceil(o.endMin / 60));
+      return startH === Math.floor(block.startMin / 60) && endH === Math.floor(block.endMin / 60);
+    });
+    if(orig){
+      block.startMin = orig.startMin;
+      block.endMin = orig.endMin;
+    }
+  });
   // 각 블록마다 "다른 일정과 안 겹치게 조정 가능한 최대 범위"를 미리 계산해서 붙여둠 - 이 범위 밖은 아예 선택 못 하게 함
   availFineTuneBlocks.forEach(block => {
     const range = computeFreeRangeForBlock(block.dateKey, block.startMin, block.endMin);
@@ -11669,7 +11687,7 @@ function openAvailFineTune(){
   document.getElementById('availableGridGroup').style.display = 'none';
   document.getElementById('availFineTuneGroup').style.display = 'block';
   document.getElementById('availFineTuneBackBtn').style.display = 'block';
-  document.getElementById('eventFormSubmitBtn').textContent = '이대로 등록하기';
+  document.getElementById('eventFormSubmitBtn').textContent = editingEventId ? '이대로 수정하기' : '이대로 등록하기';
   renderAvailFineTuneList();
 }
 
@@ -11793,7 +11811,7 @@ function setEventTypeUI(type){
   const titleGroup = document.getElementById('eventFormTitleGroup');
   const titleInput = document.getElementById('eventFormTitle');
 
-  const useGrid = (type === 'available' && !editingEventId);
+  const useGrid = (type === 'available');
   document.getElementById('busyFieldsGroup').style.display = useGrid ? 'none' : 'block';
   document.getElementById('availableGridGroup').style.display = useGrid ? 'block' : 'none';
   // 다른 타입으로 바꾸거나 새로 열었으면 세부조정 상태는 항상 초기화
@@ -11892,7 +11910,32 @@ function openEventForm(existingEvent){
       private: !!(existingEvent.visibility && existingEvent.visibility.private),
     };
     renderVisibilityPicker();
+
+    // "예약 가능" 일정을 수정할 때는, 원래 만들 때 쓰던 그리드 선택 화면으로 다시 열어서
+    // 어떤 칸들이 선택되어 있었는지 그대로 보여줌 (setEventTypeUI가 그리드를 일단
+    // 오늘 기준 주간/빈 선택으로 초기화해두므로, 그 다음에 실제 값으로 덮어씀)
+    if(existingEvent.type === 'available'){
+      const pieces = existingEvent.linkGroupId
+        ? SCHEDULE_EVENTS.filter(e => e.linkGroupId === existingEvent.linkGroupId)
+        : [existingEvent];
+      availSelectedCells.clear();
+      pieces.forEach(piece => {
+        if(!piece.dateKey) return;
+        const startH = Math.floor(piece.startMin / 60);
+        const endH = Math.max(startH + 1, Math.ceil(piece.endMin / 60));
+        for(let h = startH; h < endH && h < 24; h++){
+          availSelectedCells.add(`${piece.dateKey}::${HOURS.indexOf(h)}`);
+        }
+      });
+      const firstPiece = pieces.find(p => p.dateKey) || existingEvent;
+      if(firstPiece.dateKey) availGridWeekStart = getWeekStart(parseDateInputValue(firstPiece.dateKey));
+      editingOriginalAvailBlocks = pieces.filter(p => p.dateKey).map(p => ({ dateKey: p.dateKey, startMin: p.startMin, endMin: p.endMin }));
+      renderAvailSelectGrid();
+    } else {
+      editingOriginalAvailBlocks = [];
+    }
   } else {
+    editingOriginalAvailBlocks = [];
     setEventTypeUI('busy');
     availSelectedCells.clear();
     document.getElementById('eventFormTitle').value = '';
@@ -11922,6 +11965,7 @@ function closeEventForm(){
   document.getElementById('dayEventList').style.display = '';
   editingEventId = null;
   editingLinkedPieceIds = [];
+  editingOriginalAvailBlocks = [];
   closeAllCustomPopups();
   closeDeleteConfirmOverlay();
 }
@@ -12353,7 +12397,7 @@ document.getElementById('visibilityPicker').addEventListener('click', (e) => {
 
 document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   // 예약 가능 시간 + 신규 추가 모드일 때는 그리드에서 선택한 칸들로 등록
-  if(formEventType === 'available' && !editingEventId){
+  if(formEventType === 'available'){
 
     // 아직 세부조정 화면으로 안 넘어갔으면, 먼저 그 화면으로 이동 (여기서는 등록하지 않음)
     if(!availFineTuneMode){
@@ -12386,12 +12430,31 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
         }
       }
       // 이미 등록된 다른 일정(바쁨이든 예약가능이든)이랑 겹치는지 확인
+      // (지금 수정 중인 원래 "예약 가능" 조각 자신은 겹침 검사에서 제외함 - 안 그러면 시간을
+      // 그대로 두거나 살짝만 바꿔도 "자기 자신"이랑 겹친다고 막혀버림)
+      const editingExcludeIds = editingEventId ? new Set([editingEventId, ...editingLinkedPieceIds]) : null;
       const dateObj = parseDateInputValue(block.dateKey);
-      const conflict = getEventsForDate(dateObj).find(ev => block.startMin < ev.endMin && block.endMin > ev.startMin);
+      const conflict = getEventsForDate(dateObj).find(ev => (!editingExcludeIds || !editingExcludeIds.has(ev.id)) && block.startMin < ev.endMin && block.endMin > ev.startMin);
       if(conflict){
         showToast(`${availFineTuneDateLabel(block.dateKey)} ${minutesToLabel(conflict.startMin)}-${minutesToLabel(conflict.endMin)}에 "${conflict.title}" 일정이 이미 있어서 그 시간엔 예약 가능으로 만들 수 없어요.`);
         return;
       }
+    }
+
+    // 수정 모드였다면, 검증을 다 통과한 지금 시점에 원래 있던 조각들을 지움
+    // (검증 실패로 중간에 return 됐을 수도 있으니, 지우는 건 항상 검증 통과 "이후"에만 함 - 그래야
+    // 조건에 안 맞아서 멈췄을 때 원래 일정이 사라지는 일이 없음)
+    const wasEditing = !!editingEventId;
+    if(editingEventId){
+      const idsToRemove = new Set([editingEventId, ...editingLinkedPieceIds]);
+      idsToRemove.forEach(id => {
+        const idx = SCHEDULE_EVENTS.findIndex(e => e.id === id);
+        if(idx >= 0){
+          const piece = SCHEDULE_EVENTS[idx];
+          SCHEDULE_EVENTS.splice(idx, 1);
+          if(piece.serverId) syncEventDeleteToServer(piece);
+        }
+      });
     }
 
     let createdCount = 0;
@@ -12415,9 +12478,11 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     availSelectedCells.clear();
     availFineTuneMode = false;
     availFineTuneBlocks = [];
+    editingEventId = null;
+    editingLinkedPieceIds = [];
     closeEventForm();
     refreshActiveScheduleView();
-    showToast(`예약 가능한 시간 ${createdCount}개를 등록했어요.`);
+    showToast(wasEditing ? `예약 가능한 시간을 수정했어요.` : `예약 가능한 시간 ${createdCount}개를 등록했어요.`);
     return;
   }
 
