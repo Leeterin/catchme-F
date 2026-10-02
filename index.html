@@ -14012,29 +14012,12 @@ function renderMonthSchedView(){
     }
     const shownEvents = slots.filter(Boolean);
 
+    // 여러 날짜에 걸치는 일정도 칸마다 따로, 그 칸 안에서만 띠를 그리고 이름도 칸마다 보여줌
+    // (예전엔 옆 칸까지 폭을 넓혀 하나로 이어진 막대처럼 그렸는데, 띠가 옆 칸을 침범해 보였음).
+    // 같은 일정은 위의 레인 배정 덕분에 그 주 안에서 같은 줄에 나와서, 칸이 나뉘어도 이어지는 게 보임
     const labelsHtml = shownEvents.map(ev => {
       const bg = ev.isPendingHold ? '#F59E0B' : (ev.isReservationLinked ? 'var(--accent)' : colorForEvent(ev));
-      const range = getEventMultiDayRange(ev);
-      if(!range){
-        return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(ev.title))}</div>`;
-      }
-      // 여러 날짜짜리 일정은 시작/끝 칸에서만 둥글게 하고, 칸 사이 여백을 음수 margin으로 메꿔서
-      // 요일 칸을 넘어가도 하나로 이어진 막대처럼 보이게 함. 제목은 시작 칸에만 보여줌(안 그러면
-      // 같은 글자가 칸마다 반복돼서 지저분해짐).
-      const isStartDay = dateKeyOf(cellDate) === dateKeyOf(range.start);
-      const isEndDay = dateKeyOf(cellDate) === dateKeyOf(range.end);
-      // 칸 하나짜리 폭(width:100%)에 그냥 margin만 음수로 줘서는(이전 방식) 실제로 박스가 넓어지지
-      // 않아서(칼럼 flex 안에서 margin-right는 넓이에 영향을 못 줌) 화면엔 전혀 안 이어져 보였음.
-      // 그래서 calc()로 "실제 폭 자체"를 늘려서 칸 경계(패딩 3px + 그리드 틈 2px = 8px, 안전하게 9px)를
-      // 진짜로 덮게 만들고, 왼쪽으로 넓힐 때는 margin-left를 같이 음수로 줘서 왼쪽 시작점도 같이 당김.
-      const BRIDGE = 9;
-      let barStyle;
-      if(isStartDay && isEndDay) barStyle = '';
-      else if(isStartDay) barStyle = `border-radius:4px 0 0 4px;width:calc(100% + ${BRIDGE}px);max-width:none;position:relative;z-index:1;`;
-      else if(isEndDay) barStyle = `border-radius:0 4px 4px 0;width:calc(100% + ${BRIDGE}px);max-width:none;margin-left:-${BRIDGE}px;position:relative;z-index:1;`;
-      else barStyle = `border-radius:0;width:calc(100% + ${BRIDGE*2}px);max-width:none;margin-left:-${BRIDGE}px;position:relative;z-index:1;`;
-      const text = isStartDay ? escapeHtml(truncateForMonthLabel(ev.title)) : '&nbsp;';
-      return `<div class="month-event-label" style="background:${bg};${barStyle}">${text}</div>`;
+      return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(ev.title))}</div>`;
     }).join('');
     const moreHtml = events.length > shownEvents.length
       ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
