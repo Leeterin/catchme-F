@@ -4900,6 +4900,20 @@
     background:var(--bg);
   }
 
+  /* 일정이 많아 세로로 길어지면 이 영역만 스크롤되고, 요일 헤더 줄은 위에 고정돼서 보이게 함 */
+  .my-week-grid-wrap{
+    max-height:50vh;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .my-week-grid-wrap .week-cal-day-head,
+  .my-week-grid-wrap .week-cal-headspacer{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:var(--bg);
+  }
+
   /* ---------------- 내 시간표 일주일 뷰 (블록형 캘린더) ---------------- */
   .week-cal-wrap{
     display:flex;
@@ -5638,7 +5652,7 @@
         </div>
         <div id="customColorList"></div>
       </div>
-      <div class="week-grid-wrap"><div class="week-grid" id="weekGrid"></div></div>
+      <div class="week-grid-wrap my-week-grid-wrap"><div class="week-grid" id="weekGrid"></div></div>
       <div class="agenda-list" id="weekAgenda"></div>
     </div>
 
@@ -13143,6 +13157,9 @@ function renderWeekView(){
     d.setDate(d.getDate() + i);
     days.push(d);
   }
+  // 화면에는 일-토가 아니라 월-일 순서로 보여줌 (주의 시작/종료일 계산 자체는 그대로 일요일
+  // 기준으로 두고, 여기서 보여주는 순서만 맨 앞의 일요일을 맨 뒤로 돌림)
+  days.push(days.shift());
 
   // 그룹 필터가 없으면 기존처럼 캐시(scheduleText, 전체 일정 기준)를 그대로 쓰고, 필터가 걸려있으면
   // 캐시 대신 그 날짜의 필터링된 일정만으로 시간대별 텍스트 배열을 새로 계산함
