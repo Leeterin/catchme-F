@@ -118,6 +118,7 @@
     display:flex; flex-direction:column; padding:6px; border-radius:14px;
     background:var(--surface); border:1px solid var(--line); box-shadow:0 10px 28px rgba(0,0,0,0.16);
   }
+  .new-chat-menu[hidden]{ display:none; }
   .new-chat-menu button{
     display:flex; flex-direction:column; align-items:flex-start; gap:2px; width:100%;
     padding:10px 12px; border:0; border-radius:10px; background:transparent; color:var(--text); text-align:left; cursor:pointer;
@@ -6296,7 +6297,7 @@
     <div class="schedule-view active" id="scheduleView-day">
       <div class="day-header-row">
         <div style="display:flex;align-items:center;gap:8px;">
-          <button class="profile-back" id="dayViewChatBackBtn" style="display:none;padding:0;">&#8249;</button>
+          <button class="profile-back" id="dayViewChatBackBtn" style="display:none;padding:0 4px;font-size:14px;font-weight:700;white-space:nowrap;">&#8249; 채팅방</button>
           <div>
             <div class="day-header-title">내 시간표</div>
             <div class="day-header-sub" id="dayViewLabel">-</div>
@@ -20286,6 +20287,7 @@ function viewDayFromChat(dateObj){
   dayViewOpenedFromChat = activeChatRoomId;
   scheduleFocusDate = new Date(dateObj);
   showTab('schedule');
+  switchScheduleView('day'); // 기본 보기(한달 등)가 아니라 그날 하루 일정을 바로 보여줌
 
   panels['schedule'].classList.add('home-clean-mode');
   document.querySelector('.bottom-nav').style.display = 'none';
