@@ -12141,7 +12141,10 @@ function readAvailFineTuneBlocksFromInputs(){
     const startH = parseInt(list.querySelector(`.finetune-start-hour[data-block-idx="${idx}"]`).value, 10);
     const startM = parseInt(list.querySelector(`.finetune-start-minute[data-block-idx="${idx}"]`).value, 10);
     const endH = parseInt(list.querySelector(`.finetune-end-hour[data-block-idx="${idx}"]`).value, 10);
-    const endM = parseInt(list.querySelector(`.finetune-end-minute[data-block-idx="${idx}"]`).value, 10);
+    const endMinuteSel = list.querySelector(`.finetune-end-minute[data-block-idx="${idx}"]`);
+    // 종료 시간이 24시(자정)면 분 선택지를 비워서 비활성화해두므로(옵션이 하나도 없음) select의 value가
+    // 빈 문자열이라 parseInt하면 NaN이 나와버림 - 자정은 항상 0분이므로 그 경우엔 0으로 취급함
+    const endM = (endH === 24 || endMinuteSel.disabled) ? 0 : parseInt(endMinuteSel.value, 10);
     block.startMin = startH * 60 + startM;
     block.endMin = endH * 60 + endM;
   });
