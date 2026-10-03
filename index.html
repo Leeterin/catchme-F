@@ -18956,6 +18956,13 @@ async function loadChatRoomsFromServer(){
         pinned: existing ? existing.pinned : false,
         _pinsLoaded: existing ? existing._pinsLoaded : false,
       };
+      // 상단 고정 카드는 방 목록과 같이 받아옴 - 방에 들어가자마자 기다림 없이 처음부터 보이게
+      // (지금 열려 있는 방은 그 화면에서 직접 관리 중이라 덮어쓰지 않음)
+      if(Array.isArray(r.pins) && !(activeChatRoomId === r.id && room._pinsLoaded)){
+        room.pinnedSchedules = r.pins.map(mapServerPinToLocal);
+        room._pinsLoaded = true;
+        try { localStorage.setItem(pinsCacheKey(r.id), JSON.stringify(r.pins)); } catch(e){}
+      }
       if(!hasLoadedMessages && r.lastMessage){
         room.messages = [mapServerMessageToLocal(r.lastMessage, room)];
       }
