@@ -8385,7 +8385,7 @@ function connectRealtimeSocket(){
     renderIncomingFriendRequests(); // "받은 요청" 영역은 어느 탭에 있든 항상 최신으로 갱신해둠 (안 그러면 나중에 친구 탭으로 가도 예전 상태 그대로 보임)
     if(document.getElementById('panel-friends').classList.contains('active')) renderFriendsList();
     // "친구 요청 알림"을 끈 경우엔 받은 요청 목록/배지만 조용히 갱신하고 안내는 안 띄움
-    if(settingsState.notif_friendreq) showToast('새로운 친구 요청이 왔어요.');
+    if(settingsState.notif_message) showToast('새로운 친구 요청이 왔어요.');
   });
   // 내가 보낸 요청이 수락됐거나(자동수락 포함), 상대가 나를 새로 친구로 추가한 경우 등 - 친구 목록을 실시간으로 갱신
   realtimeSocket.on('friendsChanged', async () => {
@@ -8887,7 +8887,7 @@ function renderSavedLocationsList(){
 }
 
 const settingsState = {
-  priv_stranger_chat: false,
+  priv_stranger_chat: true,
   notif_message: true,
   notif_friendreq: true,
   notif_matched: true,
@@ -9165,10 +9165,8 @@ function openSettingsDetail(id){
   } else if(id === 'notifications'){
     body.innerHTML = `
       <div class="settings-detail-desc">받고 싶은 알림만 골라서 켜두세요.</div>
-      ${toggleRowHTML('notif_message', '새 메시지 알림', '', false)}
-      ${toggleRowHTML('notif_friendreq', '친구 요청 알림', '', false)}
-      ${toggleRowHTML('notif_matched', '약속 확정 알림', '캘린더 매칭으로 보낸 시간을 친구가 고르거나, 단톡 투표가 끝나서 약속이 정해지면 알려줘요', false)}
-      ${toggleRowHTML('notif_marketing', '마케팅/이벤트 알림', '', false)}
+      ${toggleRowHTML('notif_message', 'CATCHME 푸시 알림 받기', '새 메시지, 친구 요청, 약속 확정 알림을 받아요', false)}
+      ${toggleRowHTML('notif_marketing', '마케팅/이벤트 알림', '이벤트와 혜택 소식을 받아요', false)}
     `;
     bindToggleRows(body);
 
@@ -22823,7 +22821,7 @@ function selectTimeOptionDirect(roomId, msg, optionIndex){
   touchRoom(roomId);
   if(activeChatRoomId === roomId){ renderChatMessages(); renderPinnedSchedule(); }
   renderChatList();
-  if(settingsState.notif_matched) showToast(`${room.name}님이 시간을 선택해서 약속이 확정됐어요!`);
+  if(settingsState.notif_message) showToast(`${room.name}님이 시간을 선택해서 약속이 확정됐어요!`);
 }
 
 // 1:1 데모 채팅방에서 여러 후보를 제안하면, 실제로는 상대가 고르는 것이라 내 쪽에서 할 일은 없음 -
@@ -22892,7 +22890,7 @@ function checkTimeOptionsConsensus(roomId, msg){
   });
   touchRoom(roomId);
   if(activeChatRoomId === roomId) renderPinnedSchedule();
-  if(settingsState.notif_matched) showToast('모두 같은 시간에 투표해서 확정됐어요!');
+  if(settingsState.notif_message) showToast('모두 같은 시간에 투표해서 확정됐어요!');
 }
 
 // 채팅방 헤더를 누르고 있으면 메시지 목록이 맨 위까지 계속 스크롤됨 (오래된 대화 빨리 보기)
