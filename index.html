@@ -7200,6 +7200,22 @@
         <button type="button" class="location-picker-recommend-chip" data-rec="bar">술집</button>
         <button type="button" class="location-picker-recommend-chip" data-rec="play">놀거리</button>
         <button type="button" class="location-picker-recommend-chip" data-rec="station">지하철역</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="dessert">디저트</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="sight">관광명소</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="culture">문화시설</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="movie">영화관</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="karaoke">노래방</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="pcroom">PC방</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="escape">방탈출</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="park">공원</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="stay">숙박</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="parking">주차장</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="conv">편의점</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="mart">대형마트</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="gas">주유소</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="bank">은행</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="hospital">병원</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="pharmacy">약국</button>
       </div>
       <div class="location-suggest-list" id="locationPickerSuggestList"></div>
     </div>
@@ -20805,6 +20821,23 @@ const LOCATION_PICKER_RECOMMEND = {
   bar:     { label:'술집', keyword:'술집' },
   play:    { label:'놀거리', keyword:'놀거리' },
   station: { label:'지하철역', category:'SW8' },
+  // 카카오맵 장소 분류 그대로 (category: 카카오 분류 코드 / keyword: 분류 코드가 없는 건 검색어로)
+  dessert:  { label:'디저트', keyword:'디저트' },
+  sight:    { label:'관광명소', category:'AT4' },
+  culture:  { label:'문화시설', category:'CT1' },
+  movie:    { label:'영화관', keyword:'영화관' },
+  karaoke:  { label:'노래방', keyword:'노래방' },
+  pcroom:   { label:'PC방', keyword:'PC방' },
+  escape:   { label:'방탈출', keyword:'방탈출카페' },
+  park:     { label:'공원', keyword:'공원' },
+  stay:     { label:'숙박', category:'AD5' },
+  parking:  { label:'주차장', category:'PK6' },
+  conv:     { label:'편의점', category:'CS2' },
+  mart:     { label:'대형마트', category:'MT1' },
+  gas:      { label:'주유소', category:'OL7' },
+  bank:     { label:'은행', category:'BK9' },
+  hospital: { label:'병원', category:'HP8' },
+  pharmacy: { label:'약국', category:'PM9' },
 };
 function setLocationPickerRecommendChip(key){
   document.querySelectorAll('#locationPickerRecommendRow .location-picker-recommend-chip').forEach(c => {
