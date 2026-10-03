@@ -3342,8 +3342,7 @@
     margin:0 -18px;
     /* 키보드가 닫혀 있을 때도 입력칸이 화면 맨 아래에 붙게 - 홈바(아이폰 하단 막대) 영역을 통째로 비우지 않고
        홈바에 안 겹칠 만큼만 띄움 (홈바 영역이 없는 폰은 8px) */
-    padding:8px 14px max(8px, calc(env(safe-area-inset-bottom) - 16px));
-    border-top:1px solid var(--line);
+    padding:8px 12px max(8px, calc(env(safe-area-inset-bottom) - 16px));
   }
   /* 앱에서 키보드가 올라와 있을 때: 키보드 높이에 홈바 영역이 이미 포함돼 있어서 하단 여백을 카카오톡처럼 최소로 */
   .chat-room-view.keyboard-open .chat-bottom-fixed{ padding-bottom:6px; }
@@ -3678,53 +3677,58 @@
   .place-choice-title{ display:block; font-size:14px; font-weight:700; margin-bottom:3px; }
   .place-choice-desc{ display:block; font-size:12px; color:var(--text-dim); line-height:1.45; }
 
-  /* 채팅 입력줄 - 동글동글한 알약 모양 입력칸 + 둥근 사진/전송 버튼 */
+  /* 채팅 입력줄 - 하나의 큰 알약 안에 [+ 버튼 | 입력칸 | 파란 동그라미 전송 버튼]이 들어간 모양 */
   .chat-input-row{
     display:flex;
     align-items:center;
-    gap:8px;
+    gap:4px;
+    min-height:50px;
+    box-sizing:border-box;
+    padding:5px;
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-radius:999px;
+    transition:border-color .15s ease, box-shadow .15s ease;
   }
+  .chat-input-row:focus-within{ border-color:rgba(56,189,248,.55); box-shadow:0 0 0 3px var(--accent-soft); }
   .chat-input-row input{
     flex:1;
     min-width:0;
-    height:40px;
+    height:38px;
     box-sizing:border-box;
-    background:var(--surface-2);
-    border:1.5px solid transparent;
-    border-radius:999px;
-    padding:0 16px;
+    background:transparent;
+    border:none;
+    padding:0 4px;
     font-family:'Inter',sans-serif;
-    font-size:14px;
+    font-size:15px;
     color:var(--text);
     outline:none;
-    transition:border-color .15s ease, background .15s ease;
   }
-  .chat-input-row input:focus{ border-color:var(--accent); background:var(--surface); }
   #chatImageBtn{
     flex-shrink:0;
-    width:40px;
-    height:40px;
+    width:38px;
+    height:38px;
     padding:0;
     border-radius:50%;
     border:none;
-    background:var(--surface-2);
-    color:var(--text-dim);
+    background:transparent;
+    color:var(--text);
     display:flex;
     align-items:center;
     justify-content:center;
     cursor:pointer;
-    transition:transform .12s ease;
+    transition:transform .12s ease, background .12s ease;
   }
   #chatImageBtn svg{
-    width:21px;
-    height:21px;
+    width:22px;
+    height:22px;
   }
-  #chatImageBtn:active{ transform:scale(.9); }
-  .chat-input-row input::placeholder{ color:#B7B8BE; }
+  #chatImageBtn:active{ transform:scale(.9); background:var(--line); }
+  .chat-input-row input::placeholder{ color:#A9AAB1; }
   #chatSendBtn{
     flex-shrink:0;
-    width:40px;
-    height:40px;
+    width:38px;
+    height:38px;
     padding:0;
     border:none;
     border-radius:50%;
@@ -3734,8 +3738,8 @@
     align-items:center;
     justify-content:center;
     cursor:pointer;
-    opacity:.4;
-    transform:scale(.9);
+    opacity:.35;
+    transform:scale(.88);
     transition:opacity .18s ease, transform .18s cubic-bezier(.2,.9,.3,1.3);
   }
   #chatSendBtn svg{ width:19px; height:19px; }
@@ -7399,7 +7403,7 @@
         </div>
         <div class="chat-input-row">
           <input type="file" id="chatImageInput" accept="image/*" style="display:none;" />
-          <button type="button" id="chatImageBtn" title="사진 보내기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button>
+          <button type="button" id="chatImageBtn" title="사진 보내기" aria-label="사진 보내기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요" maxlength="200" />
           <button id="chatSendBtn" title="전송" aria-label="전송"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5.5 11.5 12 5l6.5 6.5"/></svg></button>
         </div>
