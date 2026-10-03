@@ -3331,6 +3331,9 @@
   .chat-messages::-webkit-scrollbar{ display:none; width:0; height:0; }
   /* 메시지가 적어도 위가 아니라 입력창 바로 위(맨 아래)부터 쌓이게 - 카카오톡처럼 (justify-content:flex-end는 스크롤이 깨져서 margin-top:auto로) */
   .chat-messages > :first-child{ margin-top:auto; }
+  /* 방에 들어갈 때 맨 아래로 스크롤이 끝나기 전까지는 숨겨서, 위에서부터 촤라락 내려가는 모습이 안 보이게 */
+  .chat-messages{ transition:opacity .12s ease; }
+  .chat-messages.chat-entering{ opacity:0; transition:none; }
 
   .chat-bottom-fixed{
     flex-shrink:0;
@@ -21216,6 +21219,15 @@ function openChatRoom(id){
   document.getElementById('calendarMatchView').classList.remove('active');
   cancelReply();
 
+  // 화면을 먼저 띄운 다음에 메시지를 그려야 높이 계산이 돼서 처음부터 맨 아래로 내려간 상태로 보임
+  // (전에는 숨겨진 상태에서 그려서 스크롤이 안 먹고, 화면이 뜬 뒤에야 위에서부터 촤라락 내려갔음)
+  document.getElementById('chatListView').classList.remove('active');
+  document.getElementById('chatRoomView').classList.add('active');
+  document.querySelector('.bottom-nav').style.display = 'none';
+  const msgBox = document.getElementById('chatMessages');
+  msgBox.classList.add('chat-entering');
+  const enterToken = ++chatEnterToken;
+
   renderChatMessages();
   renderPinnedSchedule();
   checkPendingRestoreAvailPrompts(id); // 취소된 예약 중 아직 "예약 가능으로 남길지" 결정 안 한 게 있으면 물어봄
@@ -21234,13 +21246,46 @@ function openChatRoom(id){
   // 경우)가 방을 다시 들어와도 영영 반영이 안 되는 문제가 있었음 - 방에 들어올 때마다 항상 최신
   // 메시지로 다시 동기화하도록 바꿈 (처음 들어온 게 아니면 실패해도 토스트 없이 조용히 넘어감)
   if(room.isRealRoom){
-    loadRoomMessagesFromServer(id, room, !room._loaded);
+    const firstLoad = !room._loaded;
+    const loading = loadRoomMessagesFromServer(id, room, firstLoad);
+    if(firstLoad){
+      // 처음 여는 방은 서버에서 대화를 받아온 뒤에 한 번에 보여줌 (느리면 1.5초 뒤엔 일단 보여줌)
+      loading.finally(() => revealChatMessagesWhenReady(enterToken));
+      setTimeout(() => revealChatMessagesWhenReady(enterToken), 1500);
+    } else {
+      revealChatMessagesWhenReady(enterToken);
+    }
+  } else {
+    revealChatMessagesWhenReady(enterToken);
   }
 
-  document.getElementById('chatListView').classList.remove('active');
-  document.getElementById('chatRoomView').classList.add('active');
-  document.querySelector('.bottom-nav').style.display = 'none';
   pushViewState(closeChatRoomView);
+}
+
+// 방에 들어올 때 숨겨둔 메시지 영역을, 사진까지 자리 잡고 맨 아래로 내려간 다음에 보여줌 (사진은 최대 0.7초까지만 기다림)
+var chatEnterToken = 0; // var: 시작할 때 링크로 바로 방이 열려도 선언 전 접근 에러가 안 나게
+function revealChatMessagesWhenReady(token){
+  const box = document.getElementById('chatMessages');
+  if(token !== chatEnterToken || !box.classList.contains('chat-entering')) return;
+  let finished = false;
+  const done = () => {
+    if(finished || token !== chatEnterToken) return;
+    finished = true;
+    box.scrollTop = box.scrollHeight;
+    requestAnimationFrame(() => {
+      box.scrollTop = box.scrollHeight;
+      box.classList.remove('chat-entering');
+    });
+  };
+  const pendingImgs = Array.from(box.querySelectorAll('img')).filter(img => !img.complete);
+  if(pendingImgs.length === 0){ done(); return; }
+  let left = pendingImgs.length;
+  const one = () => { if(--left <= 0) done(); };
+  pendingImgs.forEach(img => {
+    img.addEventListener('load', one, { once: true });
+    img.addEventListener('error', one, { once: true });
+  });
+  setTimeout(done, 700);
 }
 
 // 서버에서 온 메시지 하나(어떤 타입이든)를 로컬 카드 형식으로 변환. 방 전체 메시지를 불러올 때뿐 아니라,
@@ -21267,13 +21312,27 @@ function mapServerMessageToLocal(m, room){
 // 채팅방의 메시지를 서버에서 불러와 room.messages에 채움 (방 처음 열 때, 그리고 백그라운드 복귀 시 재동기화에도 재사용)
 function loadRoomMessagesFromServer(id, room, isFirstLoad){
   return apiRequest(`/chats/${id}/messages`).then(data => {
-    room.messages = data.messages.map(m => mapServerMessageToLocal(m, room));
+    const before = chatMessagesSignature(room.messages);
+    // 보내는 중/전송 실패 메시지는 아직 서버에 없으니 지우지 않고 뒤에 그대로 남김
+    const unsent = (room.messages || []).filter(m => m._pending || m._failed);
+    room.messages = data.messages.map(m => mapServerMessageToLocal(m, room)).concat(unsent);
     room._loaded = true;
+    // 이미 화면에 있는 대화와 똑같으면 다시 그리지 않음 - 방에 들어가자마자 한 번 더 깜빡이며 다시 그려지던 것 방지
+    const changed = chatMessagesSignature(room.messages) !== before;
     if(activeChatRoomId === id){
-      renderChatMessages();
+      if(changed) renderChatMessages();
       checkPendingRestoreAvailPrompts(id); // 서버에서 새로 받아온 메시지 기준으로 다시 한 번 확인 (새로고침 느낌으로 들어온 경우 대비)
     }
   }).catch(err => { if(isFirstLoad) showToast(err.message); else console.error('[messages resync]', err); });
+}
+
+// 메시지 목록 비교용 - 화면용으로 매번 새로 붙는 로컬 id 같은 값은 빼고 내용만 비교
+function chatMessagesSignature(messages){
+  try {
+    return JSON.stringify(messages || [], (k, v) => (k === 'id' || k === '_animate' || k === 'msgId') ? undefined : v);
+  } catch(e){
+    return String(Math.random());
+  }
 }
 
 let chatReturnToCalendar = null; // 캘린더의 "채팅에서 확인"으로 들어온 경우, 뒤로가기 시 돌아갈 캘린더 상태(뷰/날짜)를 기억해둠
