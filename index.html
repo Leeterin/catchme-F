@@ -19555,6 +19555,8 @@ async function loadPinsFromServer(roomId, room){
   if(!authToken || !room.isRealRoom) return;
   try {
     const data = await apiRequest(`/chats/${roomId}/pins`);
+    const removedKey = () => (room.messages || []).filter(m => m.type === 'hotplace' && isHotplaceNoticeRemoved(room, m)).map(m => m.id).join(',');
+    const removedBefore = removedKey();
     room.pinnedSchedules = data.pins.map(p => ({
       id: 'pin' + (pinIdCounter++),
       serverId: p.id,
@@ -19574,8 +19576,8 @@ async function loadPinsFromServer(roomId, room){
     if(pinFriend) checkMeetLevelUp(pinFriend);
     if(activeChatRoomId === roomId){
       renderPinnedSchedule();
-      // 삭제된 장소의 "근처에서 만나요" 카드를 작은 알림으로 바꿔 그림 (그런 카드가 있을 때만)
-      if((room.messages || []).some(m => isHotplaceNoticeRemoved(room, m))) renderChatMessages();
+      // 장소 카드("근처에서 만나요" ↔ "삭제됐어요") 상태가 실제로 바뀐 경우에만 다시 그림 - 같으면 그대로 둬서 깜빡이지 않게
+      if(removedKey() !== removedBefore) renderChatMessages();
       maybePromptPlaceReview(roomId);
     }
   } catch(err){
@@ -22419,10 +22421,8 @@ function openChatRoom(id, opts){
   checkPendingRestoreAvailPrompts(id); // 취소된 예약 중 아직 "예약 가능으로 남길지" 결정 안 한 게 있으면 물어봄
 
   // 핀(확정된 약속 목록)도 메시지와 같은 이유로 방에 들어올 때마다 항상 다시 불러옴
-  if(room.isRealRoom){
-    room._pinsLoaded = true;
-    loadPinsFromServer(id, room);
-  }
+  // (예전엔 받기도 전에 _pinsLoaded=true로 표시해서, 장소 카드가 잠깐 "장소가 삭제됐어요"로 그려졌다가 다시 돌아오는 깜빡임이 있었음)
+  if(room.isRealRoom) loadPinsFromServer(id, room);
   // 진행 중인 모임 장소 추천이 있으면 상단 바로 띄움 (방에 들어올 때마다 최신 상태로)
   renderActiveRecommendBar();
   if(room.isRealRoom) loadActiveLocationRecommend(id);
@@ -22507,7 +22507,13 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
     // 이미 받아둔 더 옛날 대화(위로 올리거나 날짜 검색으로 받은 것)는 재동기화해도 버리지 않음
     const firstFreshTime = fresh.length ? +new Date(fresh[0].time) : Infinity;
     const keepOlder = room._loaded ? (room.messages || []).filter(m => m._serverId && !m._pending && !m._failed && +new Date(m.time) < firstFreshTime) : [];
-    room.messages = keepOlder.concat(fresh, unsent);
+    const localNotices = (room.messages || []).filter(m => m.type === 'system-notice' && !m._serverId && !m._pending && !m._failed);
+    let merged = keepOlder.concat(fresh);
+    if(localNotices.length){
+      const t = (m) => +new Date(m.time || 0);
+      merged = merged.concat(localNotices).map((m, i) => ({ m, i })).sort((a, b) => (t(a.m) - t(b.m)) || (a.i - b.i)).map(x => x.m);
+    }
+    room.messages = merged.concat(unsent);
     if(!keepOlder.length) room._historyComplete = data.messages.length < CHAT_SERVER_PAGE;
     room._loaded = true;
     saveChatCache(id, room.messages);
@@ -23286,6 +23292,17 @@ function loadOlderChatWithSpinner(revealPx){
     if(revealPx) box.scrollBy({ top: -revealPx, behavior: 'smooth' });
   });
 }
+(function keepChatBottomWhenResized(){
+  const box = document.getElementById('chatMessages');
+  if(!box || typeof ResizeObserver === 'undefined') return;
+  let atBottom = true;
+  box.addEventListener('scroll', () => {
+    atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  }, { passive: true });
+  new ResizeObserver(() => {
+    if(atBottom && !isChatSearchActive()) box.scrollTop = box.scrollHeight;
+  }).observe(box);
+})();
 document.getElementById('chatMessages').addEventListener('scroll', () => {
   const box = document.getElementById('chatMessages');
   if(chatStatusTapScrolling) return;
