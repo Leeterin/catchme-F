@@ -556,6 +556,8 @@
     flex-direction:column;
   }
   .location-picker-full.show{ display:flex; }
+  body.map-full-open #chatRoomView,
+  body.map-full-open .bottom-nav{ visibility:hidden; }
   .location-picker-topbar{
     display:flex;
     align-items:center;
@@ -10021,6 +10023,24 @@ function autoRelayoutKakaoMap(map, el){
   }).observe(el);
 }
 
+// 두 손가락 확대/축소가 버벅이지 않게: 지도 위 터치는 브라우저 기본 동작(화면 확대/스크롤) 없이 지도만 처리하게 하고,
+// iOS의 화면 확대 제스처(gesturestart/change)가 지도 확대와 겹쳐 같이 계산되지 않게 막음
+(function watchFullMapOverlays(){
+  const overlays = document.querySelectorAll('.location-picker-full');
+  const sync = () => document.body.classList.toggle('map-full-open', Array.from(overlays).some(o => o.classList.contains('show')));
+  const mo = new MutationObserver(sync);
+  overlays.forEach(o => mo.observe(o, { attributes: true, attributeFilter: ['class'] }));
+})();
+function smoothKakaoMapGestures(el){
+  if(!el || el._smoothGestures) return;
+  el._smoothGestures = true;
+  el.style.touchAction = 'none';
+  const stop = (e) => e.preventDefault();
+  el.addEventListener('gesturestart', stop, { passive: false });
+  el.addEventListener('gesturechange', stop, { passive: false });
+  el.addEventListener('gestureend', stop, { passive: false });
+}
+
 function ensureKakaoMapsLoaded(callback){
   if(typeof kakao !== 'undefined' && kakao.maps){
     kakao.maps.load(callback);
@@ -12320,7 +12340,8 @@ function showFeedPlaceMap(lat, lon){
     const container = document.getElementById('feedPlaceMap');
     const center = new kakao.maps.LatLng(lat, lon);
     if(!feedPlaceMapInstance){
-      feedPlaceMapInstance = new kakao.maps.Map(container, { center, level: 4 });
+      feedPlaceMapInstance = new kakao.maps.Map(container, { center, level: 4, tileAnimation: false });
+      smoothKakaoMapGestures(container);
       autoRelayoutKakaoMap(feedPlaceMapInstance, container);
     } else {
       feedPlaceMapInstance.setCenter(center);
@@ -19785,8 +19806,10 @@ function openPlaceSuggestionMap(roomId, focusMsgId, pinned){
       placeViewerMap = new kakao.maps.Map(document.getElementById('placeViewerMap'), {
         center: new kakao.maps.LatLng(c ? c.locationLat : 37.5665, c ? c.locationLon : 126.978),
         level: 5,
+        tileAnimation: false, // 확대/축소 때 타일이 서서히 나타나는 효과를 꺼서 버벅임 줄임
       });
       autoRelayoutKakaoMap(placeViewerMap, document.getElementById('placeViewerMap'));
+      smoothKakaoMapGestures(document.getElementById('placeViewerMap'));
     }
     renderPlaceViewerMarkers();
     setTimeout(() => {
@@ -20589,8 +20612,10 @@ function initLocationPickerMap(){
   locationPickerMapInstance = new kakao.maps.Map(container, {
     center: new kakao.maps.LatLng(37.5665, 126.9780),
     level: 4,
+    tileAnimation: false, // 확대/축소 때 타일이 서서히 나타나는 효과를 꺼서 버벅임 줄임
   });
   autoRelayoutKakaoMap(locationPickerMapInstance, container);
+  smoothKakaoMapGestures(container);
   locationPickerGeocoder = new kakao.maps.services.Geocoder();
   kakao.maps.event.addListener(locationPickerMapInstance, 'click', (mouseEvent) => {
     const pos = mouseEvent.latLng;
