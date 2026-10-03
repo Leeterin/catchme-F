@@ -8191,6 +8191,17 @@ let realtimeSocket = null;
 // 아이폰 사파리 등은 앱이 백그라운드로 가면 웹소켓 연결이 끊기고, 그동안 온 실시간 이벤트도 놓치게 됨.
 // 화면이 다시 보일 때(포그라운드 복귀) 소켓이 끊겨있으면 재연결하고, 그새 놓쳤을 수 있는 핵심 데이터를 새로 불러와서
 // "강제종료 후 재실행해야만 최신 상태로 보인다"는 문제를 없앰.
+// 입력창에 포커스가 있는 채로 다른 앱으로 갔다 오면, 아이폰이 복귀하면서 키보드를 내렸다가 다시 올리며 화면이 출렁임.
+// 백그라운드로 갈 때 포커스를 미리 풀어둬서, 돌아왔을 때 키보드가 내려간 상태로 차분하게 시작하게 함
+function blurActiveInputOnHide(){
+  const el = document.activeElement;
+  if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) el.blur();
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'hidden') blurActiveInputOnHide();
+});
+window.addEventListener('pagehide', blurActiveInputOnHide);
+
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState !== 'visible' || !authToken) return;
   if(realtimeSocket && !realtimeSocket.connected) realtimeSocket.connect();
