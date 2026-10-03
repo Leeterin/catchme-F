@@ -17521,6 +17521,15 @@ function addHotplaceNoticeMessage(roomId, location, lat, lon, pinId){
 // (장소가 바뀔 때마다 카드가 계속 쌓이지 않고, 항상 최신 장소 하나만 보이게 하기 위함)
 // 장소가 새로 바뀌면, 이 방에 있던 예전 "OO 근처에서 만나요!" 카드들은 지우지 않고
 // "약속 장소가 변경됐어요"라는 작은 알림으로 표시만 바꾸고, 새 알림 하나만 큰 카드로 보여줌
+// "OO 근처에서 만나요" 카드의 장소가 지금 이 방의 어떤 핀에도 없으면 삭제된 장소로 봄
+// (서버 방은 핀을 불러온 뒤에만 판단 - 불러오기 전에 카드가 잘못 접히지 않게)
+function isHotplaceNoticeRemoved(room, m){
+  if(m.superseded || !m.location) return false;
+  if(room.isRealRoom && !room._pinsLoaded) return false;
+  const name = String(m.location).trim();
+  return !(room.pinnedSchedules || []).some(p => p.location && String(p.location).trim() === name);
+}
+
 function replaceHotplaceNoticeForPin(room, newMsg){
   room.messages.forEach(m => {
     if(m.type === 'hotplace' && !m.superseded) m.superseded = true;
@@ -18048,8 +18057,11 @@ async function loadPinsFromServer(roomId, room){
       reservationMsgId: p.sourceMessageId,
       dateObj: p.dateLabel ? parseDateLabelToDate(p.dateLabel) : null,
     }));
+    room._pinsLoaded = true;
     if(activeChatRoomId === roomId){
       renderPinnedSchedule();
+      // 삭제된 장소의 "근처에서 만나요" 카드를 작은 알림으로 바꿔 그림 (그런 카드가 있을 때만)
+      if((room.messages || []).some(m => isHotplaceNoticeRemoved(room, m))) renderChatMessages();
       maybePromptPlaceReview(roomId);
     }
   } catch(err){
@@ -18121,7 +18133,9 @@ function removePinnedLocation(pinId){
   // 예전에 정해졌던 장소가 대신 다시 뜨지 않도록 같이 지움
   if(pin.dateLabel) dropRoomPlaceOnlyPins(room, null);
 
-  room.messages.push({
+  // "근처에서 만나요" 카드가 있었으면 그 카드가 "약속 장소가 삭제됐어요"로 바뀌니 알림을 따로 또 넣지 않음
+  const hadNotice = room.messages.some(m => m.type === 'hotplace' && !m.superseded);
+  if(!hadNotice) room.messages.push({
     who: 'me',
     type: 'system-notice',
     id: 'sys' + (locationMsgIdCounter++),
@@ -20902,7 +20916,11 @@ function renderChatMessages(){
       // 이어지게 함 - "장소 확정"(LOCATION_NOTICE) 카드의 "주변 핫플 보기"와 똑같은 화면을 재사용
       row.querySelector('.lr-nearby-food-btn').addEventListener('click', () => openHotplaceView(m.areaName, m.lat, m.lon));
     } else if(m.type === 'hotplace'){
-      if(m.superseded){
+      if(isHotplaceNoticeRemoved(room, m)){
+        // 그 장소가 지금은 약속 장소로 정해져 있지 않음(삭제됨) - "근처에서 만나요" 카드 대신 작은 알림만
+        row.className = 'msg-row system-notice-row';
+        row.innerHTML = `<div class="system-notice-card">${ICO.pin} 약속 장소가 삭제됐어요</div>`;
+      } else if(m.superseded){
         // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 카드 - 다른 시스템 알림처럼 작게만 표시함
         row.className = 'msg-row system-notice-row';
         row.innerHTML = `<div class="system-notice-card">${ICO.pin} 약속 장소가 변경됐어요</div>`;
