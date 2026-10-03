@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <title>CATCHME - 메인 화면</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content, viewport-fit=cover" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -3512,6 +3512,7 @@
   .chat-search-hit-card{ box-shadow:0 0 0 2px #FFE76A !important; }
   .msg-row.search-current .chat-search-hit-card{ box-shadow:0 0 0 2.5px #FFC93C !important; }
   .chat-search-nav{
+    touch-action:manipulation; /* 빠르게 두 번 눌러도 화면이 확대되지 않게 */
     position:absolute; right:12px; bottom:100%; margin-bottom:8px; z-index:5;
     display:flex; align-items:center; gap:4px;
     padding:4px 4px 4px 10px;
@@ -3530,7 +3531,7 @@
   }
   .chat-search-arrow svg{ width:15px; height:15px; }
   .chat-search-arrow:active{ opacity:.6; }
-  .chat-search-arrow:disabled{ opacity:.35; cursor:default; }
+  .chat-search-arrow.at-end{ opacity:.35; }
   .msg-bubble-image{
     padding:4px;
     background:var(--surface-2);
@@ -22564,10 +22565,9 @@ function focusChatSearchHit(smooth){
   updateChatSearchNav();
 }
 function moveChatSearchHit(step){
-  if(!chatSearchHits.length) return;
+  if(!chatSearchHits.length){ showToast('더 이상 검색 결과가 없어요.'); return; }
   const next = chatSearchIndex + step;
-  if(next < 0){ showToast('첫 번째 검색 결과예요.'); return; }
-  if(next >= chatSearchHits.length){ showToast('마지막 검색 결과예요.'); return; }
+  if(next < 0 || next >= chatSearchHits.length){ showToast('더 이상 검색 결과가 없어요.'); return; }
   chatSearchIndex = next;
   focusChatSearchHit(true);
 }
@@ -22578,8 +22578,9 @@ function updateChatSearchNav(){
   if(!searching) return;
   const total = chatSearchHits.length;
   document.getElementById('chatSearchCount').textContent = total ? `${chatSearchIndex + 1}/${total}` : '0/0';
-  document.getElementById('chatSearchUpBtn').disabled = !total || chatSearchIndex <= 0;
-  document.getElementById('chatSearchDownBtn').disabled = !total || chatSearchIndex >= total - 1;
+  // 끝에 닿아도 눌리긴 해야 "더 이상 검색 결과가 없어요"를 띄울 수 있어서 비활성화 대신 흐리게만
+  document.getElementById('chatSearchUpBtn').classList.toggle('at-end', !total || chatSearchIndex <= 0);
+  document.getElementById('chatSearchDownBtn').classList.toggle('at-end', !total || chatSearchIndex >= total - 1);
 }
 
 // 최신 메시지가 항상 맨 아래(입력창 바로 위)에 보이게 스크롤. 바로 한 번 내리고, 키보드가 올라오는
