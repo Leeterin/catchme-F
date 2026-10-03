@@ -3411,6 +3411,31 @@
     border-bottom-right-radius:4px;
   }
   .msg-bubble{ cursor:pointer; }
+  /* 보낸 메시지가 아래에서 살짝 튀어오르며 나타나는 모션 (카톡/인스타 느낌) */
+  .msg-row.me.msg-pop .msg-bubble{
+    transform-origin:100% 100%;
+    animation:msgSendPop .32s cubic-bezier(.2,.9,.3,1.25) both;
+  }
+  .msg-row.me.msg-pop .msg-meta{ animation:msgMetaFade .3s .12s ease both; }
+  @keyframes msgSendPop{
+    0%{ opacity:0; transform:translateY(14px) scale(.82); }
+    60%{ opacity:1; }
+    100%{ opacity:1; transform:none; }
+  }
+  @keyframes msgMetaFade{ from{ opacity:0; } to{ opacity:1; } }
+  .msg-row.me.msg-sending .msg-bubble{ opacity:.75; transition:opacity .2s ease; }
+  .msg-sending-dot{
+    width:8px; height:8px; border-radius:50%;
+    border:1.5px solid var(--text-dim); border-top-color:transparent;
+    animation:msgSendingSpin .8s linear infinite;
+  }
+  @keyframes msgSendingSpin{ to{ transform:rotate(360deg); } }
+  .msg-row.me.msg-failed .msg-bubble{ opacity:.6; }
+  .msg-failed-label{ color:#EF4444; }
+  .msg-retry-btn{
+    border:none; background:none; padding:0; font:inherit; font-size:10.5px;
+    color:var(--accent); font-weight:600; cursor:pointer;
+  }
   .msg-bubble-text{ white-space:pre-wrap; }
   .msg-bubble-image{
     padding:4px;
@@ -8485,6 +8510,17 @@ function connectRealtimeSocket(){
     };
     // 이미 내가 보내서 화면에 반영된 메시지(같은 id)라면 중복으로 또 넣지 않음
     if(room.messages.some(m => m._serverId === message.id)) return;
+    // 내가 방금 보내서 화면에 먼저 띄워둔(서버 응답 대기 중) 메시지면, 새로 넣지 않고 그 메시지를 확정함
+    if(mapped.who === 'me'){
+      const pending = room.messages.find(m => m._pending && m.who === 'me' && m.text === message.text && !m._serverId);
+      if(pending){
+        pending._pending = false;
+        pending._serverId = message.id;
+        pending.time = message.createdAt;
+        if(activeChatRoomId === roomId) refreshChatMessagesQuietly();
+        return;
+      }
+    }
     mapped._serverId = message.id;
     mapped.id = 'msg' + (locationMsgIdCounter++);
     room.messages.push(mapped);
@@ -21100,6 +21136,8 @@ function getGroupSenderName(room, m){
 function buildMsgMetaHtml(m){
   const timeText = formatMessageTime(m.time || Date.now());
   if(m.who === 'me'){
+    if(m._failed) return `<div class="msg-meta"><button type="button" class="msg-retry-btn">다시 보내기</button><span class="msg-failed-label">전송 실패</span></div>`;
+    if(m._pending) return `<div class="msg-meta"><span class="msg-sending-dot"></span></div>`;
     const showRead = m.read && settingsState.chat_read_receipt;
     return `<div class="msg-meta">${showRead ? '<span>읽음</span>' : ''}<span>${timeText}</span></div>`;
   }
@@ -21140,7 +21178,8 @@ function renderChatMessages(){
     }
 
     const row = document.createElement('div');
-    row.className = 'msg-row ' + m.who;
+    row.className = 'msg-row ' + m.who + (m._animate ? ' msg-pop' : '') + (m._pending ? ' msg-sending' : '') + (m._failed ? ' msg-failed' : '');
+    m._animate = false; // 처음 보낼 때 한 번만 튀어오르게 (다시 그릴 때는 모션 없이)
     if(m.id) row.dataset.msgId = m.id; // 핀 카드를 눌렀을 때 이 메시지로 바로 이동하기 위한 참조
     const metaHtml = buildMsgMetaHtml(m);
 
@@ -21521,6 +21560,8 @@ function renderChatMessages(){
       nameLabel.textContent = senderName;
       box.appendChild(nameLabel);
     }
+    const retryBtn = row.querySelector('.msg-retry-btn');
+    if(retryBtn) retryBtn.addEventListener('click', (e) => { e.stopPropagation(); retryFailedChatText(activeChatRoomId, m); });
     box.appendChild(row);
   });
   scrollChatToBottom();
@@ -21601,32 +21642,18 @@ function sendChatMessage(){
   if(room.isRealRoom){
     input.value = '';
     cancelReply();
-    apiRequest(`/chats/${roomId}/messages`, {
-      method: 'POST',
-      body: JSON.stringify({
-        text,
-        // 서버에 저장돼야 상대방 화면에도 답장이 보이니, 로컬 id 말고 서버 id로 보냄
-        // (cancelReply()가 전역 replyingToMsg를 이미 null로 초기화하므로, 그 전에 미리 담아둔
-        // replyToPayload.serverId를 써야 함 - replyingToMsg를 직접 읽으면 null 참조 에러로 전송 자체가 실패했었음)
-        replyToMessageId: (replyToPayload && replyToPayload.serverId) ? replyToPayload.serverId : undefined,
-        replyToPreview: (replyToPayload && replyToPayload.serverId) ? replyToPayload.preview : undefined,
-      }),
-    })
-      .then(data => {
-        const msg = { who: 'me', text: data.message.text, time: data.message.createdAt, read: false, _serverId: data.message.id, id: 'msg' + (locationMsgIdCounter++) };
-        // 서버가 실제로 답장을 저장해줬으면 그걸 기준으로, 아니면(동기화 전 메시지에 답장한 경우) 내 화면용 로컬 미리보기라도 남김
-        if(data.message.replyTo) msg.replyTo = { msgId: replyToPayload.msgId, preview: data.message.replyTo.preview };
-        else if(replyToPayload) msg.replyTo = replyToPayload;
-        room.messages.push(msg);
-        touchRoom(roomId);
-        renderChatList();
-        if(activeChatRoomId === roomId) renderChatMessages();
-      })
-      .catch(err => showToast(err.message));
+    // 서버 응답을 기다리지 않고 내 화면에 바로 띄움 (카톡처럼) - 서버가 저장해주면 그때 서버 id만 붙여줌
+    const pendingMsg = { who: 'me', text, time: new Date(), read: false, id: 'msg' + (locationMsgIdCounter++), _animate: true };
+    if(replyToPayload) pendingMsg.replyTo = replyToPayload;
+    room.messages.push(pendingMsg);
+    touchRoom(roomId);
+    if(activeChatRoomId === roomId) renderChatMessages();
+    renderChatList();
+    postRealChatText(roomId, pendingMsg, replyToPayload);
     return;
   }
 
-  const myMessage = { who: 'me', text, time: new Date(), read: false, id: 'msg' + (locationMsgIdCounter++) };
+  const myMessage = { who: 'me', text, time: new Date(), read: false, id: 'msg' + (locationMsgIdCounter++), _animate: true };
   if(replyToPayload) myMessage.replyTo = replyToPayload;
   room.messages.push(myMessage);
   touchRoom(roomId);
@@ -21654,6 +21681,55 @@ function sendChatMessage(){
     renderChatList();
     if(activeChatRoomId === roomId) renderChatMessages();
   }, 900);
+}
+
+// 실제 방에 텍스트 전송 - 화면에 먼저 띄운 메시지를 서버 결과로 확정하거나, 실패하면 "전송 실패"로 표시
+function postRealChatText(roomId, pendingMsg, replyToPayload){
+  const room = CHAT_ROOMS[roomId];
+  pendingMsg._pending = true;
+  pendingMsg._failed = false;
+  apiRequest(`/chats/${roomId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({
+      text: pendingMsg.text,
+      // 서버에 저장돼야 상대방 화면에도 답장이 보이니, 로컬 id 말고 서버 id로 보냄
+      replyToMessageId: (replyToPayload && replyToPayload.serverId) ? replyToPayload.serverId : undefined,
+      replyToPreview: (replyToPayload && replyToPayload.serverId) ? replyToPayload.preview : undefined,
+    }),
+  })
+    .then(data => {
+      // 실시간 소켓으로 같은 메시지가 먼저 도착해서 따로 들어가 있으면 그건 지우고 화면에 먼저 띄운 걸 남김
+      const dup = room.messages.find(m => m !== pendingMsg && m._serverId === data.message.id);
+      if(dup) room.messages.splice(room.messages.indexOf(dup), 1);
+      pendingMsg._pending = false;
+      pendingMsg._serverId = data.message.id;
+      pendingMsg.time = data.message.createdAt;
+      // 서버가 실제로 답장을 저장해줬으면 그걸 기준으로, 아니면(동기화 전 메시지에 답장한 경우) 내 화면용 로컬 미리보기를 그대로 둠
+      if(data.message.replyTo && replyToPayload) pendingMsg.replyTo = { msgId: replyToPayload.msgId, preview: data.message.replyTo.preview };
+      if(activeChatRoomId === roomId) refreshChatMessagesQuietly();
+    })
+    .catch(() => {
+      pendingMsg._pending = false;
+      pendingMsg._failed = true;
+      showToast('메시지를 보내지 못했어요. 말풍선 옆 "다시 보내기"를 눌러주세요.');
+      if(activeChatRoomId === roomId) refreshChatMessagesQuietly();
+    });
+}
+
+// 전송 실패한 메시지 다시 보내기
+function retryFailedChatText(roomId, m){
+  if(!m || !m._failed) return;
+  postRealChatText(roomId, m, m.replyTo || null);
+  if(activeChatRoomId === roomId) refreshChatMessagesQuietly();
+}
+
+// 전송 중/완료/실패 상태만 바뀌었을 때 다시 그리기 - 위로 올려서 이전 대화를 보던 중이면 그 위치를 유지
+function refreshChatMessagesQuietly(){
+  const box = document.getElementById('chatMessages');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  const prevTop = box.scrollTop;
+  renderChatMessages();
+  if(!atBottom) box.scrollTop = prevTop;
 }
 
 // 포커스 빠짐(키보드 닫힘)이 touchend가 아니라 "손가락이 처음 닿는 순간"(touchstart)에 이미 일어나는 경우가 많아서,
