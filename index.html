@@ -4162,6 +4162,23 @@
     font-size:12.5px;
     color:var(--text-dim);
     margin-top:3px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  /* 하루 보기에서 보고 있는 날이 오늘인지 / 오늘에서 며칠 떨어졌는지 표시 */
+  .day-header-sub.is-today #dayViewLabel{ color:var(--accent); font-weight:700; }
+  .day-today-chip{
+    font-size:10.5px; font-weight:700;
+    padding:2px 7px; border-radius:999px;
+    background:var(--surface-2); color:var(--text-dim);
+  }
+  .day-today-chip:empty{ display:none; }
+  .day-today-chip.today{ background:var(--accent); color:#FFFFFF; }
+  .day-goto-today-btn{
+    border:1px solid var(--accent); background:transparent; color:var(--accent);
+    font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; cursor:pointer;
   }
   .day-header-actions{
     display:flex;
@@ -6446,7 +6463,11 @@
           <button class="profile-back" id="dayViewChatBackBtn" style="display:none;padding:0 4px;font-size:14px;font-weight:700;white-space:nowrap;">&#8249; 채팅방</button>
           <div>
             <div class="day-header-title">내 시간표</div>
-            <div class="day-header-sub" id="dayViewLabel">-</div>
+            <div class="day-header-sub">
+              <span id="dayViewLabel">-</span>
+              <span class="day-today-chip" id="dayViewTodayChip"></span>
+              <button type="button" class="day-goto-today-btn" id="dayGotoTodayBtn" style="display:none;">오늘로</button>
+            </div>
           </div>
         </div>
         <div class="day-header-actions">
@@ -13134,7 +13155,8 @@ function nextVisibilityOnClick(vis, clickedVis, clickedGroupId){
 // ---------- 하루 보기 ----------
 function renderDayView(){
   document.getElementById('dayViewLabel').textContent =
-    `${scheduleFocusDate.getMonth()+1}월 ${scheduleFocusDate.getDate()}일 ${WEEKDAY_KO[scheduleFocusDate.getDay()]}요일`;
+    `${scheduleFocusDate.getFullYear()}년 ${scheduleFocusDate.getMonth()+1}월 ${scheduleFocusDate.getDate()}일 ${WEEKDAY_KO[scheduleFocusDate.getDay()]}요일`;
+  renderDayTodayIndicator();
 
   const events = filterEventsByScheduleGroup(getEventsForDate(scheduleFocusDate));
   const list = document.getElementById('dayEventList');
@@ -13227,6 +13249,21 @@ function renderDayView(){
 
     list.appendChild(card);
   });
+}
+
+// 보고 있는 날이 오늘이면 "오늘" 배지, 아니면 "내일/어제/N일 후/N일 전" 배지 + "오늘로" 버튼
+// (앱을 켜둔 채 날짜가 바뀔 수 있으니 TODAY 상수 대신 매번 현재 시각 기준으로 계산)
+function renderDayTodayIndicator(){
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const focus = new Date(scheduleFocusDate.getFullYear(), scheduleFocusDate.getMonth(), scheduleFocusDate.getDate());
+  const diff = Math.round((focus - today) / 86400000);
+  const chip = document.getElementById('dayViewTodayChip');
+  const label = diff === 0 ? '오늘' : diff === 1 ? '내일' : diff === -1 ? '어제' : diff > 0 ? `${diff}일 후` : `${-diff}일 전`;
+  chip.textContent = label;
+  chip.classList.toggle('today', diff === 0);
+  chip.parentElement.classList.toggle('is-today', diff === 0);
+  document.getElementById('dayGotoTodayBtn').style.display = diff === 0 ? 'none' : '';
 }
 
 // ---------- 일정 추가/수정 (이름/시작·종료 시간/요일 반복/공개 설정/유형) ----------
@@ -15841,6 +15878,10 @@ document.getElementById('dayPrev').addEventListener('click', () => {
 });
 document.getElementById('dayNext').addEventListener('click', () => {
   scheduleFocusDate.setDate(scheduleFocusDate.getDate() + 1);
+  renderDayView();
+});
+document.getElementById('dayGotoTodayBtn').addEventListener('click', () => {
+  scheduleFocusDate = new Date();
   renderDayView();
 });
 document.getElementById('weekPrev').addEventListener('click', () => {
