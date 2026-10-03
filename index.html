@@ -3353,6 +3353,7 @@
   .chat-messages > :first-child{ margin-top:auto; }
 
   .chat-bottom-fixed{
+    position:relative;
     flex-shrink:0;
     box-sizing:border-box;
     background:var(--bg);
@@ -3508,18 +3509,25 @@
   @keyframes chatSearchHitPulse{ 0%{ filter:brightness(1); } 40%{ filter:brightness(1.12) saturate(1.3); } 100%{ filter:none; } }
   .chat-search-hit-card{ box-shadow:0 0 0 2px #FFE76A !important; }
   .msg-row.search-current .chat-search-hit-card{ box-shadow:0 0 0 2.5px #FFC93C !important; }
-  .chat-search-nav{ display:flex; align-items:center; gap:2px; flex-shrink:0; }
+  .chat-search-nav{
+    position:absolute; right:12px; bottom:100%; margin-bottom:8px; z-index:5;
+    display:flex; align-items:center; gap:4px;
+    padding:4px 4px 4px 10px;
+    background:var(--surface); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 4px 14px rgba(0,0,0,.12);
+    animation:msgMetaFade .2s ease both;
+  }
   .chat-search-nav[hidden]{ display:none; }
   .chat-search-count{ font-size:11.5px; color:var(--text-dim); margin-right:4px; font-variant-numeric:tabular-nums; }
   .chat-search-arrow{
     width:28px; height:28px; padding:0;
     display:inline-flex; align-items:center; justify-content:center;
-    border:1px solid var(--line); border-radius:8px;
-    background:var(--surface); color:var(--text); cursor:pointer;
+    border:none; border-radius:8px;
+    background:var(--surface-2); color:var(--text); cursor:pointer;
     -webkit-tap-highlight-color:transparent;
   }
   .chat-search-arrow svg{ width:15px; height:15px; }
-  .chat-search-arrow:active{ background:var(--surface-2); }
+  .chat-search-arrow:active{ opacity:.6; }
   .chat-search-arrow:disabled{ opacity:.35; cursor:default; }
   .msg-bubble-image{
     padding:4px;
@@ -7592,11 +7600,6 @@
       <div class="chat-top-loader" id="chatTopLoader"><span class="msg-sending-dot"></span>이전 대화 불러오는 중</div>
       <div class="chat-search-bar" id="chatSearchBar">
         <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" enterkeyhint="search" />
-        <div class="chat-search-nav" id="chatSearchNav" hidden>
-          <span class="chat-search-count" id="chatSearchCount">0/0</span>
-          <button type="button" class="chat-search-arrow" id="chatSearchUpBtn" aria-label="이전 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
-          <button type="button" class="chat-search-arrow" id="chatSearchDownBtn" aria-label="다음 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-        </div>
         <button type="button" class="chat-search-cancel" id="chatSearchCancelBtn">취소</button>
       </div>
       <div class="chat-pinned-schedule" id="chatPinnedSchedule" style="display:none;"></div>
@@ -7604,6 +7607,12 @@
       <button type="button" class="chat-active-recommend-bar" id="chatActiveRecommendBar" hidden></button>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-bottom-fixed">
+        <!-- 대화 검색 결과 위/아래 이동 - 입력칸 오른쪽 위에 떠 있음 -->
+        <div class="chat-search-nav" id="chatSearchNav" hidden>
+          <span class="chat-search-count" id="chatSearchCount">0/0</span>
+          <button type="button" class="chat-search-arrow" id="chatSearchUpBtn" aria-label="이전 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+          <button type="button" class="chat-search-arrow" id="chatSearchDownBtn" aria-label="다음 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        </div>
         <div class="chat-reply-preview-bar" id="chatReplyPreviewBar" style="display:none;">
           <div class="chat-reply-preview-info">
             <div class="chat-reply-preview-label">답장</div>
@@ -23188,6 +23197,8 @@ document.getElementById('chatSearchInput').addEventListener('keydown', (e) => {
   if(chatSearchQuery.trim() && !chatSearchHits.length) showToast('검색 결과가 없어요.');
 });
 document.getElementById('chatSearchUpBtn').addEventListener('click', () => moveChatSearchHit(-1));
+// 위/아래 버튼을 눌러도 입력칸 포커스(키보드)가 그대로 유지되게
+document.getElementById('chatSearchNav').addEventListener('mousedown', (e) => e.preventDefault());
 document.getElementById('chatSearchDownBtn').addEventListener('click', () => moveChatSearchHit(1));
 document.getElementById('chatSearchInput').addEventListener('input', (e) => {
   if(e.target.value.trim() || !chatSearchQuery) return;
@@ -23477,6 +23488,11 @@ document.getElementById('extraMuteOption').addEventListener('click', async (e) =
 document.getElementById('chatExtraBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   document.getElementById('chatSearchBar').classList.remove('open');
+  if(chatSearchQuery){ // 검색창이 닫히니 검색도 끝냄 (위/아래 버튼이 남아있지 않게)
+    chatSearchQuery = '';
+    document.getElementById('chatSearchInput').value = '';
+    renderChatMessages();
+  }
   updateChatExtraOptionForRoom();
   document.getElementById('chatExtraDropdown').classList.toggle('open');
 });
