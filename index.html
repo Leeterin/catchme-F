@@ -13077,6 +13077,14 @@ let MY_GROUPS = [];
 // 그룹 id면 그 그룹에게 공개로 설정해둔(visibility.groupIds에 포함된) 일정만 걸러서 보여줌
 let scheduleGroupFilter = null;
 
+// 새 일정의 기본 공개설정 - 위쪽 그룹 칩에서 특정 그룹(예: 친구)을 골라둔 상태면 그 그룹 공개로, 아니면 전체공개
+function defaultVisibilityForNewEvent(){
+  if(scheduleGroupFilter && MY_GROUPS.some(g => g.id === scheduleGroupFilter)){
+    return { groupIds: [scheduleGroupFilter], private: false };
+  }
+  return { groupIds: [], private: false };
+}
+
 // 이 일정이 지금 걸려있는 그룹 필터를 통과하는지 - 필터가 없으면 전부 통과, 있으면 "나만 보기"/"전체
 // 공개"는 특정 그룹에 포함된 게 아니므로 제외하고, 그 그룹 칩이 켜져있는 일정만 통과시킴
 function eventMatchesScheduleGroupFilter(ev){
@@ -13999,7 +14007,7 @@ function openEventForm(existingEvent){
     formSelectedWeekdays.clear();
     document.querySelectorAll('.weekday-pick-btn').forEach(b => b.classList.remove('on'));
 
-    formVisibility = { groupIds: [], private: false };
+    formVisibility = defaultVisibilityForNewEvent();
     renderVisibilityPicker();
 
     formColor = null;
@@ -15128,7 +15136,7 @@ function handleAddCommand(transcript, isRetry){
     title: parsed.title,
     startMin: startTotal,
     endMin: endTotal,
-    visibility: { groupIds: [], private: false },
+    visibility: defaultVisibilityForNewEvent(),
     recurringWeekdays: null,
     dateKey: dateKeyOf(targetDate),
   });
