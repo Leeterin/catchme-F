@@ -3337,11 +3337,11 @@
     box-sizing:border-box;
     background:var(--bg);
     margin:0 -18px;
-    padding:8px 18px calc(16px + env(safe-area-inset-bottom));
+    padding:8px 14px calc(6px + env(safe-area-inset-bottom));
     border-top:1px solid var(--line);
   }
   /* 앱에서 키보드가 올라와 있을 때: 키보드 높이에 홈바 영역이 이미 포함돼 있어서 하단 여백을 카카오톡처럼 최소로 */
-  .chat-room-view.keyboard-open .chat-bottom-fixed{ padding-bottom:8px; }
+  .chat-room-view.keyboard-open .chat-bottom-fixed{ padding-bottom:6px; }
   /* 앱에서는 입력창이 키보드 애니메이션(약 0.25초)과 같이 부드럽게 올라오도록 */
   .chat-room-view.native-keyboard{ transition:bottom .25s cubic-bezier(.25,.8,.3,1); }
   .chat-room-view.native-keyboard .chat-bottom-fixed{ transition:padding-bottom .25s cubic-bezier(.25,.8,.3,1); }
@@ -3673,52 +3673,70 @@
   .place-choice-title{ display:block; font-size:14px; font-weight:700; margin-bottom:3px; }
   .place-choice-desc{ display:block; font-size:12px; color:var(--text-dim); line-height:1.45; }
 
+  /* 채팅 입력줄 - 동글동글한 알약 모양 입력칸 + 둥근 사진/전송 버튼 */
   .chat-input-row{
     display:flex;
+    align-items:center;
     gap:8px;
   }
   .chat-input-row input{
     flex:1;
+    min-width:0;
+    height:40px;
+    box-sizing:border-box;
     background:var(--surface-2);
-    border:1px solid var(--line);
-    border-radius:11px;
-    padding:11px 13px;
+    border:1.5px solid transparent;
+    border-radius:999px;
+    padding:0 16px;
     font-family:'Inter',sans-serif;
-    font-size:12.5px;
+    font-size:14px;
     color:var(--text);
     outline:none;
+    transition:border-color .15s ease, background .15s ease;
   }
-  .chat-input-row input:focus{ border-color:var(--accent); }
+  .chat-input-row input:focus{ border-color:var(--accent); background:var(--surface); }
   #chatImageBtn{
     flex-shrink:0;
-    width:54px;
-    height:54px;
-    border-radius:15px;
-    border:1px solid var(--line);
+    width:40px;
+    height:40px;
+    padding:0;
+    border-radius:50%;
+    border:none;
     background:var(--surface-2);
     color:var(--text-dim);
     display:flex;
     align-items:center;
     justify-content:center;
     cursor:pointer;
+    transition:transform .12s ease;
   }
   #chatImageBtn svg{
-    width:36px;
-    height:36px;
+    width:21px;
+    height:21px;
   }
+  #chatImageBtn:active{ transform:scale(.9); }
   .chat-input-row input::placeholder{ color:#B7B8BE; }
-  .chat-input-row button{
-    padding:0 16px;
+  #chatSendBtn{
+    flex-shrink:0;
+    width:40px;
+    height:40px;
+    padding:0;
     border:none;
-    border-radius:11px;
+    border-radius:50%;
     background:var(--accent);
     color:#FFFFFF;
-    font-family:'Space Grotesk',sans-serif;
-    font-weight:600;
-    font-size:12.5px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
     cursor:pointer;
-    flex-shrink:0;
+    opacity:.4;
+    transform:scale(.9);
+    transition:opacity .18s ease, transform .18s cubic-bezier(.2,.9,.3,1.3);
   }
+  #chatSendBtn svg{ width:19px; height:19px; }
+  /* 글자를 입력하면 전송 버튼이 진해지면서 톡 커짐 */
+  #chatSendBtn.ready{ opacity:1; transform:scale(1); }
+  #chatSendBtn.ready:active{ transform:scale(.88); }
 
   /* ---------------- 온스크린 키보드 ---------------- */
   .chat-keyboard{
@@ -7378,7 +7396,7 @@
           <input type="file" id="chatImageInput" accept="image/*" style="display:none;" />
           <button type="button" id="chatImageBtn" title="사진 보내기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="36" height="36"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button>
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요" maxlength="200" />
-          <button id="chatSendBtn">전송</button>
+          <button id="chatSendBtn" title="전송" aria-label="전송"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5.5 11.5 12 5l6.5 6.5"/></svg></button>
         </div>
 
         <div class="chat-keyboard" id="chatKeyboard" style="display:none;">
@@ -21935,17 +21953,25 @@ document.getElementById('chatSendBtn').addEventListener('touchend', (e) => {
   e.preventDefault();
   sendBtnHandledByTouch = true;
   sendChatMessage();
+  updateChatSendBtnState();
   document.getElementById('chatInput').focus(); // 터치에서 실제로 전송을 처리하는 건 여기인데, 정작 재포커스가 빠져있었음 - 그래서 키보드가 안 돌아왔던 것
   setTimeout(() => { sendBtnHandledByTouch = false; }, 500);
 }, { passive: false });
 document.getElementById('chatSendBtn').addEventListener('click', () => {
   if(sendBtnHandledByTouch) return; // 터치에서 이미 처리했으면 중복 전송 방지
   sendChatMessage();
+  updateChatSendBtnState();
   document.getElementById('chatInput').focus();
 });
 document.getElementById('chatInput').addEventListener('keydown', (e) => {
-  if(e.key === 'Enter' && !e.isComposing) sendChatMessage();
+  if(e.key === 'Enter' && !e.isComposing){ sendChatMessage(); updateChatSendBtnState(); }
 });
+// 입력칸에 글자가 있을 때만 전송 버튼을 진하게
+function updateChatSendBtnState(){
+  const input = document.getElementById('chatInput');
+  document.getElementById('chatSendBtn').classList.toggle('ready', !!input.value.trim());
+}
+document.getElementById('chatInput').addEventListener('input', updateChatSendBtnState);
 // 입력창에 포커스가 가서 키보드가 뜰 때, 마지막 메시지가 키보드에 가려지지 않게 맨 아래로 스크롤.
 // resize 이벤트 안에서 처리하면 키보드가 뜨는 애니메이션 자체를 방해할 수 있어서(iOS에서 키보드가 아예
 // 안 열리는 부작용 발생), 완전히 분리해서 키보드 애니메이션이 끝날 시간을 넉넉히 준 뒤 딱 한 번만 처리함.
@@ -21983,10 +22009,12 @@ function composeHangul(c){
 function kbAppendChar(ch){
   const input = document.getElementById('chatInput');
   input.value += ch;
+  updateChatSendBtnState();
 }
 function kbReplaceLastChar(ch){
   const input = document.getElementById('chatInput');
   input.value = input.value.slice(0, -1) + ch;
+  updateChatSendBtnState();
 }
 function kbResetComposer(){
   hangulComposer = null;
@@ -22068,6 +22096,7 @@ function kbBackspace(){
   } else {
     input.value = input.value.slice(0, -1);
   }
+  updateChatSendBtnState();
 }
 
 // ---------- 키보드 레이아웃 ----------
