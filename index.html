@@ -17024,19 +17024,33 @@ function returnToChatRoomFromProfile(){
 }
 // 메시지 옆 프로필 아이콘을 눌렀을 때 - 보낸 사람이 친구면 프로필로
 function openMsgSenderProfile(room, m){
-  let username = null;
+  let user = null;
   if(room.isGroup){
     const mem = (m.senderId && room.members) ? room.members.find(x => x.userId === m.senderId) : null;
-    username = mem ? mem.username : null;
-  } else {
-    username = room.counterpartUsername;
+    if(mem && mem.username) user = { id: mem.userId, name: mem.name, username: mem.username, avatar: mem.avatar, color: mem.color };
+  } else if(room.counterpartUsername){
+    user = { id: room.counterpartId, name: room.name, username: room.counterpartUsername, avatar: room.avatar, color: room.color };
   }
-  const friend = username ? FRIENDS.find(f => f.username === username) : null;
-  if(!friend){
-    showToast('친구로 추가된 사람만 프로필을 볼 수 있어요.');
+  if(!user){
+    showToast('프로필을 볼 수 없는 사용자예요.');
     return;
   }
-  openFriendProfileFromChat(friend);
+  const friend = FRIENDS.find(f => f.username === user.username);
+  if(friend) openFriendProfileFromChat(friend);
+  else openStrangerProfileFromChat(user);
+}
+// 친구가 아닌 사람(친구 삭제한 사람 포함)의 프로필 - 검색 결과용 프로필 화면을 빌려 쓰고, 거기서 친구 요청도 보냄.
+// 뒤로 가면 보던 채팅방으로 돌아옴
+function openStrangerProfileFromChat(user){
+  const box = document.getElementById('chatMessages');
+  const back = { roomId: activeChatRoomId, scrollTop: box ? box.scrollTop : null, calendarReturn: chatReturnToCalendar };
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  document.getElementById('chatRoomView').classList.remove('active');
+  showTab('friends');
+  profileReturnToChat = back; // showTab이 지우므로 그 뒤에 기억
+  document.getElementById('friendsListView').classList.remove('active');
+  document.getElementById('friendSearchView').classList.add('active');
+  openPersonProfile(user, 'search');
 }
 
 // 친구 프로필에서 이 친구가 속한 그룹을 칩으로 보여주고, 탭할 때마다 그 그룹에 넣거나 빼줌
@@ -18323,6 +18337,13 @@ document.getElementById('removeFriendBtn').addEventListener('click', async () =>
   const friendId = document.getElementById('removeFriendBtn').dataset.friendId;
   const friend = FRIENDS.find(f => f.id === friendId);
   if(!friend) return;
+  const ok = await appConfirm({
+    title: '친구 삭제',
+    html: `<b>${escapeHtml(friend.name)}</b>님을 친구에서 삭제하시겠습니까?`,
+    yesText: '삭제',
+    noText: '취소',
+  });
+  if(!ok) return;
 
   if(friend.id === DEMO_FRIEND.id){
     // 로컬 데모 친구는 서버에 실제 관계가 없으니 화면에서만 지움
@@ -18474,8 +18495,13 @@ function openPersonProfile(user, context, viewPrefix){
 
   if(context === 'search'){
     const avatarEl = document.getElementById(prefix + 'ProfileAvatar');
-    avatarEl.style.background = colorForFriendId(user.id);
-    avatarEl.textContent = user.name[0];
+    if(user.avatar){
+      avatarEl.style.background = 'transparent';
+      avatarEl.innerHTML = `<img src="${user.avatar}" alt="${escapeHtml(user.name)}" />`;
+    } else {
+      avatarEl.style.background = user.color || colorForFriendId(user.id);
+      avatarEl.textContent = user.name[0];
+    }
   } else {
     document.getElementById(prefix + 'ProfileAvatar').innerHTML = `<img src="${avatarUrl(user)}" alt="${escapeHtml(user.name)}" />`;
   }
@@ -18572,6 +18598,11 @@ function openPersonProfile(user, context, viewPrefix){
 function closeSearchProfileView(){
   document.getElementById('searchProfileView').classList.remove('active');
   document.getElementById('searchListView').classList.add('active');
+  if(profileReturnToChat){ // 채팅방에서 열었던 거면 검색 화면 말고 채팅방으로
+    document.getElementById('friendSearchView').classList.remove('active');
+    document.getElementById('friendsListView').classList.add('active');
+    returnToChatRoomFromProfile();
+  }
 }
 function closeSuggestProfileView(){
   document.getElementById('suggestProfileView').classList.remove('active');
@@ -18763,6 +18794,7 @@ async function loadChatRoomsFromServer(){
         isGroup: !!r.isGroup,
         isRealRoom: true,
         counterpartUsername: r.counterpart ? r.counterpart.username : null,
+        counterpartId: r.counterpart ? r.counterpart.id : null,
         members: r.isGroup && r.members
           ? r.members.map(m => ({ userId: m.userId, name: m.name, username: m.username, color: colorForFriendId(m.userId), avatar: m.hasAvatar ? cachedAvatarUrl(m.userId) : null }))
           : (existing ? existing.members : undefined),
@@ -23649,7 +23681,7 @@ document.getElementById('groupMembersBackBtn').addEventListener('click', () => g
 
 // 그룹 멤버 하나를 눌렀을 때 - 실제 친구로 등록된 사람이면 연락처/채팅하기까지 보여주고, 아니면 이름만 보여줌
 function openGroupMemberProfile(member){
-  const friend = FRIENDS.find(f => f.name === member.name);
+  const friend = member.username ? FRIENDS.find(f => f.username === member.username) : FRIENDS.find(f => f.name === member.name);
 
   const avatarEl = document.getElementById('groupMemberProfileAvatar');
   if(member.avatar){
@@ -23686,6 +23718,24 @@ function openGroupMemberProfile(member){
     statusEl.textContent = '그룹에서 함께하는 멤버예요 (친구 목록에는 없어요)';
     contactEl.innerHTML = '';
     actionsEl.innerHTML = '';
+    if(member.username && authToken && !(currentUser && currentUser.username === member.username)){
+      const requested = OUTGOING_FRIEND_REQUESTS.some(r => r.id === member.userId || (r.username && r.username === member.username));
+      actionsEl.innerHTML = `<button class="person-action-btn request" id="groupMemberRequestBtn"${requested ? ' disabled' : ''}>${requested ? '요청됨' : '친구 요청'}</button>`;
+      const btn = document.getElementById('groupMemberRequestBtn');
+      btn.addEventListener('click', async () => {
+        if(btn.disabled) return;
+        try {
+          await apiRequest('/friends/requests', { method: 'POST', body: JSON.stringify({ username: member.username }) });
+          btn.textContent = '요청됨';
+          btn.disabled = true;
+          showToast('친구 요청을 보냈어요.');
+          await loadFriendsFromServer();
+          renderFriendsList();
+        } catch(err){
+          showToast(err.message);
+        }
+      });
+    }
   }
 
   document.getElementById('groupMembersView').classList.remove('active');
@@ -23702,12 +23752,12 @@ function openChatRoomCounterpartProfile(){
   const room = CHAT_ROOMS[activeChatRoomId];
   if(!room || room.isGroup) return;
   if(!room.counterpartUsername){
-    showToast('친구로 추가된 사람만 프로필을 볼 수 있어요.');
+    showToast('프로필을 볼 수 없는 사용자예요.');
     return;
   }
   const friend = FRIENDS.find(f => f.username === room.counterpartUsername);
   if(!friend){
-    showToast('친구로 추가된 사람만 프로필을 볼 수 있어요.');
+    openStrangerProfileFromChat({ id: room.counterpartId, name: room.name, username: room.counterpartUsername, avatar: room.avatar, color: room.color });
     return;
   }
   showTab('friends');
