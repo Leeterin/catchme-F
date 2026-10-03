@@ -9173,6 +9173,22 @@ function connectRealtimeSocket(){
   // ---------- 다중 모임 자동 장소 추천 ----------
   // 출발지 입력 요청은 이제 채팅방에 카카오톡 투표 같은 카드(LOCATION_RECOMMEND, newMessage로 옴)로 뜨고,
   // 각자 그 카드의 "내 출발지 입력하기" 버튼으로 냄 - 그래서 예전처럼 알림/팝업을 따로 띄우지 않음
+  // 새 장소가 정해져서 서버가 이 방의 모임 장소 추천 카드를 통째로 지웠을 때 - 화면에서도 바로 없앰
+  realtimeSocket.on('locationRecommendCleared', ({ roomId }) => {
+    delete pendingLocationRecommendByRoom[roomId];
+    const room = CHAT_ROOMS[roomId];
+    if(!room) return;
+    room.activeRecommend = null;
+    const before = room.messages.length;
+    room.messages = room.messages.filter(m => m.type !== 'location-recommend');
+    scheduleChatCacheSave(roomId);
+    if(activeChatRoomId === roomId){
+      if(document.getElementById('activeRecommendOverlay').classList.contains('show')) closeActiveRecommendSheet();
+      renderActiveRecommendBar();
+      if(room.messages.length !== before) renderChatMessages();
+    }
+    renderChatList();
+  });
   realtimeSocket.on('locationRecommendCancelled', ({ roomId }) => {
     delete pendingLocationRecommendByRoom[roomId];
     const room = CHAT_ROOMS[roomId];
@@ -20692,7 +20708,18 @@ function initLocationPickerMap(){
   autoRelayoutKakaoMap(locationPickerMapInstance, container);
   smoothKakaoMapGestures(container);
   locationPickerGeocoder = new kakao.maps.services.Geocoder();
+  // 장소명 검색칸에 키보드가 올라와 있을 때 지도를 한 번 터치하면 키보드만 내림 (그 터치로 핀을 찍지는 않음)
+  let pickerTapDismissedKeyboard = false;
+  container.addEventListener('touchstart', () => {
+    const input = document.getElementById('locationPickerInput');
+    if(document.activeElement === input){
+      input.blur();
+      pickerTapDismissedKeyboard = true;
+      setTimeout(() => { pickerTapDismissedKeyboard = false; }, 600);
+    }
+  }, { capture: true, passive: true });
   kakao.maps.event.addListener(locationPickerMapInstance, 'click', (mouseEvent) => {
+    if(pickerTapDismissedKeyboard){ pickerTapDismissedKeyboard = false; return; }
     const pos = mouseEvent.latLng;
     // 직접 누른 위치는 지도를 다시 가운데로 옮기지 않고, 누른 자리 그대로에 핀만 찍음
     placeLocationPickerMarkerAt(pos.getLat(), pos.getLng(), { recenter:false });
