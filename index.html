@@ -6542,9 +6542,51 @@
   input, textarea, select {
     font-size: 16px !important;
   }
+
+  /* ================= 다크 모드 맞춤 =================
+     밝은 화면 기준으로 고정 색을 쓴 곳들(뒤집힌 배경, 파스텔 배경, 진한 글자)을 어두운 화면에 맞는 색으로 다시 칠함 */
+  body.dark-mode{ color-scheme:dark; }
+  /* 토스트/툴팁: 밝은 화면에선 검정 배경이었는데 다크에선 흰 배경+흰 글씨가 돼서 안 보였음 -> 한 단계 떠 있는 진회색 */
+  body.dark-mode .global-toast,
+  body.dark-mode .cell-hover-tooltip{
+    background:#3A3A3E;
+    color:#F5F5F7;
+    border:1px solid rgba(255,255,255,0.08);
+    box-shadow:0 8px 24px rgba(0,0,0,0.45);
+  }
+  /* 확정/완료 초록 칩: 연두 배경 대신 은은한 초록 + 밝은 초록 글씨 */
+  body.dark-mode .reservation-card-status.confirmed{ background:rgba(34,197,94,0.18); color:#4ADE80; }
+  body.dark-mode .inv-person.ok,
+  body.dark-mode .inv-badge.done{ background:rgba(34,197,94,0.18); color:#4ADE80; }
+  body.dark-mode .feed-post-btn.status-badge.confirmed,
+  body.dark-mode .feed-post-btn.status-badge.confirmed:hover{ background:rgba(74,222,128,0.16); color:#4ADE80; }
+  /* 수락 대기(노란) 일정 카드: 밝은 노랑 배경 위 흰 글씨가 안 보이던 것 -> 어두운 호박색 배경 + 밝은 노랑 글씨 */
+  body.dark-mode .day-event-card.pending-hold{ background:rgba(234,179,8,0.14); border-color:rgba(234,179,8,0.7); }
+  body.dark-mode .day-event-card.pending-hold .day-event-title{ color:#FDE68A; }
+  body.dark-mode .day-event-pending-note{ color:#FCD34D; }
+  body.dark-mode .my-sched-quick-row.pending-hold{
+    border-left-color:#EAB308;
+    background:repeating-linear-gradient(135deg, rgba(234,179,8,0.16) 0 8px, rgba(234,179,8,0.08) 8px 16px);
+  }
+  body.dark-mode .day-event-card.reservation-linked{ background:rgba(244,63,94,0.16); }
+  body.dark-mode .day-event-card.available{ background:rgba(56,189,248,0.14); }
+  /* 지도 위 장소 이름표 */
+  body.dark-mode .place-viewer-label{ background:#2C2C2E; color:#F2F2F2; box-shadow:0 2px 8px rgba(0,0,0,0.5); }
+  /* 앱 시작 로고 화면도 어두운 배경 */
+  body.dark-mode .app-splash{ background:#18181A; }
+  /* 상대 말풍선 속 인용(답장) 칸: 반투명 검정은 다크에선 안 보여서 흰 반투명으로 */
+  body.dark-mode .msg-row.other .msg-quote-block{ background:rgba(255,255,255,0.07); }
+  body.dark-mode .chat-search-arrow{ background:#3A3A3C; }
+  body.dark-mode .chat-search-nav{ box-shadow:0 4px 14px rgba(0,0,0,0.5); }
+  body.dark-mode input::placeholder,
+  body.dark-mode textarea::placeholder{ color:#6E6E73; }
 </style>
 </head>
 <body class="app-booting">
+<script>
+  // 지난번 다크 모드 설정을 그리기 전에 바로 적용 - 서버 설정을 기다리는 동안 밝은 화면이 먼저 번쩍이지 않게
+  try { if(localStorage.getItem('catchme_dark_mode') === '1') document.body.classList.add('dark-mode'); } catch(_){}
+</script>
 <!-- 앱 시작 로딩 화면 -->
 <div class="app-splash" id="appSplash">
   <svg class="app-splash-logo" viewBox="220 220 584 584" aria-label="CATCHME">
@@ -9410,7 +9452,7 @@ const settingsState = {
   friend_search_allow: true,
   chat_read_receipt: true,
   chat_preview: true,
-  dark_mode: false,
+  dark_mode: (() => { try { return localStorage.getItem('catchme_dark_mode') === '1'; } catch(_){ return false; } })(), // 서버 설정 오기 전엔 폰에 기억해둔 값
   default_schedule_view: 'month', // 첫 화면/시간표 탭 진입 시 기본으로 보여줄 화면: day/week/month
 };
 
@@ -9457,6 +9499,15 @@ function saveSettingToServer(localKey){
 
 function applyDarkMode(){
   document.body.classList.toggle('dark-mode', settingsState.dark_mode);
+  try { localStorage.setItem('catchme_dark_mode', settingsState.dark_mode ? '1' : '0'); } catch(_){}
+  applyStatusBarStyle();
+}
+// 아이폰 상단 상태바(시계/배터리) 글자색도 다크 모드면 흰색으로
+setTimeout(() => applyStatusBarStyle(), 0); // 앱 켤 때 한 번 (설정 화면에서 바꾸면 applyDarkMode가 다시 맞춤)
+function applyStatusBarStyle(){
+  const sb = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.StatusBar;
+  if(!sb || typeof sb.setStyle !== 'function') return;
+  sb.setStyle({ style: settingsState.dark_mode ? 'DARK' : 'LIGHT' }).catch(() => {});
 }
 
 // "캐시 삭제" - 서버에서 다시 불러올 수 있는 로컬 캐시들을 지우고 새로 불러옴
