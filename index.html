@@ -2771,6 +2771,37 @@
     box-sizing:border-box;
   }
   .chat-search-bar input:focus{ border-color:var(--accent); }
+  .chat-search-tool{
+    position:relative; flex-shrink:0;
+    width:34px; height:34px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--line); background:var(--surface-2);
+    color:var(--text-dim); cursor:pointer; padding:0;
+    -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+  }
+  .chat-search-tool svg{ width:16px; height:16px; pointer-events:none; }
+  .chat-search-tool:active{ opacity:.6; }
+  .chat-search-tool.active{ color:var(--accent); border-color:var(--accent); }
+  .chat-search-bar .chat-search-tool input[type=date]{
+    position:absolute; inset:0; width:100%; height:100%;
+    opacity:0; border:none; padding:0; margin:0; cursor:pointer;
+  }
+  .chat-search-sender-list{
+    display:flex; gap:6px; overflow-x:auto; flex-shrink:0;
+    margin:-2px 0 10px; padding-bottom:2px; scrollbar-width:none;
+  }
+  .chat-search-sender-list::-webkit-scrollbar{ display:none; }
+  .chat-search-sender-list[hidden]{ display:none; }
+  .chat-search-sender-chip{
+    flex-shrink:0; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--text); border-radius:999px; padding:6px 12px;
+    font:inherit; font-size:12px; font-weight:600; cursor:pointer;
+    -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+  }
+  .chat-search-sender-chip.selected{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  /* 날짜로 이동했을 때 그 날 구분선이 살짝 반짝 */
+  .chat-date-divider.date-jump-flash span{ animation:chatDateJumpFlash 1.4s ease; }
+  @keyframes chatDateJumpFlash{ 0%,60%{ background:#FFE76A; color:#3A2E00; } 100%{} }
 
   .chat-extra-dropdown{
     display:none;
@@ -7658,8 +7689,18 @@
       </div>
       <div class="chat-search-bar" id="chatSearchBar">
         <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" enterkeyhint="search" />
+        <!-- 날짜로 이동: 투명한 날짜 입력칸을 버튼 위에 덮어서 누르면 바로 달력(날짜 선택기)이 뜸 -->
+        <label class="chat-search-tool" id="chatSearchDateBtn" aria-label="날짜로 검색">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+          <input type="date" id="chatSearchDateInput" />
+        </label>
+        <button type="button" class="chat-search-tool" id="chatSearchSenderBtn" aria-label="보낸 사람으로 검색">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/></svg>
+        </button>
         <button type="button" class="chat-search-cancel" id="chatSearchCancelBtn">취소</button>
       </div>
+      <!-- 보낸 사람 고르기 (사람 버튼 누르면 펼쳐짐) -->
+      <div class="chat-search-sender-list" id="chatSearchSenderList" hidden></div>
       <div class="chat-pinned-schedule" id="chatPinnedSchedule" style="display:none;"></div>
       <!-- 진행 중인 모임 장소 추천 - 카카오톡의 "진행 중인 투표"처럼 상단에 띄워두고, 누르면 현황/입력 시트가 열림 -->
       <button type="button" class="chat-active-recommend-bar" id="chatActiveRecommendBar" hidden></button>
@@ -21950,8 +21991,7 @@ function openChatRoom(id, opts){
   document.getElementById('chatRoomAvatar').classList.toggle('clickable', !!room.isGroup);
   document.getElementById('chatMembersDropdown').classList.remove('open');
 
-  chatSearchQuery = '';
-  document.getElementById('chatSearchInput').value = '';
+  resetChatSearchState();
   document.getElementById('chatSearchBar').classList.remove('open');
   document.getElementById('chatExtraDropdown').classList.remove('open');
   document.getElementById('calendarMatchView').classList.remove('active');
@@ -22119,6 +22159,23 @@ function goToReservationChat(roomId){
 }
 
 let chatSearchQuery = '';
+let chatSearchSender = null; // 보낸 사람으로 걸러보기 ('me' / 'o:상대id' - null이면 전체)
+
+// 검색어나 보낸 사람 중 하나라도 걸려 있으면 검색 중
+function isChatSearchActive(){ return !!(chatSearchQuery.trim() || chatSearchSender); }
+// 메시지를 보낸 사람 구분용 키 (안내/시스템 메시지는 null)
+function chatSenderKey(m){
+  if(m.who === 'me') return 'me';
+  if(m.who === 'other') return 'o:' + (m.senderId || m.senderName || '');
+  return null;
+}
+function resetChatSearchState(){
+  chatSearchQuery = '';
+  chatSearchSender = null;
+  document.getElementById('chatSearchInput').value = '';
+  document.getElementById('chatSearchSenderList').hidden = true;
+  document.getElementById('chatSearchSenderBtn').classList.remove('active');
+}
 
 function formatMessageTime(time){
   const d = (time instanceof Date) ? time : new Date(time);
@@ -22214,10 +22271,11 @@ function renderChatMessages(){
   const room = CHAT_ROOMS[activeChatRoomId];
   const box = document.getElementById('chatMessages');
   const q = chatSearchQuery.trim().toLowerCase();
+  const searching = isChatSearchActive();
   let lastDateKey = null;
   // 한 번에 전부 그리면 대화가 길수록 방 들어갈 때 버벅여서, 최근 메시지만 그리고 위로 올리면 더 그림 (검색 중엔 전부)
-  const visibleMessages = q ? room.messages : room.messages.slice(-chatRenderCount);
-  chatHasMoreAbove = !q && room.messages.length > visibleMessages.length;
+  const visibleMessages = searching ? room.messages : room.messages.slice(-chatRenderCount);
+  chatHasMoreAbove = !searching && room.messages.length > visibleMessages.length;
   // 화면에 붙이기 전에 따로 다 만든 뒤 한 번에 교체 - 중간 상태가 보이거나 여러 번 다시 계산되지 않게
   const frag = document.createDocumentFragment();
   // 장소 알림은 항상 가장 마지막 것만 큰 카드 - 그 전 것들은 서버 표시(superseded)를 기다리지 않고 바로 "변경됐어요"로
@@ -22228,8 +22286,8 @@ function renderChatMessages(){
   let lastOtherRunKey = null; // 바로 앞 "상대 메시지"의 보낸 사람+분 - 같으면 프로필 아이콘을 또 그리지 않음
 
   visibleMessages.forEach(m => {
-    let isSearchHit = false;
-    if(q){
+    let isSearchHit = searching && (!chatSearchSender || chatSenderKey(m) === chatSearchSender);
+    if(q && isSearchHit){
       const haystack = (m.type === 'reservation' || m.type === 'time-suggest'
         ? `${m.note || ''} ${m.dateLabel || ''} ${m.timeLabel || ''} ${m.location || ''}`
         : m.type === 'time-options-suggest'
@@ -22247,6 +22305,7 @@ function renderChatMessages(){
     if(dateKey !== lastDateKey){
       const divider = document.createElement('div');
       divider.className = 'chat-date-divider';
+      divider.dataset.dateKey = dateKey; // 날짜로 검색할 때 이 구분선으로 이동
       const dividerLabel = document.createElement('span');
       dividerLabel.textContent = formatChatDateDividerLabel(msgTime);
       divider.appendChild(dividerLabel);
@@ -22653,7 +22712,7 @@ function renderChatMessages(){
       row.classList.add('search-match');
       // 글 말풍선이 아닌 카드(예약/장소 등)는 카드 전체를 형광펜 색으로 둘러줌
       if(!row.querySelector('.chat-search-hit')){
-        const card = row.querySelector('.reservation-card, .hotplace-notice-card');
+        const card = row.querySelector('.reservation-card, .hotplace-notice-card, .msg-bubble');
         if(card) card.classList.add('chat-search-hit-card');
       }
     }
@@ -22663,7 +22722,7 @@ function renderChatMessages(){
   });
   box.replaceChildren(frag);
   scheduleChatCacheSave(activeChatRoomId); // 카드 상태 변경(수락/취소 등)도 저장본에 반영
-  if(q){
+  if(searching){
     refreshChatSearchHits();
   } else {
     chatSearchHits = [];
@@ -22716,7 +22775,7 @@ function moveChatSearchHit(step){
 }
 function updateChatSearchNav(){
   const nav = document.getElementById('chatSearchNav');
-  const searching = !!chatSearchQuery.trim();
+  const searching = isChatSearchActive();
   nav.hidden = !searching;
   if(!searching) return;
   const total = chatSearchHits.length;
@@ -23327,8 +23386,7 @@ document.getElementById('chatSearchBtn').addEventListener('click', () => {
   if(willOpen){
     document.getElementById('chatSearchInput').focus();
   } else {
-    chatSearchQuery = '';
-    document.getElementById('chatSearchInput').value = '';
+    resetChatSearchState();
     renderChatMessages();
   }
 });
@@ -23337,8 +23395,7 @@ document.getElementById('chatSearchCancelBtn').addEventListener('click', () => {
   const input = document.getElementById('chatSearchInput');
   input.blur();
   document.getElementById('chatSearchBar').classList.remove('open');
-  chatSearchQuery = '';
-  input.value = '';
+  resetChatSearchState();
   renderChatMessages();
 });
 // 글자 칠 때마다가 아니라 키보드의 "검색" 버튼을 눌러야 검색됨 (다 지우면 바로 원래 대화로)
@@ -23349,7 +23406,7 @@ document.getElementById('chatSearchInput').addEventListener('keydown', (e) => {
   chatSearchCurrentId = null; // 새로 검색하면 가장 최근 결과부터
   e.target.blur();
   renderChatMessages();
-  if(chatSearchQuery.trim() && !chatSearchHits.length) showToast('검색 결과가 없어요.');
+  if(isChatSearchActive() && !chatSearchHits.length) showToast('검색 결과가 없어요.');
 });
 document.getElementById('chatSearchUpBtn').addEventListener('click', () => moveChatSearchHit(-1));
 // 위/아래 버튼을 눌러도 입력칸 포커스(키보드)가 그대로 유지되게
@@ -23358,7 +23415,86 @@ document.getElementById('chatSearchDownBtn').addEventListener('click', () => mov
 document.getElementById('chatSearchInput').addEventListener('input', (e) => {
   if(e.target.value.trim() || !chatSearchQuery) return;
   chatSearchQuery = '';
-  renderChatMessages();
+  chatSearchCurrentId = null;
+  renderChatMessages(); // 보낸 사람을 골라뒀으면 그 사람 메시지 검색으로 돌아감
+});
+
+// ---------- 대화 검색: 보낸 사람으로 ----------
+function renderChatSearchSenderList(){
+  const room = CHAT_ROOMS[activeChatRoomId];
+  const list = document.getElementById('chatSearchSenderList');
+  if(!room) return;
+  const senders = [{ key: null, name: '전체' }, { key: 'me', name: '나' }];
+  const seen = new Set(['me']);
+  // 실제로 말한 사람만 (최근에 말한 순서)
+  for(let i = room.messages.length - 1; i >= 0; i--){
+    const m = room.messages[i];
+    const key = chatSenderKey(m);
+    if(!key || seen.has(key)) continue;
+    seen.add(key);
+    senders.push({ key, name: room.isGroup ? getGroupSenderName(room, m) : room.name });
+  }
+  list.replaceChildren(...senders.map(sd => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'chat-search-sender-chip' + (sd.key === chatSearchSender ? ' selected' : '');
+    chip.textContent = sd.name;
+    chip.addEventListener('click', () => {
+      chatSearchSender = sd.key;
+      chatSearchCurrentId = null; // 가장 최근에 그 사람이 한 말부터
+      document.getElementById('chatSearchSenderBtn').classList.toggle('active', !!sd.key);
+      list.hidden = true;
+      // 검색칸에 쳐둔 글자도 같이 적용 (검색 버튼 안 눌렀어도)
+      chatSearchQuery = document.getElementById('chatSearchInput').value;
+      renderChatMessages();
+      if(isChatSearchActive() && !chatSearchHits.length) showToast('검색 결과가 없어요.');
+    });
+    return chip;
+  }));
+}
+document.getElementById('chatSearchSenderBtn').addEventListener('click', () => {
+  const list = document.getElementById('chatSearchSenderList');
+  if(list.hidden) renderChatSearchSenderList();
+  list.hidden = !list.hidden;
+});
+
+// ---------- 대화 검색: 날짜로 (카톡처럼 그 날 대화로 바로 이동) ----------
+function jumpChatToDate(value){
+  const room = CHAT_ROOMS[activeChatRoomId];
+  if(!room || !value) return;
+  const [y, mo, d] = value.split('-').map(Number);
+  const start = new Date(y, mo - 1, d).getTime();
+  const msgs = room.messages;
+  const idx = msgs.findIndex(m => +(m.time ? new Date(m.time) : Date.now()) >= start);
+  if(idx < 0){ showToast('그 날짜 이후엔 대화가 없어요.'); return; }
+  const targetKey = chatDateKey(msgs[idx].time || Date.now());
+  if(targetKey !== chatDateKey(start)) showToast('그 날엔 대화가 없어서 가장 가까운 날로 이동했어요.');
+  // 아직 안 그린 옛날 대화면 그 날까지 그려둠
+  if(!isChatSearchActive() && msgs.length - idx > chatRenderCount){
+    chatRenderCount = msgs.length - idx + 10;
+    renderChatMessages();
+  }
+  chatAutoScrollToken++; // "맨 아래로" 자동 스크롤 취소
+  const box = document.getElementById('chatMessages');
+  const divider = box.querySelector(`.chat-date-divider[data-date-key="${targetKey}"]`);
+  if(!divider) return;
+  box.scrollTop += divider.getBoundingClientRect().top - box.getBoundingClientRect().top - 4;
+  divider.classList.remove('date-jump-flash');
+  void divider.offsetWidth;
+  divider.classList.add('date-jump-flash');
+}
+document.getElementById('chatSearchDateBtn').addEventListener('click', () => {
+  // 고를 수 있는 범위: 첫 대화 날 ~ 오늘
+  const room = CHAT_ROOMS[activeChatRoomId];
+  const input = document.getElementById('chatSearchDateInput');
+  const ymd = (t) => { const x = new Date(t); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
+  input.max = ymd(Date.now());
+  if(room && room.messages.length && room.messages[0].time) input.min = ymd(room.messages[0].time);
+  if(!input.value) input.value = input.max;
+  document.getElementById('chatSearchSenderList').hidden = true;
+});
+document.getElementById('chatSearchDateInput').addEventListener('change', (e) => {
+  jumpChatToDate(e.target.value);
 });
 
 // ---------- 채팅방: 그룹 멤버 목록 (전용 화면) ----------
@@ -23643,9 +23779,8 @@ document.getElementById('extraMuteOption').addEventListener('click', async (e) =
 document.getElementById('chatExtraBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   document.getElementById('chatSearchBar').classList.remove('open');
-  if(chatSearchQuery){ // 검색창이 닫히니 검색도 끝냄 (위/아래 버튼이 남아있지 않게)
-    chatSearchQuery = '';
-    document.getElementById('chatSearchInput').value = '';
+  if(isChatSearchActive()){ // 검색창이 닫히니 검색도 끝냄 (위/아래 버튼이 남아있지 않게)
+    resetChatSearchState();
     renderChatMessages();
   }
   updateChatExtraOptionForRoom();
