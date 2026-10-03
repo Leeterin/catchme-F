@@ -20761,8 +20761,24 @@ function fixChatHeaderPosition(){
   // 계산되는 기준이 이쪽이라서, window.innerHeight와의 미세한 차이 때문에 입력창이 키보드보다 살짝
   // 위로 뜨던 오차를 없앰)
   const gap = document.documentElement.clientHeight - (window.visualViewport.height + window.visualViewport.offsetTop);
-  view.style.bottom = Math.max(0, gap) + 'px';
+  view.style.bottom = Math.max(0, gap, nativeKeyboardHeight) + 'px';
 }
+// 앱(Capacitor)에서는 Keyboard 플러그인 resize:none 설정 때문에 키보드가 떠도 웹뷰/visualViewport가 줄어들지 않아
+// gap이 0으로 나와서 입력창이 키보드 뒤에 가려졌음. 그래서 플러그인이 알려주는 실제 키보드 높이로 직접 끌어올림
+let nativeKeyboardHeight = 0;
+(function listenNativeKeyboard(){
+  const cap = window.Capacitor;
+  const kb = cap && cap.Plugins && cap.Plugins.Keyboard;
+  if(!kb || typeof kb.addListener !== 'function') return;
+  kb.addListener('keyboardWillShow', (info) => {
+    nativeKeyboardHeight = (info && info.keyboardHeight) || 0;
+    startChatHeaderSync();
+  });
+  kb.addListener('keyboardWillHide', () => {
+    nativeKeyboardHeight = 0;
+    startChatHeaderSync();
+  });
+})();
 let chatHeaderSyncRafId = null;
 function runChatHeaderSync(deadline){
   fixChatHeaderPosition();
