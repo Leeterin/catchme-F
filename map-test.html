@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>지도 비교 (시험용)</title>
+<!-- 캐치미 지도 시험 페이지: 무료 공개 지도(OpenStreetMap 데이터 + MapLibre 엔진)와 지금 쓰는 카카오 지도를 같은 자리에서 비교.
+     본 앱과는 완전히 분리된 페이지 - 앱 동작에는 영향 없음 -->
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=0478c56c589c7ff7bca5d5bbd76cb0c6&autoload=false"></script>
+<style>
+  :root{
+    --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F2F3F5; --text:#16171B; --text-dim:#6B6F78;
+    --line:#E3E5E9; --accent:#38BDF8;
+  }
+  body.dark{
+    --bg:#111214; --surface:#1C1D21; --surface-2:#2A2B30; --text:#F5F5F7; --text-dim:#A0A3AB; --line:#34363C;
+  }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; overflow:hidden; }
+  .top{
+    position:fixed; left:0; right:0; top:0; z-index:10;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 10px;
+    background:var(--surface); border-bottom:1px solid var(--line);
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .title{ font-size:15px; font-weight:800; display:flex; align-items:center; gap:8px; }
+  .title small{ font-size:11px; font-weight:600; color:var(--text-dim); }
+  .row{ display:flex; gap:6px; align-items:center; }
+  .seg{ display:flex; background:var(--surface-2); border-radius:10px; padding:3px; flex:1; }
+  .seg button{
+    flex:1; border:none; background:none; padding:8px 4px; border-radius:8px;
+    font:inherit; font-size:13px; font-weight:700; color:var(--text-dim); cursor:pointer;
+  }
+  .seg button.on{ background:var(--surface); color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,.12); }
+  .icon-btn{
+    border:1px solid var(--line); background:var(--surface-2); color:var(--text);
+    border-radius:10px; padding:8px 10px; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  .map{ position:fixed; left:0; right:0; bottom:0; touch-action:none; }
+  .map.hidden{ visibility:hidden; }
+  /* 캐치미 핀 (앱의 장소 고르기 핀과 같은 모양) */
+  .pin{ display:flex; flex-direction:column; align-items:center; cursor:pointer; }
+  .pin-dot{
+    width:26px; height:26px; border-radius:50% 50% 50% 0; transform:rotate(-45deg);
+    background:#FF5A3C; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.3);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .pin-dot span{ transform:rotate(45deg); color:#fff; font-size:12px; font-weight:800; }
+  .pin.cafe .pin-dot{ background:#B08968; }
+  .pin.etc .pin-dot{ background:#7C6CFF; }
+  .pin-name{
+    margin-top:3px; max-width:120px; padding:2px 7px; border-radius:7px;
+    background:rgba(255,255,255,.96); color:#222; font-size:11px; font-weight:700;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 4px rgba(0,0,0,.2);
+  }
+  .card{
+    position:fixed; left:12px; right:12px; bottom:calc(14px + env(safe-area-inset-bottom)); z-index:10;
+    background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:12px 14px;
+    box-shadow:0 8px 24px rgba(0,0,0,.18); font-size:12.5px; color:var(--text-dim); line-height:1.5;
+  }
+  .card b{ color:var(--text); font-size:14px; }
+  .card .x{ float:right; border:none; background:none; color:var(--text-dim); font-size:18px; cursor:pointer; }
+  .maplibregl-ctrl-attrib{ font-size:10px; }
+</style>
+</head>
+<body>
+  <div class="top" id="top">
+    <div class="title">지도 비교 <small>시험용 · 앱과 무관</small></div>
+    <div class="row">
+      <div class="seg" id="seg">
+        <button type="button" data-map="ours" class="on">캐치미 지도</button>
+        <button type="button" data-map="kakao">카카오 지도</button>
+      </div>
+      <button type="button" class="icon-btn" id="darkBtn">다크</button>
+    </div>
+  </div>
+  <div class="map" id="oursMap"></div>
+  <div class="map hidden" id="kakaoMap"></div>
+  <div class="card" id="card">
+    <button type="button" class="x" id="cardClose">&times;</button>
+    <b>두 손가락으로 확대·축소해 보세요</b><br>
+    위 버튼으로 캐치미 지도와 카카오 지도를 바꿔가며, 같은 위치에서 부드러움·글자·디자인을 비교할 수 있어요.
+    핀은 캐치미 장소 DB에 있는 곳이에요.
+  </div>
+
+<script>
+  // 캐치미 장소 DB에 지금 들어있는 곳 (시험용으로 고정)
+  const PLACES = [
+    { name:'우래옥 본점', lat:37.56821185731751, lon:126.9987186589897, cat:'food', info:'캐치미 리뷰 2 · 약속 기록 있음' },
+    { name:'광화문국밥 본점', lat:37.5689589279236, lon:126.975391668232, cat:'etc', info:'약속 장소로 정해진 곳' },
+    { name:'청년다방 서울당산역점', lat:37.53293471526537, lon:126.9004176013281, cat:'food', info:'캐치미 리뷰 1' },
+  ];
+  const START = { lat:37.5665, lon:126.9780, zoom:13.5 };
+  let dark = false;
+  let current = 'ours';
+
+  function layout(){
+    const h = document.getElementById('top').offsetHeight;
+    document.querySelectorAll('.map').forEach(m => { m.style.top = h + 'px'; });
+  }
+  layout();
+  window.addEventListener('resize', layout);
+  // iOS 화면 확대 제스처가 지도 확대와 겹치지 않게
+  ['gesturestart','gesturechange','gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive:false }));
+
+  function showCard(html){
+    const card = document.getElementById('card');
+    card.innerHTML = '<button type="button" class="x" id="cardClose">&times;</button>' + html;
+    card.hidden = false;
+    document.getElementById('cardClose').onclick = () => { card.hidden = true; };
+  }
+  document.getElementById('cardClose').onclick = () => { document.getElementById('card').hidden = true; };
+
+  function pinEl(p, idx){
+    const el = document.createElement('div');
+    el.className = 'pin ' + p.cat;
+    el.innerHTML = `<div class="pin-dot"><span>${idx + 1}</span></div><div class="pin-name"></div>`;
+    el.querySelector('.pin-name').textContent = p.name;
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showCard(`<b></b><br>${p.info}`);
+      document.querySelector('#card b').textContent = p.name;
+    });
+    return el;
+  }
+
+  // ---------- 캐치미 지도: OpenStreetMap 데이터 + MapLibre (무료 공개 지도) ----------
+  const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
+  const ours = new maplibregl.Map({
+    container: 'oursMap',
+    style: STYLE_URL,
+    center: [START.lon, START.lat],
+    zoom: START.zoom,
+    attributionControl: { compact: true },
+    dragRotate: false,
+    pitchWithRotate: false,
+  });
+  ours.touchZoomRotate.disableRotation();
+
+  // 캐치미 색으로 다시 칠함 (밝은 모드 / 다크 모드)
+  function paintOurs(){
+    const style = ours.getStyle();
+    if(!style) return;
+    const C = dark
+      ? { bg:'#17181D', water:'#1E2A3A', park:'#1B2620', building:'#24262C', road:'#34373F', roadMajor:'#454954', casing:'#24262C', text:'#D4D7DE', halo:'#17181D', boundary:'#4A4D55' }
+      : { bg:'#F7F7F5', water:'#CDE7F7', park:'#DCEFD8', building:'#ECECEA', road:'#FFFFFF', roadMajor:'#FFE7A8', casing:'#E2E2DE', text:'#3A3D45', halo:'#FFFFFF', boundary:'#C9CBD0' };
+    style.layers.forEach(l => {
+      const id = l.id;
+      try {
+        if(l.type === 'background') ours.setPaintProperty(id, 'background-color', C.bg);
+        else if(l.type === 'fill'){
+          if(/water/.test(id)) ours.setPaintProperty(id, 'fill-color', C.water);
+          else if(/park|wood|grass|landcover|green|cemetery/.test(id)) ours.setPaintProperty(id, 'fill-color', C.park);
+          else if(/building/.test(id)) ours.setPaintProperty(id, 'fill-color', C.building);
+          else if(dark) ours.setPaintProperty(id, 'fill-color', C.bg);
+        } else if(l.type === 'line'){
+          if(/water|river|stream/.test(id)) ours.setPaintProperty(id, 'line-color', C.water);
+          else if(/boundary|admin/.test(id)) ours.setPaintProperty(id, 'line-color', C.boundary);
+          else if(/casing/.test(id)) ours.setPaintProperty(id, 'line-color', C.casing);
+          else if(/motorway|trunk|primary|major/.test(id)) ours.setPaintProperty(id, 'line-color', C.roadMajor);
+          else if(/road|highway|street|transport|bridge|tunnel/.test(id)) ours.setPaintProperty(id, 'line-color', C.road);
+        } else if(l.type === 'symbol' && l.layout && l.layout['text-field']){
+          ours.setPaintProperty(id, 'text-color', C.text);
+          ours.setPaintProperty(id, 'text-halo-color', C.halo);
+          // 한글 이름 우선 (없으면 기본 이름)
+          ours.setLayoutProperty(id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name']]);
+        }
+      } catch(e){}
+    });
+  }
+  ours.on('load', () => {
+    paintOurs();
+    PLACES.forEach((p, i) => new maplibregl.Marker({ element: pinEl(p, i), anchor: 'bottom' }).setLngLat([p.lon, p.lat]).addTo(ours));
+  });
+
+  // ---------- 카카오 지도 (지금 앱에서 쓰는 것) ----------
+  let kakaoMap = null;
+  function ensureKakao(cb){
+    if(kakaoMap) return cb();
+    kakao.maps.load(() => {
+      kakaoMap = new kakao.maps.Map(document.getElementById('kakaoMap'), {
+        center: new kakao.maps.LatLng(START.lat, START.lon), level: 6, tileAnimation: false,
+      });
+      PLACES.forEach((p, i) => {
+        new kakao.maps.CustomOverlay({
+          position: new kakao.maps.LatLng(p.lat, p.lon), content: pinEl(p, i), yAnchor: 1, clickable: true, map: kakaoMap,
+        });
+      });
+      cb();
+    });
+  }
+  // MapLibre 확대 단계 <-> 카카오 레벨 대략 변환 (같은 자리를 비슷한 크기로 보여주려고)
+  const zoomToLevel = (z) => Math.min(14, Math.max(1, Math.round(19.5 - z)));
+  const levelToZoom = (l) => 19.5 - l;
+
+  document.getElementById('seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if(!b || b.dataset.map === current) return;
+    document.querySelectorAll('#seg button').forEach(x => x.classList.toggle('on', x === b));
+    const to = b.dataset.map;
+    if(to === 'kakao'){
+      const c = ours.getCenter(), z = ours.getZoom();
+      ensureKakao(() => {
+        document.getElementById('oursMap').classList.add('hidden');
+        document.getElementById('kakaoMap').classList.remove('hidden');
+        kakaoMap.relayout();
+        kakaoMap.setLevel(zoomToLevel(z));
+        kakaoMap.setCenter(new kakao.maps.LatLng(c.lat, c.lng));
+      });
+    } else {
+      if(kakaoMap){
+        const c = kakaoMap.getCenter();
+        ours.jumpTo({ center: [c.getLng(), c.getLat()], zoom: levelToZoom(kakaoMap.getLevel()) });
+      }
+      document.getElementById('kakaoMap').classList.add('hidden');
+      document.getElementById('oursMap').classList.remove('hidden');
+      ours.resize();
+    }
+    current = to;
+    document.getElementById('darkBtn').style.visibility = to === 'ours' ? 'visible' : 'hidden';
+  });
+
+  document.getElementById('darkBtn').addEventListener('click', () => {
+    dark = !dark;
+    document.body.classList.toggle('dark', dark);
+    document.getElementById('darkBtn').textContent = dark ? '라이트' : '다크';
+    paintOurs();
+  });
+</script>
+</body>
+</html>
