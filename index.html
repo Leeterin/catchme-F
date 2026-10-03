@@ -3509,6 +3509,18 @@
     animation:chatSearchHitPulse .5s ease;
   }
   @keyframes chatSearchHitPulse{ 0%{ filter:brightness(1); } 40%{ filter:brightness(1.12) saturate(1.3); } 100%{ filter:none; } }
+  .msg-row.search-bounce .msg-bubble,
+  .msg-row.search-bounce .reservation-card,
+  .msg-row.search-bounce .hotplace-notice-card{ animation:chatSearchBounce .65s cubic-bezier(.3,1.4,.5,1) both; }
+  .msg-row.me.search-bounce .msg-bubble{ transform-origin:100% 50%; }
+  .msg-row.other.search-bounce .msg-bubble{ transform-origin:0% 50%; }
+  @keyframes chatSearchBounce{
+    0%{ transform:scale(1); }
+    20%{ transform:scale(1.08) translateY(-4px); }
+    45%{ transform:scale(.97) translateY(1px); }
+    65%{ transform:scale(1.03) translateY(-2px); }
+    100%{ transform:none; }
+  }
   .chat-search-hit-card{ box-shadow:0 0 0 2px #FFE76A !important; }
   .msg-row.search-current .chat-search-hit-card{ box-shadow:0 0 0 2.5px #FFC93C !important; }
   .chat-search-nav{
@@ -6076,6 +6088,8 @@
   .global-toast.show{
     opacity:1;
     transform:translateX(-50%) translateY(0);
+    pointer-events:auto; /* 떠 있는 동안엔 손가락으로 아래로 쓸어서 내릴 수 있게 */
+    touch-action:none;
   }
   /* ---------------- 약속 초대 링크 (비회원 참여) ---------------- */
   .invite-top-btn{
@@ -8201,11 +8215,50 @@ function goBackOrClose(closeFn){
 
 function showToast(message, duration = 2400){
   const el = document.getElementById('globalToast');
+  el.style.transition = '';
+  el.style.transform = '';
+  el.style.opacity = '';
   el.textContent = message;
   el.classList.add('show');
   clearTimeout(el._hideTimer);
   el._hideTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
+
+// 토스트를 손가락으로 아래로 쓸어내리면 따라 내려가다가 사라짐
+(function setupToastSwipeDown(){
+  const el = document.getElementById('globalToast');
+  let startY = null, dy = 0;
+  el.addEventListener('touchstart', (e) => {
+    if(!el.classList.contains('show') || e.touches.length !== 1) return;
+    startY = e.touches[0].clientY; dy = 0;
+    clearTimeout(el._hideTimer); // 잡고 있는 동안엔 저절로 안 사라지게
+    el.style.transition = 'none';
+  }, { passive: true });
+  el.addEventListener('touchmove', (e) => {
+    if(startY === null) return;
+    e.preventDefault();
+    const raw = e.touches[0].clientY - startY;
+    dy = raw > 0 ? raw : raw / 4; // 위로는 살짝만 끌려가게
+    el.style.transform = `translateX(-50%) translateY(${dy}px)`;
+    el.style.opacity = String(Math.max(0.2, 1 - Math.max(0, dy) / 120));
+  }, { passive: false });
+  const end = () => {
+    if(startY === null) return;
+    startY = null;
+    el.style.transition = 'opacity .2s ease, transform .2s ease';
+    if(dy > 28){
+      el.style.transform = 'translateX(-50%) translateY(80px)';
+      el.style.opacity = '0';
+      el.classList.remove('show');
+    } else {
+      el.style.transform = '';
+      el.style.opacity = '';
+      el._hideTimer = setTimeout(() => el.classList.remove('show'), 1600);
+    }
+  };
+  el.addEventListener('touchend', end);
+  el.addEventListener('touchcancel', end);
+})();
 
 // ============================================================
 // 백엔드 연동 (회원가입 / 로그인)
@@ -22640,6 +22693,17 @@ function focusChatSearchHit(smooth){
   if(row){
     row.classList.add('search-current');
     row.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+    if(smooth){
+      // 찾아간 메시지가 통통 튀며 "여기예요" 하고 알려줌
+      // (스크롤로 이동하는 동안엔 안 보이니 도착할 즈음 튀게 살짝 늦게 시작)
+      row.classList.remove('search-bounce');
+      clearTimeout(row._bounceTimer);
+      row._bounceTimer = setTimeout(() => {
+        void row.offsetWidth;
+        row.classList.add('search-bounce');
+        row._bounceTimer = setTimeout(() => row.classList.remove('search-bounce'), 700);
+      }, 220);
+    }
   }
   updateChatSearchNav();
 }
