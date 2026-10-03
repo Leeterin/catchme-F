@@ -2651,6 +2651,8 @@
     overflow:hidden;
   }
   .chat-room-view.active{ display:flex; }
+  /* 밀어서 나가는 중엔 왼쪽 가장자리에 그림자를 줘서 채팅 목록 위에 떠 있는 느낌 */
+  .chat-room-view.swiping{ box-shadow:-8px 0 24px rgba(0,0,0,.18); will-change:transform; }
 
   .chat-room-header{
     display:flex;
@@ -3371,6 +3373,25 @@
     margin:8px 0 3px 2px;
     font-weight:600;
   }
+  .msg-sender-name.with-avatar{ margin-left:39px; }
+  /* 상대 메시지 왼쪽 프로필 아이콘 - 말풍선 윗줄에 맞춰 붙음 */
+  .msg-avatar{
+    width:32px; height:32px;
+    border-radius:50%;
+    flex-shrink:0;
+    align-self:flex-start;
+    margin-right:2px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:12px;
+    color:#FFFFFF;
+    overflow:hidden;
+  }
+  .msg-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .msg-avatar-spacer{ height:1px; background:none; }
+  /* 그룹방은 이름이 아이콘 오른쪽 위에 오도록 아이콘을 이름 줄까지 끌어올림 */
+  .msg-row.has-sender-name .msg-avatar{ margin-top:-25px; } /* 이름 줄 높이(약 14px) + 아래 여백 3px + 메시지 간격 8px */
   .msg-row.msg-highlight .reservation-card,
   .msg-row.msg-highlight .msg-bubble,
   .msg-row.msg-highlight .hotplace-notice-card,
@@ -3418,6 +3439,18 @@
     animation:msgSendPop .32s cubic-bezier(.2,.9,.3,1.25) both;
   }
   .msg-row.me.msg-pop .msg-meta{ animation:msgMetaFade .3s .12s ease both; }
+  /* 받은 메시지는 프로필 아이콘이 먼저 톡 뜨고 말풍선이 왼쪽에서 따라 나옴 */
+  .msg-row.other.msg-pop .msg-avatar:not(.msg-avatar-spacer){ animation:msgAvatarPop .3s cubic-bezier(.2,.9,.3,1.3) both; }
+  .msg-row.other.msg-pop .msg-bubble,
+  .msg-row.other.msg-pop .reservation-card{
+    transform-origin:0% 100%;
+    animation:msgSendPop .32s .06s cubic-bezier(.2,.9,.3,1.25) both;
+  }
+  .msg-row.other.msg-pop .msg-meta{ animation:msgMetaFade .3s .16s ease both; }
+  @keyframes msgAvatarPop{
+    0%{ opacity:0; transform:scale(.4); }
+    100%{ opacity:1; transform:none; }
+  }
   @keyframes msgSendPop{
     0%{ opacity:0; transform:translateY(14px) scale(.82); }
     60%{ opacity:1; }
@@ -8590,7 +8623,11 @@ function connectRealtimeSocket(){
     }
     if(message.type === 'IMAGE'){
       const existing = room.messages.find(m => m._serverId === message.id);
-      if(!existing) room.messages.push(mapServerImageMessage(message));
+      if(!existing){
+        const mappedImg = mapServerImageMessage(message);
+        if(mappedImg.who === 'other') mappedImg._animate = true;
+        room.messages.push(mappedImg);
+      }
       touchRoom(roomId);
       if(activeChatRoomId === roomId){
         renderChatMessages();
@@ -8657,6 +8694,7 @@ function connectRealtimeSocket(){
     }
     mapped._serverId = message.id;
     mapped.id = 'msg' + (locationMsgIdCounter++);
+    if(mapped.who === 'other') mapped._animate = true; // 상대 메시지는 프로필 아이콘과 함께 쏙 나타나게
     room.messages.push(mapped);
 
     touchRoom(roomId);
@@ -21459,8 +21497,9 @@ function openChatRoom(id){
     avatarEl.innerHTML = escapeHtml(room.initial);
   }
   document.getElementById('chatRoomName').textContent = room.name;
-  document.getElementById('chatRoomName').classList.add('clickable');
-  document.getElementById('chatRoomAvatar').classList.add('clickable');
+  // 1:1 방 상단의 상대 프로필은 눌러도 아무 일 없게 (그룹방만 눌러서 멤버 목록 보기)
+  document.getElementById('chatRoomName').classList.toggle('clickable', !!room.isGroup);
+  document.getElementById('chatRoomAvatar').classList.toggle('clickable', !!room.isGroup);
   document.getElementById('chatMembersDropdown').classList.remove('open');
 
   chatSearchQuery = '';
@@ -21673,6 +21712,30 @@ function buildMsgMetaHtml(m){
   return `<div class="msg-meta"><span>${timeText}</span></div>`;
 }
 
+// 상대 메시지 왼쪽 프로필 아이콘 (show=false면 같은 너비의 빈 자리만 - 이어지는 메시지들 줄 맞춤용)
+function buildMsgAvatarEl(room, m, show){
+  const el = document.createElement('div');
+  el.className = 'msg-avatar' + (show ? '' : ' msg-avatar-spacer');
+  if(!show) return el;
+  let avatar = room.avatar, color = room.color, name = room.name || '';
+  if(room.isGroup){
+    const mem = (m.senderId && room.members) ? room.members.find(x => x.userId === m.senderId) : null;
+    avatar = mem ? mem.avatar : null;
+    color = mem ? mem.color : 'var(--text-dim)';
+    name = mem ? mem.name : (m.senderName || '');
+  }
+  if(avatar){
+    const img = document.createElement('img');
+    img.src = avatar;
+    img.alt = name;
+    el.appendChild(img);
+  } else {
+    el.style.background = color || 'var(--text-dim)';
+    el.textContent = room.isGroup ? (name.trim().charAt(0) || '?') : (room.initial || name.charAt(0) || '?');
+  }
+  return el;
+}
+
 var chatRenderCount = 60; // 지금 화면에 그리는 최근 메시지 수 (방 들어갈 때마다 60으로 초기화)
 var chatHasMoreAbove = false;
 const CHAT_RENDER_STEP = 60;
@@ -21687,6 +21750,7 @@ function renderChatMessages(){
   chatHasMoreAbove = !q && room.messages.length > visibleMessages.length;
   // 화면에 붙이기 전에 따로 다 만든 뒤 한 번에 교체 - 중간 상태가 보이거나 여러 번 다시 계산되지 않게
   const frag = document.createDocumentFragment();
+  let lastOtherRunKey = null; // 바로 앞 "상대 메시지"의 보낸 사람+분 - 같으면 프로필 아이콘을 또 그리지 않음
 
   visibleMessages.forEach(m => {
     if(q){
@@ -22090,12 +22154,24 @@ function renderChatMessages(){
       }
     }
 
-    const senderName = getGroupSenderName(room, m);
+    // 상대가 보낸 메시지엔 왼쪽에 프로필 아이콘 (카톡처럼 같은 사람이 같은 분에 이어 보낸 건 첫 메시지에만, 나머지는 자리만 비워 줄 맞춤)
+    const isOtherRow = row.classList.contains('other');
+    let showAvatar = false;
+    if(isOtherRow){
+      const runKey = `${m.senderId || m.senderName || 'other'}|${dateKey}|${formatMessageTime(msgTime)}`;
+      showAvatar = runKey !== lastOtherRunKey;
+      lastOtherRunKey = runKey;
+      row.insertBefore(buildMsgAvatarEl(room, m, showAvatar), row.firstChild);
+    } else {
+      lastOtherRunKey = null;
+    }
+    const senderName = showAvatar ? getGroupSenderName(room, m) : null;
     if(senderName){
       const nameLabel = document.createElement('div');
-      nameLabel.className = 'msg-sender-name';
+      nameLabel.className = 'msg-sender-name with-avatar';
       nameLabel.textContent = senderName;
       frag.appendChild(nameLabel);
+      row.classList.add('has-sender-name');
     }
     const retryBtn = row.querySelector('.msg-retry-btn');
     if(retryBtn) retryBtn.addEventListener('click', (e) => { e.stopPropagation(); retryFailedChatText(activeChatRoomId, m); });
@@ -22557,6 +22633,103 @@ renderKeyboard();
 
 document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrClose(closeChatRoomView));
 
+// ---------- 채팅방: 왼쪽에서 오른쪽으로 밀어서 나가기 ----------
+// 손가락을 따라 채팅방이 오른쪽으로 밀리고, 뒤에 채팅 목록이 보임. 충분히 밀거나 빠르게 튕기면 스르륵 나가고, 아니면 제자리로 돌아옴
+(function setupChatRoomSwipeBack(){
+  const view = document.getElementById('chatRoomView');
+  const listView = document.getElementById('chatListView');
+  let startX = 0, startY = 0, startT = 0, dx = 0;
+  let tracking = false, dragging = false, listShownBySwipe = false;
+
+  function isInsideHorizontalScroll(el){
+    let node = el;
+    while(node && node !== view){
+      const style = window.getComputedStyle(node);
+      if((style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+  function setOffset(x){ view.style.transform = `translateX(calc(-50% + ${x}px))`; }
+  function clearSwipeStyles(){
+    view.style.transition = '';
+    view.style.transform = '';
+    view.classList.remove('swiping');
+  }
+  function afterTransition(fn){
+    let done = false;
+    const finish = () => { if(done) return; done = true; view.removeEventListener('transitionend', finish); fn(); };
+    view.addEventListener('transitionend', finish);
+    setTimeout(finish, 320);
+  }
+
+  view.addEventListener('touchstart', (e) => {
+    tracking = false;
+    if(e.touches.length !== 1 || !view.classList.contains('active')) return;
+    if(e.target.closest('input, textarea, .location-picker-full, .invite-overlay')) return;
+    if(isInsideHorizontalScroll(e.target)) return; // 가로로 넘기는 줄(버튼 목록 등)은 그쪽 스크롤 우선
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY; startT = Date.now(); dx = 0;
+    tracking = true; dragging = false;
+  }, { passive: true });
+
+  view.addEventListener('touchmove', (e) => {
+    if(!tracking) return;
+    const t = e.touches[0];
+    const mx = t.clientX - startX, my = t.clientY - startY;
+    if(!dragging){
+      if(Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+      // 오른쪽으로, 위아래보다 확실히 가로로 움직일 때만 나가기 제스처로 봄 (위아래 스크롤은 그대로)
+      if(!(mx > 0 && mx > Math.abs(my) * 1.5)){ tracking = false; return; }
+      dragging = true;
+      view.classList.add('swiping');
+      view.style.transition = 'none';
+      // 뒤에 돌아갈 채팅 목록을 미리 깔아둠 (캘린더에서 들어온 방은 캘린더로 돌아가니 목록은 안 깜)
+      if(!chatReturnToCalendar && !listView.classList.contains('active')){
+        listView.classList.add('active');
+        listShownBySwipe = true;
+      }
+    }
+    e.preventDefault();
+    dx = Math.max(0, mx);
+    setOffset(dx);
+  }, { passive: false });
+
+  function onEnd(){
+    if(!tracking) return;
+    tracking = false;
+    if(!dragging) return;
+    dragging = false;
+    const width = view.offsetWidth || window.innerWidth;
+    const speed = dx / Math.max(1, Date.now() - startT); // px/ms
+    const shouldClose = dx > width * 0.33 || (dx > 40 && speed > 0.5);
+    view.style.transition = 'transform .24s cubic-bezier(.2,.8,.3,1)';
+    if(shouldClose){
+      setOffset(width + 20);
+      afterTransition(() => {
+        if(document.activeElement && view.contains(document.activeElement)) document.activeElement.blur();
+        listShownBySwipe = false;
+        goBackOrClose(closeChatRoomView);
+        // history.back()으로 닫히는 건 한 박자 늦게 일어나서, 실제로 닫힌 뒤에 위치를 되돌려야 제자리로 번쩍 안 돌아옴
+        const until = Date.now() + 600;
+        (function waitClosed(){
+          if(view.classList.contains('active') && Date.now() < until) return requestAnimationFrame(waitClosed);
+          clearSwipeStyles();
+        })();
+      });
+    } else {
+      setOffset(0);
+      afterTransition(() => {
+        clearSwipeStyles();
+        if(listShownBySwipe && view.classList.contains('active')) listView.classList.remove('active');
+        listShownBySwipe = false;
+      });
+    }
+  }
+  view.addEventListener('touchend', onEnd);
+  view.addEventListener('touchcancel', onEnd);
+})();
+
 // ---------- 채팅방: 대화 내용 검색 ----------
 document.getElementById('chatSearchBtn').addEventListener('click', () => {
   const bar = document.getElementById('chatSearchBar');
@@ -22793,26 +22966,19 @@ function openChatRoomCounterpartProfile(){
   openFriendProfile(friend.id);
 }
 
+// 1:1 방은 상단 프로필을 눌러도 프로필로 넘어가지 않음 (그룹방만 멤버 목록 열기)
 document.getElementById('chatRoomAvatar').addEventListener('click', (e) => {
   const room = CHAT_ROOMS[activeChatRoomId];
-  if(!room) return;
+  if(!room || !room.isGroup) return;
   e.stopPropagation();
-  if(room.isGroup){
-    openGroupMembersView(activeChatRoomId);
-  } else {
-    openChatRoomCounterpartProfile();
-  }
+  openGroupMembersView(activeChatRoomId);
 });
 
 document.getElementById('chatRoomName').addEventListener('click', (e) => {
   const room = CHAT_ROOMS[activeChatRoomId];
-  if(!room) return;
+  if(!room || !room.isGroup) return;
   e.stopPropagation();
-  if(room.isGroup){
-    openGroupMembersView(activeChatRoomId);
-  } else {
-    openChatRoomCounterpartProfile();
-  }
+  openGroupMembersView(activeChatRoomId);
 });
 
 // ---------- 채팅방: 추가 기능 ----------
