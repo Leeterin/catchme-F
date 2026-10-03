@@ -5,5 +5,10 @@
   "server": {
     "url": "https://catchme-29rt.onrender.com",
     "cleartext": false
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "none"
+    }
   }
 }

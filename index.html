@@ -8116,6 +8116,14 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   initPushNotifications();
 }
 
+// 아이폰 키보드 위에 붙는 기본 도구막대(위/아래 화살표 + 완료)를 숨김 - 카카오톡처럼 입력창이 키보드 바로 위에 붙게
+(function hideIosKeyboardAccessoryBar(){
+  const cap = window.Capacitor;
+  if(!cap || typeof cap.getPlatform !== 'function' || cap.getPlatform() !== 'ios') return;
+  const kb = cap.Plugins && cap.Plugins.Keyboard;
+  if(kb && kb.setAccessoryBarVisible) kb.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
+})();
+
 // ---------- 휴대폰 푸시 알림 (설치한 앱에서만 동작, 웹에서는 아무것도 안 함) ----------
 let pushToken = null;
 let pushListenersReady = false;
