@@ -7680,11 +7680,43 @@ function fitMonthLabelsByChars(container){
 // 화면을 열 때마다 pushViewState(그 화면을 닫는 함수)를 호출해서 히스토리에 쌓아두면,
 // 사용자가 뒤로가기를 눌렀을 때 앱을 나가는 대신 그 화면이 닫힘
 const viewCloseStack = [];
+// 히스토리를 조용히 되감는 중(unwindViewStack)이면 그 popstate는 닫기 함수를 실행하지 않고 넘김.
+// 되감기는 비동기라, 그 사이에 새로 여는 화면의 pushState는 되감기가 끝난 뒤에 쌓아야 순서가 안 꼬임
+let historyUnwinding = 0;
+let pendingHistoryPushes = 0;
 function pushViewState(closeFn){
   viewCloseStack.push(closeFn);
+  if(historyUnwinding > 0){ pendingHistoryPushes++; return; }
   history.pushState({ catchmeView: viewCloseStack.length }, '', '');
 }
+// 스택을 toLength개만 남기고 그 위 히스토리 항목들을 닫기 함수 실행 없이 되감음
+function unwindViewStack(toLength){
+  const n = viewCloseStack.length - toLength;
+  if(n <= 0) return;
+  viewCloseStack.length = toLength;
+  if(pendingHistoryPushes >= n){ pendingHistoryPushes -= n; return; } // 아직 실제로 안 쌓인 것만 취소하면 됨
+  const real = n - pendingHistoryPushes;
+  pendingHistoryPushes = 0;
+  historyUnwinding++;
+  history.go(-real);
+}
+// 뒤로가기가 아니라 저장/삭제 완료 등으로 화면을 코드에서 직접 닫을 때 사용 - 그 화면(과 그 위에 쌓인 화면)의
+// 히스토리 항목도 같이 지워서, 다음 뒤로가기가 "이미 닫힌 화면 닫기"로 한 번 헛돌지 않게 함
+function dismissView(closeFn){
+  const i = viewCloseStack.lastIndexOf(closeFn);
+  if(i >= 0) unwindViewStack(i);
+  closeFn();
+}
 window.addEventListener('popstate', () => {
+  if(historyUnwinding > 0){
+    historyUnwinding--;
+    if(historyUnwinding === 0){
+      for(; pendingHistoryPushes > 0; pendingHistoryPushes--){
+        history.pushState({ catchmeView: viewCloseStack.length - pendingHistoryPushes + 1 }, '', '');
+      }
+    }
+    return;
+  }
   const closeFn = viewCloseStack.pop();
   if(closeFn){
     try { closeFn(); } catch(err){ console.error('[뒤로가기] 화면 닫기 실패:', err); }
@@ -8648,7 +8680,9 @@ const panels = {
   community: document.getElementById('panel-community'),
 };
 
+let currentTopTab = null; // 지금 보고 있는 아래 탭 (null = 메인 캘린더)
 function showTab(tabKey){
+  currentTopTab = tabKey;
   document.body.classList.remove('chat-open');
   document.getElementById('myProfileView').style.display = 'none';
   document.getElementById('settingsView').style.display = 'none';
@@ -8694,14 +8728,37 @@ function showTab(tabKey){
   }
 }
 
+// 아래 탭/홈 로고로 화면을 옮길 때도 뒤로가기 한 번이면 직전에 보던 탭으로 돌아가게 함.
+// 옮기기 전 탭 안에서 열려있던 하위 화면(채팅방, 친구 프로필 등)은 showTab이 어차피 정리하므로
+// 그 히스토리 항목들은 되감아 지우고, "직전 탭으로 돌아가기" 항목 하나만 쌓음
+function switchTopTab(tabKey){
+  // 메인 캘린더(첫 화면)로 가면 쌓인 걸 전부 되감음 - 거기서 뒤로가기는 원래대로 앱을 벗어남
+  if(tabKey === null){
+    unwindViewStack(0);
+    showTab(null);
+    return;
+  }
+  let lastTabIdx = -1;
+  for(let i = viewCloseStack.length - 1; i >= 0; i--){
+    if(viewCloseStack[i]._isTabEntry){ lastTabIdx = i; break; }
+  }
+  unwindViewStack(lastTabIdx + 1);
+  const prevTab = currentTopTab;
+  showTab(tabKey);
+  if(prevTab !== tabKey){
+    const backToPrev = () => showTab(prevTab);
+    backToPrev._isTabEntry = true;
+    pushViewState(backToPrev);
+  }
+}
 navItems.forEach(item => {
   item.addEventListener('click', () => {
-    showTab(item.dataset.tab);
+    switchTopTab(item.dataset.tab);
   });
 });
 
 // 홈(브랜드 로고) 클릭 시 캘린더 메인 화면으로 복귀
-document.getElementById('homeBtn').addEventListener('click', () => showTab(null));
+document.getElementById('homeBtn').addEventListener('click', () => switchTopTab(null));
 
 // 설정 버튼 -> 설정 화면 열기
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
@@ -10486,7 +10543,7 @@ function wireFeedPostDetail(container, post){
       container.querySelector('.feed-detail-kebab-menu').classList.remove('open');
       try {
         await deleteFeedPostItem(post);
-        closeFeedPostDetail();
+        dismissView(closeFeedPostDetail);
       } catch(err){
         showToast(err.message);
       }
@@ -11557,7 +11614,7 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
       const existing = FEED_POSTS[activeFeedCategory].find(p => p.id === editingFeedPostId);
       if(existing) Object.assign(existing, data.post);
       renderFeedPosts();
-      closeFeedCreate();
+      dismissView(closeFeedCreate);
       showToast('수정했어요.');
       return;
     }
@@ -11570,7 +11627,7 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
     FEED_POSTS[feedCreateSelectedCategory].unshift(data.post);
     sortFeedPosts(feedCreateSelectedCategory);
     if(feedCreateSelectedCategory === activeFeedCategory) renderFeedPosts();
-    closeFeedCreate();
+    dismissView(closeFeedCreate);
     showToast('게시물을 올렸어요!');
   } catch(err){
     showToast(err.message);
@@ -11798,7 +11855,7 @@ document.getElementById('meetupCreateSubmitBtn').addEventListener('click', async
     activeMeetupId = editingMeetupId;
     renderMeetups();
     renderMeetupDetail();
-    closeMeetupCreate();
+    dismissView(closeMeetupCreate);
     showToast('모임 정보를 수정했어요.');
     return;
   }
@@ -11852,7 +11909,7 @@ document.getElementById('meetupCreateSubmitBtn').addEventListener('click', async
   activeMeetupCategory = 'mine';
   document.querySelectorAll('#meetupChipRow .meetup-chip').forEach(c => c.classList.toggle('active', c.dataset.cat === 'mine'));
   renderMeetups();
-  closeMeetupCreate();
+  dismissView(closeMeetupCreate);
   showToast('모임을 만들었어요!');
 });
 
@@ -13405,9 +13462,12 @@ function openAvailFineTune(){
   document.getElementById('availFineTuneBackBtn').style.display = 'block';
   document.getElementById('eventFormSubmitBtn').textContent = editingEventId ? '이대로 수정하기' : '이대로 등록하기';
   renderAvailFineTuneList();
+  // 분 단위 조정도 한 단계로 쌓아서, 폰 뒤로가기를 누르면 일정 창 전체가 아니라 칸 선택 화면으로만 돌아가게 함
+  pushViewState(closeAvailFineTune);
 }
 
 function closeAvailFineTune(){
+  if(!availFineTuneMode) return;
   availFineTuneMode = false;
   document.getElementById('availFineTuneGroup').style.display = 'none';
   document.getElementById('availableGridGroup').style.display = 'block';
@@ -13500,7 +13560,7 @@ function renderAvailFineTuneList(){
     });
   });
 }
-document.getElementById('availFineTuneBackBtn').addEventListener('click', closeAvailFineTune);
+document.getElementById('availFineTuneBackBtn').addEventListener('click', () => goBackOrClose(closeAvailFineTune));
 
 // 세부조정 화면의 select 값들을 읽어서 availFineTuneBlocks에 반영(분 단위 정밀 시간으로 갱신)
 function readAvailFineTuneBlocksFromInputs(){
@@ -13534,6 +13594,9 @@ function setEventTypeUI(type){
   document.getElementById('busyFieldsGroup').style.display = useGrid ? 'none' : 'block';
   document.getElementById('availableGridGroup').style.display = useGrid ? 'block' : 'none';
   // 다른 타입으로 바꾸거나 새로 열었으면 세부조정 상태는 항상 초기화
+  // 분 단위 조정 중에 일정 종류를 바꾸면 조정 화면이 닫히니, 그 뒤로가기 항목도 같이 지움
+  const fineTuneIdx = viewCloseStack.lastIndexOf(closeAvailFineTune);
+  if(fineTuneIdx >= 0) unwindViewStack(fineTuneIdx);
   availFineTuneMode = false;
   availFineTuneBlocks = [];
   document.getElementById('availFineTuneGroup').style.display = 'none';
@@ -13763,7 +13826,7 @@ document.getElementById('recurringDeleteAllBtn').addEventListener('click', () =>
   // 자정 넘기는 일정이라 여러 날짜로 쪼개져 있으면, 지금 편집 중인 조각뿐 아니라 묶인 조각들을 전부 함께 지움
   deleteScheduleEventAndLinked(ev);
   closeDeleteConfirmOverlay();
-  closeEventForm();
+  dismissView(closeEventForm);
   refreshActiveScheduleView();
   showToast(wasRecurring ? '반복되는 일정 전체를 삭제했어요.' : '일정을 삭제했어요.');
 });
@@ -13773,7 +13836,7 @@ document.getElementById('recurringDeleteThisBtn').addEventListener('click', () =
   if(!ev) return;
   deleteEventOccurrence(ev, scheduleFocusDate);
   closeDeleteConfirmOverlay();
-  closeEventForm();
+  dismissView(closeEventForm);
   refreshActiveScheduleView();
 });
 
@@ -14289,7 +14352,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     availFineTuneBlocks = [];
     editingEventId = null;
     editingLinkedPieceIds = [];
-    closeEventForm();
+    dismissView(closeEventForm);
     refreshActiveScheduleView();
     showToast(wasEditing ? `예약 가능한 시간을 수정했어요.` : `예약 가능한 시간 ${createdCount}개를 등록했어요.`);
     return;
@@ -14450,7 +14513,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
       console.error('[event form] submit failed:', err);
       showToast('일정을 저장하는 중 문제가 생겼어요.');
     } finally {
-      closeEventForm();
+      dismissView(closeEventForm);
       refreshActiveScheduleView();
     }
   }
@@ -17928,7 +17991,7 @@ function closeHotplacePlaceReviews(){
 }
 document.getElementById('hotplacePlaceReviewsCloseBtn').addEventListener('click', () => goBackOrClose(closeHotplacePlaceReviews));
 document.getElementById('hotplacePlaceReviewsOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'hotplacePlaceReviewsOverlay') closeHotplacePlaceReviews();
+  if(e.target.id === 'hotplacePlaceReviewsOverlay') dismissView(closeHotplacePlaceReviews);
 });
 
 // 네이버 검색 결과로 받은 장소 하나를 카드로 만듦 (커뮤니티 추천 카드랑 비슷한 모양, 저장/제안 버튼은 없음)
@@ -18295,7 +18358,7 @@ async function fixHotplaceLocation(post){
       renderChatMessages();
       renderPinnedSchedule();
       renderChatList();
-      closeHotplaceView();
+      dismissView(closeHotplaceView);
       showToast(`장소가 "${post.place}"(으)로 확정됐어요!`);
     } catch(err){
       showToast(err.message);
@@ -18318,7 +18381,7 @@ async function fixHotplaceLocation(post){
   renderChatMessages();
   renderPinnedSchedule();
   renderChatList();
-  closeHotplaceView();
+  dismissView(closeHotplaceView);
   showToast(`장소가 "${post.place}"(으)로 확정됐어요!`);
 }
 
@@ -19704,7 +19767,7 @@ function closeHotplaceView(){
 }
 document.getElementById('hotplaceCloseFooterBtn').addEventListener('click', () => goBackOrClose(closeHotplaceView));
 document.getElementById('hotplaceOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'hotplaceOverlay') closeHotplaceView();
+  if(e.target.id === 'hotplaceOverlay') dismissView(closeHotplaceView);
 });
 
 // ---------- 밥집/카페 카드의 주소를 눌렀을 때 뜨는 작은 지도: 약속장소 + 그 밥집을 마커 2개로 함께 보여줌 ----------
@@ -19798,7 +19861,7 @@ function closePlaceDetailMap(){
 }
 document.getElementById('placeDetailMapCloseBtn').addEventListener('click', () => goBackOrClose(closePlaceDetailMap));
 document.getElementById('placeDetailMapOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'placeDetailMapOverlay') closePlaceDetailMap();
+  if(e.target.id === 'placeDetailMapOverlay') dismissView(closePlaceDetailMap);
 });
 
 // ---------- 소식 탭 "지도 전체보기" - 지금 카테고리(맛집/카페/체험)에서 목록에 뜨는 장소들을 한 지도에 모아서 보여줌 ----------
@@ -19862,7 +19925,7 @@ function openFeedMapView(){
         label.setMap(feedMapInstance);
         // 마커를 누르면 그 장소의 "장소 태그 모아보기" 화면으로 바로 이동
         kakao.maps.event.addListener(marker, 'click', () => {
-          closeFeedMapView();
+          dismissView(closeFeedMapView);
           openFeedPlaceTagView(place.title);
         });
         feedMapOverlays.push(marker, label);
@@ -19888,7 +19951,7 @@ function closeFeedMapView(){
 document.getElementById('feedMapViewBtn').addEventListener('click', openFeedMapView);
 document.getElementById('feedMapOverlayCloseBtn').addEventListener('click', () => goBackOrClose(closeFeedMapView));
 document.getElementById('feedMapOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'feedMapOverlay') closeFeedMapView();
+  if(e.target.id === 'feedMapOverlay') dismissView(closeFeedMapView);
 });
 
 // ---------- 근처 모임 탭 "지도 전체보기" - 지금 목록에 뜨는 모임들을 한 지도에 모아서 보여줌 ----------
@@ -19948,7 +20011,7 @@ function openMeetupMapView(){
         label.setMap(meetupMapInstance);
         // 마커를 누르면 그 모임 상세로 바로 이동
         kakao.maps.event.addListener(marker, 'click', () => {
-          closeMeetupMapView();
+          dismissView(closeMeetupMapView);
           openMeetupDetail(meetup.id);
         });
         meetupMapOverlays.push(marker, label);
@@ -19974,7 +20037,7 @@ function closeMeetupMapView(){
 document.getElementById('meetupMapViewBtn').addEventListener('click', openMeetupMapView);
 document.getElementById('meetupMapOverlayCloseBtn').addEventListener('click', () => goBackOrClose(closeMeetupMapView));
 document.getElementById('meetupMapOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'meetupMapOverlay') closeMeetupMapView();
+  if(e.target.id === 'meetupMapOverlay') dismissView(closeMeetupMapView);
 });
 document.querySelectorAll('.hotplace-tab').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -23178,7 +23241,7 @@ function goRegisterAvailabilityFromInvite(){
     window.addEventListener('popstate', () => setTimeout(open, 0), { once: true });
     history.back();
   } else {
-    hideInviteOverlay();
+    dismissView(hideInviteOverlay);
     open();
   }
 }
