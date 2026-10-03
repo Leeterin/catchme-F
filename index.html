@@ -3286,6 +3286,8 @@
     -ms-overflow-style:none;
   }
   .chat-messages::-webkit-scrollbar{ display:none; width:0; height:0; }
+  /* 메시지가 적어도 위가 아니라 입력창 바로 위(맨 아래)부터 쌓이게 - 카카오톡처럼 (justify-content:flex-end는 스크롤이 깨져서 margin-top:auto로) */
+  .chat-messages > :first-child{ margin-top:auto; }
 
   .chat-bottom-fixed{
     flex-shrink:0;
@@ -21429,7 +21431,25 @@ function renderChatMessages(){
     }
     box.appendChild(row);
   });
-  box.scrollTop = box.scrollHeight;
+  scrollChatToBottom();
+}
+
+// 최신 메시지가 항상 맨 아래(입력창 바로 위)에 보이게 스크롤. 바로 한 번 내리고, 키보드가 올라오는
+// 애니메이션(약 0.25초)이나 레이아웃 변화가 끝난 뒤에도 한 번 더 내려서 중간에 높이가 바뀌어도 어긋나지 않게 함
+function scrollChatToBottom(){
+  const box = document.getElementById('chatMessages');
+  if(!box) return;
+  const toBottom = () => { box.scrollTop = box.scrollHeight; };
+  toBottom();
+  requestAnimationFrame(toBottom);
+  setTimeout(toBottom, 300);
+  // 사진은 늦게 로드되면서 높이가 커져 최신 메시지를 위로 밀어내니, 로드되면 (맨 아래를 보고 있던 경우) 다시 내림
+  box.querySelectorAll('img').forEach(img => {
+    if(img.complete) return;
+    img.addEventListener('load', () => {
+      if(box.scrollHeight - box.scrollTop - box.clientHeight < img.clientHeight + 80) toBottom();
+    }, { once: true });
+  });
 }
 
 // ---------- 채팅 답장(인용) ----------
