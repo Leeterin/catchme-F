@@ -3477,6 +3477,25 @@
     color:var(--accent); font-weight:600; cursor:pointer;
   }
   .msg-bubble-text{ white-space:pre-wrap; }
+  /* 대화 검색: 찾은 글자를 하늘색 테두리 칩으로 표시 (내 말풍선은 배경이 하늘색이라 흰 테두리) */
+  mark.chat-search-hit{
+    color:inherit;
+    font-weight:600;
+    background:var(--accent-soft);
+    border-radius:5px;
+    padding:0 2px;
+    margin:0 -1px;
+    box-shadow:0 0 0 1.5px var(--accent), 0 0 8px rgba(56,189,248,.35);
+    -webkit-box-decoration-break:clone;
+    box-decoration-break:clone;
+    animation:chatSearchHitIn .25s ease both;
+  }
+  .msg-row.me mark.chat-search-hit{
+    background:rgba(255,255,255,.22);
+    box-shadow:0 0 0 1.5px rgba(255,255,255,.95), 0 0 8px rgba(255,255,255,.35);
+  }
+  .chat-search-hit-card{ box-shadow:0 0 0 1.5px var(--accent), 0 0 10px rgba(56,189,248,.3) !important; }
+  @keyframes chatSearchHitIn{ from{ box-shadow:0 0 0 4px transparent; } }
   .msg-bubble-image{
     padding:4px;
     background:var(--surface-2);
@@ -21972,6 +21991,25 @@ function buildMsgMetaHtml(m){
   return `<div class="msg-meta"><span>${timeText}</span></div>`;
 }
 
+// 대화 검색 중이면 글 속 검색어 부분을 테두리 칩(<mark>)으로 감싸서 보여줌 (q는 소문자)
+function fillChatTextWithSearchHits(el, text, q){
+  text = String(text || '');
+  el.textContent = '';
+  if(!q){ el.textContent = text; return; }
+  const lower = text.toLowerCase();
+  let i = 0;
+  while(i < text.length){
+    const hit = lower.indexOf(q, i);
+    if(hit < 0){ el.appendChild(document.createTextNode(text.slice(i))); break; }
+    if(hit > i) el.appendChild(document.createTextNode(text.slice(i, hit)));
+    const mark = document.createElement('mark');
+    mark.className = 'chat-search-hit';
+    mark.textContent = text.slice(hit, hit + q.length);
+    el.appendChild(mark);
+    i = hit + q.length;
+  }
+}
+
 // 상대 메시지 왼쪽 프로필 아이콘 (show=false면 같은 너비의 빈 자리만 - 이어지는 메시지들 줄 맞춤용)
 function buildMsgAvatarEl(room, m, show){
   const el = document.createElement('div');
@@ -22394,7 +22432,7 @@ function renderChatMessages(){
         </div>` : '';
       const bubbleHtml = `<div class="msg-bubble">${quoteHtml}<div class="msg-bubble-text"></div></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + bubbleHtml) : (bubbleHtml + metaHtml);
-      row.querySelector('.msg-bubble-text').textContent = m.text;
+      fillChatTextWithSearchHits(row.querySelector('.msg-bubble-text'), m.text, q);
 
       // 인용된 원문: 아직 대화에 남아있으면 실제 내용/발신자로, 없으면 보낼 때 저장해둔 미리보기로 표시
       // (실제 채팅방은 사람마다 로컬 id가 달라서, 내 화면 로컬 id(msgId)뿐 아니라 서버 id(_serverId)로도 찾아봄 -
@@ -22434,6 +22472,11 @@ function renderChatMessages(){
       nameLabel.textContent = senderName;
       frag.appendChild(nameLabel);
       row.classList.add('has-sender-name');
+    }
+    // 글 말풍선이 아닌 카드(예약/장소 등)는 카드 전체에 검색 테두리
+    if(q && !row.querySelector('.chat-search-hit')){
+      const card = row.querySelector('.reservation-card, .hotplace-notice-card');
+      if(card) card.classList.add('chat-search-hit-card');
     }
     const retryBtn = row.querySelector('.msg-retry-btn');
     if(retryBtn) retryBtn.addEventListener('click', (e) => { e.stopPropagation(); retryFailedChatText(activeChatRoomId, m); });
@@ -22900,6 +22943,7 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
 (function setupChatRoomSwipeBack(){
   const view = document.getElementById('chatRoomView');
   const listView = document.getElementById('chatListView');
+  const bottomNav = document.querySelector('.bottom-nav');
   let startX = 0, startY = 0, startT = 0, dx = 0;
   let tracking = false, dragging = false, listShownBySwipe = false;
 
@@ -22951,6 +22995,8 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
         listView.classList.add('active');
         listShownBySwipe = true;
       }
+      // 하단 메뉴는 어느 화면에서나 고정이라, 밀기 시작할 때부터 채팅방 뒤에 미리 보여둠 (닫힌 뒤에 늦게 뜨지 않게)
+      bottomNav.style.display = 'flex';
     }
     e.preventDefault();
     dx = Math.max(0, mx);
@@ -22984,6 +23030,7 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
       afterTransition(() => {
         clearSwipeStyles();
         if(listShownBySwipe && view.classList.contains('active')) listView.classList.remove('active');
+        if(view.classList.contains('active')) bottomNav.style.display = 'none';
         listShownBySwipe = false;
       });
     }
