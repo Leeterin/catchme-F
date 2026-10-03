@@ -2771,36 +2771,94 @@
     box-sizing:border-box;
   }
   .chat-search-bar input:focus{ border-color:var(--accent); }
+  .chat-search-field{
+    flex:1; min-width:0; position:relative; display:flex; align-items:center;
+  }
+  .chat-search-field svg{
+    position:absolute; left:12px; width:17px; height:17px;
+    color:var(--text-dim); pointer-events:none;
+  }
+  .chat-search-bar .chat-search-field input{ padding-left:36px; }
+  /* 검색 중: 입력칸/답장바/자체 키보드 숨기고 검색 도구줄 */
+  .chat-room-view.chat-searching .chat-input-row,
+  .chat-room-view.chat-searching .chat-reply-preview-bar,
+  .chat-room-view.chat-searching .chat-keyboard{ display:none !important; }
+  .chat-search-toolbar{
+    position:relative;
+    display:flex; align-items:center; gap:4px;
+    min-height:50px; box-sizing:border-box;
+    padding:5px 6px 5px 8px;
+    background:var(--surface-2); border:1px solid var(--line); border-radius:999px;
+    touch-action:manipulation; /* 빠르게 두 번 눌러도 화면이 확대되지 않게 */
+  }
+  .chat-search-toolbar[hidden]{ display:none; }
+  .chat-search-toolbar-gap{ flex:1; }
   .chat-search-tool{
-    position:relative; flex-shrink:0;
-    width:34px; height:34px; border-radius:10px;
+    flex-shrink:0; width:40px; height:38px; padding:0;
     display:flex; align-items:center; justify-content:center;
-    border:1px solid var(--line); background:var(--surface-2);
-    color:var(--text-dim); cursor:pointer; padding:0;
-    -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+    border:none; background:none; color:var(--text); cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
   }
-  .chat-search-tool svg{ width:16px; height:16px; pointer-events:none; }
-  .chat-search-tool:active{ opacity:.6; }
-  .chat-search-tool.active{ color:var(--accent); border-color:var(--accent); }
-  .chat-search-bar .chat-search-tool input[type=date]{
-    position:absolute; inset:0; width:100%; height:100%;
-    opacity:0; border:none; padding:0; margin:0; cursor:pointer;
+  .chat-search-tool svg{ width:22px; height:22px; pointer-events:none; }
+  .chat-search-tool:active{ opacity:.55; }
+  .chat-search-tool.active{ color:var(--accent); }
+  .chat-search-arrow{
+    width:38px; height:38px; padding:0; flex-shrink:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    border:none; border-radius:50%;
+    background:rgba(127,127,127,.16); color:var(--text-dim); cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
   }
-  .chat-search-sender-list{
-    display:flex; gap:6px; overflow-x:auto; flex-shrink:0;
-    margin:-2px 0 10px; padding-bottom:2px; scrollbar-width:none;
+  .chat-search-arrow svg{ width:18px; height:18px; }
+  .chat-search-arrow:active{ opacity:.6; }
+  .chat-search-arrow.at-end{ opacity:.4; }
+  /* 보낸 사람 / 날짜 고르는 카드 - 도구줄 바로 위에 뜸 */
+  .chat-search-popup{
+    position:absolute; left:0; right:0; bottom:calc(100% + 8px); z-index:6;
+    background:var(--surface); border:1px solid var(--line); border-radius:22px;
+    box-shadow:0 8px 28px rgba(0,0,0,.18);
+    padding:8px 0; max-height:46vh; overflow-y:auto;
+    animation:msgMetaFade .18s ease both;
   }
-  .chat-search-sender-list::-webkit-scrollbar{ display:none; }
-  .chat-search-sender-list[hidden]{ display:none; }
-  .chat-search-sender-chip{
-    flex-shrink:0; border:1px solid var(--line); background:var(--surface-2);
-    color:var(--text); border-radius:999px; padding:6px 12px;
-    font:inherit; font-size:12px; font-weight:600; cursor:pointer;
-    -webkit-tap-highlight-color:transparent; touch-action:manipulation;
+  .chat-search-popup[hidden]{ display:none; }
+  .chat-search-person{
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:9px 18px; border:none; background:none; text-align:left;
+    font:inherit; font-size:15px; font-weight:600; color:var(--text); cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
   }
-  /* 오른쪽 정렬 (justify-content:flex-end는 넘칠 때 왼쪽이 잘려서 첫 칩을 auto 여백으로 밀어줌) */
-  .chat-search-sender-chip:first-child{ margin-left:auto; }
-  .chat-search-sender-chip.selected{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .chat-search-person:active{ background:rgba(127,127,127,.12); }
+  .chat-search-person-avatar{
+    width:34px; height:34px; border-radius:50%; flex-shrink:0; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:14px; font-weight:700;
+  }
+  .chat-search-person-avatar img{ width:100%; height:100%; object-fit:cover; }
+  .chat-search-me-badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:19px; height:19px; border-radius:50%; margin-right:5px;
+    background:rgba(127,127,127,.35); color:var(--text); font-size:10.5px; font-weight:700;
+  }
+  .chat-search-person-check{ margin-left:auto; color:var(--accent); font-size:16px; }
+  .chat-search-cal{ padding:14px 14px 10px; }
+  .chat-search-cal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .chat-search-cal-head b{ font-size:15px; color:var(--text); }
+  .chat-search-cal-nav{
+    width:32px; height:32px; border:none; border-radius:50%; background:none;
+    color:var(--text); font-size:20px; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  }
+  .chat-search-cal-nav:disabled{ opacity:.25; }
+  .chat-search-cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); row-gap:2px; text-align:center; }
+  .chat-search-cal-wd{ font-size:11.5px; color:var(--text-dim); padding:4px 0; }
+  .chat-search-cal-day{
+    height:36px; width:36px; margin:0 auto; border:none; border-radius:50%; background:none;
+    font:inherit; font-size:14px; font-weight:700; color:var(--text); cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .chat-search-cal-day:disabled{ color:var(--text-dim); opacity:.35; font-weight:400; cursor:default; }
+  .chat-search-cal-day.today{ box-shadow:inset 0 0 0 1.5px var(--line); }
+  .chat-search-cal-day:not(:disabled):active{ background:var(--accent); color:#fff; }
+  .chat-search-cal-loading{ font-size:11.5px; color:var(--text-dim); text-align:center; margin-top:6px; }
   /* 날짜로 이동했을 때 그 날 구분선이 살짝 반짝 */
   .chat-date-divider.date-jump-flash span{ animation:chatDateJumpFlash 1.4s ease; }
   @keyframes chatDateJumpFlash{ 0%,60%{ background:#FFE76A; color:#3A2E00; } 100%{} }
@@ -3556,27 +3614,6 @@
   }
   .chat-search-hit-card{ box-shadow:0 0 0 2px #FFE76A !important; }
   .msg-row.search-current .chat-search-hit-card{ box-shadow:0 0 0 2.5px #FFC93C !important; }
-  .chat-search-nav{
-    touch-action:manipulation; /* 빠르게 두 번 눌러도 화면이 확대되지 않게 */
-    position:absolute; right:12px; bottom:100%; margin-bottom:8px; z-index:5;
-    display:flex; align-items:center; gap:4px;
-    padding:4px 4px 4px 10px;
-    background:var(--surface); border:1px solid var(--line); border-radius:12px;
-    box-shadow:0 4px 14px rgba(0,0,0,.12);
-    animation:msgMetaFade .2s ease both;
-  }
-  .chat-search-nav[hidden]{ display:none; }
-  .chat-search-count{ font-size:11.5px; color:var(--text-dim); margin-right:4px; font-variant-numeric:tabular-nums; }
-  .chat-search-arrow{
-    width:28px; height:28px; padding:0;
-    display:inline-flex; align-items:center; justify-content:center;
-    border:none; border-radius:8px;
-    background:var(--surface-2); color:var(--text); cursor:pointer;
-    -webkit-tap-highlight-color:transparent;
-  }
-  .chat-search-arrow svg{ width:15px; height:15px; }
-  .chat-search-arrow:active{ opacity:.6; }
-  .chat-search-arrow.at-end{ opacity:.35; }
   .msg-bubble-image{
     padding:4px;
     background:var(--surface-2);
@@ -6624,7 +6661,7 @@
   /* 상대 말풍선 속 인용(답장) 칸: 반투명 검정은 다크에선 안 보여서 흰 반투명으로 */
   body.dark-mode .msg-row.other .msg-quote-block{ background:rgba(255,255,255,0.07); }
   body.dark-mode .chat-search-arrow{ background:#3A3A3C; }
-  body.dark-mode .chat-search-nav{ box-shadow:0 4px 14px rgba(0,0,0,0.5); }
+  body.dark-mode .chat-search-popup{ background:#2C2C2E; border-color:#3A3A3C; box-shadow:0 8px 28px rgba(0,0,0,0.55); }
   body.dark-mode input::placeholder,
   body.dark-mode textarea::placeholder{ color:#6E6E73; }
 </style>
@@ -7690,27 +7727,24 @@
         </div>
       </div>
       <div class="chat-search-bar" id="chatSearchBar">
-        <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" enterkeyhint="search" />
-        <!-- 날짜로 이동: 투명한 날짜 입력칸을 버튼 위에 덮어서 누르면 바로 달력(날짜 선택기)이 뜸 -->
-        <label class="chat-search-tool" id="chatSearchDateBtn" aria-label="날짜로 검색">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
-          <input type="date" id="chatSearchDateInput" />
-        </label>
-        <button type="button" class="chat-search-tool" id="chatSearchSenderBtn" aria-label="보낸 사람으로 검색">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/></svg>
-        </button>
+        <div class="chat-search-field">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>
+          <input type="text" id="chatSearchInput" placeholder="대화내용 검색" enterkeyhint="search" />
+        </div>
         <button type="button" class="chat-search-cancel" id="chatSearchCancelBtn">취소</button>
       </div>
-      <!-- 보낸 사람 고르기 (사람 버튼 누르면 펼쳐짐) -->
-      <div class="chat-search-sender-list" id="chatSearchSenderList" hidden></div>
       <div class="chat-pinned-schedule" id="chatPinnedSchedule" style="display:none;"></div>
       <!-- 진행 중인 모임 장소 추천 - 카카오톡의 "진행 중인 투표"처럼 상단에 띄워두고, 누르면 현황/입력 시트가 열림 -->
       <button type="button" class="chat-active-recommend-bar" id="chatActiveRecommendBar" hidden></button>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-bottom-fixed">
-        <!-- 대화 검색 결과 위/아래 이동 - 입력칸 오른쪽 위에 떠 있음 -->
-        <div class="chat-search-nav" id="chatSearchNav" hidden>
-          <span class="chat-search-count" id="chatSearchCount">0/0</span>
+        <!-- 대화 검색 중엔 메시지 입력칸 대신 이 줄이 뜸 (카톡처럼): 보낸 사람 / 날짜 + 위·아래 이동 -->
+        <div class="chat-search-toolbar" id="chatSearchNav" hidden>
+          <div class="chat-search-popup" id="chatSearchSenderList" hidden></div>
+          <div class="chat-search-popup chat-search-cal" id="chatSearchCalendar" hidden></div>
+          <button type="button" class="chat-search-tool" id="chatSearchSenderBtn" aria-label="보낸 사람으로 검색"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20c.7-3.5 3.3-5.5 6.5-5.5 1.1 0 2.1.2 3 .7"/><circle cx="17" cy="16.5" r="2.6"/><path d="M19 18.5l2 2"/></svg></button>
+          <button type="button" class="chat-search-tool" id="chatSearchDateBtn" aria-label="날짜로 검색"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20H6a2.5 2.5 0 0 1-2.5-2.5v-10A2.5 2.5 0 0 1 6 5h12a2.5 2.5 0 0 1 2.5 2.5V11"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle cx="16.5" cy="16.5" r="2.6"/><path d="M18.5 18.5l2 2"/></svg></button>
+          <span class="chat-search-toolbar-gap"></span>
           <button type="button" class="chat-search-arrow" id="chatSearchUpBtn" aria-label="이전 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
           <button type="button" class="chat-search-arrow" id="chatSearchDownBtn" aria-label="다음 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
         </div>
@@ -22127,12 +22161,18 @@ function mapServerMessageToLocal(m, room){
 }
 
 // 채팅방의 메시지를 서버에서 불러와 room.messages에 채움 (방 처음 열 때, 그리고 백그라운드 복귀 시 재동기화에도 재사용)
+const CHAT_SERVER_PAGE = 50; // 서버가 한 번에 주는 최근 메시지 수
 function loadRoomMessagesFromServer(id, room, isFirstLoad){
   return apiRequest(`/chats/${id}/messages`).then(data => {
     const before = chatMessagesSignature(room.messages);
     // 보내는 중/전송 실패 메시지는 아직 서버에 없으니 지우지 않고 뒤에 그대로 남김
     const unsent = (room.messages || []).filter(m => m._pending || m._failed);
-    room.messages = data.messages.map(m => mapServerMessageToLocal(m, room)).concat(unsent);
+    const fresh = data.messages.map(m => mapServerMessageToLocal(m, room));
+    // 이미 받아둔 더 옛날 대화(위로 올리거나 날짜 검색으로 받은 것)는 재동기화해도 버리지 않음
+    const firstFreshTime = fresh.length ? +new Date(fresh[0].time) : Infinity;
+    const keepOlder = room._loaded ? (room.messages || []).filter(m => m._serverId && !m._pending && !m._failed && +new Date(m.time) < firstFreshTime) : [];
+    room.messages = keepOlder.concat(fresh, unsent);
+    if(!keepOlder.length) room._historyComplete = data.messages.length < CHAT_SERVER_PAGE;
     room._loaded = true;
     saveChatCache(id, room.messages);
     // 이미 화면에 있는 대화와 똑같으면 다시 그리지 않음 - 방에 들어가자마자 한 번 더 깜빡이며 다시 그려지던 것 방지
@@ -22142,6 +22182,35 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
       checkPendingRestoreAvailPrompts(id); // 서버에서 새로 받아온 메시지 기준으로 다시 한 번 확인 (새로고침 느낌으로 들어온 경우 대비)
     }
   }).catch(err => { if(isFirstLoad) showToast(err.message); else console.error('[messages resync]', err); });
+}
+
+// 서버엔 최근 50개만 받아와 있어서, 그보다 옛날 대화(위로 올리기/날짜·대화 검색)는 앞쪽을 더 받아와 붙임
+// opts.untilTime: 그 시각보다 옛날까지 받았으면 멈춤 / opts.maxPages: 몇 번까지만 받을지 (없으면 처음까지 전부)
+function fetchOlderChatMessages(roomId, room, opts){
+  opts = opts || {};
+  if(!room || !room.isRealRoom || !room._loaded || room._historyComplete || !authToken) return Promise.resolve(false);
+  if(room._olderFetch) return room._olderFetch.then(() => fetchOlderChatMessages(roomId, room, opts));
+  room._olderFetch = (async () => {
+    let added = false;
+    try {
+      for(let page = 0; page < (opts.maxPages || 60); page++){
+        const oldest = room.messages.find(m => m._serverId);
+        if(!oldest){ room._historyComplete = true; break; }
+        if(opts.untilTime != null && +new Date(oldest.time) < opts.untilTime) break;
+        const data = await apiRequest(`/chats/${roomId}/messages?limit=100&cursor=${encodeURIComponent(oldest._serverId)}`);
+        const known = new Set(room.messages.map(m => m._serverId).filter(Boolean));
+        const older = data.messages.filter(m => !known.has(m.id)).map(m => mapServerMessageToLocal(m, room));
+        if(older.length){ room.messages = older.concat(room.messages); added = true; }
+        if(data.messages.length < 100){ room._historyComplete = true; break; }
+      }
+    } catch(err){
+      console.error('[older messages]', err);
+    } finally {
+      room._olderFetch = null;
+    }
+    return added;
+  })();
+  return room._olderFetch;
 }
 
 // 메시지 목록 비교용 - 화면용으로 매번 새로 붙는 로컬 id 같은 값은 빼고 내용만 비교
@@ -22207,8 +22276,12 @@ function resetChatSearchState(){
   chatSearchQuery = '';
   chatSearchSender = null;
   document.getElementById('chatSearchInput').value = '';
-  document.getElementById('chatSearchSenderList').hidden = true;
+  closeChatSearchPopups();
   document.getElementById('chatSearchSenderBtn').classList.remove('active');
+}
+function closeChatSearchPopups(){
+  document.getElementById('chatSearchSenderList').hidden = true;
+  document.getElementById('chatSearchCalendar').hidden = true;
 }
 
 function formatMessageTime(time){
@@ -22808,12 +22881,7 @@ function moveChatSearchHit(step){
   focusChatSearchHit(true);
 }
 function updateChatSearchNav(){
-  const nav = document.getElementById('chatSearchNav');
-  const searching = isChatSearchActive();
-  nav.hidden = !searching;
-  if(!searching) return;
-  const total = chatSearchHits.length;
-  document.getElementById('chatSearchCount').textContent = total ? `${chatSearchIndex + 1}/${total}` : '0/0';
+  const total = isChatSearchActive() ? chatSearchHits.length : 0;
   // 끝에 닿아도 눌리긴 해야 "더 이상 검색 결과가 없어요"를 띄울 수 있어서 비활성화 대신 흐리게만
   document.getElementById('chatSearchUpBtn').classList.toggle('at-end', !total || chatSearchIndex <= 0);
   document.getElementById('chatSearchDownBtn').classList.toggle('at-end', !total || chatSearchIndex >= total - 1);
@@ -22854,27 +22922,38 @@ var chatStatusTapScrolling = false; // 꼭대기 탭으로 올라가는 중엔 �
 var chatLoadingOlder = false;
 // 인스타그램처럼: 맨 위에 닿으면 로딩 동그라미가 잠깐 돌고 그 위로 이전 대화가 붙음 (미리 몰래 붙이지 않음)
 // revealPx: 불러온 뒤 위로 조금 더 올려서 새로 붙은 내역이 바로 보이게
+// 화면에 안 그린 대화가 남았거나, 서버에 더 옛날 대화가 있으면 true
+function chatCanLoadOlder(){
+  if(chatHasMoreAbove) return true;
+  const room = CHAT_ROOMS[activeChatRoomId];
+  return !!(room && room.isRealRoom && room._loaded && !room._historyComplete && !isChatSearchActive());
+}
 function loadOlderChatWithSpinner(revealPx){
   const box = document.getElementById('chatMessages');
-  if(chatLoadingOlder || !chatHasMoreAbove || !box) return;
+  if(chatLoadingOlder || !box || !chatCanLoadOlder()) return;
   chatLoadingOlder = true;
   const spinner = document.createElement('div');
   spinner.className = 'chat-older-spinner';
   spinner.innerHTML = '<span></span>';
   box.prepend(spinner);
   const roomAtStart = activeChatRoomId;
-  setTimeout(() => {
+  const room = CHAT_ROOMS[roomAtStart];
+  // 그릴 게 남아있으면 바로, 다 그렸으면 서버에서 한 묶음 더 받아옴 (로딩은 최소 0.22초만)
+  const fetching = chatHasMoreAbove ? Promise.resolve(true) : fetchOlderChatMessages(roomAtStart, room, { maxPages: 1 });
+  Promise.all([fetching, new Promise(r => setTimeout(r, 220))]).then(() => {
     spinner.remove();
     chatLoadingOlder = false;
-    if(roomAtStart !== activeChatRoomId || !chatHasMoreAbove) return;
+    if(roomAtStart !== activeChatRoomId) return;
+    const room2 = CHAT_ROOMS[roomAtStart];
+    if(!room2 || room2.messages.length <= chatRenderCount) return; // 더 그릴 게 없음
     renderMoreChatAbove();
     if(revealPx) box.scrollBy({ top: -revealPx, behavior: 'smooth' });
-  }, 220);
+  });
 }
 document.getElementById('chatMessages').addEventListener('scroll', () => {
   const box = document.getElementById('chatMessages');
   if(chatStatusTapScrolling) return;
-  if(chatHasMoreAbove && box.scrollTop < 8) loadOlderChatWithSpinner(0);
+  if(box.scrollTop < 8 && chatCanLoadOlder()) loadOlderChatWithSpinner(0);
 }, { passive: true });
 
 // 아이폰 화면 꼭대기(시계 있는 상태바)를 한 번 누르면: 위로 쭉 올라간 뒤 로딩이 잠깐 돌고 이전 내역이 위에 붙음
@@ -23439,9 +23518,18 @@ document.getElementById('chatSearchInput').addEventListener('keydown', (e) => {
   chatSearchQuery = e.target.value;
   chatSearchCurrentId = null; // 새로 검색하면 가장 최근 결과부터
   e.target.blur();
+  closeChatSearchPopups();
+  runChatSearch();
+});
+// 서버엔 최근 대화만 받아와 있어서, 검색 전에 예전 대화까지 마저 받아온 다음 검색
+async function runChatSearch(){
+  const roomId = activeChatRoomId;
+  const room = CHAT_ROOMS[roomId];
+  if(isChatSearchActive() && room && !room._historyComplete) await fetchOlderChatMessages(roomId, room);
+  if(roomId !== activeChatRoomId) return;
   renderChatMessages();
   if(isChatSearchActive() && !chatSearchHits.length) showToast('검색 결과가 없어요.');
-});
+}
 document.getElementById('chatSearchUpBtn').addEventListener('click', () => moveChatSearchHit(-1));
 // 위/아래 버튼을 눌러도 입력칸 포커스(키보드)가 그대로 유지되게
 document.getElementById('chatSearchNav').addEventListener('mousedown', (e) => e.preventDefault());
@@ -23453,12 +23541,42 @@ document.getElementById('chatSearchInput').addEventListener('input', (e) => {
   renderChatMessages(); // 보낸 사람을 골라뒀으면 그 사람 메시지 검색으로 돌아감
 });
 
+// 검색창이 열리면 메시지 입력칸 대신 검색 도구줄을 보여줌
+new MutationObserver(() => {
+  const open = document.getElementById('chatSearchBar').classList.contains('open');
+  document.getElementById('chatRoomView').classList.toggle('chat-searching', open);
+  document.getElementById('chatSearchNav').hidden = !open;
+  if(open){
+    updateChatSearchNav();
+    const room = CHAT_ROOMS[activeChatRoomId];
+    if(room && !room._historyComplete) fetchOlderChatMessages(activeChatRoomId, room); // 미리 받아두기
+  } else {
+    closeChatSearchPopups();
+  }
+}).observe(document.getElementById('chatSearchBar'), { attributes: true, attributeFilter: ['class'] });
+
 // ---------- 대화 검색: 보낸 사람으로 ----------
+function buildChatSearchAvatar(avatar, color, name){
+  const el = document.createElement('div');
+  el.className = 'chat-search-person-avatar';
+  if(avatar){
+    const img = document.createElement('img');
+    img.src = avatar;
+    img.alt = name || '';
+    el.appendChild(img);
+  } else {
+    el.style.background = color || 'var(--text-dim)';
+    el.textContent = (name || '?').trim().charAt(0) || '?';
+  }
+  return el;
+}
 function renderChatSearchSenderList(){
   const room = CHAT_ROOMS[activeChatRoomId];
   const list = document.getElementById('chatSearchSenderList');
   if(!room) return;
-  const senders = [{ key: null, name: '전체' }, { key: 'me', name: '나' }];
+  const myName = (currentUser && currentUser.name) || myProfileData.name || '나';
+  const myAvatar = myProfileData.profileImageUrl || null;
+  const people = [{ key: 'me', name: myName, isMe: true, avatarEl: buildChatSearchAvatar(myAvatar, myProfileData.color, myName) }];
   const seen = new Set(['me']);
   // 실제로 말한 사람만 (최근에 말한 순서)
   for(let i = room.messages.length - 1; i >= 0; i--){
@@ -23466,38 +23584,123 @@ function renderChatSearchSenderList(){
     const key = chatSenderKey(m);
     if(!key || seen.has(key)) continue;
     seen.add(key);
-    senders.push({ key, name: room.isGroup ? getGroupSenderName(room, m) : room.name });
+    let name = room.name, avatar = room.avatar, color = room.color;
+    if(room.isGroup){
+      const mem = (m.senderId && room.members) ? room.members.find(x => x.userId === m.senderId) : null;
+      name = getGroupSenderName(room, m);
+      avatar = mem ? mem.avatar : null;
+      color = mem ? mem.color : null;
+    }
+    people.push({ key, name, avatarEl: buildChatSearchAvatar(avatar, color, name) });
   }
-  list.replaceChildren(...senders.map(sd => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'chat-search-sender-chip' + (sd.key === chatSearchSender ? ' selected' : '');
-    chip.textContent = sd.name;
-    chip.addEventListener('click', () => {
-      chatSearchSender = sd.key;
+  list.replaceChildren(...people.map(pp => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'chat-search-person';
+    row.appendChild(pp.avatarEl);
+    const label = document.createElement('span');
+    if(pp.isMe) label.innerHTML = '<span class="chat-search-me-badge">나</span>';
+    label.appendChild(document.createTextNode(pp.name));
+    row.appendChild(label);
+    if(pp.key === chatSearchSender){
+      const check = document.createElement('span');
+      check.className = 'chat-search-person-check';
+      check.textContent = '✓';
+      row.appendChild(check);
+    }
+    row.addEventListener('click', () => {
+      // 이미 고른 사람을 다시 누르면 해제
+      chatSearchSender = (pp.key === chatSearchSender) ? null : pp.key;
       chatSearchCurrentId = null; // 가장 최근에 그 사람이 한 말부터
-      document.getElementById('chatSearchSenderBtn').classList.toggle('active', !!sd.key);
+      document.getElementById('chatSearchSenderBtn').classList.toggle('active', !!chatSearchSender);
       list.hidden = true;
       // 검색칸에 쳐둔 글자도 같이 적용 (검색 버튼 안 눌렀어도)
       chatSearchQuery = document.getElementById('chatSearchInput').value;
-      renderChatMessages();
-      if(isChatSearchActive() && !chatSearchHits.length) showToast('검색 결과가 없어요.');
+      runChatSearch();
     });
-    return chip;
+    return row;
   }));
 }
 document.getElementById('chatSearchSenderBtn').addEventListener('click', () => {
   const list = document.getElementById('chatSearchSenderList');
-  if(list.hidden) renderChatSearchSenderList();
-  list.hidden = !list.hidden;
+  const willOpen = list.hidden;
+  closeChatSearchPopups();
+  if(willOpen){ renderChatSearchSenderList(); list.hidden = false; }
 });
 
-// ---------- 대화 검색: 날짜로 (카톡처럼 그 날 대화로 바로 이동) ----------
-function jumpChatToDate(value){
+// ---------- 대화 검색: 날짜로 (카톡처럼 대화가 있는 날을 골라 그 날로 바로 이동) ----------
+let chatSearchCalMonth = null; // 달력에 보이는 달 { y, m(0~11) }
+function renderChatSearchCalendar(){
   const room = CHAT_ROOMS[activeChatRoomId];
-  if(!room || !value) return;
-  const [y, mo, d] = value.split('-').map(Number);
-  const start = new Date(y, mo - 1, d).getTime();
+  const cal = document.getElementById('chatSearchCalendar');
+  if(!room) return;
+  const days = new Set(room.messages.map(m => chatDateKey(m.time || Date.now())));
+  const now = new Date();
+  const first = room.messages.length ? new Date(room.messages[0].time || Date.now()) : now;
+  if(!chatSearchCalMonth) chatSearchCalMonth = { y: now.getFullYear(), m: now.getMonth() };
+  const { y, m } = chatSearchCalMonth;
+  const canPrev = (y * 12 + m) > (first.getFullYear() * 12 + first.getMonth()) || !room._historyComplete;
+  const canNext = (y * 12 + m) < (now.getFullYear() * 12 + now.getMonth());
+  const startDow = new Date(y, m, 1).getDay();
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  let html = `<div class="chat-search-cal-head">
+      <button type="button" class="chat-search-cal-nav" data-step="-1"${canPrev ? '' : ' disabled'}>&#8249;</button>
+      <b>${y}년 ${m + 1}월</b>
+      <button type="button" class="chat-search-cal-nav" data-step="1"${canNext ? '' : ' disabled'}>&#8250;</button>
+    </div><div class="chat-search-cal-grid">`;
+  html += ['일','월','화','수','목','금','토'].map(w => `<div class="chat-search-cal-wd">${w}</div>`).join('');
+  for(let i = 0; i < startDow; i++) html += '<div></div>';
+  const todayKey = chatDateKey(now);
+  for(let d = 1; d <= lastDay; d++){
+    const key = chatDateKey(new Date(y, m, d));
+    html += `<button type="button" class="chat-search-cal-day${key === todayKey ? ' today' : ''}" data-day="${d}"${days.has(key) ? '' : ' disabled'}>${d}</button>`;
+  }
+  html += '</div>';
+  if(!room._historyComplete && room.isRealRoom) html += '<div class="chat-search-cal-loading">이전 대화를 불러오는 중…</div>';
+  cal.innerHTML = html;
+}
+document.getElementById('chatSearchCalendar').addEventListener('click', (e) => {
+  const nav = e.target.closest('.chat-search-cal-nav');
+  if(nav && !nav.disabled){
+    const t = chatSearchCalMonth.y * 12 + chatSearchCalMonth.m + Number(nav.dataset.step);
+    chatSearchCalMonth = { y: Math.floor(t / 12), m: t % 12 };
+    renderChatSearchCalendar();
+    return;
+  }
+  const day = e.target.closest('.chat-search-cal-day');
+  if(day && !day.disabled){
+    document.getElementById('chatSearchCalendar').hidden = true;
+    jumpChatToDate(chatSearchCalMonth.y, chatSearchCalMonth.m, Number(day.dataset.day));
+  }
+});
+document.getElementById('chatSearchDateBtn').addEventListener('click', async () => {
+  const cal = document.getElementById('chatSearchCalendar');
+  const willOpen = cal.hidden;
+  closeChatSearchPopups();
+  if(!willOpen) return;
+  const roomId = activeChatRoomId;
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  renderChatSearchCalendar();
+  cal.hidden = false;
+  // 옛날 대화가 다 안 받아져 있으면 받아온 뒤 달력을 다시 그림 (대화 있는 날이 더 생김)
+  if(!room._historyComplete){
+    await fetchOlderChatMessages(roomId, room);
+    if(roomId === activeChatRoomId && !cal.hidden) renderChatSearchCalendar();
+  }
+});
+async function jumpChatToDate(y, mo, d){
+  const roomId = activeChatRoomId;
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  const start = new Date(y, mo, d).getTime();
+  // 그 날이 아직 안 받아온 옛날이면 거기까지 받아옴
+  if(!room._historyComplete){
+    const added = await fetchOlderChatMessages(roomId, room, { untilTime: start });
+    if(roomId !== activeChatRoomId) return;
+    if(added && isChatSearchActive()) renderChatMessages(); // 검색 중엔 전부 그리므로 새로 받은 것도 그려둠
+  }
+  if(roomId !== activeChatRoomId) return;
   const msgs = room.messages;
   const idx = msgs.findIndex(m => +(m.time ? new Date(m.time) : Date.now()) >= start);
   if(idx < 0){ showToast('그 날짜 이후엔 대화가 없어요.'); return; }
@@ -23512,24 +23715,13 @@ function jumpChatToDate(value){
   const box = document.getElementById('chatMessages');
   const divider = box.querySelector(`.chat-date-divider[data-date-key="${targetKey}"]`);
   if(!divider) return;
+  chatStatusTapScrolling = true; // 맨 위에 닿아도 바로 이전 대화를 또 불러오지 않게 잠깐
   box.scrollTop += divider.getBoundingClientRect().top - box.getBoundingClientRect().top - 4;
+  setTimeout(() => { chatStatusTapScrolling = false; }, 400);
   divider.classList.remove('date-jump-flash');
   void divider.offsetWidth;
   divider.classList.add('date-jump-flash');
 }
-document.getElementById('chatSearchDateBtn').addEventListener('click', () => {
-  // 고를 수 있는 범위: 첫 대화 날 ~ 오늘
-  const room = CHAT_ROOMS[activeChatRoomId];
-  const input = document.getElementById('chatSearchDateInput');
-  const ymd = (t) => { const x = new Date(t); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
-  input.max = ymd(Date.now());
-  if(room && room.messages.length && room.messages[0].time) input.min = ymd(room.messages[0].time);
-  if(!input.value) input.value = input.max;
-  document.getElementById('chatSearchSenderList').hidden = true;
-});
-document.getElementById('chatSearchDateInput').addEventListener('change', (e) => {
-  jumpChatToDate(e.target.value);
-});
 
 // ---------- 채팅방: 그룹 멤버 목록 (전용 화면) ----------
 let activeGroupMembersRoomId = null;
