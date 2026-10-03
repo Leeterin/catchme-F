@@ -2742,11 +2742,13 @@
     flex-shrink:0;
   }
   .chat-search-bar.open{ display:flex; align-items:center; gap:8px; }
-  .chat-top-loader{
-    display:none; align-items:center; justify-content:center; gap:7px;
-    font-size:11.5px; color:var(--text-dim); padding:4px 0 8px; flex-shrink:0;
+  /* 이전 대화 불러올 때 맨 위에 잠깐 도는 동그라미 (인스타그램 느낌) */
+  .chat-older-spinner{ display:flex; justify-content:center; padding:6px 0 10px; }
+  .chat-older-spinner span{
+    width:18px; height:18px; border-radius:50%;
+    border:2px solid var(--line); border-top-color:var(--text-dim);
+    animation:msgSendingSpin .7s linear infinite;
   }
-  .chat-top-loader.show{ display:flex; animation:msgMetaFade .2s ease both; }
   .chat-search-cancel{
     flex-shrink:0;
     border:none; background:none; padding:6px 2px;
@@ -7597,7 +7599,6 @@
           </div>
         </div>
       </div>
-      <div class="chat-top-loader" id="chatTopLoader"><span class="msg-sending-dot"></span>이전 대화 불러오는 중</div>
       <div class="chat-search-bar" id="chatSearchBar">
         <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" enterkeyhint="search" />
         <button type="button" class="chat-search-cancel" id="chatSearchCancelBtn">취소</button>
@@ -22612,38 +22613,48 @@ function renderMoreChatAbove(extra){
   chatAutoScrollToken++; // renderChatMessages가 예약한 "맨 아래로" 취소
   box.scrollTop = box.scrollHeight - prevHeight + prevTop;
 }
-var chatStatusTapScrolling = false; // 꼭대기 탭으로 올라가는 중엔 중간에 더 불러오며 위치가 튀지 않게 잠깐 멈춤
+var chatStatusTapScrolling = false; // 꼭대기 탭으로 올라가는 중엔 중간에 불러오지 않게 잠깐 멈춤
+var chatLoadingOlder = false;
+// 인스타그램처럼: 맨 위에 닿으면 로딩 동그라미가 잠깐 돌고 그 위로 이전 대화가 붙음 (미리 몰래 붙이지 않음)
+// revealPx: 불러온 뒤 위로 조금 더 올려서 새로 붙은 내역이 바로 보이게
+function loadOlderChatWithSpinner(revealPx){
+  const box = document.getElementById('chatMessages');
+  if(chatLoadingOlder || !chatHasMoreAbove || !box) return;
+  chatLoadingOlder = true;
+  const spinner = document.createElement('div');
+  spinner.className = 'chat-older-spinner';
+  spinner.innerHTML = '<span></span>';
+  box.prepend(spinner);
+  const roomAtStart = activeChatRoomId;
+  setTimeout(() => {
+    spinner.remove();
+    chatLoadingOlder = false;
+    if(roomAtStart !== activeChatRoomId || !chatHasMoreAbove) return;
+    renderMoreChatAbove();
+    if(revealPx) box.scrollBy({ top: -revealPx, behavior: 'smooth' });
+  }, 220);
+}
 document.getElementById('chatMessages').addEventListener('scroll', () => {
   const box = document.getElementById('chatMessages');
   if(chatStatusTapScrolling) return;
-  if(chatHasMoreAbove && box.scrollTop < 120) renderMoreChatAbove();
+  if(chatHasMoreAbove && box.scrollTop < 8) loadOlderChatWithSpinner(0);
 }, { passive: true });
 
-// 아이폰 화면 꼭대기(상태바)를 누르면 채팅방이 위로 올라가며 이전 대화를 불러옴 (카톡처럼)
-// 채팅방은 화면 고정이라 iOS 기본 "맨 위로"가 안 먹어서, Capacitor가 보내주는 statusTap으로 직접 처리
+// 아이폰 화면 꼭대기(시계 있는 상태바)를 한 번 누르면: 위로 쭉 올라간 뒤 로딩이 잠깐 돌고 이전 내역이 위에 붙음
+// 채팅방은 화면 고정이라 iOS 기본 "맨 위로"가 안 먹어서, status-bar 플러그인이 보내주는 statusTap으로 직접 처리
 window.addEventListener('statusTap', () => {
   const view = document.getElementById('chatRoomView');
   if(!view || !view.classList.contains('active')) return;
   const box = document.getElementById('chatMessages');
-  const loader = document.getElementById('chatTopLoader');
   chatAutoScrollToken++;
-  const goTop = () => {
-    chatStatusTapScrolling = true;
-    box.scrollTo({ top: 0, behavior: 'smooth' });
-    const until = Date.now() + 1500;
-    (function waitTop(){
-      if(box.scrollTop > 2 && Date.now() < until) return requestAnimationFrame(waitTop);
-      chatStatusTapScrolling = false;
-    })();
-  };
-  if(!chatHasMoreAbove){ goTop(); return; }
-  // 이전 대화가 더 있으면 위에 로딩 표시를 잠깐 띄우고 한 묶음 더 그린 뒤 올라감
-  loader.classList.add('show');
-  setTimeout(() => {
-    renderMoreChatAbove();
-    loader.classList.remove('show');
-    goTop();
-  }, 350);
+  chatStatusTapScrolling = true;
+  box.scrollTo({ top: 0, behavior: 'smooth' });
+  const until = Date.now() + 1200;
+  (function waitTop(){
+    if(box.scrollTop > 2 && Date.now() < until) return requestAnimationFrame(waitTop);
+    chatStatusTapScrolling = false;
+    loadOlderChatWithSpinner(Math.round(box.clientHeight * 0.4));
+  })();
 });
 
 // ---------- 채팅 답장(인용) ----------
