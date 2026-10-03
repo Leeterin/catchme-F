@@ -13421,6 +13421,7 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
 let formRepeatMode = 'once';
 let formEventType = 'busy';
 let editingEventId = null;
+let absorbedAvailIds = []; // 예약 가능 수정 중 두 번 눌러서 이번 수정에 합친 다른 예약 가능 일정 id들
 let editingLinkedPieceIds = []; // 예전 방식(linkGroupId)으로 여러 날짜 조각으로 쪼개져 저장된 일정을 수정할 때,
                                  // 지금 연 조각 말고 나머지 조각들의 id - 저장 시 하나로 합치면서 이 조각들은 정리함
 const formSelectedWeekdays = new Set();
@@ -13674,6 +13675,11 @@ function defaultUntilDateValue(){
 
 function setEventTypeUI(type){
   formEventType = type;
+  // 예약 가능이 아닌 유형으로 바꾸면, 두 번 눌러서 합쳐뒀던 다른 예약 가능 일정은 원래대로 둠 (저장할 때 지워지지 않게)
+  if(type !== 'available' && absorbedAvailIds.length){
+    editingLinkedPieceIds = editingLinkedPieceIds.filter(id => !absorbedAvailIds.includes(id));
+    absorbedAvailIds = [];
+  }
   document.querySelectorAll('.event-type-btn').forEach(b => b.classList.toggle('active', b.dataset.type === type));
   const titleGroup = document.getElementById('eventFormTitleGroup');
   const titleInput = document.getElementById('eventFormTitle');
@@ -13710,6 +13716,7 @@ function setEventTypeUI(type){
 function openEventForm(existingEvent){
   editingEventId = existingEvent ? existingEvent.id : null;
   editingLinkedPieceIds = [];
+  absorbedAvailIds = [];
   document.getElementById('dayEventList').style.display = 'none';
   document.getElementById('eventFormView').classList.add('active');
   document.getElementById('eventFormHeaderTitle').textContent = existingEvent ? '일정 수정' : '일정 추가';
@@ -14203,16 +14210,51 @@ function renderAvailSelectGrid(){
       } else {
         // 이미 다른 일정 있어서 선택 못 하는 칸: PC에서는 마우스 올리면 무슨 일정인지 말풍선으로 보여주고 떼면 사라짐,
         // 모바일에서는 탭하면 토스트 알림으로 알려줌.
-        const occupiedTitle = alreadyAvailable ? '이미 예약 가능으로 등록돼 있어요' : ((blockingEv && blockingEv.title) || (texts[h] && texts[h].trim()) || '일정이 있어요');
+        // "예약 가능" 일정을 수정하는 중에 다른 예약 가능 칸을 두 번 누르면, 그 일정도 이번 수정에 합쳐서 같이 고칠 수 있게 함
+        const canAbsorb = alreadyAvailable && !!editingEventId && formEventType === 'available' && !blockingEv.recurring;
+        const occupiedTitle = canAbsorb
+          ? '두 번 누르면 이 시간도 같이 수정할 수 있어요'
+          : alreadyAvailable ? '이미 예약 가능으로 등록돼 있어요' : ((blockingEv && blockingEv.title) || (texts[h] && texts[h].trim()) || '일정이 있어요');
         cell.addEventListener('mouseenter', (e) => showCellHoverTooltip(occupiedTitle, e.clientX, e.clientY));
         cell.addEventListener('mousemove', (e) => positionCellHoverTooltip(e.clientX, e.clientY));
         cell.addEventListener('mouseleave', hideCellHoverTooltip);
-        cell.addEventListener('click', () => showToast(occupiedTitle));
+        cell.addEventListener('click', () => {
+          const now = Date.now();
+          if(canAbsorb && availLastOccupiedTap.key === cellKey && now - availLastOccupiedTap.at < 450){
+            availLastOccupiedTap = { key: null, at: 0 };
+            hideCellHoverTooltip();
+            absorbAvailEventIntoEdit(blockingEv);
+            return;
+          }
+          availLastOccupiedTap = { key: cellKey, at: now };
+          showToast(occupiedTitle);
+        });
       }
 
       grid.appendChild(cell);
     });
   });
+}
+
+// 수정 중인 "예약 가능" 일정에 다른 예약 가능 일정(ev)을 합침 - 그 칸들이 선택(파란색) 상태가 되고,
+// 저장하면 원래 일정과 함께 지워진 뒤 지금 선택된 칸들로 다시 만들어짐 (그래서 칸을 꺼서 일부만 취소할 수도 있음)
+let availLastOccupiedTap = { key: null, at: 0 };
+function absorbAvailEventIntoEdit(ev){
+  const pieces = ev.linkGroupId ? SCHEDULE_EVENTS.filter(e => e.linkGroupId === ev.linkGroupId) : [ev];
+  pieces.forEach(piece => {
+    if(piece.id === editingEventId || editingLinkedPieceIds.includes(piece.id)) return;
+    editingLinkedPieceIds.push(piece.id);
+    absorbedAvailIds.push(piece.id);
+    if(!piece.dateKey) return;
+    editingOriginalAvailBlocks.push({ dateKey: piece.dateKey, startMin: piece.startMin, endMin: piece.endMin });
+    const startH = Math.floor(piece.startMin / 60);
+    const endH = Math.max(startH + 1, Math.ceil(piece.endMin / 60));
+    for(let h = startH; h < endH && h < 24; h++){
+      availSelectedCells.add(`${piece.dateKey}::${HOURS.indexOf(h)}`);
+    }
+  });
+  renderAvailSelectGrid();
+  showToast('이 시간도 같이 수정할 수 있어요. 필요 없는 칸은 눌러서 꺼주세요.');
 }
 
 function paintAvailCell(cellEl, cellKey, value){
