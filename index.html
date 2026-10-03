@@ -7868,6 +7868,7 @@ function handleSessionExpired(){
 // 사용자가 직접 로그아웃 버튼을 눌렀을 때 - 서버에도 리프레시 토큰을 지워달라고 알리고 세션 정리
 async function performLogout(){
   const refreshTokenToRevoke = refreshTokenValue;
+  unregisterPushToken(authToken);
   authToken = null;
   refreshTokenValue = null;
   currentUser = null;
@@ -8112,6 +8113,68 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   loadSavedLocationsFromServer();
   connectRealtimeSocket();
   claimPendingInvite();
+  initPushNotifications();
+}
+
+// ---------- 휴대폰 푸시 알림 (설치한 앱에서만 동작, 웹에서는 아무것도 안 함) ----------
+let pushToken = null;
+let pushListenersReady = false;
+function getPushPlugin(){
+  const cap = window.Capacitor;
+  if(!cap || typeof cap.isNativePlatform !== 'function' || !cap.isNativePlatform()) return null;
+  return (cap.Plugins && cap.Plugins.PushNotifications) || null;
+}
+async function initPushNotifications(){
+  const push = getPushPlugin();
+  if(!push || !authToken) return;
+  try {
+    if(!pushListenersReady){
+      pushListenersReady = true;
+      // 기기 토큰을 받으면 서버에 "이 기기로 내 알림을 보내줘"라고 등록
+      push.addListener('registration', (t) => {
+        pushToken = t.value;
+        if(!authToken) return;
+        apiRequest('/push/tokens', { method: 'POST', body: JSON.stringify({ token: t.value, platform: window.Capacitor.getPlatform() }) }).catch(() => {});
+      });
+      push.addListener('registrationError', (e) => console.warn('[push] 등록 실패', e));
+      // 알림을 눌러서 앱이 열리면 해당 화면으로 이동
+      push.addListener('pushNotificationActionPerformed', (action) => {
+        handlePushTap((action && action.notification && action.notification.data) || {});
+      });
+    }
+    if(window.Capacitor.getPlatform() === 'android'){
+      await push.createChannel({ id: 'catchme_default', name: 'CATCHME 알림', importance: 5, visibility: 1 }).catch(() => {});
+    }
+    let perm = await push.checkPermissions();
+    if(perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') perm = await push.requestPermissions();
+    if(perm.receive !== 'granted') return;
+    await push.register();
+  } catch(err){
+    console.warn('[push] 초기화 실패', err);
+  }
+}
+async function handlePushTap(data){
+  if(!authToken) return;
+  if(data.type === 'chat' && data.roomId){
+    if(!CHAT_ROOMS[data.roomId]) await loadChatRoomsFromServer();
+    if(!CHAT_ROOMS[data.roomId]) return;
+    if(activeChatRoomId === data.roomId) return;
+    switchTopTab('chat');
+    openChatRoom(data.roomId);
+  } else if(data.type === 'friend'){
+    switchTopTab('friends');
+  } else if(data.type === 'invite'){
+    switchTopTab('schedule');
+  }
+}
+// 로그아웃하면 이 기기로 더 이상 내 알림이 안 오게 서버에서 토큰을 지움
+function unregisterPushToken(accessToken){
+  if(!pushToken || !accessToken) return;
+  fetch(API_BASE_URL + '/push/tokens', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + accessToken },
+    body: JSON.stringify({ token: pushToken }),
+  }).catch(() => {});
 }
 
 // ---------- 실시간 메시지 (Socket.io) ----------
