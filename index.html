@@ -3486,25 +3486,36 @@
     color:var(--accent); font-weight:600; cursor:pointer;
   }
   .msg-bubble-text{ white-space:pre-wrap; }
-  /* 대화 검색: 찾은 글자를 하늘색 테두리 칩으로 표시 (내 말풍선은 배경이 하늘색이라 흰 테두리) */
+  /* 대화 검색: 찾은 글자를 형광펜으로 칠한 것처럼 (글자 아래쪽 위주로 칠해서 손으로 그은 느낌) */
   mark.chat-search-hit{
-    color:inherit;
-    font-weight:600;
-    background:var(--accent-soft);
-    border-radius:5px;
-    padding:0 2px;
-    margin:0 -1px;
-    box-shadow:0 0 0 1.5px var(--accent), 0 0 8px rgba(56,189,248,.35);
+    color:#17181D;
+    background:linear-gradient(transparent 12%, #FFE76A 12%, #FFE76A 92%, transparent 92%);
+    border-radius:3px;
+    padding:0 1px;
     -webkit-box-decoration-break:clone;
     box-decoration-break:clone;
-    animation:chatSearchHitIn .25s ease both;
   }
-  .msg-row.me mark.chat-search-hit{
-    background:rgba(255,255,255,.22);
-    box-shadow:0 0 0 1.5px rgba(255,255,255,.95), 0 0 8px rgba(255,255,255,.35);
+  /* 지금 보고 있는 결과는 진한 형광펜 */
+  .msg-row.search-current mark.chat-search-hit{
+    background:linear-gradient(transparent 12%, #FFC93C 12%, #FFC93C 92%, transparent 92%);
+    animation:chatSearchHitPulse .5s ease;
   }
-  .chat-search-hit-card{ box-shadow:0 0 0 1.5px var(--accent), 0 0 10px rgba(56,189,248,.3) !important; }
-  @keyframes chatSearchHitIn{ from{ box-shadow:0 0 0 4px transparent; } }
+  @keyframes chatSearchHitPulse{ 0%{ filter:brightness(1); } 40%{ filter:brightness(1.12) saturate(1.3); } 100%{ filter:none; } }
+  .chat-search-hit-card{ box-shadow:0 0 0 2px #FFE76A !important; }
+  .msg-row.search-current .chat-search-hit-card{ box-shadow:0 0 0 2.5px #FFC93C !important; }
+  .chat-search-nav{ display:flex; align-items:center; gap:2px; flex-shrink:0; }
+  .chat-search-nav[hidden]{ display:none; }
+  .chat-search-count{ font-size:11.5px; color:var(--text-dim); margin-right:4px; font-variant-numeric:tabular-nums; }
+  .chat-search-arrow{
+    width:28px; height:28px; padding:0;
+    display:inline-flex; align-items:center; justify-content:center;
+    border:1px solid var(--line); border-radius:8px;
+    background:var(--surface); color:var(--text); cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .chat-search-arrow svg{ width:15px; height:15px; }
+  .chat-search-arrow:active{ background:var(--surface-2); }
+  .chat-search-arrow:disabled{ opacity:.35; cursor:default; }
   .msg-bubble-image{
     padding:4px;
     background:var(--surface-2);
@@ -7575,6 +7586,11 @@
       </div>
       <div class="chat-search-bar" id="chatSearchBar">
         <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" enterkeyhint="search" />
+        <div class="chat-search-nav" id="chatSearchNav" hidden>
+          <span class="chat-search-count" id="chatSearchCount">0/0</span>
+          <button type="button" class="chat-search-arrow" id="chatSearchUpBtn" aria-label="이전 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button>
+          <button type="button" class="chat-search-arrow" id="chatSearchDownBtn" aria-label="다음 결과"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        </div>
         <button type="button" class="chat-search-cancel" id="chatSearchCancelBtn">취소</button>
       </div>
       <div class="chat-pinned-schedule" id="chatPinnedSchedule" style="display:none;"></div>
@@ -22064,6 +22080,7 @@ function renderChatMessages(){
   let lastOtherRunKey = null; // 바로 앞 "상대 메시지"의 보낸 사람+분 - 같으면 프로필 아이콘을 또 그리지 않음
 
   visibleMessages.forEach(m => {
+    let isSearchHit = false;
     if(q){
       const haystack = (m.type === 'reservation' || m.type === 'time-suggest'
         ? `${m.note || ''} ${m.dateLabel || ''} ${m.timeLabel || ''} ${m.location || ''}`
@@ -22073,7 +22090,7 @@ function renderChatMessages(){
             ? `${m.place || ''} ${m.note || ''} ${m.location || ''}`
             : (m.text || '')
       ).toLowerCase();
-      if(!haystack.includes(q)) return;
+      isSearchHit = haystack.includes(q);
     }
 
     // 이전 메시지랑 날짜(일자)가 다르면, 그 사이에 날짜 구분선을 넣어줌
@@ -22484,17 +22501,69 @@ function renderChatMessages(){
       frag.appendChild(nameLabel);
       row.classList.add('has-sender-name');
     }
-    // 글 말풍선이 아닌 카드(예약/장소 등)는 카드 전체에 검색 테두리
-    if(q && !row.querySelector('.chat-search-hit')){
-      const card = row.querySelector('.reservation-card, .hotplace-notice-card');
-      if(card) card.classList.add('chat-search-hit-card');
+    if(isSearchHit){
+      row.classList.add('search-match');
+      // 글 말풍선이 아닌 카드(예약/장소 등)는 카드 전체를 형광펜 색으로 둘러줌
+      if(!row.querySelector('.chat-search-hit')){
+        const card = row.querySelector('.reservation-card, .hotplace-notice-card');
+        if(card) card.classList.add('chat-search-hit-card');
+      }
     }
     const retryBtn = row.querySelector('.msg-retry-btn');
     if(retryBtn) retryBtn.addEventListener('click', (e) => { e.stopPropagation(); retryFailedChatText(activeChatRoomId, m); });
     frag.appendChild(row);
   });
   box.replaceChildren(frag);
-  scrollChatToBottom();
+  if(q){
+    refreshChatSearchHits();
+  } else {
+    chatSearchHits = [];
+    updateChatSearchNav();
+    scrollChatToBottom();
+  }
+}
+
+// ---------- 대화 검색: 카톡처럼 대화는 전부 두고, 찾은 곳을 위/아래 버튼으로 오가며 봄 ----------
+var chatSearchHits = [];      // 검색어가 들어간 메시지 줄들 (위→아래 순)
+var chatSearchIndex = -1;     // 지금 보고 있는 결과 (처음엔 가장 최근 것)
+var chatSearchCurrentId = null;
+function refreshChatSearchHits(){
+  const box = document.getElementById('chatMessages');
+  chatSearchHits = Array.from(box.querySelectorAll('.msg-row.search-match'));
+  // 다시 그려져도(새 메시지 등) 보던 결과를 그대로 유지
+  let idx = chatSearchCurrentId ? chatSearchHits.findIndex(r => r.dataset.msgId === chatSearchCurrentId) : -1;
+  if(idx < 0) idx = chatSearchHits.length - 1;
+  chatSearchIndex = idx;
+  chatAutoScrollToken++; // 맨 아래로 자동 스크롤 취소
+  focusChatSearchHit(false);
+}
+function focusChatSearchHit(smooth){
+  chatSearchHits.forEach(r => r.classList.remove('search-current'));
+  const row = chatSearchHits[chatSearchIndex];
+  chatSearchCurrentId = row ? (row.dataset.msgId || null) : null;
+  if(row){
+    row.classList.add('search-current');
+    row.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+  }
+  updateChatSearchNav();
+}
+function moveChatSearchHit(step){
+  if(!chatSearchHits.length) return;
+  const next = chatSearchIndex + step;
+  if(next < 0){ showToast('첫 번째 검색 결과예요.'); return; }
+  if(next >= chatSearchHits.length){ showToast('마지막 검색 결과예요.'); return; }
+  chatSearchIndex = next;
+  focusChatSearchHit(true);
+}
+function updateChatSearchNav(){
+  const nav = document.getElementById('chatSearchNav');
+  const searching = !!chatSearchQuery.trim();
+  nav.hidden = !searching;
+  if(!searching) return;
+  const total = chatSearchHits.length;
+  document.getElementById('chatSearchCount').textContent = total ? `${chatSearchIndex + 1}/${total}` : '0/0';
+  document.getElementById('chatSearchUpBtn').disabled = !total || chatSearchIndex <= 0;
+  document.getElementById('chatSearchDownBtn').disabled = !total || chatSearchIndex >= total - 1;
 }
 
 // 최신 메시지가 항상 맨 아래(입력창 바로 위)에 보이게 스크롤. 바로 한 번 내리고, 키보드가 올라오는
@@ -23078,9 +23147,13 @@ document.getElementById('chatSearchInput').addEventListener('keydown', (e) => {
   if(e.key !== 'Enter' || e.isComposing) return;
   e.preventDefault();
   chatSearchQuery = e.target.value;
+  chatSearchCurrentId = null; // 새로 검색하면 가장 최근 결과부터
   e.target.blur();
   renderChatMessages();
+  if(chatSearchQuery.trim() && !chatSearchHits.length) showToast('검색 결과가 없어요.');
 });
+document.getElementById('chatSearchUpBtn').addEventListener('click', () => moveChatSearchHit(-1));
+document.getElementById('chatSearchDownBtn').addEventListener('click', () => moveChatSearchHit(1));
 document.getElementById('chatSearchInput').addEventListener('input', (e) => {
   if(e.target.value.trim() || !chatSearchQuery) return;
   chatSearchQuery = '';
