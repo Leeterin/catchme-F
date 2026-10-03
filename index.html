@@ -7288,7 +7288,7 @@
           <b id="feedReviewProfileName" style="min-width:0;"></b>
           <span id="feedReviewProfileBadge" style="flex-shrink:0;"></span>
         </div>
-        <span>리뷰용 프로필 · 탭해서 수정</span>
+        <span>탭해서 수정하기</span>
       </div>
       <button class="edit-icon-btn" id="feedReviewProfileEditBtn" type="button">&#9998;</button>
     </div>
@@ -10214,7 +10214,8 @@ function closeFeedAuthorView(){
   if(reviewProfileCard) reviewProfileCard.style.display = '';
 }
 document.getElementById('feedAuthorBackBtn').addEventListener('click', () => goBackOrClose(closeFeedAuthorView));
-document.getElementById('feedAuthorViewEditBtn').addEventListener('click', () => {
+// 리뷰용 프로필 수정 팝업 - 작성자 화면의 수정 버튼과 추천 탭 맨 위 "내 리뷰 프로필" 카드가 같이 씀
+function openMyReviewProfileEdit(){
   openReviewProfileSetupOverlay(() => {
     if(!currentUser) return;
     // 이미 불러와 있는 내 게시물들의 작성자 표시 정보(닉네임/사진 유무)도 같이 갱신해둬야
@@ -10227,9 +10228,11 @@ document.getElementById('feedAuthorViewEditBtn').addEventListener('click', () =>
         }
       });
     });
-    renderFeedAuthorViewContent(currentUser); // 화면이 이미 열려있는 채로 내용만 새로고침 (pushViewState는 다시 안 함)
+    // 작성자 화면이 열려있으면 내용만 새로고침 (pushViewState는 다시 안 함)
+    if(document.getElementById('feedAuthorView').classList.contains('active')) renderFeedAuthorViewContent(currentUser);
   }, true);
-});
+}
+document.getElementById('feedAuthorViewEditBtn').addEventListener('click', openMyReviewProfileEdit);
 
 
 // 별점을 채워진/빈 별로 표시 (예: 4점이면 ★★★★☆)
@@ -12215,9 +12218,10 @@ function renderFeedReviewProfileCard(){
   if(badgeEl){
     const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
     const myTier = getReviewerLevelTier(myCount);
+    // "등급 보기" 대신 실제 등급을 이름 바로 옆에 보여줌 - 리뷰 0개면 회색 "등급 없음"(눌러서 등급표 확인 가능)
     badgeEl.innerHTML = myTier
       ? renderReviewerLevelBadgeHtml(currentUser.id)
-      : '<span class="meet-badge-chip" style="color:var(--text-dim);border-color:var(--line);">등급 보기</span>';
+      : '<span class="meet-badge-chip" style="color:var(--text-dim);border-color:var(--line);">등급 없음</span>';
   }
   if(myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl){
     avatarEl.style.background = '';
@@ -12228,12 +12232,10 @@ function renderFeedReviewProfileCard(){
     avatarEl.style.background = myProfileData.color;
   }
 }
+// 카드를 탭하면 바로 리뷰용 닉네임/사진 수정 팝업 (등급 뱃지를 누르면 등급표 - 아래 stopPropagation)
 document.getElementById('feedReviewProfileCard').addEventListener('click', () => {
-  // 예전엔 바로 닉네임/사진 수정 팝업만 띄웠는데, 이제는 "내 리뷰 모아보기"(등급+개수+리뷰 목록,
-  // 그 안에 수정 버튼) 화면으로 들어가도록 바꿈 - 작성자 이름/뱃지를 눌렀을 때와 똑같은 화면을
-  // 재사용함(내 계정이라 isSelf가 자동으로 true가 되어 수정 버튼이 나타남)
   if(!currentUser) return;
-  openFeedAuthorView(currentUser);
+  openMyReviewProfileEdit();
 });
 
 // ---------- 리뷰 등급 전체 기준표 팝업 ----------
