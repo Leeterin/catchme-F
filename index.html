@@ -14400,12 +14400,38 @@ document.querySelectorAll('.date-picker-btn').forEach(btn => {
 let activeTimePickerTarget = null;
 let pendingTimeHour = 9;
 let pendingTimeMin = 0;
+// 일정 폼의 종료 시간을 고를 때, 시작 시간(분) 이후만 고를 수 있게 하는 하한값 (null이면 제한 없음)
+let timePickerMinAfter = null;
+
+function timeStrToMin(str){
+  const [h, m] = (str || '00:00').split(':').map(Number);
+  return h * 60 + m;
+}
+function minToTimeStr(min){
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+// 일정 폼의 종료 시간이 시작 시간과 같은 날인지 (요일 반복이거나 시작 날짜 = 종료 날짜)
+function eventFormEndIsSameDay(){
+  if(formRepeatMode !== 'once') return true;
+  const sd = document.getElementById('eventFormStartDate').value;
+  const ed = document.getElementById('eventFormEndDate').value;
+  return !ed || sd === ed;
+}
 
 function openTimePicker(targetId){
   closeAllCustomPopups();
   activeTimePickerTarget = targetId;
+  timePickerMinAfter = null;
+  if(targetId === 'eventFormEnd' && eventFormEndIsSameDay()){
+    const startMin = timeStrToMin(document.getElementById('eventFormStart').value);
+    if(startMin < 23 * 60 + 55) timePickerMinAfter = startMin;
+  }
   const current = document.getElementById(targetId).value || '09:00';
-  const [h, m] = current.split(':').map(Number);
+  let [h, m] = current.split(':').map(Number);
+  if(timePickerMinAfter !== null && h * 60 + m <= timePickerMinAfter){
+    const def = Math.min(timePickerMinAfter + 60, 23 * 60 + 55);
+    h = Math.floor(def / 60); m = def % 60;
+  }
   renderTimeColumns(h, m);
   document.getElementById('customTimePopup').style.display = 'flex';
 }
@@ -14422,7 +14448,28 @@ function renderTimeColumns(selH, selM){
   hourCol.innerHTML = '';
   minCol.innerHTML = '';
 
-  for(let h = 0; h < 24; h++){
+  const minAfter = timePickerMinAfter;
+  const minHour = minAfter === null ? 0 : Math.floor(minAfter / 60);
+  // 종료 시간 제한이 있을 때, 시작 시간과 같은 "시"를 고르면 시작 분 이후의 분만 보여줌
+  const renderMinutes = () => {
+    minCol.innerHTML = '';
+    const lowest = (minAfter !== null && pendingTimeHour === minHour) ? (minAfter % 60) + 5 : 0;
+    if(pendingTimeMin < lowest) pendingTimeMin = lowest;
+    for(let m = lowest; m < 60; m += 5){
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'custom-picker-time-opt' + (m === pendingTimeMin ? ' selected' : '');
+      el.textContent = String(m).padStart(2, '0');
+      el.addEventListener('click', () => {
+        pendingTimeMin = m;
+        minCol.querySelectorAll('.custom-picker-time-opt').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+      minCol.appendChild(el);
+    }
+  };
+
+  for(let h = minHour; h < 24; h++){
     const el = document.createElement('button');
     el.type = 'button';
     el.className = 'custom-picker-time-opt' + (h === selH ? ' selected' : '');
@@ -14431,21 +14478,11 @@ function renderTimeColumns(selH, selM){
       pendingTimeHour = h;
       hourCol.querySelectorAll('.custom-picker-time-opt').forEach(o => o.classList.remove('selected'));
       el.classList.add('selected');
+      if(minAfter !== null) renderMinutes();
     });
     hourCol.appendChild(el);
   }
-  for(let m = 0; m < 60; m += 5){
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'custom-picker-time-opt' + (m === selM ? ' selected' : '');
-    el.textContent = String(m).padStart(2, '0');
-    el.addEventListener('click', () => {
-      pendingTimeMin = m;
-      minCol.querySelectorAll('.custom-picker-time-opt').forEach(o => o.classList.remove('selected'));
-      el.classList.add('selected');
-    });
-    minCol.appendChild(el);
-  }
+  renderMinutes();
 
   requestAnimationFrame(() => {
     const selHourEl = hourCol.querySelector('.selected');
@@ -14458,6 +14495,26 @@ document.getElementById('customTimeConfirm').addEventListener('click', () => {
   const val = `${String(pendingTimeHour).padStart(2, '0')}:${String(pendingTimeMin).padStart(2, '0')}`;
   document.getElementById(activeTimePickerTarget).value = val;
   refreshTimeDisplay(activeTimePickerTarget);
+  // 일정 폼에서 시작 시간을 고르면 종료 시간은 기본으로 1시간 뒤로 맞춤 (자정을 넘기면 하루짜리 일정은 다음 날로)
+  if(activeTimePickerTarget === 'eventFormStart'){
+    let endMin = timeStrToMin(val) + 60;
+    if(endMin >= 24 * 60){
+      if(formRepeatMode === 'once'){
+        const sd = document.getElementById('eventFormStartDate').value;
+        if(sd){
+          const next = parseDateInputValue(sd);
+          next.setDate(next.getDate() + 1);
+          document.getElementById('eventFormEndDate').value = toDateInputValue(next);
+          refreshDateDisplay('eventFormEndDate');
+        }
+        endMin -= 24 * 60;
+      } else {
+        endMin = 23 * 60 + 55;
+      }
+    }
+    document.getElementById('eventFormEnd').value = minToTimeStr(endMin);
+    refreshTimeDisplay('eventFormEnd');
+  }
   closeTimePicker();
 });
 document.getElementById('customTimePopup').addEventListener('click', (e) => {
