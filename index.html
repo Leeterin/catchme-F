@@ -3331,9 +3331,6 @@
   .chat-messages::-webkit-scrollbar{ display:none; width:0; height:0; }
   /* 메시지가 적어도 위가 아니라 입력창 바로 위(맨 아래)부터 쌓이게 - 카카오톡처럼 (justify-content:flex-end는 스크롤이 깨져서 margin-top:auto로) */
   .chat-messages > :first-child{ margin-top:auto; }
-  /* 방에 들어갈 때 맨 아래로 스크롤이 끝나기 전까지는 숨겨서, 위에서부터 촤라락 내려가는 모습이 안 보이게 */
-  .chat-messages{ transition:opacity .12s ease; }
-  .chat-messages.chat-entering{ opacity:0; transition:none; }
 
   .chat-bottom-fixed{
     flex-shrink:0;
@@ -20556,7 +20553,18 @@ document.querySelectorAll('.hotplace-tab').forEach(btn => {
 // 핀 카드를 눌렀을 때 그 핀이 생겨난 채팅 메시지로 스크롤해서 이동 + 잠깐 하이라이트
 function scrollToChatMessage(msgId){
   if(!msgId) return;
-  const el = document.querySelector(`#chatMessages [data-msg-id="${msgId}"]`);
+  let el = document.querySelector(`#chatMessages [data-msg-id="${msgId}"]`);
+  if(!el){
+    // 아직 안 그린 이전 대화에 있는 메시지면 거기까지 그린 뒤 찾음
+    const room = CHAT_ROOMS[activeChatRoomId];
+    const idx = room ? room.messages.findIndex(m => m.id === msgId) : -1;
+    if(idx >= 0){
+      chatRenderCount = room.messages.length - idx + 10;
+      renderChatMessages();
+      el = document.querySelector(`#chatMessages [data-msg-id="${msgId}"]`);
+    }
+  }
+  chatAutoScrollToken++; // 맨 아래로 자동 스크롤이 이동을 덮어쓰지 않게
   if(!el){
     showToast('연결된 메시지를 찾을 수 없어요.');
     return;
@@ -21228,8 +21236,7 @@ function openChatRoom(id){
   document.getElementById('chatListView').classList.remove('active');
   document.getElementById('chatRoomView').classList.add('active');
   document.querySelector('.bottom-nav').style.display = 'none';
-  const msgBox = document.getElementById('chatMessages');
-  msgBox.classList.add('chat-entering');
+  chatRenderCount = CHAT_RENDER_STEP;
   const enterToken = ++chatEnterToken;
   // 앱을 새로 켠 뒤 처음 여는 방이면, 서버 응답 오기 전까지 폰에 저장해둔 최근 대화를 먼저 보여줌 (카톡처럼 바로 뜨게)
   if(room.isRealRoom && !room._loaded){
@@ -21263,16 +21270,13 @@ function openChatRoom(id){
   pushViewState(closeChatRoomView);
 }
 
-// 방에 들어올 때 숨겨둔 메시지 영역을 맨 아래로 내린 다음 바로 다음 프레임에 보여줌 (아무것도 기다리지 않음 -
-// 서버/사진을 기다리면 그동안 하얀 화면이 1초 넘게 보였음. 사진이 늦게 떠서 높이가 바뀌는 건 scrollChatToBottom이 다시 맞춰줌)
+// 방에 들어온 직후 맨 아래로 한 번 더 확실히 맞춤 (숨기거나 기다리는 것 없이 그대로 보여줌)
 var chatEnterToken = 0; // var: 시작할 때 링크로 바로 방이 열려도 선언 전 접근 에러가 안 나게
 function revealChatMessagesWhenReady(token){
   const box = document.getElementById('chatMessages');
   box.scrollTop = box.scrollHeight;
   requestAnimationFrame(() => {
-    if(token !== chatEnterToken) return;
-    box.scrollTop = box.scrollHeight;
-    box.classList.remove('chat-entering');
+    if(token === chatEnterToken) box.scrollTop = box.scrollHeight;
   });
 }
 
@@ -21430,14 +21434,22 @@ function buildMsgMetaHtml(m){
   return `<div class="msg-meta"><span>${timeText}</span></div>`;
 }
 
+var chatRenderCount = 60; // 지금 화면에 그리는 최근 메시지 수 (방 들어갈 때마다 60으로 초기화)
+var chatHasMoreAbove = false;
+const CHAT_RENDER_STEP = 60;
+
 function renderChatMessages(){
   const room = CHAT_ROOMS[activeChatRoomId];
   const box = document.getElementById('chatMessages');
-  box.innerHTML = '';
   const q = chatSearchQuery.trim().toLowerCase();
   let lastDateKey = null;
+  // 한 번에 전부 그리면 대화가 길수록 방 들어갈 때 버벅여서, 최근 메시지만 그리고 위로 올리면 더 그림 (검색 중엔 전부)
+  const visibleMessages = q ? room.messages : room.messages.slice(-chatRenderCount);
+  chatHasMoreAbove = !q && room.messages.length > visibleMessages.length;
+  // 화면에 붙이기 전에 따로 다 만든 뒤 한 번에 교체 - 중간 상태가 보이거나 여러 번 다시 계산되지 않게
+  const frag = document.createDocumentFragment();
 
-  room.messages.forEach(m => {
+  visibleMessages.forEach(m => {
     if(q){
       const haystack = (m.type === 'reservation' || m.type === 'time-suggest'
         ? `${m.note || ''} ${m.dateLabel || ''} ${m.timeLabel || ''} ${m.location || ''}`
@@ -21459,7 +21471,7 @@ function renderChatMessages(){
       const dividerLabel = document.createElement('span');
       dividerLabel.textContent = formatChatDateDividerLabel(msgTime);
       divider.appendChild(dividerLabel);
-      box.appendChild(divider);
+      frag.appendChild(divider);
       lastDateKey = dateKey;
     }
 
@@ -21844,21 +21856,25 @@ function renderChatMessages(){
       const nameLabel = document.createElement('div');
       nameLabel.className = 'msg-sender-name';
       nameLabel.textContent = senderName;
-      box.appendChild(nameLabel);
+      frag.appendChild(nameLabel);
     }
     const retryBtn = row.querySelector('.msg-retry-btn');
     if(retryBtn) retryBtn.addEventListener('click', (e) => { e.stopPropagation(); retryFailedChatText(activeChatRoomId, m); });
-    box.appendChild(row);
+    frag.appendChild(row);
   });
+  box.replaceChildren(frag);
   scrollChatToBottom();
 }
 
 // 최신 메시지가 항상 맨 아래(입력창 바로 위)에 보이게 스크롤. 바로 한 번 내리고, 키보드가 올라오는
 // 애니메이션(약 0.25초)이나 레이아웃 변화가 끝난 뒤에도 한 번 더 내려서 중간에 높이가 바뀌어도 어긋나지 않게 함
+// 맨 아래로 자동 스크롤 예약을 취소하고 싶을 때(이전 대화 더 불러오기, 특정 메시지로 이동) 이 값을 올림
+var chatAutoScrollToken = 0;
 function scrollChatToBottom(){
   const box = document.getElementById('chatMessages');
   if(!box) return;
-  const toBottom = () => { box.scrollTop = box.scrollHeight; };
+  const token = ++chatAutoScrollToken;
+  const toBottom = () => { if(token === chatAutoScrollToken) box.scrollTop = box.scrollHeight; };
   toBottom();
   requestAnimationFrame(toBottom);
   setTimeout(toBottom, 300);
@@ -21870,6 +21886,21 @@ function scrollChatToBottom(){
     }, { once: true });
   });
 }
+
+// 위로 끝까지 올리면 이전 대화를 더 그림 - 보고 있던 위치가 튀지 않게 늘어난 높이만큼 보정
+function renderMoreChatAbove(extra){
+  const box = document.getElementById('chatMessages');
+  const prevHeight = box.scrollHeight;
+  const prevTop = box.scrollTop;
+  chatRenderCount += extra || CHAT_RENDER_STEP;
+  renderChatMessages();
+  chatAutoScrollToken++; // renderChatMessages가 예약한 "맨 아래로" 취소
+  box.scrollTop = box.scrollHeight - prevHeight + prevTop;
+}
+document.getElementById('chatMessages').addEventListener('scroll', () => {
+  const box = document.getElementById('chatMessages');
+  if(chatHasMoreAbove && box.scrollTop < 120) renderMoreChatAbove();
+}, { passive: true });
 
 // ---------- 채팅 답장(인용) ----------
 let replyingToMsg = null; // { msgId, preview }
