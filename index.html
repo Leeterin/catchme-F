@@ -4515,6 +4515,17 @@
   .mini-confirm-btn:hover{ background:var(--mask); }
   .mini-confirm-btn.danger{ color:var(--cta); }
 
+  /* ---------------- 서버 깨우는 중 안내 ---------------- */
+  .server-waking-banner{
+    position:fixed; top:calc(env(safe-area-inset-top, 0px) + 10px); left:50%; transform:translateX(-50%);
+    z-index:9800; max-width:calc(100% - 32px); padding:9px 14px; border-radius:999px;
+    background:var(--surface-2); color:var(--text); border:1px solid var(--line);
+    box-shadow:0 4px 14px rgba(0,0,0,0.12); font-size:12.5px; display:flex; align-items:center; gap:8px;
+  }
+  .server-waking-banner[hidden]{ display:none; }
+  .server-waking-spinner{ width:12px; height:12px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--text); animation:serverWakingSpin .8s linear infinite; flex-shrink:0; }
+  @keyframes serverWakingSpin{ to{ transform:rotate(360deg); } }
+
   /* ---------------- 오류 신고 사진 첨부 ---------------- */
   .bug-report-photos{ display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; }
   .bug-report-photo{ position:relative; width:60px; height:60px; border-radius:10px; overflow:hidden; border:1px solid var(--line); }
@@ -6231,7 +6242,6 @@
         네이버로 로그인
       </button>
 
-      <div class="auth-hint">백엔드 서버 <code id="apiBaseDisplay"></code> 가 켜져 있어야 로그인/회원가입이 동작해요.</div>
     </div>
   </div>
 
@@ -6988,6 +6998,8 @@
       </div>
     </div>
   </div>
+
+  <div class="server-waking-banner" id="serverWakingBanner" hidden><span class="server-waking-spinner"></span>서버를 깨우는 중이에요. 최대 30초 정도 걸릴 수 있어요</div>
 
   <!-- 앱 오류 신고 팝업 - 폰을 흔들거나 설정 메뉴 "오류 신고하기"로 열림 -->
   <div class="mini-confirm-overlay" id="bugReportOverlay">
@@ -7757,7 +7769,6 @@ const STARTUP_INVITE_TOKEN = (() => {
     return /^[A-Za-z0-9_-]{6,64}$/.test(t) ? t : null;
   } catch(e) { return null; }
 })();
-document.getElementById('apiBaseDisplay').textContent = API_BASE_URL;
 
 let authToken = null; // 새로고침하면 초기화됨 (이 아티팩트 환경은 localStorage를 쓸 수 없어요)
 let refreshTokenValue = null; // 액세스 토큰이 만료됐을 때 재로그인 없이 새로 받아오는 용도
@@ -7765,15 +7776,27 @@ let currentUser = null;
 let myLocationSharing = false; // 위치 공유 동의 여부 (로그인 시 서버 값으로 갱신됨)
 let isRefreshingToken = null; // 리프레시가 동시에 여러 번 실행되지 않도록 진행 중인 요청을 공유
 
+// 서버(무료 요금제)는 한동안 안 쓰면 잠들어서 첫 요청이 30초 넘게 걸릴 수 있음 - 요청이 3초 넘게
+// 안 끝나면 화면 위에 "서버를 깨우는 중" 안내를 띄워서 앱이 멈춘 것처럼 보이지 않게 함
+let slowRequestCount = 0;
+function setServerWakingBanner(show){
+  const el = document.getElementById('serverWakingBanner');
+  if(el) el.hidden = !show;
+}
 async function apiRequest(path, options = {}, _isRetry) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
 
   let res;
+  let isSlow = false;
+  const slowTimer = setTimeout(() => { isSlow = true; slowRequestCount++; setServerWakingBanner(true); }, 3000);
   try {
     res = await fetch(API_BASE_URL + path, { ...options, headers });
   } catch (networkErr) {
-    throw new Error(`백엔드 서버(${API_BASE_URL})에 연결할 수 없어요. 서버가 켜져 있는지 확인해주세요.`);
+    throw new Error('서버에 연결할 수 없어요. 인터넷 연결을 확인하고 잠시 후 다시 시도해주세요.');
+  } finally {
+    clearTimeout(slowTimer);
+    if(isSlow && --slowRequestCount <= 0){ slowRequestCount = 0; setServerWakingBanner(false); }
   }
 
   // 액세스 토큰이 만료돼서 401이 온 거면 (로그인/회원가입/재발급 자체가 아닌 이상)
