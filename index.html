@@ -20882,7 +20882,8 @@ function renderChatMessages(){
         });
       }
     } else if(m.type === 'location-recommend'){
-      const mapUrl = (typeof m.lat === 'number' && typeof m.lon === 'number')
+      const hasCoords = typeof m.lat === 'number' && typeof m.lon === 'number';
+      const mapUrl = hasCoords
         ? `https://map.kakao.com/link/map/${encodeURIComponent(m.areaName)},${m.lat},${m.lon}`
         : null;
       row.innerHTML = `
@@ -20891,9 +20892,15 @@ function renderChatMessages(){
           <div class="reservation-card-time">${escapeHtml(m.areaName)}</div>
           <div class="reservation-card-note">참가자 ${m.participants}명 · 평균 ${m.avgMinutes}분 · 최장 ${m.maxMinutes}분 (대중교통 기준)</div>
           <div class="reservation-card-note" style="color:var(--text-dim);font-size:11px;">참가자 개별 출발지는 공개되지 않아요.</div>
-          ${mapUrl ? `<div class="reservation-card-actions"><a href="${mapUrl}" target="_blank" rel="noopener" class="reservation-btn accept" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">지도에서 보기</a></div>` : ''}
+          <div class="reservation-card-actions">
+            <button type="button" class="reservation-btn accept lr-nearby-food-btn">${ICO.pin} 이 근처 맛집 보기</button>
+            ${mapUrl ? `<a href="${mapUrl}" target="_blank" rel="noopener" class="reservation-btn decline" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">지도에서 보기</a>` : ''}
+          </div>
         </div>
       `;
+      // 장소가 추천되면 거기서 바로 끝나는 게 아니라, 그 근처 맛집/카페 추천(핫플레이스 화면)으로 자연스럽게
+      // 이어지게 함 - "장소 확정"(LOCATION_NOTICE) 카드의 "주변 핫플 보기"와 똑같은 화면을 재사용
+      row.querySelector('.lr-nearby-food-btn').addEventListener('click', () => openHotplaceView(m.areaName, m.lat, m.lon));
     } else if(m.type === 'hotplace'){
       if(m.superseded){
         // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 카드 - 다른 시스템 알림처럼 작게만 표시함
