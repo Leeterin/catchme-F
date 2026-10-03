@@ -3337,7 +3337,9 @@
     box-sizing:border-box;
     background:var(--bg);
     margin:0 -18px;
-    padding:8px 14px calc(6px + env(safe-area-inset-bottom));
+    /* 키보드가 닫혀 있을 때도 입력칸이 화면 맨 아래에 붙게 - 홈바(아이폰 하단 막대) 영역을 통째로 비우지 않고
+       홈바에 안 겹칠 만큼만 띄움 (홈바 영역이 없는 폰은 8px) */
+    padding:8px 14px max(8px, calc(env(safe-area-inset-bottom) - 16px));
     border-top:1px solid var(--line);
   }
   /* 앱에서 키보드가 올라와 있을 때: 키보드 높이에 홈바 영역이 이미 포함돼 있어서 하단 여백을 카카오톡처럼 최소로 */
@@ -21106,7 +21108,9 @@ function fixChatHeaderPosition(){
   // 계산되는 기준이 이쪽이라서, window.innerHeight와의 미세한 차이 때문에 입력창이 키보드보다 살짝
   // 위로 뜨던 오차를 없앰)
   const gap = document.documentElement.clientHeight - (window.visualViewport.height + window.visualViewport.offsetTop);
-  view.style.bottom = Math.max(0, gap, nativeKeyboardHeight) + 'px';
+  // 앱에서는 웹뷰가 키보드 때문에 줄어들지 않으니(resize:none) 실제 키보드 높이만 씀 - 키보드를 닫은 뒤 gap 계산이
+  // 0으로 안 돌아오고 남아서 입력칸이 붕 떠 보이는 일을 막음
+  view.style.bottom = (view.classList.contains('native-keyboard') ? nativeKeyboardHeight : Math.max(0, gap)) + 'px';
 }
 // 앱(Capacitor)에서는 Keyboard 플러그인 resize:none 설정 때문에 키보드가 떠도 웹뷰/visualViewport가 줄어들지 않아
 // gap이 0으로 나와서 입력창이 키보드 뒤에 가려졌음. 그래서 플러그인이 알려주는 실제 키보드 높이로 직접 끌어올림
