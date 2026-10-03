@@ -624,6 +624,23 @@
     cursor:pointer;
   }
   .location-picker-recommend-chip.active{ background:var(--accent); }
+  /* 추천 칩 결과를 지도 위 핀으로 (카카오맵처럼 번호 동그라미 + 이름) */
+  .lp-rec-pin{
+    display:flex; flex-direction:column; align-items:center; transform:translateY(-4px);
+    cursor:pointer; -webkit-tap-highlight-color:transparent;
+  }
+  .lp-rec-pin-dot{
+    width:24px; height:24px; border-radius:50% 50% 50% 0; transform:rotate(-45deg);
+    background:#FF5A3C; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.3);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .lp-rec-pin-dot span{ transform:rotate(45deg); color:#fff; font-size:11px; font-weight:800; }
+  .lp-rec-pin-name{
+    margin-top:3px; max-width:110px; padding:2px 6px; border-radius:6px;
+    background:rgba(255,255,255,.95); color:#222; font-size:10.5px; font-weight:700;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 4px rgba(0,0,0,.2);
+  }
+  .lp-rec-pin.picked .lp-rec-pin-dot{ background:#2563EB; }
   .location-suggest-item .meta{ font-size:10.5px; color:var(--accent); margin-top:2px; }
   /* 지도 상단 "모임 장소 추천받기" 버튼 (채팅방 약속 장소를 정할 때만 보임) */
   .location-picker-recommend-meet{
@@ -5097,6 +5114,36 @@
     color:var(--text-dim);
     margin-bottom:10px;
   }
+  /* 카카오맵 주변 장소 (커뮤니티 추천 아래) */
+  .hotplace-kakao-section{ margin-top:16px; }
+  .hotplace-kakao-title{
+    display:flex; align-items:center; gap:6px;
+    font-size:13px; font-weight:800; color:var(--text); margin-bottom:8px;
+  }
+  .hotplace-kakao-title .kk{ background:#FEE500; color:#3C1E1E; font-size:10px; font-weight:800; padding:2px 6px; border-radius:5px; }
+  .hotplace-kakao-filter{ display:flex; gap:6px; overflow-x:auto; margin-bottom:8px; scrollbar-width:none; }
+  .hotplace-kakao-filter::-webkit-scrollbar{ display:none; }
+  .hotplace-kakao-filter button{
+    flex-shrink:0; border:1px solid var(--line); background:var(--surface-2); color:var(--text);
+    border-radius:999px; padding:5px 11px; font:inherit; font-size:11.5px; font-weight:600; cursor:pointer;
+  }
+  .hotplace-kakao-filter button.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .kakao-place-card{
+    padding:12px 12px 10px; border:1px solid var(--line); border-radius:14px;
+    background:var(--surface); margin-bottom:8px;
+  }
+  .kakao-place-head{ display:flex; align-items:baseline; gap:6px; flex-wrap:wrap; }
+  .kakao-place-name{ font-size:14px; font-weight:800; color:var(--text); }
+  .kakao-place-cat{ font-size:11px; color:var(--text-dim); }
+  .kakao-place-dist{ margin-left:auto; font-size:11px; font-weight:700; color:var(--accent); white-space:nowrap; }
+  .kakao-place-addr, .kakao-place-phone{ font-size:11.5px; color:var(--text-dim); margin-top:3px; }
+  .kakao-place-phone a{ color:var(--text-dim); text-decoration:none; }
+  .kakao-place-actions{ display:flex; gap:6px; margin-top:9px; flex-wrap:wrap; }
+  .kakao-place-actions .kakao-link{ text-decoration:none; display:inline-flex; align-items:center; }
+  .hotplace-kakao-more{
+    width:100%; padding:10px; border:1px dashed var(--line); border-radius:12px; background:none;
+    color:var(--text-dim); font:inherit; font-size:12px; font-weight:600; cursor:pointer;
+  }
   .map-search-row{
     display:flex;
     gap:8px;
@@ -7282,16 +7329,19 @@
         <div id="hotplaceMapFrame" class="hotplace-map-frame"></div>
       </div>
       <div class="hotplace-pane active" id="hotplacePane-food">
-        <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 밥집이에요.</div>
+        <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 밥집이에요. 아래엔 카카오맵의 주변 밥집도 있어요.</div>
         <div id="hotplaceList-food"></div>
+        <div class="hotplace-kakao-section" id="hotplaceKakao-food"></div>
       </div>
       <div class="hotplace-pane" id="hotplacePane-cafe">
-        <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 카페·베이커리·공방이에요.</div>
+        <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 카페·베이커리·공방이에요. 아래엔 카카오맵의 주변 카페도 있어요.</div>
         <div id="hotplaceList-cafe"></div>
+        <div class="hotplace-kakao-section" id="hotplaceKakao-cafe"></div>
       </div>
       <div class="hotplace-pane" id="hotplacePane-experience">
-        <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 놀거리·액티비티예요.</div>
+        <div class="hotplace-list-desc">우리 커뮤니티 멤버들이 추천한 놀거리·액티비티예요. 아래엔 카카오맵의 주변 놀거리도 있어요.</div>
         <div id="hotplaceList-experience"></div>
+        <div class="hotplace-kakao-section" id="hotplaceKakao-experience"></div>
       </div>
       <div class="hotplace-pane" id="hotplacePane-saved">
         <div class="hotplace-list-desc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><polygon points="12 2 15 9 22 9.5 17 14.5 18.5 22 12 18 5.5 22 7 14.5 2 9.5 9 9"/></svg> 눌러서 저장해둔 곳이에요. 나중에 가볼 곳으로 모아볼 수 있어요.</div>
@@ -19267,6 +19317,7 @@ function refreshHotplaceListsIfOpen(){
   renderHotplaceList('food', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
   renderHotplaceList('cafe', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
   renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
+  ['food', 'cafe', 'experience'].forEach(renderHotplaceKakaoSection);
   // 장소별 리뷰 모아보기가 그 위에 떠있으면 그것도 최신 상태로 다시 그림
   if(currentHotplacePlaceReviewsGroup){
     const { group, category, distKm } = currentHotplacePlaceReviewsGroup;
@@ -20843,6 +20894,40 @@ function setLocationPickerRecommendChip(key){
   document.querySelectorAll('#locationPickerRecommendRow .location-picker-recommend-chip').forEach(c => {
     c.classList.toggle('active', c.dataset.rec === key);
   });
+  if(!key) clearLocationPickerRecPins();
+}
+// 추천 칩(맛집/카페 등) 결과를 지도 위 핀으로 - 핀을 누르면 목록에서 고른 것과 똑같이 선택됨
+let locationPickerRecPins = [];
+function clearLocationPickerRecPins(){
+  locationPickerRecPins.forEach(o => o.setMap(null));
+  locationPickerRecPins = [];
+}
+function showLocationPickerRecPins(items){
+  clearLocationPickerRecPins();
+  if(!locationPickerMapInstance || !window.kakao || !kakao.maps) return;
+  const bounds = new kakao.maps.LatLngBounds();
+  items.forEach((r, idx) => {
+    const lat = parseFloat(r.y), lon = parseFloat(r.x);
+    if(isNaN(lat) || isNaN(lon)) return;
+    const pos = new kakao.maps.LatLng(lat, lon);
+    const el = document.createElement('div');
+    el.className = 'lp-rec-pin';
+    el.innerHTML = `<div class="lp-rec-pin-dot"><span>${idx + 1}</span></div><div class="lp-rec-pin-name"></div>`;
+    el.querySelector('.lp-rec-pin-name').textContent = r.place_name || '';
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.lp-rec-pin.picked').forEach(x => x.classList.remove('picked'));
+      el.classList.add('picked');
+      document.getElementById('locationPickerSuggestList').classList.remove('show');
+      placeLocationPickerPin(lat, lon, r.place_name, r.road_address_name || r.address_name || '');
+    });
+    const overlay = new kakao.maps.CustomOverlay({ position: pos, content: el, yAnchor: 1, clickable: true, zIndex: 3 });
+    overlay.setMap(locationPickerMapInstance);
+    locationPickerRecPins.push(overlay);
+    bounds.extend(pos);
+  });
+  if(locationPickerRecPins.length > 1) locationPickerMapInstance.setBounds(bounds, 60, 30, 30, 30);
+  else if(locationPickerRecPins.length === 1) locationPickerMapInstance.panTo(locationPickerRecPins[0].getPosition());
 }
 function formatPickerDistance(meters){
   if(!(meters >= 0)) return '';
@@ -20850,6 +20935,7 @@ function formatPickerDistance(meters){
 }
 function renderLocationPickerRecommendList(items, emptyText){
   const listEl = document.getElementById('locationPickerSuggestList');
+  showLocationPickerRecPins(items);
   if(!items.length){
     listEl.innerHTML = `<div class="location-suggest-status">${escapeHtml(emptyText)}</div>`;
     listEl._results = [];
@@ -20911,7 +20997,7 @@ async function showLocationPickerRecommend(key){
       // 그 사이 다른 칩을 눌렀으면 늦게 온 결과는 무시
       if(document.querySelector('#locationPickerRecommendRow .active')?.dataset.rec !== key) return;
       const ok = status === kakao.maps.services.Status.OK && results && results.length;
-      const items = ok ? results.slice(0, 10).map(r => ({
+      const items = ok ? results.slice(0, 15).map(r => ({
         ...r,
         _meta: [String(r.category_name || '').split('>').pop().trim(), formatPickerDistance(parseFloat(r.distance))].filter(Boolean).join(' · '),
       })) : [];
@@ -20954,7 +21040,10 @@ document.getElementById('locationPickerSuggestList').addEventListener('click', (
   if(!picked) return;
 
   document.getElementById('locationPickerSuggestList').classList.remove('show');
-  setLocationPickerRecommendChip(null);
+  const fromChip = !!document.querySelector('#locationPickerRecommendRow .active');
+  if(!fromChip) setLocationPickerRecommendChip(null);
+  const pickedIdx = parseInt(item.dataset.idx, 10);
+  document.querySelectorAll('.lp-rec-pin').forEach((x, i) => x.classList.toggle('picked', fromChip && i === pickedIdx));
   const lat = parseFloat(picked.y), lon = parseFloat(picked.x);
   placeLocationPickerPin(lat, lon, picked.place_name, picked.road_address_name || picked.address_name || '');
 });
@@ -21130,6 +21219,153 @@ function renderKakaoMap(location, lat, lon){
   });
 }
 
+// ---------- 핫플 탭마다 카카오맵 주변 장소 (실제 가게 정보: 이름/분류/거리/주소/전화/카카오맵 상세) ----------
+const HOTPLACE_KAKAO_FILTERS = {
+  food: [
+    { label:'전체', category:'FD6' }, { label:'한식', keyword:'한식' }, { label:'중식', keyword:'중식' },
+    { label:'일식', keyword:'일식' }, { label:'양식', keyword:'양식' }, { label:'고기', keyword:'고기집' },
+    { label:'분식', keyword:'분식' }, { label:'술집', keyword:'술집' },
+  ],
+  cafe: [
+    { label:'전체', category:'CE7' }, { label:'디저트', keyword:'디저트카페' }, { label:'베이커리', keyword:'베이커리' },
+    { label:'브런치', keyword:'브런치' }, { label:'스터디카페', keyword:'스터디카페' },
+  ],
+  experience: [
+    { label:'관광명소', category:'AT4' }, { label:'문화시설', category:'CT1' }, { label:'영화관', keyword:'영화관' },
+    { label:'노래방', keyword:'노래방' }, { label:'방탈출', keyword:'방탈출카페' }, { label:'보드게임', keyword:'보드게임카페' },
+    { label:'PC방', keyword:'PC방' }, { label:'볼링장', keyword:'볼링장' }, { label:'공원', keyword:'공원' },
+  ],
+};
+const HOTPLACE_KAKAO_LABEL = { food:'밥집', cafe:'카페', experience:'놀거리' };
+let hotplaceKakaoState = {}; // category -> { filterIdx, results, pagination, loading }
+let hotplaceKakaoCenter = null; // { lat, lon }
+let hotplaceKakaoToken = 0;
+
+function resolveHotplaceCenter(location, lat, lon){
+  return new Promise(resolve => {
+    if(typeof lat === 'number' && typeof lon === 'number') return resolve({ lat, lon });
+    if(!location) return resolve(null);
+    ensureKakaoMapsLoaded(() => {
+      new kakao.maps.services.Places().keywordSearch(location, (res, status) => {
+        if(status === kakao.maps.services.Status.OK && res[0]) resolve({ lat: parseFloat(res[0].y), lon: parseFloat(res[0].x) });
+        else resolve(null);
+      });
+    });
+  });
+}
+async function loadHotplaceKakaoPlaces(location, lat, lon){
+  const token = ++hotplaceKakaoToken;
+  hotplaceKakaoState = {};
+  ['food', 'cafe', 'experience'].forEach(cat => {
+    hotplaceKakaoState[cat] = { filterIdx: 0, results: [], pagination: null, loading: true };
+    renderHotplaceKakaoSection(cat);
+  });
+  hotplaceKakaoCenter = await resolveHotplaceCenter(location, lat, lon);
+  if(token !== hotplaceKakaoToken) return;
+  ['food', 'cafe', 'experience'].forEach(cat => searchHotplaceKakao(cat, false));
+}
+function searchHotplaceKakao(category, more){
+  const st = hotplaceKakaoState[category];
+  if(!st) return;
+  if(!hotplaceKakaoCenter){ st.loading = false; renderHotplaceKakaoSection(category); return; }
+  if(more && st.pagination && st.pagination.hasNextPage){
+    st.loading = true;
+    renderHotplaceKakaoSection(category);
+    st.pagination.nextPage();
+    return;
+  }
+  st.loading = true;
+  st.results = [];
+  st.pagination = null;
+  renderHotplaceKakaoSection(category);
+  const token = hotplaceKakaoToken;
+  const filterIdx = st.filterIdx;
+  const conf = HOTPLACE_KAKAO_FILTERS[category][filterIdx];
+  ensureKakaoMapsLoaded(() => {
+    const places = new kakao.maps.services.Places();
+    const opts = {
+      location: new kakao.maps.LatLng(hotplaceKakaoCenter.lat, hotplaceKakaoCenter.lon),
+      radius: Math.round(FEED_NEARBY_RADIUS_KM * 1000), // 도보 20분 안
+      sort: kakao.maps.services.SortBy.ACCURACY, // 카카오맵 기본 순서(정확도/인기)
+      size: 15,
+    };
+    const done = (results, status, pagination) => {
+      if(token !== hotplaceKakaoToken || st.filterIdx !== filterIdx) return; // 그 사이 다른 걸 눌렀으면 무시
+      st.loading = false;
+      if(status === kakao.maps.services.Status.OK && results){
+        const seen = new Set(st.results.map(r => r.id));
+        st.results = st.results.concat(results.filter(r => !seen.has(r.id)));
+        st.pagination = pagination || null;
+      }
+      renderHotplaceKakaoSection(category);
+    };
+    if(conf.category) places.categorySearch(conf.category, done, opts);
+    else places.keywordSearch(conf.keyword, done, opts);
+  });
+}
+function renderHotplaceKakaoSection(category){
+  const box = document.getElementById('hotplaceKakao-' + category);
+  const st = hotplaceKakaoState[category];
+  if(!box || !st) return;
+  const filters = HOTPLACE_KAKAO_FILTERS[category];
+  let html = `<div class="hotplace-kakao-title"><span class="kk">카카오맵</span> 주변 ${HOTPLACE_KAKAO_LABEL[category]}</div>`;
+  html += `<div class="hotplace-kakao-filter">${filters.map((f, i) => `<button type="button" data-fi="${i}" class="${i === st.filterIdx ? 'active' : ''}">${escapeHtml(f.label)}</button>`).join('')}</div>`;
+  if(!hotplaceKakaoCenter && !st.loading){
+    html += `<div class="search-empty">약속 장소 위치를 찾지 못해서 주변 장소를 불러올 수 없어요.</div>`;
+  } else if(!st.results.length){
+    html += `<div class="search-empty">${st.loading ? '카카오맵에서 주변 장소를 불러오는 중...' : '도보 20분 안에 찾은 곳이 없어요.'}</div>`;
+  }
+  box.innerHTML = html;
+  const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
+  st.results.forEach(r => {
+    const distKm = parseFloat(r.distance) / 1000;
+    const catName = String(r.category_name || '').split('>').map(x => x.trim()).filter(Boolean).slice(-1)[0] || '';
+    const status = getRoomPlaceStatus(room, r.place_name);
+    const card = document.createElement('div');
+    card.className = 'kakao-place-card';
+    card.innerHTML = `
+      <div class="kakao-place-head">
+        <span class="kakao-place-name"></span>
+        <span class="kakao-place-cat"></span>
+        ${isNaN(distKm) ? '' : `<span class="kakao-place-dist">${formatWalkingTime(distKm)} · ${formatDistanceMeters(distKm)}</span>`}
+      </div>
+      <div class="kakao-place-addr"></div>
+      ${r.phone ? `<div class="kakao-place-phone"><a href="tel:${escapeHtml(r.phone)}">${escapeHtml(r.phone)}</a></div>` : ''}
+      <div class="kakao-place-actions">
+        ${status === 'confirmed'
+          ? '<button type="button" class="feed-post-btn status-badge confirmed" disabled>확정됨</button>'
+          : status === 'pending'
+            ? '<button type="button" class="feed-post-btn status-badge pending" disabled>제안됨</button>'
+            : '<button type="button" class="feed-post-btn suggest">여기 어때요?</button>'}
+        <button type="button" class="feed-post-btn fix">장소 픽스</button>
+        ${r.place_url ? `<a class="feed-post-btn kakao-link" href="${escapeHtml(r.place_url)}" target="_blank" rel="noopener">카카오맵 정보 &rsaquo;</a>` : ''}
+      </div>`;
+    card.querySelector('.kakao-place-name').textContent = r.place_name;
+    card.querySelector('.kakao-place-cat').textContent = catName;
+    card.querySelector('.kakao-place-addr').textContent = r.road_address_name || r.address_name || '';
+    const compat = { place: r.place_name, note: catName, location: r.road_address_name || r.address_name || r.place_name, lat: parseFloat(r.y), lon: parseFloat(r.x) };
+    const sBtn = card.querySelector('.feed-post-btn.suggest');
+    if(sBtn) sBtn.addEventListener('click', () => suggestHotplaceToChat(compat));
+    card.querySelector('.feed-post-btn.fix').addEventListener('click', () => fixHotplaceLocation(compat));
+    box.appendChild(card);
+  });
+  if(st.results.length && (st.loading || (st.pagination && st.pagination.hasNextPage))){
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'hotplace-kakao-more';
+    more.textContent = st.loading ? '불러오는 중...' : '더 보기';
+    more.disabled = st.loading;
+    more.addEventListener('click', () => searchHotplaceKakao(category, true));
+    box.appendChild(more);
+  }
+  box.querySelectorAll('.hotplace-kakao-filter button').forEach(b => b.addEventListener('click', () => {
+    const fi = Number(b.dataset.fi);
+    if(fi === st.filterIdx) return;
+    st.filterIdx = fi;
+    searchHotplaceKakao(category, false);
+  }));
+}
+
 function openHotplaceView(location, lat, lon){
   lastHotplaceLocationHint = location;
   lastHotplaceLat = (typeof lat === 'number' && !isNaN(lat)) ? lat : null;
@@ -21140,6 +21376,7 @@ function openHotplaceView(location, lat, lon){
   renderHotplaceList('cafe', location, lastHotplaceLat, lastHotplaceLon);
   renderHotplaceList('experience', location, lastHotplaceLat, lastHotplaceLon);
   renderSavedPlacesGroups();
+  loadHotplaceKakaoPlaces(location, lastHotplaceLat, lastHotplaceLon);
 
   // 열 때마다 "밥집" 탭으로 초기화 (지도/장소 탭은 없앴으니 바로 목록부터 보여줌)
   document.querySelectorAll('.hotplace-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'food'));
