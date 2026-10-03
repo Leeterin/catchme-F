@@ -9583,6 +9583,24 @@ function loadKakaoSdkOnce(){
   }
   return kakaoSdkRetryPromise;
 }
+// 지도 영역 크기가 바뀌는 즉시(화면이 뜨는 애니메이션이 끝날 때, 키보드/주소창 등으로 높이가 바뀔 때) 지도를 다시 맞춤 -
+// 전에는 지도를 띄운 직후 한 번만 맞춰서, 그 순간 크기가 덜 잡혀 있으면 지도가 일부만 보이다가 한참 뒤에야 꽉 찼음
+function autoRelayoutKakaoMap(map, el){
+  if(!map || !el || typeof ResizeObserver === 'undefined') return;
+  let rafId = 0;
+  new ResizeObserver(() => {
+    if(rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      if(el.clientWidth && el.clientHeight){
+        const center = map.getCenter();
+        map.relayout();
+        map.setCenter(center); // 크기가 바뀌어도 보던 위치가 가운데 그대로 남게
+      }
+    });
+  }).observe(el);
+}
+
 function ensureKakaoMapsLoaded(callback){
   if(typeof kakao !== 'undefined' && kakao.maps){
     kakao.maps.load(callback);
@@ -11796,6 +11814,7 @@ function showFeedPlaceMap(lat, lon){
     const center = new kakao.maps.LatLng(lat, lon);
     if(!feedPlaceMapInstance){
       feedPlaceMapInstance = new kakao.maps.Map(container, { center, level: 4 });
+      autoRelayoutKakaoMap(feedPlaceMapInstance, container);
     } else {
       feedPlaceMapInstance.setCenter(center);
     }
@@ -18963,6 +18982,7 @@ function openPlaceSuggestionMap(roomId, focusMsgId, pinned){
         center: new kakao.maps.LatLng(c ? c.locationLat : 37.5665, c ? c.locationLon : 126.978),
         level: 5,
       });
+      autoRelayoutKakaoMap(placeViewerMap, document.getElementById('placeViewerMap'));
     }
     renderPlaceViewerMarkers();
     setTimeout(() => {
@@ -19764,6 +19784,7 @@ function initLocationPickerMap(){
     center: new kakao.maps.LatLng(37.5665, 126.9780),
     level: 4,
   });
+  autoRelayoutKakaoMap(locationPickerMapInstance, container);
   locationPickerGeocoder = new kakao.maps.services.Geocoder();
   kakao.maps.event.addListener(locationPickerMapInstance, 'click', (mouseEvent) => {
     const pos = mouseEvent.latLng;
@@ -20185,6 +20206,7 @@ function renderKakaoMap(location, lat, lon){
         center: new kakao.maps.LatLng(hasCoords ? lat : 37.5665, hasCoords ? lon : 126.9780),
         level: 4,
       });
+      autoRelayoutKakaoMap(kakaoMapInstance, container);
       kakaoMapInfoWindow = new kakao.maps.InfoWindow({ removable: true });
 
       // 지도 아무 곳이나 누르면, 그 위치의 주소를 찾아서 말풍선으로 보여줌
@@ -20307,6 +20329,7 @@ function openPlaceDetailMap(post){
           center: new kakao.maps.LatLng(centerLat, centerLon),
           level: 4,
         });
+        autoRelayoutKakaoMap(placeDetailMapInstance, container);
       } else {
         placeDetailMapInstance.setCenter(new kakao.maps.LatLng(centerLat, centerLon));
       }
@@ -20409,6 +20432,7 @@ function openFeedMapView(){
       container.innerHTML = ''; // 안내 문구가 남아있었을 수 있으니 지도 그리기 전에 비워둠
       const center = new kakao.maps.LatLng(places[0].lat, places[0].lon);
       feedMapInstance = new kakao.maps.Map(container, { center, level: 6 });
+      autoRelayoutKakaoMap(feedMapInstance, container);
 
       feedMapOverlays.forEach(o => o.setMap(null));
       feedMapOverlays = [];
@@ -20495,6 +20519,7 @@ function openMeetupMapView(){
       container.innerHTML = ''; // 안내 문구가 남아있었을 수 있으니 지도 그리기 전에 비워둠
       const center = new kakao.maps.LatLng(places[0].lat, places[0].lon);
       meetupMapInstance = new kakao.maps.Map(container, { center, level: 6 });
+      autoRelayoutKakaoMap(meetupMapInstance, container);
 
       meetupMapOverlays.forEach(o => o.setMap(null));
       meetupMapOverlays = [];
@@ -21193,6 +21218,9 @@ function isInsideScrollableArea(el){
 }
 document.addEventListener('touchmove', (e) => {
   if(!document.body.classList.contains('chat-open')) return;
+  // 채팅에서 연 전체화면 지도(장소 고르기/장소 투표 등) 위에서는 아무것도 안 함 - 지도는 스스로 터치를 처리하는데,
+  // 여기서 손가락이 움직일 때마다 화면 구조를 훑느라(getComputedStyle) 두 손가락 확대/축소가 버벅였음
+  if(e.target.closest && e.target.closest('.location-picker-full, .invite-overlay')) return;
   if(isInsideScrollableArea(e.target)) return;
   e.preventDefault();
 }, { passive: false });
