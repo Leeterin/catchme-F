@@ -3295,6 +3295,11 @@
     padding:8px 18px calc(16px + env(safe-area-inset-bottom));
     border-top:1px solid var(--line);
   }
+  /* 앱에서 키보드가 올라와 있을 때: 키보드 높이에 홈바 영역이 이미 포함돼 있어서 하단 여백을 카카오톡처럼 최소로 */
+  .chat-room-view.keyboard-open .chat-bottom-fixed{ padding-bottom:8px; }
+  /* 앱에서는 입력창이 키보드 애니메이션(약 0.25초)과 같이 부드럽게 올라오도록 */
+  .chat-room-view.native-keyboard{ transition:bottom .25s cubic-bezier(.25,.8,.3,1); }
+  .chat-room-view.native-keyboard .chat-bottom-fixed{ transition:padding-bottom .25s cubic-bezier(.25,.8,.3,1); }
   .chat-date-divider{
     display:flex;
     justify-content:center;
@@ -20766,23 +20771,40 @@ function fixChatHeaderPosition(){
 // 앱(Capacitor)에서는 Keyboard 플러그인 resize:none 설정 때문에 키보드가 떠도 웹뷰/visualViewport가 줄어들지 않아
 // gap이 0으로 나와서 입력창이 키보드 뒤에 가려졌음. 그래서 플러그인이 알려주는 실제 키보드 높이로 직접 끌어올림
 let nativeKeyboardHeight = 0;
+// 키보드가 오르내리는 동안 대화 맨 아래를 보고 있었다면 계속 맨 아래가 보이게 (카카오톡처럼 마지막 메시지가 입력창 바로 위에)
+let keepChatPinnedToBottom = false;
+function isChatScrolledToBottom(){
+  const list = document.getElementById('chatMessages');
+  return !!list && list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+}
+function onNativeKeyboardChange(height){
+  const view = document.getElementById('chatRoomView');
+  keepChatPinnedToBottom = isChatScrolledToBottom();
+  nativeKeyboardHeight = height;
+  view.classList.toggle('keyboard-open', height > 0);
+  startChatHeaderSync();
+}
 (function listenNativeKeyboard(){
   const cap = window.Capacitor;
   const kb = cap && cap.Plugins && cap.Plugins.Keyboard;
   if(!kb || typeof kb.addListener !== 'function') return;
-  kb.addListener('keyboardWillShow', (info) => {
-    nativeKeyboardHeight = (info && info.keyboardHeight) || 0;
-    startChatHeaderSync();
-  });
-  kb.addListener('keyboardWillHide', () => {
-    nativeKeyboardHeight = 0;
-    startChatHeaderSync();
-  });
+  document.getElementById('chatRoomView').classList.add('native-keyboard');
+  kb.addListener('keyboardWillShow', (info) => onNativeKeyboardChange((info && info.keyboardHeight) || 0));
+  kb.addListener('keyboardWillHide', () => onNativeKeyboardChange(0));
 })();
 let chatHeaderSyncRafId = null;
 function runChatHeaderSync(deadline){
   fixChatHeaderPosition();
-  chatHeaderSyncRafId = Date.now() < deadline ? requestAnimationFrame(() => runChatHeaderSync(deadline)) : null;
+  if(keepChatPinnedToBottom){
+    const list = document.getElementById('chatMessages');
+    if(list) list.scrollTop = list.scrollHeight;
+  }
+  if(Date.now() < deadline){
+    chatHeaderSyncRafId = requestAnimationFrame(() => runChatHeaderSync(deadline));
+  } else {
+    chatHeaderSyncRafId = null;
+    keepChatPinnedToBottom = false;
+  }
 }
 function startChatHeaderSync(){
   if(chatHeaderSyncRafId) cancelAnimationFrame(chatHeaderSyncRafId);
