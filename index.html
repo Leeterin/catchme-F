@@ -8769,13 +8769,18 @@ function connectRealtimeSocket(){
       const existing = room.messages.find(m => m._serverId === message.id);
       if(existing){
         // 기존 장소제안 메시지의 상태(투표/확정/취소 등)만 갱신 - 새 메시지가 아니니 안 읽음 수는 안 늘림
+        const wasConfirmed = existing.status === 'confirmed';
         Object.assign(existing, mapServerLocationSuggestMessage(message));
+        if(existing.status === 'confirmed' && !wasConfirmed) supersedeHotplaceNotices(room);
+        scheduleChatCacheSave(roomId);
         if(existing.status !== 'pending') loadPinsFromServer(roomId, room); // 확정/취소로 핀이 바뀌었을 수 있으니 다시 불러옴
         if(activeChatRoomId === roomId) renderChatMessages();
         if(placeViewerState && placeViewerState.roomId === roomId) refreshPlaceViewer();
         return;
       }
-      room.messages.push(mapServerLocationSuggestMessage(message));
+      const mappedSuggest = mapServerLocationSuggestMessage(message);
+      room.messages.push(mappedSuggest);
+      if(mappedSuggest.status === 'confirmed') supersedeHotplaceNotices(room);
       loadPinsFromServer(roomId, room); // 확정/취소로 핀이 바뀌었을 수 있으니 다시 불러옴
       touchRoom(roomId);
       if(placeViewerState && placeViewerState.roomId === roomId) refreshPlaceViewer();
@@ -13237,9 +13242,16 @@ function applyLocationSuggestUpdates(room, data){
   list.forEach(sm => {
     const mapped = mapServerLocationSuggestMessage(sm);
     const existing = room.messages.find(m => m._serverId === mapped._serverId);
+    const wasConfirmed = !!(existing && existing.status === 'confirmed');
     if(existing) Object.assign(existing, mapped);
     else room.messages.push(mapped);
+    if(mapped.status === 'confirmed' && !wasConfirmed) supersedeHotplaceNotices(room);
   });
+}
+// 장소 제안이 확정되면 서버는 예전 "근처에서 만나요" 카드들을 "변경됐어요"로 접는데, 새 알림 메시지는 안 보내줌.
+// 그래서 화면에도 바로 똑같이 접어둠 - 안 그러면 방에 다시 들어갈 때 큰 카드가 먼저 떴다가 "변경됐어요"로 바뀜
+function supersedeHotplaceNotices(room){
+  (room.messages || []).forEach(m => { if(m.type === 'hotplace') m.superseded = true; });
 }
 
 const RECOMMEND_MODE_LABEL = { FAIR: '공평하게', FASTEST: '가장 빠르게', CONSIDERATE: '먼 사람 배려' };
@@ -19745,6 +19757,7 @@ async function fixLocationSuggestMsg(roomId, m){
   } else {
     room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending' && x !== m) x.status = 'declined'; });
     m.status = 'confirmed';
+    supersedeHotplaceNotices(room);
     addLocationOnlyPin(roomId, room, m.place, m.locationLat, m.locationLon, m.note, m.id);
   }
   afterLocationSuggestChange(roomId, room, before);
