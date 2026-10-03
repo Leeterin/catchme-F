@@ -4509,6 +4509,69 @@
     -ms-overflow-style:none;
   }
   .custom-select-list::-webkit-scrollbar{ display:none; width:0; height:0; }
+
+  /* 아이폰 타이머 같은 시간 휠 (예약하기) - 가운데 줄에 걸린 값이 선택됨 */
+  .time-wheel-title{
+    text-align:center;
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--text-dim);
+    margin-bottom:6px;
+  }
+  .time-wheel{
+    position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    height:200px;
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 30%, #000 70%, transparent 100%);
+    mask-image:linear-gradient(to bottom, transparent 0, #000 30%, #000 70%, transparent 100%);
+  }
+  .time-wheel-band{
+    position:absolute;
+    left:0; right:0;
+    top:50%;
+    height:40px;
+    transform:translateY(-50%);
+    border-radius:11px;
+    background:var(--surface-2);
+    pointer-events:none;
+  }
+  .time-wheel-col{
+    position:relative;
+    width:64px;
+    height:100%;
+    overflow-y:auto;
+    scroll-snap-type:y mandatory;
+    overscroll-behavior:contain;
+    padding:80px 0;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+    touch-action:pan-y;
+  }
+  .time-wheel-col::-webkit-scrollbar{ display:none; width:0; height:0; }
+  .time-wheel-item{
+    height:40px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    scroll-snap-align:center;
+    font-family:'Roboto Mono',monospace;
+    font-size:19px;
+    color:var(--text-dim);
+    transition:color .12s ease, transform .12s ease;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  .time-wheel-item.selected{ color:var(--text); font-weight:700; transform:scale(1.08); }
+  .time-wheel-unit{
+    position:relative;
+    font-size:13px;
+    font-weight:600;
+    color:var(--text);
+    margin-right:6px;
+  }
   .custom-select-opt{
     border:none;
     background:transparent;
@@ -5612,6 +5675,8 @@
     position:relative;
     border-left:1px solid var(--line);
     background-image:repeating-linear-gradient(to bottom, var(--line) 0, var(--line) 1px, transparent 1px, transparent 32px);
+    /* 가로줄은 각 칸 "위쪽"에만 그려져서 맨 마지막 칸 아래가 비어 보였음 - 맨 밑 경계선도 그림 (높이는 그대로) */
+    box-shadow:inset 0 -1px 0 var(--line);
   }
   .week-cal-block{
     position:absolute;
@@ -6909,6 +6974,21 @@
   <div class="custom-select-popup" id="customSelectPopup" style="display:none;">
     <div class="custom-picker-card">
       <div class="custom-select-list" id="customSelectList"></div>
+    </div>
+  </div>
+
+  <!-- 예약하기 시작/종료 시간 - 아이폰 타이머처럼 돌려서 고르는 휠 -->
+  <div class="custom-picker-overlay" id="timeWheelPopup" style="display:none;">
+    <div class="custom-picker-card">
+      <div class="time-wheel-title" id="timeWheelTitle"></div>
+      <div class="time-wheel">
+        <div class="time-wheel-band"></div>
+        <div class="time-wheel-col" id="timeWheelHourCol"></div>
+        <div class="time-wheel-unit">시</div>
+        <div class="time-wheel-col" id="timeWheelMinCol"></div>
+        <div class="time-wheel-unit">분</div>
+      </div>
+      <button type="button" class="custom-picker-confirm" id="timeWheelConfirm">확인</button>
     </div>
   </div>
 
@@ -14502,6 +14582,11 @@ function closeAllCustomPopups(){
   if(datePopup) datePopup.style.display = 'none';
   if(timePopup) timePopup.style.display = 'none';
   if(selectPopup) selectPopup.style.display = 'none';
+  const wheelPopup = document.getElementById('timeWheelPopup');
+  if(wheelPopup && wheelPopup.style.display !== 'none'){
+    wheelPopup.style.display = 'none';
+    timeWheelTarget = null;
+  }
   activeDatePickerTarget = null;
   activeTimePickerTarget = null;
   activeSelectTarget = null;
@@ -17647,7 +17732,122 @@ function refreshSelectDisplay(selectId){
   btn.textContent = opt ? opt.textContent : '선택';
 }
 document.querySelectorAll('.custom-select-btn').forEach(btn => {
-  btn.addEventListener('click', () => openCustomSelect(btn.dataset.target));
+  btn.addEventListener('click', () => {
+    if(TIME_WHEEL_SELECTS[btn.dataset.target]) openTimeWheel(btn.dataset.target);
+    else openCustomSelect(btn.dataset.target);
+  });
+});
+
+// ---------- 예약하기 시작/종료 시간: 아이폰 타이머처럼 돌려서 고르는 휠 ----------
+// 고를 수 있는 값은 기존처럼 숨겨진 select의 선택지(분 단위, 5분 간격)를 그대로 씀 - 휠은 그걸 "시"/"분" 두 칸으로 나눠 보여줄 뿐
+const TIME_WHEEL_SELECTS = { friendReserveStartSelect: '시작 시간', friendReserveEndSelect: '종료 시간' };
+const TIME_WHEEL_ITEM_H = 40;
+let timeWheelTarget = null;
+let timeWheelValues = [];
+let timeWheelHour = 0;
+let timeWheelMin = 0;
+
+// 휠이 한 칸 넘어갈 때마다 "드르륵" 진동 - 앱에선 아이폰 기본 선택 진동(Haptics), 그 외엔 지원하면 짧은 진동
+function getHapticsPlugin(){
+  const cap = window.Capacitor;
+  if(!cap || !cap.Plugins || !cap.Plugins.Haptics) return null;
+  if(typeof cap.isNativePlatform === 'function' && !cap.isNativePlatform()) return null;
+  return cap.Plugins.Haptics;
+}
+function hapticSelectionStart(){
+  try { const hp = getHapticsPlugin(); if(hp) Promise.resolve(hp.selectionStart()).catch(() => {}); } catch(e) {}
+}
+function hapticSelectionEnd(){
+  try { const hp = getHapticsPlugin(); if(hp) Promise.resolve(hp.selectionEnd()).catch(() => {}); } catch(e) {}
+}
+function hapticTick(){
+  try {
+    const hp = getHapticsPlugin();
+    if(hp){ Promise.resolve(hp.selectionChanged()).catch(() => {}); return; }
+    if(navigator.vibrate) navigator.vibrate(4);
+  } catch(e) {}
+}
+
+function fillTimeWheelCol(col, items, selected){
+  col.innerHTML = '';
+  items.forEach((v, i) => {
+    const el = document.createElement('div');
+    el.className = 'time-wheel-item';
+    el.textContent = String(v).padStart(2, '0');
+    // 위아래 숫자를 톡 누르면 그 칸으로 굴러감
+    el.addEventListener('click', () => col.scrollTo({ top: i * TIME_WHEEL_ITEM_H, behavior: 'smooth' }));
+    col.appendChild(el);
+  });
+  col._items = items;
+  col._idx = Math.max(0, items.indexOf(selected));
+  col.scrollTop = col._idx * TIME_WHEEL_ITEM_H;
+  markTimeWheelSelected(col);
+}
+function markTimeWheelSelected(col){
+  Array.from(col.children).forEach((el, i) => el.classList.toggle('selected', i === col._idx));
+}
+// 지금 고른 "시"에서 가능한 분들로 분 휠을 다시 채움 (보던 분과 가장 가까운 값으로)
+function refillTimeWheelMinutes(){
+  const mins = timeWheelValues.filter(v => Math.floor(v / 60) === timeWheelHour).map(v => v % 60);
+  if(!mins.length) return;
+  timeWheelMin = mins.reduce((best, m) => Math.abs(m - timeWheelMin) < Math.abs(best - timeWheelMin) ? m : best, mins[0]);
+  fillTimeWheelCol(document.getElementById('timeWheelMinCol'), mins, timeWheelMin);
+}
+function openTimeWheel(selectId){
+  closeAllCustomPopups();
+  const select = document.getElementById(selectId);
+  timeWheelValues = Array.from(select.options).map(o => parseInt(o.value, 10)).filter(v => !isNaN(v));
+  if(!timeWheelValues.length) return;
+  timeWheelTarget = selectId;
+  const cur = parseInt(select.value, 10);
+  const start = isNaN(cur) ? timeWheelValues[0] : cur;
+  timeWheelHour = Math.floor(start / 60);
+  timeWheelMin = start % 60;
+  document.getElementById('timeWheelTitle').textContent = TIME_WHEEL_SELECTS[selectId] || '';
+  // 화면에 보인 다음에 채워야 스크롤 위치(가운데 맞춤)가 먹힘
+  document.getElementById('timeWheelPopup').style.display = 'flex';
+  const hours = [...new Set(timeWheelValues.map(v => Math.floor(v / 60)))];
+  fillTimeWheelCol(document.getElementById('timeWheelHourCol'), hours, timeWheelHour);
+  refillTimeWheelMinutes();
+  hapticSelectionStart();
+}
+function closeTimeWheel(){
+  document.getElementById('timeWheelPopup').style.display = 'none';
+  timeWheelTarget = null;
+  hapticSelectionEnd();
+}
+function watchTimeWheelCol(col, onChange){
+  col.addEventListener('scroll', () => {
+    const items = col._items || [];
+    if(!items.length) return;
+    const idx = Math.min(items.length - 1, Math.max(0, Math.round(col.scrollTop / TIME_WHEEL_ITEM_H)));
+    if(idx === col._idx) return;
+    col._idx = idx;
+    markTimeWheelSelected(col);
+    hapticTick();
+    onChange(items[idx]);
+  }, { passive: true });
+}
+watchTimeWheelCol(document.getElementById('timeWheelHourCol'), (h) => {
+  timeWheelHour = h;
+  refillTimeWheelMinutes();
+});
+watchTimeWheelCol(document.getElementById('timeWheelMinCol'), (m) => {
+  timeWheelMin = m;
+});
+document.getElementById('timeWheelConfirm').addEventListener('click', () => {
+  if(!timeWheelTarget) return closeTimeWheel();
+  const select = document.getElementById(timeWheelTarget);
+  const val = timeWheelHour * 60 + timeWheelMin;
+  if(timeWheelValues.includes(val)){
+    select.value = val;
+    select.dispatchEvent(new Event('change'));
+    refreshSelectDisplay(timeWheelTarget);
+  }
+  closeTimeWheel();
+});
+document.getElementById('timeWheelPopup').addEventListener('click', (e) => {
+  if(e.target.id === 'timeWheelPopup') closeTimeWheel();
 });
 document.getElementById('customSelectPopup').addEventListener('click', (e) => {
   if(e.target.id === 'customSelectPopup') closeCustomSelect();
