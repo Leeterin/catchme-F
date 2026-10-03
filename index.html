@@ -6194,7 +6194,10 @@
     transition:opacity .35s ease, visibility .35s ease;
   }
   .app-splash.hide{ opacity:0; visibility:hidden; pointer-events:none; }
-  .app-splash-logo{ width:96px; height:96px; animation:appSplashPop .6s cubic-bezier(.25,.8,.3,1) both; }
+  .app-splash-logo{ width:96px; height:96px; animation:appSplashPop .6s cubic-bezier(.25,.8,.3,1) both, appSplashPulse 1.4s .6s ease-in-out infinite; }
+  @keyframes appSplashPulse{ 0%,100%{ transform:scale(1); opacity:1; } 50%{ transform:scale(.9); opacity:.7; } }
+  /* 시작 데이터가 준비될 때까지 앱 화면은 아예 그리지 않음 - 로고 뒤로 빈 화면/임시 날짜가 비치지 않게 */
+  body.app-booting .app{ visibility:hidden; }
   .app-splash-name{
     font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; letter-spacing:2px;
     color:#38BDF8; animation:appSplashFade .6s .15s ease both;
@@ -6342,7 +6345,7 @@
   }
 </style>
 </head>
-<body>
+<body class="app-booting">
 <!-- 앱 시작 로딩 화면 -->
 <div class="app-splash" id="appSplash">
   <svg class="app-splash-logo" viewBox="220 220 584 584" aria-label="CATCHME">
@@ -6442,13 +6445,13 @@
   <!-- Date header -->
   <div class="date-header">
     <div class="today-eyebrow" id="todayEyebrow">TODAY</div>
-    <div class="today-date" id="todayDate">7월 11일 토요일</div>
+    <div class="today-date" id="todayDate"></div>
   </div>
 
   <!-- Calendar (홈 화면 메인 콘텐츠) -->
   <div class="calendar-card" id="calendarCard">
     <div class="cal-nav">
-      <div class="month-label" id="monthLabel">2026년 7월</div>
+      <div class="month-label" id="monthLabel"></div>
       <div class="arrows">
         <button id="prevMonth">&#8249;</button>
         <button id="nextMonth">&#8250;</button>
@@ -6462,7 +6465,7 @@
     <div class="event-panel">
       <div class="event-panel-header">
         <span class="event-panel-dot"></span>
-        <span id="selectedDateLabel">7월 11일 토요일</span>
+        <span id="selectedDateLabel"></span>
       </div>
       <div class="event-list" id="eventList"></div>
     </div>
@@ -8265,6 +8268,7 @@ document.getElementById('signupSubmitBtn').addEventListener('click', async () =>
   }
 });
 
+let startupDataPromise = null;
 function onAuthSuccess(token, user, skipSave, refreshToken) {
   authToken = token;
   currentUser = user;
@@ -8287,16 +8291,19 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
     persistSession();
   }
 
-  loadFriendsFromServer().then(() => {
-    renderFriendsList();
-    renderIncomingFriendRequests();
-    updateFriendsNavBadge();
-  });
-  loadChatRoomsFromServer();
-  loadScheduleFromServer();
+  // 앱 시작 로딩 화면(로고)은 아래 핵심 데이터가 다 올 때까지 유지됨 - 텅 빈 메인화면이 먼저 보이지 않게
+  startupDataPromise = Promise.allSettled([
+    loadFriendsFromServer().then(() => {
+      renderFriendsList();
+      renderIncomingFriendRequests();
+      updateFriendsNavBadge();
+    }),
+    loadChatRoomsFromServer(),
+    loadScheduleFromServer(),
+    loadSettingsFromServer(),
+  ]);
   loadMeetupsFromServer();
   loadFeedPostsFromServer();
-  loadSettingsFromServer();
   loadSavedLocationsFromServer();
   connectRealtimeSocket();
   claimPendingInvite();
@@ -25049,7 +25056,9 @@ if(STARTUP_INVITE_TOKEN) openInviteFromUrl();
 handleSocialLoginRedirect().catch(() => false).then(handled => {
   try { if(!handled) tryRestoreSession(); } catch(e) { console.error('[session restore]', e); }
   openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
-}).finally(hideAppSplash);
+  // 로그인 상태면 일정/친구/채팅/설정을 다 받아서 그린 다음에 로고를 닫음 (너무 오래 걸리면 12초에서 끊음)
+  if(startupDataPromise) return Promise.race([startupDataPromise, new Promise(r => setTimeout(r, 12000))]);
+}).finally(() => requestAnimationFrame(hideAppSplash));
 
 // 앱 시작 로딩 화면(로고) 닫기 - 로고가 너무 순식간에 사라지지 않게 최소 0.9초는 보여줌
 function hideAppSplash(){
@@ -25057,11 +25066,12 @@ function hideAppSplash(){
   if(!splash || splash.classList.contains('hide')) return;
   const wait = Math.max(0, 900 - performance.now());
   setTimeout(() => {
+    document.body.classList.remove('app-booting');
     splash.classList.add('hide');
     setTimeout(() => splash.remove(), 400);
   }, wait);
 }
-setTimeout(hideAppSplash, 5000); // 혹시 시작 과정이 멈춰도 5초 뒤엔 무조건 닫음
+setTimeout(hideAppSplash, 15000); // 혹시 시작 과정이 멈춰도 15초 뒤엔 무조건 닫음
 </script>
 
 </body>
