@@ -2683,6 +2683,10 @@
   .chat-room-name.clickable{ cursor:pointer; }
   .chat-room-name.clickable:hover{ text-decoration:underline; }
   .chat-room-avatar.clickable{ cursor:pointer; }
+  /* 상단 프로필은 눌러도 동그랗게 번쩍이는 탭 반응이 없게 */
+  .chat-room-header,
+  .chat-room-header .chat-room-avatar,
+  .chat-room-header .chat-room-name{ -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
 
   .chat-members-dropdown{
     display:none;
@@ -3341,7 +3345,7 @@
     margin:0 -18px;
     /* 키보드가 닫혀 있을 때도 입력칸이 화면 맨 아래에 붙게 - 홈바(아이폰 하단 막대) 영역을 통째로 비우지 않고
        홈바에 안 겹칠 만큼만 띄움 (홈바 영역이 없는 폰은 8px) */
-    padding:8px 12px max(8px, calc(env(safe-area-inset-bottom) - 16px));
+    padding:8px 12px max(16px, calc(env(safe-area-inset-bottom) - 4px));
   }
   /* 앱에서 키보드가 올라와 있을 때: 키보드 높이에 홈바 영역이 이미 포함돼 있어서 하단 여백을 카카오톡처럼 최소로 */
   .chat-room-view.keyboard-open .chat-bottom-fixed{ padding-bottom:6px; }
@@ -3388,6 +3392,8 @@
     color:#FFFFFF;
     overflow:hidden;
   }
+  .msg-avatar.clickable{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .msg-avatar.clickable:active{ opacity:.7; }
   .msg-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
   .msg-avatar-spacer{ height:1px; background:none; }
   /* 그룹방은 이름이 아이콘 오른쪽 위에 오도록 아이콘을 이름 줄까지 끌어올림 */
@@ -9152,6 +9158,7 @@ const panels = {
 let currentTopTab = null; // 지금 보고 있는 아래 탭 (null = 메인 캘린더)
 function showTab(tabKey){
   currentTopTab = tabKey;
+  profileReturnToChat = null; // 다른 탭으로 옮기면 "프로필 닫으면 채팅방으로" 상태는 버림
   document.body.classList.remove('chat-open');
   document.getElementById('myProfileView').style.display = 'none';
   document.getElementById('settingsView').style.display = 'none';
@@ -16766,6 +16773,51 @@ function openFriendProfile(friendId){
 function closeFriendProfileView(){
   document.getElementById('friendProfileView').classList.remove('active');
   document.getElementById('friendsListView').classList.add('active');
+  if(profileReturnToChat) returnToChatRoomFromProfile();
+}
+
+// ---------- 채팅방에서 상대 프로필 아이콘을 눌러 프로필 보기 → 뒤로 가면 보던 채팅방으로 바로 돌아옴 ----------
+var profileReturnToChat = null; // { roomId, scrollTop, calendarReturn }
+function openFriendProfileFromChat(friend){
+  const box = document.getElementById('chatMessages');
+  const back = { roomId: activeChatRoomId, scrollTop: box ? box.scrollTop : null, calendarReturn: chatReturnToCalendar };
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  document.getElementById('chatRoomView').classList.remove('active');
+  showTab('friends');
+  profileReturnToChat = back; // showTab이 지우므로 그 뒤에 기억
+  openFriendProfile(friend.id);
+}
+function returnToChatRoomFromProfile(){
+  const back = profileReturnToChat;
+  profileReturnToChat = null;
+  if(!back || !CHAT_ROOMS[back.roomId]) return;
+  showTab('chat');
+  chatReturnToCalendar = back.calendarReturn || null;
+  openChatRoom(back.roomId, { noPush: true });
+  // 맨 아래로 내리지 말고 보던 위치 그대로
+  if(back.scrollTop !== null){
+    ++chatEnterToken;
+    ++chatAutoScrollToken;
+    const box = document.getElementById('chatMessages');
+    box.scrollTop = back.scrollTop;
+    requestAnimationFrame(() => { box.scrollTop = back.scrollTop; });
+  }
+}
+// 메시지 옆 프로필 아이콘을 눌렀을 때 - 보낸 사람이 친구면 프로필로
+function openMsgSenderProfile(room, m){
+  let username = null;
+  if(room.isGroup){
+    const mem = (m.senderId && room.members) ? room.members.find(x => x.userId === m.senderId) : null;
+    username = mem ? mem.username : null;
+  } else {
+    username = room.counterpartUsername;
+  }
+  const friend = username ? FRIENDS.find(f => f.username === username) : null;
+  if(!friend){
+    showToast('친구로 추가된 사람만 프로필을 볼 수 있어요.');
+    return;
+  }
+  openFriendProfileFromChat(friend);
 }
 
 // 친구 프로필에서 이 친구가 속한 그룹을 칩으로 보여주고, 탭할 때마다 그 그룹에 넣거나 빼줌
@@ -18432,6 +18484,13 @@ document.getElementById('profileChatBtn').addEventListener('click', async () => 
   const friendId = document.getElementById('profileChatBtn').dataset.friendId;
   const friend = FRIENDS.find(f => f.id === friendId);
   if(!friend) return;
+
+  // 1:1 채팅방에서 프로필로 온 거면 새로 열지 않고 그 채팅방으로 그냥 돌아감
+  const backRoom = profileReturnToChat && CHAT_ROOMS[profileReturnToChat.roomId];
+  if(backRoom && !backRoom.isGroup && backRoom.counterpartUsername === friend.username){
+    goBackOrClose(closeFriendProfileView);
+    return;
+  }
 
   if(friend.id === DEMO_FRIEND.id){
     showTab('chat');
@@ -21679,7 +21738,7 @@ document.addEventListener('touchmove', (e) => {
 // 스크롤하는 도중에도 키보드는 그대로 열려있고, 키보드 자체를 직접 내리는 제스처(키보드를 아래로
 // 드래그하는 등 기기 자체의 키보드 숨기기 동작)를 했을 때만 닫히길 원해서 이 자동 닫힘 로직은 제거함.
 
-function openChatRoom(id){
+function openChatRoom(id, opts){
   const room = CHAT_ROOMS[id];
   if(!room) return;
   activeChatRoomId = id;
@@ -21745,7 +21804,8 @@ function openChatRoom(id){
   // 서버 응답을 기다리지 않고 지금 가진 대화를 바로 보여줌 (서버에서 새 내용이 오면 그때 조용히 갱신)
   revealChatMessagesWhenReady(enterToken);
 
-  pushViewState(closeChatRoomView);
+  // 프로필 보고 돌아오는 경우엔 히스토리에 채팅방이 이미 쌓여 있어서 또 쌓지 않음
+  if(!(opts && opts.noPush)) pushViewState(closeChatRoomView);
 }
 
 // 방에 들어온 직후 맨 아래로 한 번 더 확실히 맞춤 (숨기거나 기다리는 것 없이 그대로 보여줌)
@@ -21917,6 +21977,8 @@ function buildMsgAvatarEl(room, m, show){
   const el = document.createElement('div');
   el.className = 'msg-avatar' + (show ? '' : ' msg-avatar-spacer');
   if(!show) return el;
+  el.classList.add('clickable');
+  el.addEventListener('click', (e) => { e.stopPropagation(); openMsgSenderProfile(room, m); });
   let avatar = room.avatar, color = room.color, name = room.name || '';
   if(room.isGroup){
     const mem = (m.senderId && room.members) ? room.members.find(x => x.userId === m.senderId) : null;
