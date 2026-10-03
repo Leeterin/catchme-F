@@ -5253,15 +5253,48 @@
     overflow:hidden;
     background:conic-gradient(#EF4444, #F59E0B, #22C55E, #38BDF8, #8B5CF6, #EC4899, #EF4444);
   }
-  .event-color-custom input{
-    position:absolute;
-    inset:0;
-    width:100%;
-    height:100%;
-    opacity:0;
+  .event-color-mixer{
+    margin-top:10px;
+    padding:12px;
+    border-radius:14px;
+    background:var(--surface-2);
+    animation:ecmOpen .18s ease both;
+  }
+  @keyframes ecmOpen{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
+  .ecm-sv{
+    position:relative;
+    height:140px;
+    border-radius:10px;
+    touch-action:none;
+    cursor:crosshair;
+    background:linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, rgba(255,255,255,0));
+    background-color:hsl(200,100%,50%);
+  }
+  .ecm-hue{
+    position:relative;
+    height:16px;
+    margin-top:12px;
+    border-radius:999px;
+    touch-action:none;
     cursor:pointer;
-    border:none;
-    padding:0;
+    background:linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+  }
+  .ecm-sv-thumb, .ecm-hue-thumb{
+    position:absolute;
+    width:20px; height:20px;
+    margin:-10px 0 0 -10px;
+    border-radius:50%;
+    border:3px solid #fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.25);
+    pointer-events:none;
+  }
+  .ecm-hue-thumb{ top:50%; }
+  .ecm-footer{ display:flex; align-items:center; gap:8px; margin-top:12px; }
+  .ecm-preview{ width:24px; height:24px; border-radius:50%; box-shadow:0 0 0 1px var(--line); }
+  .ecm-hex{ font-family:'Roboto Mono',monospace; font-size:12px; color:var(--text-dim); flex:1; }
+  .ecm-done{
+    border:none; border-radius:999px; padding:6px 14px;
+    background:var(--accent); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
   }
 
   .group-chip-picker{
@@ -6590,6 +6623,16 @@
         <div class="mp-input-group">
           <label>색상 <span style="font-weight:400;color:var(--text-dim);">(이 일정에만 적용돼요)</span></label>
           <div class="event-color-picker" id="eventColorPicker"></div>
+          <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 -->
+          <div class="event-color-mixer" id="eventColorMixer" style="display:none;">
+            <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
+            <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
+            <div class="ecm-footer">
+              <span class="ecm-preview" id="ecmPreview"></span>
+              <span class="ecm-hex" id="ecmHex">#38BDF8</span>
+              <button type="button" class="ecm-done" id="ecmDone">완료</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -13611,22 +13654,124 @@ function renderEventColorPicker(){
   document.getElementById('eventColorPicker').innerHTML = `
     <button type="button" class="event-color-auto${formColor ? '' : ' on'}" data-color="">자동</button>
     ${EVENT_COLOR_PALETTE.map(c => `<button type="button" class="event-color-swatch${formColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}
-    <label class="event-color-swatch event-color-custom${isCustom ? ' on' : ''}" title="직접 고르기"${isCustom ? ` style="background:${formColor}"` : ''}>
-      <input type="color" id="eventColorCustomInput" value="${formColor || '#38BDF8'}" />
-    </label>
+    <button type="button" class="event-color-swatch event-color-custom${isCustom ? ' on' : ''}" id="eventColorCustomBtn" title="나만의 색 조제"${isCustom ? ` style="background:${formColor}"` : ''}></button>
   `;
+  closeEventColorMixer(); // 폼을 새로 열거나 기본 색을 고르면 조제 패널은 닫힘
 }
 document.getElementById('eventColorPicker').addEventListener('click', (e) => {
+  if(e.target.closest('#eventColorCustomBtn')){
+    const mixer = document.getElementById('eventColorMixer');
+    if(mixer.style.display === 'none') openEventColorMixer();
+    else closeEventColorMixer();
+    return;
+  }
   const btn = e.target.closest('button[data-color]');
   if(!btn) return;
   formColor = btn.dataset.color || null;
   renderEventColorPicker();
 });
-document.getElementById('eventColorPicker').addEventListener('change', (e) => {
-  if(e.target.id !== 'eventColorCustomInput') return;
-  formColor = e.target.value.toUpperCase();
-  renderEventColorPicker();
+
+// ---------- 나만의 색 조제 (채도/밝기 판 + 색상 바) ----------
+// 폰 기본 색상 선택창(input type=color)은 색이 바뀔 때마다 버튼을 다시 그리면서 창이 갑자기 닫히고 버벅여서,
+// 앱 안에서 직접 그리는 패널로 바꿈. 드래그하는 동안에는 필요한 부분(썸네일 위치/미리보기 색)만 바꿔서 끊김 없게 함
+const eventColorMixerState = { h: 200, s: 0.75, v: 0.97 };
+
+function hsvToHex(h, s, v){
+  const f = n => {
+    const k = (n + h / 60) % 6;
+    return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
+  };
+  return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+function hexToHsv(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if(!m) return null;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if(d){
+    if(max === r) h = ((g - b) / d) % 6;
+    else if(max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if(h < 0) h += 360;
+  }
+  return { h, s: max ? d / max : 0, v: max };
+}
+
+function openEventColorMixer(){
+  const start = hexToHsv(formColor && !EVENT_COLOR_PALETTE.includes(formColor) ? formColor : '#38BDF8');
+  Object.assign(eventColorMixerState, start);
+  document.getElementById('eventColorMixer').style.display = '';
+  applyEventColorMixer(true);
+}
+function closeEventColorMixer(){
+  const mixer = document.getElementById('eventColorMixer');
+  if(mixer) mixer.style.display = 'none';
+}
+
+// 패널 표시(썸네일 위치/미리보기) 갱신 + 고른 색을 이 일정 색으로 바로 반영 (버튼 줄 전체를 다시 그리지 않음)
+function applyEventColorMixer(){
+  const { h, s, v } = eventColorMixerState;
+  const hex = hsvToHex(h, s, v);
+  document.getElementById('ecmSv').style.backgroundColor = `hsl(${h},100%,50%)`;
+  const svThumb = document.getElementById('ecmSvThumb');
+  svThumb.style.left = (s * 100) + '%';
+  svThumb.style.top = ((1 - v) * 100) + '%';
+  svThumb.style.background = hex;
+  const hueThumb = document.getElementById('ecmHueThumb');
+  hueThumb.style.left = (h / 360 * 100) + '%';
+  hueThumb.style.background = `hsl(${h},100%,50%)`;
+  document.getElementById('ecmPreview').style.background = hex;
+  document.getElementById('ecmHex').textContent = hex;
+
+  formColor = hex;
+  const picker = document.getElementById('eventColorPicker');
+  picker.querySelectorAll('.on').forEach(el => el.classList.remove('on'));
+  const customBtn = document.getElementById('eventColorCustomBtn');
+  if(customBtn){
+    customBtn.classList.add('on');
+    customBtn.style.background = hex;
+  }
+}
+
+// 손가락/마우스로 누른 채 움직이는 동안 계속 따라오게 (pointer capture로 영역 밖으로 나가도 유지)
+function bindEventColorMixerDrag(el, onPoint){
+  let dragging = false;
+  let rafId = 0;
+  let lastEvent = null;
+  const handle = (e) => {
+    lastEvent = e;
+    if(rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      const rect = el.getBoundingClientRect();
+      const x = Math.min(1, Math.max(0, (lastEvent.clientX - rect.left) / rect.width));
+      const y = Math.min(1, Math.max(0, (lastEvent.clientY - rect.top) / rect.height));
+      onPoint(x, y);
+      applyEventColorMixer();
+    });
+  };
+  el.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    try { el.setPointerCapture(e.pointerId); } catch(err) {}
+    e.preventDefault();
+    handle(e);
+  });
+  el.addEventListener('pointermove', (e) => { if(dragging) handle(e); });
+  const end = () => { dragging = false; };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+bindEventColorMixerDrag(document.getElementById('ecmSv'), (x, y) => {
+  eventColorMixerState.s = x;
+  eventColorMixerState.v = 1 - y;
 });
+bindEventColorMixerDrag(document.getElementById('ecmHue'), (x) => {
+  eventColorMixerState.h = Math.min(359.9, x * 360);
+});
+document.getElementById('ecmDone').addEventListener('click', closeEventColorMixer);
 
 // 일정 폼의 공개설정 UI(전체공개/나만보기/그룹들 버튼)를 formVisibility 상태에 맞게 다시 그림
 function renderVisibilityPicker(){
