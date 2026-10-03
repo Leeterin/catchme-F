@@ -2741,8 +2741,17 @@
     margin-bottom:10px;
     flex-shrink:0;
   }
-  .chat-search-bar.open{ display:block; }
+  .chat-search-bar.open{ display:flex; align-items:center; gap:8px; }
+  .chat-search-cancel{
+    flex-shrink:0;
+    border:none; background:none; padding:6px 2px;
+    font:inherit; font-size:12.5px; font-weight:600;
+    color:var(--accent); cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .chat-search-cancel:active{ opacity:.6; }
   .chat-search-bar input{
+    flex:1; min-width:0;
     width:100%;
     background:var(--surface-2);
     border:1px solid var(--line);
@@ -7566,6 +7575,7 @@
       </div>
       <div class="chat-search-bar" id="chatSearchBar">
         <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" />
+        <button type="button" class="chat-search-cancel" id="chatSearchCancelBtn">취소</button>
       </div>
       <div class="chat-pinned-schedule" id="chatPinnedSchedule" style="display:none;"></div>
       <!-- 진행 중인 모임 장소 추천 - 카카오톡의 "진행 중인 투표"처럼 상단에 띄워두고, 누르면 현황/입력 시트가 열림 -->
@@ -9696,7 +9706,7 @@ function openSettingsDetail(id){
         </div>
       </div>
       <div class="settings-toggle-row">
-        <div><div class="stt-label">흔들어서 오류 신고하기</div><div class="stt-sub">폰을 세게 흔들면 오류 신고 창이 열려요</div></div>
+        <div><div class="stt-label">흔들어서 오류 신고하기</div><div class="stt-sub">폰을 5번 흔들면 오류 신고 창이 열려요</div></div>
         <div class="toggle${isShakeReportEnabled() ? ' on' : ''}" id="shakeReportToggle"><div class="knob"></div></div>
       </div>
       <div class="settings-simple-row"><span>오류 신고하기</span><button class="settings-action-btn" id="appmanageBugReportBtn">신고 &#8250;</button></div>
@@ -9722,7 +9732,7 @@ function openSettingsDetail(id){
       setShakeReportEnabled(next);
       e.currentTarget.classList.toggle('on', next);
       if(next) requestShakePermissionIfNeeded();
-      showToast(next ? '이제 폰을 흔들면 오류 신고 창이 열려요.' : '흔들어서 오류 신고하기를 껐어요.');
+      showToast(next ? '이제 폰을 5번 흔들면 오류 신고 창이 열려요.' : '흔들어서 오류 신고하기를 껐어요.');
     });
     document.querySelector('#settingsDetailBody .settings-simple-row:nth-last-child(2) .settings-action-btn').addEventListener('click', () => openLegalPage('terms'));
     document.querySelector('#settingsDetailBody .settings-simple-row:last-child .settings-action-btn').addEventListener('click', () => openLegalPage('privacy'));
@@ -20035,7 +20045,7 @@ document.getElementById('bugReportShakeOffBtn').addEventListener('click', () => 
   updateBugReportShakeBtn();
   const toggle = document.getElementById('shakeReportToggle');
   if(toggle) toggle.classList.toggle('on', next);
-  showToast(next ? '이제 폰을 흔들면 오류 신고 창이 열려요.' : '흔들어서 신고하기를 껐어요. 언제든 다시 켤 수 있어요.');
+  showToast(next ? '이제 폰을 5번 흔들면 오류 신고 창이 열려요.' : '흔들어서 신고하기를 껐어요. 언제든 다시 켤 수 있어요.');
 });
 document.getElementById('bugReportSubmitBtn').addEventListener('click', async () => {
   if(bugReportSending) return;
@@ -20090,11 +20100,12 @@ document.addEventListener('touchend', function askShakePermissionOnce(){
   if(asked !== 'denied') requestShakePermissionIfNeeded();
 });
 
-// 흔들기 감지 - 짧은 시간(1초) 안에 큰 움직임이 3번 이상 오면 흔든 걸로 봄. 걷거나 폰을 집어드는 정도로는 안 열리게 기준을 높게 잡음
+// 흔들기 감지 - 짧은 시간(2.5초) 안에 폰을 5번 흔들어야 열림. 걷거나 폰을 집어드는 정도로는 안 열리게 기준을 높게 잡음
 (function(){
   const THRESHOLD = 24;   // 직전 측정값 대비 가속도 변화량(m/s²) 합
-  const HITS_NEEDED = 3;
-  const WINDOW_MS = 1000;
+  const HITS_NEEDED = 5;
+  const WINDOW_MS = 2500;
+  const MIN_GAP_MS = 150; // 한 번 흔들 때 센서 값이 여러 번 튀어서, 이보다 가까운 건 같은 한 번으로 셈
   const COOLDOWN_MS = 4000;
   let last = null;
   let hits = [];
@@ -20105,7 +20116,7 @@ document.addEventListener('touchend', function askShakePermissionOnce(){
     const now = Date.now();
     if(last){
       const delta = Math.abs(a.x - last.x) + Math.abs(a.y - last.y) + Math.abs(a.z - last.z);
-      if(delta > THRESHOLD){
+      if(delta > THRESHOLD && !(hits.length && now - hits[hits.length - 1] < MIN_GAP_MS)){
         hits = hits.filter(t => now - t < WINDOW_MS);
         hits.push(now);
         if(hits.length >= HITS_NEEDED && now - lastTriggered > COOLDOWN_MS){
@@ -23052,6 +23063,15 @@ document.getElementById('chatSearchBtn').addEventListener('click', () => {
     document.getElementById('chatSearchInput').value = '';
     renderChatMessages();
   }
+});
+// 취소: 검색창 닫고 검색어 지워서 원래 대화로
+document.getElementById('chatSearchCancelBtn').addEventListener('click', () => {
+  const input = document.getElementById('chatSearchInput');
+  input.blur();
+  document.getElementById('chatSearchBar').classList.remove('open');
+  chatSearchQuery = '';
+  input.value = '';
+  renderChatMessages();
 });
 document.getElementById('chatSearchInput').addEventListener('input', (e) => {
   chatSearchQuery = e.target.value;
