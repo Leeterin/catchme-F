@@ -8989,7 +8989,10 @@ document.getElementById('legalPageOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'legalPageOverlay') document.getElementById('legalPageOverlay').classList.remove('show');
 });
 
+// 설정을 열기 전에 보던 탭 - 설정에서 끝까지 뒤로가면 메인이 아니라 그 탭으로 돌아감
+let settingsReturnTab = null;
 function openSettings(){
+  settingsReturnTab = currentTopTab;
   showTab(null);
   calendarCard.style.display = 'none';
   document.getElementById('settingsView').style.display = 'block';
@@ -9243,8 +9246,8 @@ function settingsBackAction(){
     document.getElementById('settingsListView').classList.add('active');
     document.getElementById('settingsHeaderLabel').textContent = '설정';
   } else {
-    // 설정 메뉴 목록 -> 메인 화면으로
-    showTab(null);
+    // 설정 메뉴 목록 -> 설정을 열기 전에 보던 화면(탭)으로
+    showTab(settingsReturnTab);
   }
 }
 document.getElementById('settingsBackToHomeBtn').addEventListener('click', () => goBackOrClose(settingsBackAction));
@@ -11933,8 +11936,10 @@ let myProfileEditing = false;
 // 내 프로필을 어디서 열었는지 기억해뒀다가 뒤로가기 하면 그 화면(설정 or 메인)으로 돌아감.
 // 예전엔 히스토리에 안 쌓여서, 설정 > 내 프로필에서 폰 뒤로가기를 누르면 설정을 건너뛰고 바로 나가버렸음
 let myProfileOpenedFromSettings = false;
+let myProfileReturnTab = null; // 위쪽 프로필 버튼으로 열었을 때 그 전에 보던 탭
 function openMyProfile(){
   myProfileOpenedFromSettings = document.getElementById('settingsView').style.display === 'block';
+  if(!myProfileOpenedFromSettings) myProfileReturnTab = currentTopTab;
   if(myProfileOpenedFromSettings){
     // 설정 화면 상태(목록/상세)는 그대로 두고 가리기만 함 - 돌아올 때 그대로 다시 보여줌
     document.getElementById('settingsView').style.display = 'none';
@@ -11954,7 +11959,7 @@ function closeMyProfile(){
     calendarCard.style.display = 'none';
     document.getElementById('settingsView').style.display = 'block';
   } else {
-    showTab(null);
+    showTab(myProfileReturnTab);
   }
 }
 // 수정 화면도 한 단계로 쌓아서, 뒤로가기 하면 프로필 "보기" 화면으로만 돌아가게 함
