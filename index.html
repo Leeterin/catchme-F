@@ -21231,6 +21231,11 @@ function openChatRoom(id){
   const msgBox = document.getElementById('chatMessages');
   msgBox.classList.add('chat-entering');
   const enterToken = ++chatEnterToken;
+  // 앱을 새로 켠 뒤 처음 여는 방이면, 서버 응답 오기 전까지 폰에 저장해둔 최근 대화를 먼저 보여줌 (카톡처럼 바로 뜨게)
+  if(room.isRealRoom && !room._loaded){
+    const cached = loadChatCache(id);
+    if(cached && cached.length >= (room.messages || []).length) room.messages = cached;
+  }
 
   renderChatMessages();
   renderPinnedSchedule();
@@ -21250,46 +21255,49 @@ function openChatRoom(id){
   // 경우)가 방을 다시 들어와도 영영 반영이 안 되는 문제가 있었음 - 방에 들어올 때마다 항상 최신
   // 메시지로 다시 동기화하도록 바꿈 (처음 들어온 게 아니면 실패해도 토스트 없이 조용히 넘어감)
   if(room.isRealRoom){
-    const firstLoad = !room._loaded;
-    const loading = loadRoomMessagesFromServer(id, room, firstLoad);
-    if(firstLoad){
-      // 처음 여는 방은 서버에서 대화를 받아온 뒤에 한 번에 보여줌 (느리면 1.5초 뒤엔 일단 보여줌)
-      loading.finally(() => revealChatMessagesWhenReady(enterToken));
-      setTimeout(() => revealChatMessagesWhenReady(enterToken), 1500);
-    } else {
-      revealChatMessagesWhenReady(enterToken);
-    }
-  } else {
-    revealChatMessagesWhenReady(enterToken);
+    loadRoomMessagesFromServer(id, room, !room._loaded);
   }
+  // 서버 응답을 기다리지 않고 지금 가진 대화를 바로 보여줌 (서버에서 새 내용이 오면 그때 조용히 갱신)
+  revealChatMessagesWhenReady(enterToken);
 
   pushViewState(closeChatRoomView);
 }
 
-// 방에 들어올 때 숨겨둔 메시지 영역을, 사진까지 자리 잡고 맨 아래로 내려간 다음에 보여줌 (사진은 최대 0.7초까지만 기다림)
+// 방에 들어올 때 숨겨둔 메시지 영역을 맨 아래로 내린 다음 바로 다음 프레임에 보여줌 (아무것도 기다리지 않음 -
+// 서버/사진을 기다리면 그동안 하얀 화면이 1초 넘게 보였음. 사진이 늦게 떠서 높이가 바뀌는 건 scrollChatToBottom이 다시 맞춰줌)
 var chatEnterToken = 0; // var: 시작할 때 링크로 바로 방이 열려도 선언 전 접근 에러가 안 나게
 function revealChatMessagesWhenReady(token){
   const box = document.getElementById('chatMessages');
-  if(token !== chatEnterToken || !box.classList.contains('chat-entering')) return;
-  let finished = false;
-  const done = () => {
-    if(finished || token !== chatEnterToken) return;
-    finished = true;
+  box.scrollTop = box.scrollHeight;
+  requestAnimationFrame(() => {
+    if(token !== chatEnterToken) return;
     box.scrollTop = box.scrollHeight;
-    requestAnimationFrame(() => {
-      box.scrollTop = box.scrollHeight;
-      box.classList.remove('chat-entering');
-    });
-  };
-  const pendingImgs = Array.from(box.querySelectorAll('img')).filter(img => !img.complete);
-  if(pendingImgs.length === 0){ done(); return; }
-  let left = pendingImgs.length;
-  const one = () => { if(--left <= 0) done(); };
-  pendingImgs.forEach(img => {
-    img.addEventListener('load', one, { once: true });
-    img.addEventListener('error', one, { once: true });
+    box.classList.remove('chat-entering');
   });
-  setTimeout(done, 700);
+}
+
+// 방별 최근 대화를 폰(localStorage)에 저장 - 앱을 다시 켜도 방에 들어가자마자 대화가 보이게 (서버가 진짜 기준이라 오면 덮어씀)
+const CHAT_CACHE_LIMIT = 80;
+function chatCacheKey(roomId){
+  return 'catchme_chat_cache_' + (currentUser && currentUser.id ? currentUser.id : 'anon') + '_' + roomId;
+}
+function saveChatCache(roomId, messages){
+  try {
+    const list = (messages || []).filter(m => !m._pending && !m._failed).slice(-CHAT_CACHE_LIMIT);
+    localStorage.setItem(chatCacheKey(roomId), JSON.stringify(list, (k, v) => k === '_animate' ? undefined : v));
+  } catch(e) {}
+}
+function loadChatCache(roomId){
+  try {
+    const raw = localStorage.getItem(chatCacheKey(roomId));
+    const list = raw ? JSON.parse(raw) : null;
+    if(!Array.isArray(list) || list.length === 0) return null;
+    // 화면용 로컬 id는 새로 붙여서 다른 메시지와 겹치지 않게
+    list.forEach(m => { m.id = 'msg' + (locationMsgIdCounter++); });
+    return list;
+  } catch(e) {
+    return null;
+  }
 }
 
 // 서버에서 온 메시지 하나(어떤 타입이든)를 로컬 카드 형식으로 변환. 방 전체 메시지를 불러올 때뿐 아니라,
@@ -21321,6 +21329,7 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
     const unsent = (room.messages || []).filter(m => m._pending || m._failed);
     room.messages = data.messages.map(m => mapServerMessageToLocal(m, room)).concat(unsent);
     room._loaded = true;
+    saveChatCache(id, room.messages);
     // 이미 화면에 있는 대화와 똑같으면 다시 그리지 않음 - 방에 들어가자마자 한 번 더 깜빡이며 다시 그려지던 것 방지
     const changed = chatMessagesSignature(room.messages) !== before;
     if(activeChatRoomId === id){
