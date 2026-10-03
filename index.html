@@ -2798,6 +2798,8 @@
     font:inherit; font-size:12px; font-weight:600; cursor:pointer;
     -webkit-tap-highlight-color:transparent; touch-action:manipulation;
   }
+  /* 오른쪽 정렬 (justify-content:flex-end는 넘칠 때 왼쪽이 잘려서 첫 칩을 auto 여백으로 밀어줌) */
+  .chat-search-sender-chip:first-child{ margin-left:auto; }
   .chat-search-sender-chip.selected{ background:var(--accent); border-color:var(--accent); color:#fff; }
   /* 날짜로 이동했을 때 그 날 구분선이 살짝 반짝 */
   .chat-date-divider.date-jump-flash span{ animation:chatDateJumpFlash 1.4s ease; }
