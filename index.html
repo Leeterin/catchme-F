@@ -11873,10 +11873,36 @@ const myProfileData = {
 };
 let myProfileEditing = false;
 
+// 내 프로필을 어디서 열었는지 기억해뒀다가 뒤로가기 하면 그 화면(설정 or 메인)으로 돌아감.
+// 예전엔 히스토리에 안 쌓여서, 설정 > 내 프로필에서 폰 뒤로가기를 누르면 설정을 건너뛰고 바로 나가버렸음
+let myProfileOpenedFromSettings = false;
 function openMyProfile(){
-  showTab(null);
+  myProfileOpenedFromSettings = document.getElementById('settingsView').style.display === 'block';
+  if(myProfileOpenedFromSettings){
+    // 설정 화면 상태(목록/상세)는 그대로 두고 가리기만 함 - 돌아올 때 그대로 다시 보여줌
+    document.getElementById('settingsView').style.display = 'none';
+  } else {
+    showTab(null);
+  }
   calendarCard.style.display = 'none';
   document.getElementById('myProfileView').style.display = 'block';
+  myProfileEditing = false;
+  renderMyProfile();
+  pushViewState(closeMyProfile);
+}
+function closeMyProfile(){
+  myProfileEditing = false;
+  if(myProfileOpenedFromSettings){
+    document.getElementById('myProfileView').style.display = 'none';
+    calendarCard.style.display = 'none';
+    document.getElementById('settingsView').style.display = 'block';
+  } else {
+    showTab(null);
+  }
+}
+// 수정 화면도 한 단계로 쌓아서, 뒤로가기 하면 프로필 "보기" 화면으로만 돌아가게 함
+function exitMyProfileEdit(){
+  if(!myProfileEditing) return;
   myProfileEditing = false;
   renderMyProfile();
 }
@@ -11953,9 +11979,8 @@ function renderMyProfile(){
       myProfileData.id = document.getElementById('mpIdInput').value.trim() || myProfileData.id;
       myProfileData.phone = document.getElementById('mpPhoneInput').value.trim();
       myProfileData.email = document.getElementById('mpEmailInput').value.trim();
-      myProfileEditing = false;
       saveProfileToServer();
-      renderMyProfile();
+      goBackOrClose(exitMyProfileEdit);
     });
   }
 }
@@ -12297,19 +12322,18 @@ function saveProfileVisibility(){
 }
 
 document.getElementById('myProfileBtn').addEventListener('click', openMyProfile);
+// 화면 왼쪽 위 뒤로가기도 폰 뒤로가기와 똑같이 히스토리를 따라감 (수정 중이면 보기 화면으로, 아니면 열었던 화면으로)
 document.getElementById('myProfileBackBtn').addEventListener('click', () => {
-  // 수정 화면에서 뒤로가기를 누르면 메인 화면까지 나가버리는 게 아니라, 내 프로필 "보기" 화면으로만 돌아가게 함.
-  // 이미 보기 화면이면(수정 중이 아니면) 원래대로 메인 화면으로 나감.
-  if(myProfileEditing){
-    myProfileEditing = false;
-    renderMyProfile();
-  } else {
-    showTab(null);
-  }
+  goBackOrClose(myProfileEditing ? exitMyProfileEdit : closeMyProfile);
 });
 document.getElementById('myProfileEditBtn').addEventListener('click', () => {
-  myProfileEditing = !myProfileEditing;
-  renderMyProfile();
+  if(myProfileEditing){
+    goBackOrClose(exitMyProfileEdit);
+  } else {
+    myProfileEditing = true;
+    renderMyProfile();
+    pushViewState(exitMyProfileEdit);
+  }
 });
 
 // ============================================================
