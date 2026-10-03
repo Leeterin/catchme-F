@@ -18671,6 +18671,15 @@ updateChatNavBadge();
 // Date.now()로 통일해서 항상 "가장 최근"이 맨 위로 오게 함.
 function touchRoom(roomId){
   if(CHAT_ROOMS[roomId]) CHAT_ROOMS[roomId].lastActivity = Date.now();
+  scheduleChatCacheSave(roomId);
+}
+// 실시간으로 바뀐 대화(장소 변경 등)도 폰 저장본에 바로 반영 - 안 그러면 앱을 다시 켰을 때 예전 상태가 먼저 떴다가 바뀜
+const chatCacheSaveTimers = {};
+function scheduleChatCacheSave(roomId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !room.isRealRoom || !room._loaded) return; // 아직 서버에서 다 안 받은 방은 저장본을 덮어쓰지 않음
+  clearTimeout(chatCacheSaveTimers[roomId]);
+  chatCacheSaveTimers[roomId] = setTimeout(() => saveChatCache(roomId, room.messages), 400);
 }
 
 const AUTO_REPLIES = ['오 좋아요!', '넵 확인했어요', '그때 봐요 :)', '조금만 기다려주세요'];
@@ -22094,6 +22103,11 @@ function renderChatMessages(){
   chatHasMoreAbove = !q && room.messages.length > visibleMessages.length;
   // 화면에 붙이기 전에 따로 다 만든 뒤 한 번에 교체 - 중간 상태가 보이거나 여러 번 다시 계산되지 않게
   const frag = document.createDocumentFragment();
+  // 장소 알림은 항상 가장 마지막 것만 큰 카드 - 그 전 것들은 서버 표시(superseded)를 기다리지 않고 바로 "변경됐어요"로
+  let latestHotplaceMsg = null;
+  for(let i = room.messages.length - 1; i >= 0; i--){
+    if(room.messages[i].type === 'hotplace'){ latestHotplaceMsg = room.messages[i]; break; }
+  }
   let lastOtherRunKey = null; // 바로 앞 "상대 메시지"의 보낸 사람+분 - 같으면 프로필 아이콘을 또 그리지 않음
 
   visibleMessages.forEach(m => {
@@ -22346,14 +22360,14 @@ function renderChatMessages(){
       // 이어지게 함 - "장소 확정"(LOCATION_NOTICE) 카드의 "주변 핫플 보기"와 똑같은 화면을 재사용
       row.querySelector('.lr-nearby-food-btn').addEventListener('click', () => openHotplaceView(m.areaName, m.lat, m.lon));
     } else if(m.type === 'hotplace'){
-      if(isHotplaceNoticeRemoved(room, m)){
-        // 그 장소가 지금은 약속 장소로 정해져 있지 않음(삭제됨) - "근처에서 만나요" 카드 대신 작은 알림만
-        row.className = 'msg-row system-notice-row';
-        row.innerHTML = `<div class="system-notice-card">${ICO.pin} 약속 장소가 삭제됐어요</div>`;
-      } else if(m.superseded){
+      if(m.superseded || m !== latestHotplaceMsg){
         // 그 뒤에 장소가 또 바뀌어서 이제 예전 알림이 된 카드 - 다른 시스템 알림처럼 작게만 표시함
         row.className = 'msg-row system-notice-row';
         row.innerHTML = `<div class="system-notice-card">${ICO.pin} 약속 장소가 변경됐어요</div>`;
+      } else if(isHotplaceNoticeRemoved(room, m)){
+        // 그 장소가 지금은 약속 장소로 정해져 있지 않음(삭제됨) - "근처에서 만나요" 카드 대신 작은 알림만
+        row.className = 'msg-row system-notice-row';
+        row.innerHTML = `<div class="system-notice-card">${ICO.pin} 약속 장소가 삭제됐어요</div>`;
       } else {
         row.className = 'msg-row hotplace-notice-row';
         row.innerHTML = `
@@ -22531,6 +22545,7 @@ function renderChatMessages(){
     frag.appendChild(row);
   });
   box.replaceChildren(frag);
+  scheduleChatCacheSave(activeChatRoomId); // 카드 상태 변경(수락/취소 등)도 저장본에 반영
   if(q){
     refreshChatSearchHits();
   } else {
