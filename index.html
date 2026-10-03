@@ -14424,12 +14424,12 @@ function openTimePicker(targetId){
   timePickerMinAfter = null;
   if(targetId === 'eventFormEnd' && eventFormEndIsSameDay()){
     const startMin = timeStrToMin(document.getElementById('eventFormStart').value);
-    if(startMin < 23 * 60 + 55) timePickerMinAfter = startMin;
+    if(startMin < 23 * 60 + 59) timePickerMinAfter = startMin;
   }
   const current = document.getElementById(targetId).value || '09:00';
   let [h, m] = current.split(':').map(Number);
   if(timePickerMinAfter !== null && h * 60 + m <= timePickerMinAfter){
-    const def = Math.min(timePickerMinAfter + 60, 23 * 60 + 55);
+    const def = Math.min(timePickerMinAfter + 60, 23 * 60 + 59);
     h = Math.floor(def / 60); m = def % 60;
   }
   renderTimeColumns(h, m);
@@ -14449,13 +14449,15 @@ function renderTimeColumns(selH, selM){
   minCol.innerHTML = '';
 
   const minAfter = timePickerMinAfter;
+  // 일반 일정(시작/종료 시간)은 1분 단위, 그 외(약속 시간 등)는 5분 단위로 고름
+  const minStep = (activeTimePickerTarget === 'eventFormStart' || activeTimePickerTarget === 'eventFormEnd') ? 1 : 5;
   const minHour = minAfter === null ? 0 : Math.floor(minAfter / 60);
   // 종료 시간 제한이 있을 때, 시작 시간과 같은 "시"를 고르면 시작 분 이후의 분만 보여줌
   const renderMinutes = () => {
     minCol.innerHTML = '';
-    const lowest = (minAfter !== null && pendingTimeHour === minHour) ? (minAfter % 60) + 5 : 0;
+    const lowest = (minAfter !== null && pendingTimeHour === minHour) ? (minAfter % 60) + minStep : 0;
     if(pendingTimeMin < lowest) pendingTimeMin = lowest;
-    for(let m = lowest; m < 60; m += 5){
+    for(let m = lowest; m < 60; m += minStep){
       const el = document.createElement('button');
       el.type = 'button';
       el.className = 'custom-picker-time-opt' + (m === pendingTimeMin ? ' selected' : '');
@@ -14509,7 +14511,7 @@ document.getElementById('customTimeConfirm').addEventListener('click', () => {
         }
         endMin -= 24 * 60;
       } else {
-        endMin = 23 * 60 + 55;
+        endMin = 23 * 60 + 59;
       }
     }
     document.getElementById('eventFormEnd').value = minToTimeStr(endMin);
