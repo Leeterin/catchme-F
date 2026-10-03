@@ -1842,6 +1842,7 @@
   /* .placeholder-text span{display:block}이 등급 뱃지(inline-flex로 아이콘+글자를 나란히 두는 칩)까지
      깨버려서, 이 카드 안에서만 뱃지의 inline-flex를 다시 살려줌(specificity로 덮어씀) */
   .feed-review-profile-card .meet-badge-chip{ display:inline-flex; }
+  #feedReviewProfileBadge{ cursor:pointer; }
 
   /* ===== [출시 초기 임시 숨김] 근처 모임 / 추천 친구 =====
      우선 "추천"(맛집·카페·체험)만 남겨두기로 해서, 그 둘로 가는 세그먼트 버튼을 통째로 숨김.
@@ -4514,6 +4515,27 @@
   .mini-confirm-btn:hover{ background:var(--mask); }
   .mini-confirm-btn.danger{ color:var(--cta); }
 
+  /* ---------------- 리뷰 등급 기준표 팝업 ---------------- */
+  .reviewer-tier-list{ display:flex; flex-direction:column; gap:8px; }
+  .reviewer-tier-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 11px;
+    border-radius:11px;
+    background:var(--surface-2);
+    border:1px solid transparent;
+  }
+  .reviewer-tier-row.mine{ border-color:var(--accent); background:var(--mask); }
+  .reviewer-tier-row .meet-badge-chip{ display:inline-flex; margin-left:0; flex-shrink:0; }
+  .reviewer-tier-range{ font-size:11.5px; color:var(--text-dim); flex:1; }
+  .reviewer-tier-mine-tag{
+    font-size:10px;
+    font-weight:700;
+    color:var(--accent);
+    flex-shrink:0;
+  }
+
   /* ---------------- 채팅: 주변 핫플 보기 알림 카드 ---------------- */
   .hotplace-notice-row{ justify-content:center !important; }
   .hotplace-notice-card{
@@ -7073,6 +7095,15 @@
       <div class="mini-confirm-title" id="legalPageTitle">이용약관</div>
       <div id="legalPageBody" style="overflow-y:auto;font-size:12.5px;color:var(--text-dim);line-height:1.6;text-align:left;white-space:pre-wrap;flex:1;margin-bottom:10px;"></div>
       <button type="button" id="legalPageCloseBtn" class="mini-confirm-btn">닫기</button>
+    </div>
+  </div>
+
+  <!-- 리뷰 등급 뱃지(추천 탭 맨 위 내 리뷰 프로필)를 누르면 전체 등급 기준표를 보여줌 -->
+  <div class="mini-confirm-overlay" id="reviewerLevelInfoOverlay">
+    <div class="mini-confirm-card" style="max-width:320px;max-height:70vh;display:flex;flex-direction:column;">
+      <div class="mini-confirm-title">리뷰 등급</div>
+      <div class="reviewer-tier-list" id="reviewerTierList" style="overflow-y:auto;"></div>
+      <button type="button" id="reviewerLevelInfoCloseBtn" class="mini-confirm-btn" style="margin-top:14px;">닫기</button>
     </div>
   </div>
 
@@ -12194,6 +12225,45 @@ document.getElementById('feedReviewProfileCard').addEventListener('click', () =>
   // 재사용함(내 계정이라 isSelf가 자동으로 true가 되어 수정 버튼이 나타남)
   if(!currentUser) return;
   openFeedAuthorView(currentUser);
+});
+
+// ---------- 리뷰 등급 전체 기준표 팝업 ----------
+// 추천 탭 맨 위 뱃지를 누르면, 등급이 총 몇 단계고 각각 몇 개부터인지 한눈에 보여줌.
+// 내 등급은 테두리로 표시해서 지금 몇 번째 단계인지, 다음 단계까진 얼마나 남았는지 바로 알 수 있게 함.
+function renderReviewerLevelInfoList(){
+  const listEl = document.getElementById('reviewerTierList');
+  if(!listEl) return;
+  const tiersAsc = [...REVIEWER_LEVEL_TIERS].sort((a, b) => a.min - b.min);
+  const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
+  const myTier = getReviewerLevelTier(myCount);
+  listEl.innerHTML = tiersAsc.map((t, i) => {
+    const next = tiersAsc[i + 1];
+    const rangeLabel = next ? `리뷰 ${t.min}~${next.min - 1}개` : `리뷰 ${t.min}개 이상`;
+    const isMine = !!(myTier && myTier.key === t.key);
+    return `
+      <div class="reviewer-tier-row${isMine ? ' mine' : ''}">
+        <span class="meet-badge-chip" style="color:${t.color};border-color:${t.color};">${t.icon}${t.label}</span>
+        <span class="reviewer-tier-range">${rangeLabel}</span>
+        ${isMine ? '<span class="reviewer-tier-mine-tag">내 등급</span>' : ''}
+      </div>
+    `;
+  }).join('');
+}
+function openReviewerLevelInfoOverlay(){
+  renderReviewerLevelInfoList();
+  document.getElementById('reviewerLevelInfoOverlay').classList.add('show');
+}
+document.getElementById('reviewerLevelInfoCloseBtn').addEventListener('click', () => {
+  document.getElementById('reviewerLevelInfoOverlay').classList.remove('show');
+});
+document.getElementById('reviewerLevelInfoOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'reviewerLevelInfoOverlay') document.getElementById('reviewerLevelInfoOverlay').classList.remove('show');
+});
+// 뱃지는 "내 리뷰 프로필" 카드 안에 있어서, 그냥 두면 카드 클릭(리뷰 모아보기 열기)이 같이 눌림 -
+// stopPropagation으로 뱃지를 눌렀을 땐 등급표만 뜨게 분리함
+document.getElementById('feedReviewProfileBadge').addEventListener('click', (e) => {
+  e.stopPropagation();
+  openReviewerLevelInfoOverlay();
 });
 
 // 공개/비공개 토글만 바뀐 경우 (보기 모드에서) 서버에 조용히 반영
