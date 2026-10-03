@@ -3612,9 +3612,9 @@
   .chat-input-row input:focus{ border-color:var(--accent); }
   #chatImageBtn{
     flex-shrink:0;
-    width:38px;
-    height:38px;
-    border-radius:11px;
+    width:46px;
+    height:46px;
+    border-radius:13px;
     border:1px solid var(--line);
     background:var(--surface-2);
     color:var(--text-dim);
@@ -3622,6 +3622,10 @@
     align-items:center;
     justify-content:center;
     cursor:pointer;
+  }
+  #chatImageBtn svg{
+    width:30px;
+    height:30px;
   }
   .chat-input-row input::placeholder{ color:#B7B8BE; }
   .chat-input-row button{
@@ -7152,7 +7156,7 @@
         </div>
         <div class="chat-input-row">
           <input type="file" id="chatImageInput" accept="image/*" style="display:none;" />
-          <button type="button" id="chatImageBtn" title="사진 보내기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button>
+          <button type="button" id="chatImageBtn" title="사진 보내기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="30" height="30"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button>
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요" maxlength="200" />
           <button id="chatSendBtn">전송</button>
         </div>
