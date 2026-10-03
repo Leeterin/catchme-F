@@ -12208,8 +12208,17 @@ function renderFeedReviewProfileCard(){
   const avatarEl = document.getElementById('feedReviewProfileAvatar');
   if(!nameEl || !avatarEl) return; // 로그인 전 등 화면이 아직 안 그려졌으면 그냥 넘어감
   nameEl.textContent = myProfileData.reviewNickname || myProfileData.name;
+  // 리뷰를 아직 한 번도 안 써서 등급이 없으면(1개 미만) renderReviewerLevelBadgeHtml이 빈 문자열을 주는데,
+  // 그러면 누를 게 아예 안 보여서 등급표 팝업을 열 방법이 없었음 - 그 경우에도 회색 "등급 보기" 칩을
+  // 대신 보여줘서 항상 누를 수 있게 함
   const badgeEl = document.getElementById('feedReviewProfileBadge');
-  if(badgeEl) badgeEl.innerHTML = currentUser ? renderReviewerLevelBadgeHtml(currentUser.id) : '';
+  if(badgeEl){
+    const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
+    const myTier = getReviewerLevelTier(myCount);
+    badgeEl.innerHTML = myTier
+      ? renderReviewerLevelBadgeHtml(currentUser.id)
+      : '<span class="meet-badge-chip" style="color:var(--text-dim);border-color:var(--line);">등급 보기</span>';
+  }
   if(myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl){
     avatarEl.style.background = '';
     avatarEl.innerHTML = `<img src="${myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
