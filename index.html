@@ -3209,7 +3209,7 @@
   }
   .profile-badge-tier-list{
     display:grid;
-    grid-template-columns:repeat(3, 1fr);
+    grid-template-columns:repeat(2, 1fr);
     gap:8px;
   }
   .profile-badge-tier{
@@ -4649,6 +4649,46 @@
   .bug-report-photo-remove{ position:absolute; top:2px; right:2px; width:20px; height:20px; border-radius:50%; border:none; background:rgba(0,0,0,0.6); color:#fff; font-size:12px; line-height:20px; padding:0; cursor:pointer; }
   .bug-report-photo-add{ width:60px; height:60px; border-radius:10px; border:1px dashed var(--line); background:var(--surface-2); color:var(--text-dim); font-size:11px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; padding:0; }
   .bug-report-photo-add b{ font-size:18px; line-height:1; font-weight:400; }
+
+  /* ---------------- 레벨(Lv) 진행 막대 / 레벨업 축하 팝업 ---------------- */
+  .lv-num{ font-weight:800; }
+  .level-progress{ width:100%; margin-top:8px; text-align:left; }
+  .level-progress-head{ display:flex; justify-content:space-between; font-size:11px; font-weight:700; color:var(--text-dim); margin-bottom:5px; }
+  .level-progress-head b{ color:var(--text); }
+  .level-progress-bar{ height:7px; border-radius:999px; background:var(--line); overflow:hidden; }
+  .level-progress-bar > div{ height:100%; border-radius:999px; transition:width .6s cubic-bezier(.25,.8,.3,1); }
+  .levelup-overlay{
+    position:fixed; inset:0; z-index:5000;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.45);
+    animation:levelupFadeIn .25s ease both;
+  }
+  .levelup-overlay.out{ animation:levelupFadeOut .25s ease both; }
+  .levelup-card{
+    width:min(280px, calc(100vw - 48px));
+    padding:26px 20px 20px;
+    border-radius:20px;
+    background:var(--bg);
+    text-align:center;
+    box-shadow:0 18px 50px rgba(0,0,0,.25);
+    animation:levelupPop .5s cubic-bezier(.2,1.4,.4,1) both;
+  }
+  .levelup-icon{
+    width:64px; height:64px; margin:0 auto 12px;
+    border-radius:50%; border:2.5px solid currentColor;
+    display:flex; align-items:center; justify-content:center;
+    animation:levelupSpin .9s .15s cubic-bezier(.25,.8,.3,1) both;
+  }
+  .levelup-icon svg{ width:30px; height:30px; }
+  .levelup-title{ font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; letter-spacing:1px; }
+  .levelup-levels{ margin-top:6px; font-size:15px; font-weight:800; color:var(--text); }
+  .levelup-levels .from{ color:var(--text-dim); font-weight:600; }
+  .levelup-sub{ margin-top:8px; font-size:12.5px; color:var(--text-dim); line-height:1.5; }
+  .levelup-tier-new{ margin-top:10px; font-size:12.5px; font-weight:700; }
+  @keyframes levelupFadeIn{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes levelupFadeOut{ from{ opacity:1; } to{ opacity:0; } }
+  @keyframes levelupPop{ from{ opacity:0; transform:scale(.6); } to{ opacity:1; transform:scale(1); } }
+  @keyframes levelupSpin{ from{ transform:rotate(-180deg) scale(.4); opacity:0; } to{ transform:none; opacity:1; } }
 
   /* ---------------- 리뷰 등급 기준표 팝업 ---------------- */
   .reviewer-tier-list{ display:flex; flex-direction:column; gap:8px; }
@@ -10509,7 +10549,86 @@ function renderMonthlyKingBadgeHtml(authorId){
 // 위의 첫 리뷰어/친구N+/이달의 맛집왕은 "이 장소" 또는 "이번 달" 한정 뱃지라 리뷰를 더 써도
 // 사라지거나 그대로인 게 제각각이었음. 이 등급 뱃지는 그 사람이 지금까지 쓴 리뷰 총 개수만 보고
 // 매겨져서, 리뷰를 쓰면 쓸수록 등급이 오르기만 하지 절대 내려가거나 사라지지 않음.
+// ---------- 레벨(Lv) 시스템 - 리뷰 등급·약속 등급 공통 ----------
+// 등급(새싹/단골/고수…)은 단계가 몇 개뿐이라 맨 위 등급에 닿으면 더 오를 게 없었음. 그 위에 끝없이 오르는
+// Lv을 얹어서 리뷰/약속이 쌓일 때마다 계속 레벨업하는 느낌을 줌.
+// Lv n이 되려면 누적 n(n-1)/2+1개 필요 (Lv1:1, Lv2:2, Lv3:4, Lv4:7, Lv5:11, Lv6:16, Lv7:22…) - 갈수록 조금씩 더 필요함
+function countForLevel(n){ return n * (n - 1) / 2 + 1; }
+function levelFromCount(count){
+  if(count < 1) return 0;
+  let lv = 1;
+  while(countForLevel(lv + 1) <= count) lv++;
+  return lv;
+}
+// "Lv.3 단골" 칩 - 등급이 아직 없으면(약속 1~2회 등) 회색으로 Lv만 보여줌
+function levelChipHtml(count, tier, cls = '', title = ''){
+  const color = tier ? tier.color : 'var(--text-dim)';
+  return `<span class="meet-badge-chip ${cls}" style="color:${color};border-color:${color};" title="${title}">${tier ? tier.icon : ''}<span class="lv-num">Lv.${levelFromCount(count)}</span>${tier ? ' ' + tier.label : ''}</span>`;
+}
+// 다음 레벨까지 진행 막대 - remainText(n)은 "리뷰 n개" / "약속 n회"처럼 남은 양을 글로 바꿔줌
+function levelProgressHtml(count, color, remainText){
+  const lv = levelFromCount(count);
+  const from = lv ? countForLevel(lv) : 0;
+  const to = countForLevel(lv + 1);
+  const pct = Math.max(4, Math.round((count - from) / (to - from) * 100));
+  return `<div class="level-progress">
+    <div class="level-progress-head"><b>${lv ? 'Lv.' + lv : '시작 전'}</b><span>Lv.${lv + 1}까지 ${remainText(to - count)} 남음</span></div>
+    <div class="level-progress-bar"><div style="width:${pct}%;background:${color || 'var(--accent)'};"></div></div>
+  </div>`;
+}
+
+// 레벨이 올랐는지 확인 - 마지막으로 본 개수를 폰에 기억해두고, 그보다 올라갔으면 레벨업 축하 팝업을 띄움.
+// 처음 보는 항목은 기준값만 저장(앱 설치 직후 지금까지 쌓인 걸로 축하가 우르르 뜨지 않게). 내려가면 조용히 맞춰둠
+function checkLevelUp(storeKey, count, tiers, info){
+  if(!currentUser) return;
+  const key = `catchme_lvcount_${currentUser.id}_${storeKey}`;
+  let prev = null;
+  try { prev = localStorage.getItem(key); localStorage.setItem(key, String(count)); } catch(e){ return; }
+  if(prev === null) return;
+  const prevCount = parseInt(prev, 10) || 0;
+  const lv = levelFromCount(count);
+  const prevLv = levelFromCount(prevCount);
+  if(lv <= prevLv) return;
+  const tier = tiers.find(t => count >= t.min) || null;
+  const prevTier = tiers.find(t => prevCount >= t.min) || null;
+  showLevelUpCelebration({ fromLv: prevLv, toLv: lv, tier, newTier: tier && (!prevTier || prevTier.key !== tier.key), ...info });
+}
+// 레벨업 축하 팝업 - 여러 개가 한꺼번에 오르면 차례대로 하나씩 보여줌
+const levelUpQueue = [];
+let levelUpShowing = false;
+function showLevelUpCelebration(item){
+  levelUpQueue.push(item);
+  if(!levelUpShowing) showNextLevelUp();
+}
+function showNextLevelUp(){
+  const item = levelUpQueue.shift();
+  if(!item){ levelUpShowing = false; return; }
+  levelUpShowing = true;
+  const color = item.tier ? item.tier.color : 'var(--accent)';
+  const icon = item.tier ? item.tier.icon : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+  const overlay = document.createElement('div');
+  overlay.className = 'levelup-overlay';
+  overlay.innerHTML = `
+    <div class="levelup-card">
+      <div class="levelup-icon" style="color:${color};">${icon.replace(/width="\d+" height="\d+"/, '')}</div>
+      <div class="levelup-title" style="color:${color};">LEVEL UP!</div>
+      <div class="levelup-levels"><span class="from">Lv.${item.fromLv}</span> → Lv.${item.toLv}</div>
+      <div class="levelup-sub">${item.sub || ''}</div>
+      ${item.newTier ? `<div class="levelup-tier-new" style="color:${color};">'${item.tier.label}' 등급 달성!</div>` : ''}
+    </div>`;
+  const close = () => {
+    if(overlay._closed) return;
+    overlay._closed = true;
+    overlay.classList.add('out');
+    setTimeout(() => { overlay.remove(); showNextLevelUp(); }, 250);
+  };
+  overlay.addEventListener('click', close);
+  setTimeout(close, 3200);
+  document.body.appendChild(overlay);
+}
+
 const REVIEWER_LEVEL_TIERS = [
+  { min: 50, key: 'master',  label: '리뷰 마스터', color: '#8B5CF6', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M2 8l4 10h12l4-10-6 4-4-7-4 7z"/><path d="M6 21h12"/></svg>' },
   { min: 21, key: 'legend',  label: '리뷰 레전드', color: '#F5A623', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M7 5H4a3 3 0 0 0 3 4"/><path d="M17 5h3a3 3 0 0 1-3 4"/></svg>' },
   { min: 11, key: 'expert',  label: '리뷰 고수', color: '#F472B6', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8-5.2-4.6 6.9-.6z"/></svg>' },
   { min: 6,  key: 'foodie',  label: '맛잘알', color: '#22B07D', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 2v7a2.5 2.5 0 0 0 5 0V2"/><path d="M6.5 2v20"/><path d="M18 2c-1.8 0-3 2.5-3 6s1.2 5 3 5 3-1.5 3-5-1.2-6-3-6z"/><path d="M18 13v9"/></svg>' },
@@ -10534,7 +10653,14 @@ function renderReviewerLevelBadgeHtml(authorId){
   const count = getAuthorReviewCount(authorId);
   const tier = getReviewerLevelTier(count);
   if(!tier) return '';
-  return `<span class="meet-badge-chip reviewer-level-badge" style="color:${tier.color};border-color:${tier.color};" title="${tier.label} · 작성한 리뷰 ${count}개 · 눌러서 이 사람 리뷰 모아보기">${tier.icon}${tier.label}</span>`;
+  return levelChipHtml(count, tier, 'reviewer-level-badge', `${tier.label} · 작성한 리뷰 ${count}개 · 눌러서 이 사람 리뷰 모아보기`);
+}
+// 내 리뷰 레벨이 올랐으면 축하 팝업 (서버에서 리뷰 목록을 한 번이라도 받아온 뒤에만 - 빈 목록 0개로 기준값이 잡히지 않게)
+let feedPostsLoadedOnce = false;
+function checkMyReviewLevelUp(){
+  if(!currentUser || !feedPostsLoadedOnce) return;
+  const count = getAuthorReviewCount(currentUser.id);
+  checkLevelUp('review', count, REVIEWER_LEVEL_TIERS, { sub: `지금까지 리뷰 ${count}개를 남겼어요` });
 }
 // 리뷰용 프로필(닉네임/사진) 아바타 html - 위쪽 "내 리뷰 프로필" 카드와 같은 우선순위(리뷰용 > 실명 프로필 > 이니셜).
 // 다른 사람 작성자 화면은 서버가 내려준 hasAvatar/hasReviewAvatar 플래그로 그리지만(feedAuthorAvatarHtml),
@@ -10562,14 +10688,12 @@ function renderFeedAuthorViewContent(author){
 
   document.getElementById('feedAuthorViewAvatar').innerHTML = isSelf ? feedSelfReviewAvatarHtml() : feedAuthorAvatarHtml(author);
   document.getElementById('feedAuthorViewName').textContent = isSelf ? (myProfileData.reviewNickname || myProfileData.name) : feedAuthorDisplayName(author);
-  document.getElementById('feedAuthorViewMeta').innerHTML = `작성한 리뷰 ${count}개` + (tier ? ` <span class="meet-badge-chip" style="color:${tier.color};border-color:${tier.color};">${tier.icon}${tier.label}</span>` : '');
+  document.getElementById('feedAuthorViewMeta').innerHTML = `작성한 리뷰 ${count}개` + (count ? ' ' + levelChipHtml(count, tier) : '');
+  // 다음 레벨까지 진행 막대는 항상, 다음 등급 안내는 아직 위 등급이 남아있을 때만
   const nextEl = document.getElementById('feedAuthorViewNext');
-  if(nextTier){
-    nextEl.textContent = `'${nextTier.label}' 등급까지 리뷰 ${nextTier.min - count}개 남았어요`;
-    nextEl.style.display = '';
-  } else {
-    nextEl.style.display = 'none';
-  }
+  nextEl.innerHTML = levelProgressHtml(count, tier && tier.color, n => `리뷰 ${n}개`)
+    + (nextTier ? `<div style="margin-top:6px;">'${nextTier.label}' 등급까지 리뷰 ${nextTier.min - count}개 남았어요</div>` : '');
+  nextEl.style.display = '';
   document.getElementById('feedAuthorViewEditBtn').style.display = isSelf ? '' : 'none';
 
   const posts = ['food', 'cafe', 'experience']
@@ -11254,6 +11378,7 @@ async function submitPlaceReview(note, btn){
     FEED_POSTS[info.category].unshift({ ...post, location: post.location || '', note: post.note || '', tags: post.tags || tags, fromMeetup: true });
     sortFeedPosts(info.category);
     renderFeedPosts();
+    checkMyReviewLevelUp();
     markPlaceReviewDone(c.key);
     placeReviewState = null;
     document.getElementById('placeReviewOverlay').classList.remove('show');
@@ -11600,6 +11725,8 @@ async function loadFeedPostsFromServer(){
     });
     Object.keys(FEED_POSTS).forEach(cat => sortFeedPosts(cat));
     renderFeedPosts();
+    feedPostsLoadedOnce = true;
+    checkMyReviewLevelUp();
   } catch(err){
     console.error('[feed] load failed:', err);
   }
@@ -11958,6 +12085,7 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
     if(feedCreateSelectedCategory === activeFeedCategory) renderFeedPosts();
     dismissView(closeFeedCreate);
     showToast('게시물을 올렸어요!');
+    checkMyReviewLevelUp();
   } catch(err){
     showToast(err.message);
   } finally {
@@ -12646,6 +12774,7 @@ function renderFeedReviewProfileCard(){
       ? renderReviewerLevelBadgeHtml(currentUser.id)
       : '<span class="meet-badge-chip" style="color:var(--text-dim);border-color:var(--line);">등급 없음</span>';
   }
+  checkMyReviewLevelUp();
   if(myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl){
     avatarEl.style.background = '';
     avatarEl.innerHTML = `<img src="${myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
@@ -12670,7 +12799,10 @@ function renderReviewerLevelInfoList(){
   const tiersAsc = [...REVIEWER_LEVEL_TIERS].sort((a, b) => a.min - b.min);
   const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
   const myTier = getReviewerLevelTier(myCount);
-  listEl.innerHTML = tiersAsc.map((t, i) => {
+  // 맨 위에 내 레벨 진행 막대 - 등급은 정해진 단계까지지만 Lv은 리뷰를 쓸수록 끝없이 오름
+  listEl.innerHTML = `<div style="margin-bottom:6px;">${levelProgressHtml(myCount, myTier && myTier.color, n => `리뷰 ${n}개`)}
+    <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">등급은 아래 단계까지지만, 레벨은 리뷰를 쓸수록 계속 올라가요.</div></div>`
+  + tiersAsc.map((t, i) => {
     const next = tiersAsc[i + 1];
     const rangeLabel = next ? `리뷰 ${t.min}~${next.min - 1}개` : `리뷰 ${t.min}개 이상`;
     const isMine = !!(myTier && myTier.key === t.key);
@@ -16334,6 +16466,8 @@ function getMeetCountWithFriend(friend){
 }
 // 3단계 뱃지: 단골(3회+) → 친밀(5회+) → 각별(10회+). 개인 친구/비즈니스 관계 구분 없이 동일한 기준으로 적용됨
 const MEET_BADGE_TIERS = [
+  { min: 20, key: 'soulmate', label: '소울메이트', color: '#8B5CF6',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M2 8l4 10h12l4-10-6 4-4-7-4 7z"/><path d="M6 21h12"/></svg>' },
   { min: 10, key: 'special', label: '각별', color: '#F5A623',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z"/></svg>' },
   { min: 5, key: 'close', label: '친밀', color: '#F472B6',
@@ -16347,9 +16481,18 @@ function getMeetBadgeTier(count){
 // 친구 목록 줄 옆에 붙이는 작은 뱃지 chip (조건 미달이면 빈 문자열)
 function renderMeetBadgeChip(friend){
   const count = getMeetCountWithFriend(friend);
+  if(count < 1) return '';
   const tier = getMeetBadgeTier(count);
-  if(!tier) return '';
-  return `<span class="meet-badge-chip" style="color:${tier.color};border-color:${tier.color};" title="${tier.label} · 함께한 확정 약속 ${count}회">${tier.icon}${tier.label}</span>`;
+  return levelChipHtml(count, tier, '', `${tier ? tier.label + ' · ' : ''}함께한 확정 약속 ${count}회`);
+}
+// 이 친구와의 약속 레벨이 올랐으면 축하 팝업 (그 채팅방 약속 목록을 서버에서 받아온 뒤에만)
+function checkMeetLevelUp(friend){
+  if(!friend || !friend.username) return;
+  const roomId = findFriendRoomId(friend);
+  const room = roomId ? CHAT_ROOMS[roomId] : null;
+  if(!room || !room._pinsLoaded) return;
+  const count = getMeetCountWithFriend(friend);
+  checkLevelUp('meet_' + friend.username, count, MEET_BADGE_TIERS, { sub: `${escapeHtml(friend.name || friend.username)}님과 함께한 약속 ${count}회` });
 }
 // 친구 프로필 화면에 보여주는 좀 더 자세한 만남 횟수 + 다음 단계까지 안내
 function renderProfileMeetBadge(friend){
@@ -16359,14 +16502,14 @@ function renderProfileMeetBadge(friend){
   const tier = getMeetBadgeTier(count);
   const nextTier = [...MEET_BADGE_TIERS].sort((a, b) => a.min - b.min).find(b => count < b.min);
   let html = `<span class="profile-meet-count">${ICO.pushpin} 함께한 확정 약속 ${count}회</span>`;
-  if(tier){
-    html += ` <span class="meet-badge-chip" style="color:${tier.color};border-color:${tier.color};">${tier.icon}${tier.label}</span>`;
-  }
+  if(count) html += ' ' + levelChipHtml(count, tier);
+  html += levelProgressHtml(count, tier && tier.color, n => `약속 ${n}회`);
   if(nextTier){
     html += `<div class="profile-meet-next">'${nextTier.label}' 뱃지까지 ${nextTier.min - count}회 남았어요</div>`;
   }
   el.innerHTML = html;
   renderProfileBadgeTiers(count, tier);
+  checkMeetLevelUp(friend);
 }
 // 친구 프로필의 뱃지 등급표: 단골/친밀/각별 각각의 조건과 지금 어디까지 왔는지(현재 등급/획득/남은 횟수)를 한눈에 보여줌
 function renderProfileBadgeTiers(count, currentTier){
@@ -18742,6 +18885,8 @@ async function loadPinsFromServer(roomId, room){
       dateObj: p.dateLabel ? parseDateLabelToDate(p.dateLabel) : null,
     }));
     room._pinsLoaded = true;
+    const pinFriend = room.counterpartUsername && FRIENDS.find(f => f.username === room.counterpartUsername);
+    if(pinFriend) checkMeetLevelUp(pinFriend);
     if(activeChatRoomId === roomId){
       renderPinnedSchedule();
       // 삭제된 장소의 "근처에서 만나요" 카드를 작은 알림으로 바꿔 그림 (그런 카드가 있을 때만)
