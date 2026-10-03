@@ -7574,7 +7574,7 @@
         </div>
       </div>
       <div class="chat-search-bar" id="chatSearchBar">
-        <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" />
+        <input type="text" id="chatSearchInput" placeholder="대화 내용 검색" enterkeyhint="search" />
         <button type="button" class="chat-search-cancel" id="chatSearchCancelBtn">취소</button>
       </div>
       <div class="chat-pinned-schedule" id="chatPinnedSchedule" style="display:none;"></div>
@@ -23073,8 +23073,17 @@ document.getElementById('chatSearchCancelBtn').addEventListener('click', () => {
   input.value = '';
   renderChatMessages();
 });
-document.getElementById('chatSearchInput').addEventListener('input', (e) => {
+// 글자 칠 때마다가 아니라 키보드의 "검색" 버튼을 눌러야 검색됨 (다 지우면 바로 원래 대화로)
+document.getElementById('chatSearchInput').addEventListener('keydown', (e) => {
+  if(e.key !== 'Enter' || e.isComposing) return;
+  e.preventDefault();
   chatSearchQuery = e.target.value;
+  e.target.blur();
+  renderChatMessages();
+});
+document.getElementById('chatSearchInput').addEventListener('input', (e) => {
+  if(e.target.value.trim() || !chatSearchQuery) return;
+  chatSearchQuery = '';
   renderChatMessages();
 });
 
