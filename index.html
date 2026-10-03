@@ -6087,6 +6087,21 @@
     line-height:1.5;
   }
   /* ---------------- 회원가입 / 로그인 게이트 ---------------- */
+  /* 앱 시작 로딩 화면 - 캐치미 로고 */
+  .app-splash{
+    position:fixed; inset:0; z-index:9999;
+    background:#FFFFFF;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+    transition:opacity .35s ease, visibility .35s ease;
+  }
+  .app-splash.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+  .app-splash-logo{ width:96px; height:96px; animation:appSplashPop .6s cubic-bezier(.25,.8,.3,1) both; }
+  .app-splash-name{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; letter-spacing:2px;
+    color:#38BDF8; animation:appSplashFade .6s .15s ease both;
+  }
+  @keyframes appSplashPop{ from{ opacity:0; transform:scale(.85); } to{ opacity:1; transform:scale(1); } }
+  @keyframes appSplashFade{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
   .auth-gate{
     position:fixed;
     inset:0;
@@ -6229,6 +6244,15 @@
 </style>
 </head>
 <body>
+<!-- 앱 시작 로딩 화면 -->
+<div class="app-splash" id="appSplash">
+  <svg class="app-splash-logo" viewBox="220 220 584 584" aria-label="CATCHME">
+    <defs><linearGradient id="appSplashGrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#84D2FF"/><stop offset="1" stop-color="#4DABFF"/></linearGradient></defs>
+    <polygon fill="url(#appSplashGrad)" points="440,235 580,374 721,235 789,302 649,442 789,582 721,650 373,302"/>
+    <polygon fill="url(#appSplashGrad)" points="302,373 651,721 583,789 443,650 302,789 235,721 374,581 235,440"/>
+  </svg>
+  <div class="app-splash-name">CATCHME</div>
+</div>
 
 <div class="app">
 
@@ -24534,7 +24558,19 @@ if(STARTUP_INVITE_TOKEN) openInviteFromUrl();
 handleSocialLoginRedirect().catch(() => false).then(handled => {
   try { if(!handled) tryRestoreSession(); } catch(e) { console.error('[session restore]', e); }
   openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
-});
+}).finally(hideAppSplash);
+
+// 앱 시작 로딩 화면(로고) 닫기 - 로고가 너무 순식간에 사라지지 않게 최소 0.9초는 보여줌
+function hideAppSplash(){
+  const splash = document.getElementById('appSplash');
+  if(!splash || splash.classList.contains('hide')) return;
+  const wait = Math.max(0, 900 - performance.now());
+  setTimeout(() => {
+    splash.classList.add('hide');
+    setTimeout(() => splash.remove(), 400);
+  }, wait);
+}
+setTimeout(hideAppSplash, 5000); // 혹시 시작 과정이 멈춰도 5초 뒤엔 무조건 닫음
 </script>
 
 </body>
