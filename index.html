@@ -4085,6 +4085,19 @@
     height:22px;
   }
   #chatImageBtn:active{ transform:scale(.9); background:var(--line); }
+  #chatImageBtn svg{ transition:transform .15s ease; }
+  #chatImageBtn.open svg{ transform:rotate(45deg); }
+  /* 채팅 하단 + 패널 - 사진 / 약속 잡기 / 장소 (약속·장소를 헤더 ≡ 메뉴에 숨겨두면 못 찾았음) */
+  .chat-plus-menu:not([hidden]){ display:flex; gap:10px; padding:10px 12px 6px; }
+  .chat-plus-item{
+    flex:1; min-height:72px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    padding:10px 6px; border:none; border-radius:14px;
+    background:var(--surface-2); color:var(--text);
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .chat-plus-item svg{ width:22px; height:22px; color:var(--accent); }
+  .chat-plus-item:active{ transform:scale(.97); background:var(--line); }
   .chat-input-row input::placeholder{ color:#A9AAB1; }
   #chatSendBtn{
     flex-shrink:0;
@@ -8125,21 +8138,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
           <div class="chat-extra-dropdown" id="chatExtraDropdown">
-            <div class="chat-extra-option" id="extraMatchOption">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
-              <span id="extraMatchOptionLabel">약속 잡기</span>
-            </div>
             <div class="chat-extra-option" id="extraCalendarOption" data-mode="calendar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
               <span id="extraCalendarOptionLabel">캘린더 보기</span>
-            </div>
-            <div class="chat-extra-option" id="extraReserveOption" style="display:none;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
-              <span>열어둔 시간에 약속 잡기</span>
-            </div>
-            <div class="chat-extra-option" id="extraRecommendLocationOption" style="display:none;">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
-              <span>모임 장소 추천받기</span>
             </div>
             <div class="chat-extra-option" id="extraPastApptOption">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
@@ -8185,9 +8186,14 @@
           </div>
           <button type="button" class="chat-reply-preview-close" id="chatReplyPreviewClose">✕</button>
         </div>
+        <div class="chat-plus-menu" id="chatPlusMenu" hidden>
+          <button type="button" class="chat-plus-item" id="chatPlusPhotoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 5l1.5-2h4l1.5 2"/></svg>사진</button>
+          <button type="button" class="chat-plus-item" id="chatPlusPlanBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v5M9.5 16.5h5"/></svg>약속 잡기</button>
+          <button type="button" class="chat-plus-item" id="chatPlusPlaceBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>장소</button>
+        </div>
         <div class="chat-input-row">
           <input type="file" id="chatImageInput" accept="image/*" style="display:none;" />
-          <button type="button" id="chatImageBtn" title="사진 보내기" aria-label="사진 보내기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          <button type="button" id="chatImageBtn" title="사진 · 약속 잡기 · 장소" aria-label="사진, 약속 잡기, 장소 메뉴" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
           <input type="text" id="chatInput" placeholder="메시지를 입력하세요" maxlength="200" />
           <button id="chatSendBtn" title="전송" aria-label="전송"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5.5 11.5 12 5l6.5 6.5"/></svg></button>
         </div>
@@ -13648,7 +13654,31 @@ function handleChatImageSelected(e){
   };
   reader.readAsDataURL(file);
 }
-document.getElementById('chatImageBtn').addEventListener('click', () => document.getElementById('chatImageInput').click());
+// 채팅 하단 + : 사진 / 약속 잡기 / 장소 패널을 열고 닫음
+function setChatPlusMenu(open){
+  const menu = document.getElementById('chatPlusMenu');
+  const btn = document.getElementById('chatImageBtn');
+  if(!menu || !btn) return;
+  menu.hidden = !open;
+  btn.classList.toggle('open', open);
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+document.getElementById('chatImageBtn').addEventListener('click', () => {
+  setChatPlusMenu(document.getElementById('chatPlusMenu').hidden);
+});
+document.getElementById('chatPlusPhotoBtn').addEventListener('click', () => {
+  setChatPlusMenu(false);
+  document.getElementById('chatImageInput').click();
+});
+document.getElementById('chatPlusPlanBtn').addEventListener('click', () => {
+  setChatPlusMenu(false);
+  startPlanFromChat();
+});
+document.getElementById('chatPlusPlaceBtn').addEventListener('click', () => {
+  setChatPlusMenu(false);
+  startPlaceFromChat();
+});
+document.getElementById('chatInput').addEventListener('focus', () => setChatPlusMenu(false));
 document.getElementById('chatImageInput').addEventListener('change', handleChatImageSelected);
 
 async function sendChatImageMessage(dataUrl){
@@ -23427,6 +23457,7 @@ document.addEventListener('touchmove', (e) => {
 // 드래그하는 등 기기 자체의 키보드 숨기기 동작)를 했을 때만 닫히길 원해서 이 자동 닫힘 로직은 제거함.
 
 function openChatRoom(id, opts){
+  setChatPlusMenu(false); // + 패널은 방을 옮기거나 닫으면 접음
   const room = CHAT_ROOMS[id];
   if(!room) return;
   activeChatRoomId = id;
@@ -23625,6 +23656,7 @@ function chatMessagesSignature(messages){
 let chatReturnToCalendar = null; // 캘린더의 "채팅에서 확인"으로 들어온 경우, 뒤로가기 시 돌아갈 캘린더 상태(뷰/날짜)를 기억해둠
 
 function closeChatRoomView(){
+  setChatPlusMenu(false); // + 패널은 방을 옮기거나 닫으면 접음
   closeRestoreAvailPrompt(); // 결정 안 하고 방을 나가도 팝업 상태를 리셋해서, 다음에 들어오면 다시 뜨게 함
   if(placeReviewState) closePlaceReviewSheet('later');
   const view = document.getElementById('chatRoomView');
@@ -25479,21 +25511,12 @@ const EXTRA_OPTION_ICON_MEMBERS = '<svg viewBox="0 0 24 24" fill="none" stroke="
 function updateChatExtraOptionForRoom(){
   const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
   const option = document.getElementById('extraCalendarOption');
-  const reserveOption = document.getElementById('extraReserveOption');
-  const recommendOption = document.getElementById('extraRecommendLocationOption');
   if(room && room.isGroup){
     option.dataset.mode = 'members';
     option.innerHTML = `${EXTRA_OPTION_ICON_MEMBERS}<span>멤버보기</span>`;
-    reserveOption.style.display = 'none';
-    document.getElementById('extraMatchOptionLabel').textContent = '약속 잡기 · 모두 되는 시간';
-    recommendOption.style.display = room.isRealRoom ? '' : 'none'; // 실제 서버 방(참가자 출발지를 모을 수 있는 방)에서만 보임
   } else {
     option.dataset.mode = 'calendar';
     option.innerHTML = `${EXTRA_OPTION_ICON_CALENDAR}<span>${room ? escapeHtml(room.name) + '님 ' : ''}캘린더 보기</span>`;
-    // 예약하기/둘 다 되는 시간 찾기는 "약속 잡기" 하나로 묶음 - 홈과 같은 시트에서 이 친구 기준으로 방법을 추천
-    reserveOption.style.display = 'none';
-    document.getElementById('extraMatchOptionLabel').textContent = '약속 잡기';
-    recommendOption.style.display = (room && room.isRealRoom) ? '' : 'none'; // 1:1 실제 방에서도 두 사람 출발지로 추천받을 수 있음
   }
   document.getElementById('extraMuteOptionLabel').textContent = (room && room.muted) ? '알림 켜기' : '알림 끄기';
 }
@@ -25561,24 +25584,8 @@ document.getElementById('extraCalendarOption').addEventListener('click', (e) => 
   openFriendCalendar(friendId, 'calendar');
 });
 
-document.getElementById('extraReserveOption').addEventListener('click', (e) => {
-  e.stopPropagation();
-  document.getElementById('chatExtraDropdown').classList.remove('open');
-  const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
-  if(!room || room.isGroup) return;
-
-  const friendId = activeChatRoomId.startsWith('dm-')
-    ? activeChatRoomId.replace('dm-', '')
-    : (FRIENDS.find(f => f.username === room.counterpartUsername) || {}).id;
-  if(!friendId || !FRIENDS.some(f => f.id === friendId)){
-    showToast('친구로 추가된 사람만 약속을 요청할 수 있어요.');
-    return;
-  }
-  calendarOpenedFromChat = activeChatRoomId;
-  openFriendCalendar(friendId, 'reserve');
-});
-document.getElementById('extraMatchOption').addEventListener('click', () => {
-  document.getElementById('chatExtraDropdown').classList.remove('open');
+// 채팅 + 패널의 "약속 잡기" - 1:1은 이 친구 기준 약속 잡기 시트, 그룹은 모두 되는 시간 찾기
+function startPlanFromChat(){
   const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
   if(!room) return;
 
@@ -25599,7 +25606,7 @@ document.getElementById('extraMatchOption').addEventListener('click', () => {
     return;
   }
   openPlanStart(friendId, activeChatRoomId);
-});
+}
 
 // ---------- 다중 모임 자동 장소 추천 ----------
 // ---------- 진행 중인 모임 장소 추천 (카카오톡 "진행 중인 투표"처럼 상단 바 + 현황 시트) ----------
@@ -25765,10 +25772,14 @@ async function startLocationRecommend(roomId){
   document.getElementById('recommendModeOverlay').classList.add('show');
   document.getElementById('recommendModeNextBtn').dataset.roomId = roomId;
 }
-document.getElementById('extraRecommendLocationOption').addEventListener('click', () => {
-  document.getElementById('chatExtraDropdown').classList.remove('open');
-  startLocationRecommend(activeChatRoomId);
-});
+// 채팅 + 패널의 "장소" - 상단 약속 카드의 "+ 장소 추가"와 같은 화면(지도 검색/핀 + 모임 장소 추천받기 + 후보 제안)
+function startPlaceFromChat(){
+  const roomId = activeChatRoomId;
+  const room = roomId ? CHAT_ROOMS[roomId] : null;
+  if(!room) return;
+  const pin = (room.pinnedSchedules || []).find(p => p.dateObj) || null;
+  addMeetPlace(room, roomId, pin);
+}
 
 // 상단 고정 카드의 "장소 정하기"를 누르면, 항상 "모임 장소 추천받기"를 먼저 추천하고 직접 고르기도 고를 수 있게 함
 let placeChoiceAction = null;
