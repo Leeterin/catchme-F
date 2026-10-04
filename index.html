@@ -4988,6 +4988,21 @@
   .plan-option .plan-option-status{ color:var(--accent); font-weight:600; }
   .plan-option.unavailable .plan-option-status{ color:var(--text-dim); }
   .plan-link-row{ margin-top:10px; }
+  /* 예약 가능 시간 빠르게 열기 */
+  .quick-avail-card{ max-width:380px; max-height:calc(100vh - 48px); overflow-y:auto; padding:22px 14px 16px; }
+  .quick-avail-desc{ font-size:12.5px; line-height:1.5; color:var(--text-dim); text-align:center; margin:0 0 12px; }
+  .quick-avail-desc b{ color:var(--text); }
+  .quick-avail-presets{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:12px; }
+  .quick-avail-preset{ padding:6px 10px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text); font-size:12px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
+  .quick-avail-preset.active{ border-color:var(--accent); background:var(--accent-soft); color:var(--accent); }
+  .quick-avail-grid{ display:grid; grid-template-columns:42px repeat(7, minmax(0, 1fr)); gap:4px; }
+  .quick-avail-head, .quick-avail-row-label{ border:none; background:none; padding:4px 0; font-size:11.5px; font-weight:700; color:var(--text-dim); font-family:'Inter',sans-serif; cursor:pointer; }
+  .quick-avail-head.weekend{ color:var(--accent); }
+  .quick-avail-row-label{ text-align:left; line-height:1.2; }
+  .quick-avail-row-label small{ display:block; font-size:9.5px; font-weight:500; }
+  .quick-avail-cell{ height:36px; min-width:0; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); cursor:pointer; padding:0; }
+  .quick-avail-cell.on{ background:var(--accent); border-color:var(--accent); }
+  .quick-avail-hint{ font-size:11px; color:var(--text-dim); line-height:1.45; margin:10px 0 12px; text-align:center; }
   /* 캘린더 매칭 결과가 0개일 때 - 왜 없는지와 다음에 할 일 */
   .match-empty-why{ margin-top:4px; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); font-size:12.5px; line-height:1.55; color:var(--text-dim); }
   .match-empty-why b{ color:var(--text); }
@@ -7631,6 +7646,21 @@
     </div>
   </div>
 
+  <!-- 예약 가능 시간 빠르게 열기 - 요일 x 시간대 칸을 몇 번 눌러서 앞으로 4주치 예약 가능 시간을 한 번에 만듦.
+       세밀하게 고르고 싶으면 아래 링크로 기존 일정 추가(칸 드래그) 화면으로 넘어감 -->
+  <div class="mini-confirm-overlay" id="quickAvailOverlay">
+    <div class="mini-confirm-card quick-avail-card">
+      <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
+      <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
+      <p class="quick-avail-desc">고른 시간이 <b>앞으로 4주 동안</b> 예약 가능 시간으로 열려요. 친구는 이 시간에만 약속을 신청할 수 있어요.</p>
+      <div class="quick-avail-presets" id="quickAvailPresets"></div>
+      <div class="quick-avail-grid" id="quickAvailGrid"></div>
+      <p class="quick-avail-hint">요일이나 시간대 이름을 누르면 한 줄을 통째로 고를 수 있어요. 이미 일정이 있는 시간은 빼고 열어요.</p>
+      <button type="button" class="profile-chat-btn" id="quickAvailSubmitBtn">열어두기</button>
+      <button type="button" class="plan-back-btn" id="quickAvailDetailBtn">시간을 직접 세밀하게 고를래요 &rsaquo;</button>
+    </div>
+  </div>
+
   <div class="mini-confirm-overlay" id="reservationCancelConfirmOverlay">
     <div class="mini-confirm-card">
       <div class="mini-confirm-title" id="reservationCancelConfirmTitle">예약을 취소하시겠습니까?</div>
@@ -9771,13 +9801,7 @@ function renderHomeOnboarding(){
 }
 function runOnboardingStep(id){
   if(id === 'available'){
-    // 일정 추가 화면을 "예약 가능 시간" 유형으로 바로 엶
-    scheduleFocusDate = new Date(TODAY);
-    switchTopTab('schedule');
-    switchScheduleView('day');
-    openEventForm();
-    setEventTypeUI('available');
-    showToast('가능한 시간을 골라서 추가해 주세요.');
+    openQuickAvail();
   } else if(id === 'friend'){
     switchTopTab('friends');
     document.getElementById('addFriendBtn').click();
@@ -14327,7 +14351,7 @@ function syncEventCreateToServer(ev){
   const startTime = dateKeyToDateAtMinutes(dayKey, ev.startMin);
   const endTime = dateKeyToDateAtMinutes(dayKey, ev.endMin);
   const recurringPayload = getRecurringSyncPayload(ev);
-  apiRequest('/events', {
+  return apiRequest('/events', {
     method: 'POST',
     body: JSON.stringify({
       title: ev.title,
@@ -25346,7 +25370,12 @@ async function friendAvailableDayCount(friend, startDate, endDate){
   return loaded ? n : null;
 }
 // 내 "예약 가능 시간" 추가 화면을 바로 엶
+// 내 "예약 가능 시간" 열기 - 처음엔 요일 x 시간대로 빠르게 고르는 화면부터 보여줌
 function openMyAvailabilityForm(){
+  openQuickAvail();
+}
+// 기존 일정 추가 화면(칸 드래그 + 분 단위 조정)을 "예약 가능 시간" 유형으로 바로 엶
+function openDetailedAvailabilityForm(){
   scheduleFocusDate = new Date(TODAY);
   switchTopTab('schedule');
   switchScheduleView('day');
@@ -25354,6 +25383,149 @@ function openMyAvailabilityForm(){
   setEventTypeUI('available');
   showToast('친구가 약속을 걸 수 있는 시간을 골라 주세요.');
 }
+
+// ---------- 예약 가능 시간 빠르게 열기 ----------
+// 칸 드래그 + 분 단위 조정은 처음 쓰는 사람한텐 너무 무거워서, 요일 x 시간대(점심/오후/저녁)만 눌러서
+// 앞으로 4주치를 한 번에 만듦. 반복 일정 대신 날짜별 하루짜리 일정으로 만드는 이유: 예약이 확정되면 서버가
+// 겹치는 "예약 가능"을 잘라내는데(clearAvailabilityInRange) 반복 일정은 그 처리를 못 해서 패턴 전체가 깨짐
+const QUICK_AVAIL_WEEKS = 4;
+const QUICK_AVAIL_BANDS = [
+  { id: 'lunch', label: '점심', range: '12-14시', s: 12 * 60, e: 14 * 60 },
+  { id: 'afternoon', label: '오후', range: '14-18시', s: 14 * 60, e: 18 * 60 },
+  { id: 'evening', label: '저녁', range: '18-22시', s: 18 * 60, e: 22 * 60 },
+];
+const QUICK_AVAIL_DOWS = [1, 2, 3, 4, 5, 6, 0]; // 월요일부터
+const QUICK_AVAIL_PRESETS = [
+  { label: '평일 저녁', dows: [1, 2, 3, 4, 5], bands: ['evening'] },
+  { label: '주말 오후', dows: [0, 6], bands: ['afternoon'] },
+  { label: '주말 종일', dows: [0, 6], bands: ['lunch', 'afternoon', 'evening'] },
+];
+const quickAvailCells = new Set(); // "요일|시간대id"
+function quickAvailKey(dow, bandId){ return `${dow}|${bandId}`; }
+function quickPresetKeys(p){ return p.dows.flatMap(dow => p.bands.map(b => quickAvailKey(dow, b))); }
+
+function openQuickAvail(){
+  quickAvailCells.clear();
+  // 아직 하나도 안 열어봤으면 많이들 고르는 시간(평일 저녁 + 주말 오후)을 미리 골라둠 - 그대로 "열어두기"만 눌러도 됨
+  if(!SCHEDULE_EVENTS.some(e => e.type === 'available')){
+    [QUICK_AVAIL_PRESETS[0], QUICK_AVAIL_PRESETS[1]].forEach(p => quickPresetKeys(p).forEach(k => quickAvailCells.add(k)));
+  }
+  renderQuickAvail();
+  const ov = document.getElementById('quickAvailOverlay');
+  if(ov.classList.contains('show')) return;
+  ov.classList.add('show');
+  pushViewState(closeQuickAvail);
+}
+function closeQuickAvail(){
+  document.getElementById('quickAvailOverlay').classList.remove('show');
+}
+function renderQuickAvail(){
+  document.getElementById('quickAvailPresets').innerHTML = QUICK_AVAIL_PRESETS.map((p, i) => {
+    const on = quickPresetKeys(p).every(k => quickAvailCells.has(k));
+    return `<button type="button" class="quick-avail-preset${on ? ' active' : ''}" data-qa-preset="${i}">${p.label}</button>`;
+  }).join('');
+  let html = '<span></span>' + QUICK_AVAIL_DOWS.map(dow =>
+    `<button type="button" class="quick-avail-head${dow === 0 || dow === 6 ? ' weekend' : ''}" data-qa-dow="${dow}">${WEEKDAY_KO[dow]}</button>`).join('');
+  QUICK_AVAIL_BANDS.forEach(b => {
+    html += `<button type="button" class="quick-avail-row-label" data-qa-band="${b.id}">${b.label}<small>${b.range}</small></button>`;
+    html += QUICK_AVAIL_DOWS.map(dow => {
+      const k = quickAvailKey(dow, b.id);
+      return `<button type="button" class="quick-avail-cell${quickAvailCells.has(k) ? ' on' : ''}" data-qa-cell="${k}" aria-label="${WEEKDAY_KO[dow]}요일 ${b.label}" aria-pressed="${quickAvailCells.has(k)}"></button>`;
+    }).join('');
+  });
+  document.getElementById('quickAvailGrid').innerHTML = html;
+  const btn = document.getElementById('quickAvailSubmitBtn');
+  btn.textContent = quickAvailCells.size ? `일주일에 ${quickAvailCells.size}칸 열어두기` : '시간을 골라 주세요';
+  btn.disabled = quickAvailCells.size === 0;
+}
+// 여러 칸을 한 번에 켜고 끔 - 다 켜져 있으면 끄고, 하나라도 꺼져 있으면 전부 켬
+function toggleQuickAvailKeys(keys){
+  const allOn = keys.every(k => quickAvailCells.has(k));
+  keys.forEach(k => allOn ? quickAvailCells.delete(k) : quickAvailCells.add(k));
+  renderQuickAvail();
+}
+document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'quickAvailOverlay'){ goBackOrClose(closeQuickAvail); return; }
+  const cell = e.target.closest('[data-qa-cell]');
+  if(cell){ toggleQuickAvailKeys([cell.dataset.qaCell]); return; }
+  const dowBtn = e.target.closest('[data-qa-dow]');
+  if(dowBtn){ toggleQuickAvailKeys(QUICK_AVAIL_BANDS.map(b => quickAvailKey(Number(dowBtn.dataset.qaDow), b.id))); return; }
+  const bandBtn = e.target.closest('[data-qa-band]');
+  if(bandBtn){ toggleQuickAvailKeys(QUICK_AVAIL_DOWS.map(dow => quickAvailKey(dow, bandBtn.dataset.qaBand))); return; }
+  const presetBtn = e.target.closest('[data-qa-preset]');
+  if(presetBtn) toggleQuickAvailKeys(quickPresetKeys(QUICK_AVAIL_PRESETS[Number(presetBtn.dataset.qaPreset)]));
+});
+document.getElementById('quickAvailCloseBtn').addEventListener('click', () => goBackOrClose(closeQuickAvail));
+document.getElementById('quickAvailDetailBtn').addEventListener('click', () => {
+  dismissView(closeQuickAvail);
+  openDetailedAvailabilityForm();
+});
+
+// [s, e) 구간들에서 빼낼 구간들을 뺀 나머지
+function subtractMinuteRanges(ranges, cuts){
+  let out = ranges;
+  cuts.forEach(c => {
+    const next = [];
+    out.forEach(r => {
+      if(c.e <= r.s || c.s >= r.e){ next.push(r); return; }
+      if(c.s > r.s) next.push({ s: r.s, e: c.s });
+      if(c.e < r.e) next.push({ s: c.e, e: r.e });
+    });
+    out = next;
+  });
+  return out;
+}
+document.getElementById('quickAvailSubmitBtn').addEventListener('click', async () => {
+  if(!quickAvailCells.size) return;
+  const visibility = defaultVisibilityForNewEvent();
+  const now = new Date();
+  const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30; // 오늘은 지금 이후 30분 단위부터
+  const created = [];
+  const openedDays = new Set();
+  for(let i = 0; i < QUICK_AVAIL_WEEKS * 7; i++){
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() + i);
+    // 고른 시간대를 시간순으로 놓고, 이어지는 건(오후+저녁 = 14-22시) 하나로 합침
+    const picked = QUICK_AVAIL_BANDS.filter(b => quickAvailCells.has(quickAvailKey(d.getDay(), b.id)));
+    if(!picked.length) continue;
+    const ranges = [];
+    picked.forEach(b => {
+      const last = ranges[ranges.length - 1];
+      if(last && last.e === b.s) last.e = b.e; else ranges.push({ s: b.s, e: b.e });
+    });
+    // 이미 있는 일정(바쁨/예약 가능/예약중 다 포함)과 겹치는 부분은 뺌 - 기존 등록 화면처럼 겹치는 예약 가능은 안 만듦
+    const cuts = getEventsForDate(d).map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
+    if(i === 0) cuts.push({ s: 0, e: nowMin });
+    subtractMinuteRanges(ranges, cuts).filter(r => r.e - r.s >= 30).forEach(r => {
+      const dateKey = dateKeyOf(d);
+      created.push({
+        id: 'ev' + (scheduleEventIdCounter++),
+        title: '예약 가능',
+        startMin: r.s,
+        endMin: r.e,
+        visibility: { ...visibility },
+        type: 'available',
+        recurring: null,
+        dateKey,
+      });
+      openedDays.add(dateKey);
+    });
+  }
+  if(!created.length){
+    showToast('고른 시간엔 이미 다른 일정이 있어서 새로 열 시간이 없어요.');
+    return;
+  }
+  created.forEach(ev => SCHEDULE_EVENTS.push(ev));
+  resyncAllScheduleEvents();
+  dismissView(closeQuickAvail);
+  refreshActiveScheduleView();
+  refreshHomeDashIfVisible();
+  showToast(`앞으로 ${QUICK_AVAIL_WEEKS}주 동안 ${openedDays.size}일에 예약 가능 시간을 열었어요.`);
+  // 한꺼번에 수십 개를 쏘지 않게 하나씩 순서대로 저장 (실패하면 syncEventCreateToServer가 알려줌)
+  for(const ev of created){
+    try { await syncEventCreateToServer(ev); } catch(e){}
+  }
+});
 
 let matchEmptyHelpSeq = 0;
 async function renderMatchEmptyHelp(body, startDate, endDate){
