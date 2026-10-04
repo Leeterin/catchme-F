@@ -193,6 +193,24 @@
   .home-avail-actions{ display:flex; gap:6px; margin-top:10px; }
   .home-avail-actions button{ flex:1; padding:9px 6px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); color:var(--text); font-size:12.5px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
   .home-avail-actions button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .home-pending-card{ border-color:var(--accent); }
+  .friend-invite-box{ margin-top:14px; padding:14px; border-radius:14px; background:var(--surface-2); text-align:left; }
+  .friend-invite-title{ font-size:13.5px; font-weight:700; color:var(--text); }
+  .friend-invite-desc{ margin-top:4px; font-size:12px; color:var(--text-dim); line-height:1.5; }
+  .friend-invite-actions{ display:flex; gap:8px; margin-top:10px; }
+  .friend-invite-actions button{
+    flex:1; padding:10px 8px; border:1px solid var(--line); border-radius:10px; background:var(--surface);
+    color:var(--text); font-size:12.5px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .friend-invite-actions button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .home-pending-row{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:10px 4px; border:none; border-top:1px solid var(--line); background:none;
+    color:var(--text); text-align:left; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .home-pending-row:first-of-type{ border-top:none; }
+  .home-pending-dot{ flex-shrink:0; width:8px; height:8px; border-radius:50%; background:var(--cta, #FF6B4A); }
+  .home-pending-go{ flex-shrink:0; font-size:12px; font-weight:700; color:var(--accent); }
   .home-empty{ font-size:13px; color:var(--text-dim); line-height:1.5; padding:4px 2px 2px; }
   .onboarding-close{ border:none; background:none; color:var(--text-dim); font-size:12px; cursor:pointer; padding:0; font-family:'Inter',sans-serif; }
   .onboarding-bar{ height:5px; border-radius:3px; background:var(--surface-2); overflow:hidden; margin-bottom:6px; }
@@ -3036,6 +3054,16 @@
   }
   .calendar-match-view.active{ display:block; }
   .calendar-match-view.active{ display:block; }
+  .match-cond-summary{
+    display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%;
+    margin:0 0 12px; padding:10px 12px; border:1px solid var(--line); border-radius:12px;
+    background:var(--surface-2); color:var(--text); font-size:13px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; text-align:left;
+  }
+  .match-cond-edit{ flex-shrink:0; font-size:12px; font-weight:700; color:var(--accent); }
+  .match-cond-edit::after{ content:' ▾'; }
+  .match-cond-summary.open .match-cond-edit::after{ content:' ▴'; }
+  .match-conditions{ display:none; margin-bottom:6px; }
+  .match-conditions.open{ display:block; }
   .match-panel-header{
     display:flex;
     align-items:center;
@@ -4510,6 +4538,12 @@
     font-size:13px;
   }
   .day-header-actions button:hover{ color:var(--text); border-color:#c7c8cc; }
+  /* "내 캘린더" 제목이 탭 제목과 겹쳐서 두 번 보였음 - 하루 보기에선 날짜를 제목처럼 크게 */
+  .day-header-title{ display:none; }
+  .day-header-sub{ margin-top:0; }
+  .day-header-sub #dayViewLabel{ font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:700; color:var(--text); }
+  /* 마이크 아이콘만으로는 뭔지 몰라서 "음성" 글자를 같이 */
+  .day-header-actions button.voice-add-btn{ width:auto; padding:0 8px; gap:3px; font-size:11.5px; font-weight:600; }
   #voiceAddBtn.listening{
     background:var(--cta);
     border-color:var(--cta);
@@ -6993,6 +7027,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v6M9 16h6"/></svg>
       <span><b>약속 잡기</b><small>친구만 고르면 잡을 수 있는 방법을 알려줘요</small></span>
     </button>
+    <!-- 답할 차례 - 친구가 보낸 예약 요청/시간 제안 중 내가 답해야 약속이 진행되는 것 (채팅방 안에만 있으면 놓치기 쉬움) -->
+    <div class="home-card home-pending-card" id="homePendingCard" style="display:none;">
+      <div class="home-card-title"><span>답할 차례</span></div>
+      <div id="homePendingList"></div>
+    </div>
     <div class="home-card">
       <div class="home-card-title"><span>다가오는 약속</span><button type="button" class="home-card-link" id="homePastApptBtn">지난 약속</button></div>
       <div id="homeUpcomingList"></div>
@@ -7100,7 +7139,7 @@
         <div class="day-header-actions">
           <button id="dayPrev" title="이전 날">&#8249;</button>
           <button id="dayNext" title="다음 날">&#8250;</button>
-          <button type="button" id="voiceAddBtn" title="음성으로 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
+          <button type="button" id="voiceAddBtn" class="voice-add-btn" title="음성으로 일정 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>음성</button>
           <button id="openEventFormBtn" class="day-add-btn" title="일정 추가">+</button>
         </div>
       </div>
@@ -7673,6 +7712,9 @@
         <button class="profile-back" id="matchBackBtn">&#8249;</button>
         <span id="matchViewTitle">둘 다 되는 시간 찾기</span>
       </div>
+      <!-- 결과가 먼저 보이게 조건(기간/만날 시간)은 한 줄 요약으로 접어둠 -->
+      <button type="button" class="match-cond-summary" id="matchCondToggle"><span id="matchCondSummary"></span><span class="match-cond-edit">조건 바꾸기</span></button>
+      <div class="match-conditions" id="matchConditions">
       <div class="event-form-time-row">
         <div class="mp-input-group">
           <label>시작 날짜</label>
@@ -7700,6 +7742,7 @@
         <button type="button" class="custom-select-btn" data-target="matchMinHours">1시간</button>
       </div>
       <button class="profile-chat-btn" id="matchSearchBtn">찾기</button>
+      </div>
       <div id="matchPanelBody" class="match-result-body"></div>
     </div>
 
@@ -9726,6 +9769,7 @@ function showTab(tabKey){
     // 홈은 "약속" 중심 - 달력은 캘린더 탭에만 둠 (홈과 캘린더 탭에 같은 달력이 두 번 나와서 헷갈렸음)
     homeDash.style.display = 'flex';
     renderHomeDash();
+    loadHomePending();
   } else {
     panels[tabKey].classList.add('active');
     document.querySelector(`.nav-item[data-tab="${tabKey}"]`).classList.add('active');
@@ -9908,10 +9952,69 @@ document.getElementById('homePastApptBtn').addEventListener('click', () => {
   switchTopTab('chat');
   openPastAppointmentsView(null); // null = 모든 채팅방의 지난 약속
 });
+// ---------- 홈: 답할 차례 ----------
+// 서버(/chats/pending)가 모든 방에서 "내가 답해야 할 것"(받은 예약 요청, 아직 투표 안 한 시간 제안)을 모아줌.
+// 홈을 열 때마다 새로 받아옴 - 채팅방에서 수락/투표하고 돌아오면 바로 빠지게
+let homePendingItems = [];
+let homePendingSeq = 0;
+async function loadHomePending(){
+  if(!authToken) return;
+  const seq = ++homePendingSeq;
+  try {
+    const data = await apiRequest('/chats/pending');
+    if(seq !== homePendingSeq) return;
+    homePendingItems = Array.isArray(data.items) ? data.items : [];
+  } catch(e){
+    return; // 서버가 아직 이 기능을 모르거나 네트워크 오류면 카드만 안 보이게 두고 조용히 넘어감
+  }
+  renderHomePending();
+}
+function homePendingWhen(start, end){
+  if(!start) return '';
+  const s = new Date(start), e = end ? new Date(end) : null;
+  const hm = d => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${s.getMonth() + 1}월 ${s.getDate()}일 (${WEEKDAY_KO[s.getDay()]}) ${hm(s)}${e ? '-' + hm(e) : ''}`;
+}
+function renderHomePending(){
+  const card = document.getElementById('homePendingCard');
+  const listEl = document.getElementById('homePendingList');
+  if(!card || !listEl) return;
+  const items = homePendingItems.filter(x => CHAT_ROOMS[x.roomId]);
+  card.style.display = items.length ? '' : 'none';
+  if(!items.length){ listEl.innerHTML = ''; return; }
+  listEl.innerHTML = items.slice(0, 5).map((x, i) => {
+    const room = CHAT_ROOMS[x.roomId];
+    const who = (x.sender && x.sender.name) || room.name || '친구';
+    const title = x.kind === 'reservation'
+      ? `${escapeHtml(who)}님이 예약을 요청했어요`
+      : `${escapeHtml(room.isGroup ? room.name : who)}${room.isGroup ? '에' : '님이'} 시간 후보 ${x.optionCount || ''}개${room.isGroup ? '가 올라왔어요' : '를 보냈어요'}`;
+    const sub = x.kind === 'reservation'
+      ? `${homePendingWhen(x.start, x.end)} · 수락하거나 거절해 주세요`
+      : '되는 시간에 투표해 주세요';
+    return `
+      <button type="button" class="home-pending-row" data-idx="${i}">
+        <span class="home-pending-dot"></span>
+        <span class="home-appt-info">
+          <div class="home-appt-name">${title}</div>
+          <div class="home-appt-sub">${escapeHtml(sub)}</div>
+        </span>
+        <span class="home-pending-go">답하기 &rsaquo;</span>
+      </button>`;
+  }).join('') + (items.length > 5 ? `<div class="home-empty" style="text-align:center;">외 ${items.length - 5}개 더 있어요</div>` : '');
+  listEl.querySelectorAll('.home-pending-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const x = items[parseInt(btn.dataset.idx, 10)];
+      if(!x) return;
+      switchTopTab('chat');
+      openChatRoom(x.roomId);
+    });
+  });
+}
 function renderHomeDash(){
   const listEl = document.getElementById('homeUpcomingList');
   if(!listEl) return;
   renderHomeOnboarding();
+  renderHomePending();
   renderHomeAvailCard();
   const items = homeUpcomingAppointments();
   if(!items.length){
@@ -9987,7 +10090,12 @@ function syncWidgetData(){
 function refreshHomeDashIfVisible(){
   try { syncWidgetData(); } catch(e){}
   try {
-    if(currentTopTab === null && document.getElementById('homeDash').style.display !== 'none') renderHomeDash();
+    if(currentTopTab === null && document.getElementById('homeDash').style.display !== 'none'){
+      renderHomeDash();
+      // 새 메시지(예약 요청 등)가 와서 채팅 목록이 바뀌었을 수 있으니 "답할 차례"도 잠깐 모았다가 한 번만 다시 받아옴
+      clearTimeout(refreshHomeDashIfVisible.pendingTimer);
+      refreshHomeDashIfVisible.pendingTimer = setTimeout(loadHomePending, 2500);
+    }
   } catch(e){} // 앱 시작 직후(변수들이 아직 준비 전)에 불려도 조용히 넘어감
 }
 document.getElementById('homePlanCta').addEventListener('click', () => {
@@ -17549,6 +17657,9 @@ function renderFriendsList(){
     container.appendChild(friendsHeading);
   }
 
+  if(FRIENDS.length === 0 && OUTGOING_FRIEND_REQUESTS.length === 0){
+    container.insertAdjacentHTML('beforeend', `<div class="search-empty">아직 친구가 없어요. 위의 + 버튼으로 아이디를 검색해 추가해요.</div>${friendInviteBoxHtml()}`);
+  }
   FRIENDS.forEach(friend => {
     const row = document.createElement('div');
     row.className = 'placeholder-row';
@@ -17967,6 +18078,51 @@ function openFriendCalendar(friendId, mode){
   renderFriendWeek();
   loadFriendScheduleForFocusWindow();
   pushViewState(closeFriendCalendar);
+  if(friendCalendarMode === 'reserve') jumpToFirstFriendOpenDay(friend);
+}
+
+// 예약하기로 열면 오늘이 아니라 친구가 열어둔 가장 빠른 날(2주 안)로 바로 이동 - 오늘이 비어 있으면
+// 빈 화면만 보고 하루씩 넘겨야 했음. 그 사이 사용자가 날짜를 옮겼거나 화면을 닫았으면 건드리지 않음
+async function jumpToFirstFriendOpenDay(friend){
+  if(!friend || !friend.username || friend.id === DEMO_FRIEND.id || !authToken) return;
+  const openedId = activeFriendCalendarId;
+  const startKey = toDateInputValue(TODAY);
+  const end = new Date(TODAY);
+  end.setDate(end.getDate() + PLAN_LOOKAHEAD_DAYS - 1);
+  const months = [[TODAY.getFullYear(), TODAY.getMonth() + 1]];
+  if(end.getMonth() !== TODAY.getMonth()) months.push([end.getFullYear(), end.getMonth() + 1]);
+  await Promise.all(months.map(([y, m]) => loadFriendMonthData(friend, y, m)));
+  const view = document.getElementById('friendCalendarView');
+  if(activeFriendCalendarId !== openedId || !view.classList.contains('active') || friendCalendarMode !== 'reserve') return;
+  if(toDateInputValue(friendDayFocusDate) !== startKey) return; // 이미 다른 날로 옮겼으면 그대로 둠
+
+  const endKey = toDateInputValue(end);
+  const nowHour = new Date().getHours();
+  let firstKey = null, loaded = false;
+  months.forEach(([y, m]) => {
+    const data = friendMonthDataCache[`${friend.username}::${y}-${m}`];
+    if(!data) return;
+    loaded = true;
+    const hours = data.hours || [];
+    (data.days || []).forEach(day => {
+      if(day.date < startKey || day.date > endKey) return;
+      const open = (day.bookable || []).some((b, i) => b && (day.date !== startKey || (hours[i] ?? 0) > nowHour));
+      if(open && (!firstKey || day.date < firstKey)) firstKey = day.date;
+    });
+  });
+  if(!loaded) return;
+  if(!firstKey){
+    showToast(`앞으로 2주 동안 ${friend.name}님이 열어둔 시간이 없어요.`);
+    return;
+  }
+  if(firstKey === startKey) return;
+  friendDayFocusDate = parseDateInputValue(firstKey);
+  friendWeekFocusDate = getWeekStart(friendDayFocusDate);
+  renderFriendCalDateNav();
+  renderFriendToday();
+  renderFriendWeek();
+  loadFriendScheduleForFocusWindow();
+  showToast(`${friend.name}님이 열어둔 가장 빠른 날로 이동했어요.`);
 }
 
 // 안내 문구 - "캘린더 보기"는 전체 일정(공개된 건 제목까지) 구경 위주, "예약하기"는 예약 가능한 시간 찾기 위주라는 걸 알려줌
@@ -19060,12 +19216,53 @@ function closeFriendSearchView(){
   renderFriendsList();
 }
 
+// 주변에 캐치미를 쓰는 사람이 없으면 아이디 검색만으로는 친구를 못 만듦 - 내 아이디를 보내거나, 가입 안 한 사람도
+// 받을 수 있는 약속 링크를 보내는 길을 친구 추가 화면/빈 친구 목록에 같이 둠
+function friendInviteBoxHtml(){
+  const myId = myProfileData && myProfileData.id ? `@${escapeHtml(myProfileData.id)}` : '';
+  return `
+    <div class="friend-invite-box">
+      <div class="friend-invite-title">주변에 캐치미를 쓰는 친구가 없나요?</div>
+      <div class="friend-invite-desc">내 아이디${myId ? `(<b>${myId}</b>)` : ''}를 보내서 친구가 나를 추가하게 하거나, 가입 안 한 친구에게도 약속 링크를 보낼 수 있어요.</div>
+      <div class="friend-invite-actions">
+        <button type="button" data-friend-invite="share">내 아이디 보내기</button>
+        <button type="button" class="primary" data-friend-invite="link">약속 링크 보내기</button>
+      </div>
+    </div>`;
+}
+function shareMyFriendId(){
+  const id = myProfileData && myProfileData.id;
+  if(!id){ showToast('로그인 후에 아이디를 보낼 수 있어요.'); return; }
+  const url = /^https?:/.test(location.origin) ? location.origin : '';
+  const text = `캐치미에서 나를 친구로 추가해줘! 아이디: @${id}`;
+  if(navigator.share){
+    navigator.share({ title: '캐치미 친구 추가', text, url: url || undefined }).catch(() => {});
+    return;
+  }
+  const shareText = url ? `${text}\n${url}` : text;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(shareText).then(() => showToast('내 아이디를 복사했어요. 친구에게 붙여넣어 보내세요!')).catch(() => showToast(shareText));
+  } else {
+    showToast(shareText);
+  }
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-friend-invite]');
+  if(!btn) return;
+  if(btn.dataset.friendInvite === 'share'){
+    shareMyFriendId();
+  } else {
+    inviteState.fromList = false;
+    openInviteList(true);
+  }
+});
+
 async function renderSearchResults(query){
   const container = document.getElementById('friendSearchResults');
   const q = query.trim();
 
   if(!q){
-    container.innerHTML = `<div class="search-empty">아이디로 친구를 검색해보세요.</div>`;
+    container.innerHTML = `<div class="search-empty">아이디로 친구를 검색해보세요.</div>${friendInviteBoxHtml()}`;
     return;
   }
 
@@ -25461,10 +25658,11 @@ function openCalendarMatch(friendId){
   activeMatchGroupRoomId = null;
   const friend = FRIENDS.find(f => f.id === friendId);
   document.getElementById('matchViewTitle').textContent = friend ? `${friend.name}님과 둘 다 되는 시간` : '둘 다 되는 시간 찾기';
+  // 기본 기간은 약속 잡기 추천과 같은 2주 (예전엔 7일이라, 추천은 "둘 다 열었어요"인데 결과는 0개인 경우가 있었음)
 
   const start = new Date(TODAY);
   const end = new Date(TODAY);
-  end.setDate(end.getDate() + 6);
+  end.setDate(end.getDate() + PLAN_LOOKAHEAD_DAYS - 1);
   document.getElementById('matchStartDate').value = toDateInputValue(start);
   document.getElementById('matchEndDate').value = toDateInputValue(end);
   document.getElementById('matchMinHours').value = '1';
@@ -25488,7 +25686,7 @@ function openGroupCalendarMatch(roomId){
 
   const start = new Date(TODAY);
   const end = new Date(TODAY);
-  end.setDate(end.getDate() + 6);
+  end.setDate(end.getDate() + PLAN_LOOKAHEAD_DAYS - 1);
   document.getElementById('matchStartDate').value = toDateInputValue(start);
   document.getElementById('matchEndDate').value = toDateInputValue(end);
   document.getElementById('matchMinHours').value = '1';
@@ -25780,6 +25978,8 @@ async function renderMatchEmptyHelp(body, startDate, endDate){
 }
 
 async function runCalendarMatch(){
+  updateMatchCondSummary();
+  setMatchCondOpen(false); // 찾기를 누르거나 화면을 열면 조건은 접고 결과부터 보여줌
   const memberNames = getMatchMemberNames();
   const body = document.getElementById('matchPanelBody');
   const startVal = document.getElementById('matchStartDate').value;
@@ -25913,6 +26113,19 @@ function renderProposeSelectedBtn(){
 }
 
 document.getElementById('matchSearchBtn').addEventListener('click', runCalendarMatch);
+// 조건 요약 줄 - "10/4(일) ~ 10/17(토) · 1시간 이상"
+function updateMatchCondSummary(){
+  const fmt = v => { const d = parseDateInputValue(v); return d ? `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_KO[d.getDay()]})` : '-'; };
+  const sv = document.getElementById('matchStartDate').value, ev = document.getElementById('matchEndDate').value;
+  document.getElementById('matchCondSummary').textContent = `${fmt(sv)} ~ ${fmt(ev)} · ${document.getElementById('matchMinHours').value || 1}시간 이상`;
+}
+function setMatchCondOpen(open){
+  document.getElementById('matchConditions').classList.toggle('open', open);
+  document.getElementById('matchCondToggle').classList.toggle('open', open);
+}
+document.getElementById('matchCondToggle').addEventListener('click', () => {
+  setMatchCondOpen(!document.getElementById('matchConditions').classList.contains('open'));
+});
 
 // 매칭 결과의 시간대를 누르면 체크해서 여러 개 골라두는 방식 (1:1, 그룹 동일)
 // 시작 시간 칩(예: "18:00 시작")을 고르면 그 밑에 5분 단위 조절 줄이 생기고, 여러 개를 골라 같이 제안할 수 있음
