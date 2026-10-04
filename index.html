@@ -4982,6 +4982,21 @@
   .plan-friend-row small{ display:block; font-size:11.5px; font-weight:500; color:var(--text-dim); }
   .plan-empty{ font-size:13px; color:var(--text-dim); text-align:center; line-height:1.5; padding:6px 0 12px; }
   .plan-back-btn{ width:100%; padding:10px 0 0; border:none; background:none; color:var(--text-dim); font-size:12.5px; cursor:pointer; font-family:'Inter',sans-serif; }
+  .plan-option.recommended{ border-color:var(--accent); border-width:1.5px; }
+  .plan-option.unavailable{ opacity:.55; }
+  .plan-option-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:var(--accent); color:#fff; font-size:10.5px; font-weight:700; vertical-align:1px; }
+  .plan-option .plan-option-status{ color:var(--accent); font-weight:600; }
+  .plan-option.unavailable .plan-option-status{ color:var(--text-dim); }
+  .plan-link-row{ margin-top:10px; }
+  /* 캘린더 매칭 결과가 0개일 때 - 왜 없는지와 다음에 할 일 */
+  .match-empty-why{ margin-top:4px; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--surface); font-size:12.5px; line-height:1.55; color:var(--text-dim); }
+  .match-empty-why b{ color:var(--text); }
+  .match-empty-who{ margin:8px 0 2px; display:flex; flex-direction:column; gap:3px; }
+  .match-empty-who span.ok{ color:var(--accent); font-weight:600; }
+  .match-empty-who span.no{ color:#e5484d; font-weight:600; }
+  .match-empty-actions{ display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+  .match-empty-actions button{ width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); color:var(--text); font-size:13px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
+  .match-empty-actions button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
 
   /* ---------------- 서버 깨우는 중 안내 ---------------- */
   .server-waking-banner{
@@ -6905,7 +6920,7 @@
     <div id="homeOnboarding"></div>
     <button type="button" class="home-plan-cta" id="homePlanCta">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v6M9 16h6"/></svg>
-      <span><b>약속 잡기</b><small>친구 빈 시간에 예약하거나, 같이 비는 시간을 찾아요</small></span>
+      <span><b>약속 잡기</b><small>친구를 고르면 지금 바로 잡을 수 있는 방법을 알려줘요</small></span>
     </button>
     <div class="home-card">
       <div class="home-card-title"><span>다가오는 약속</span></div>
@@ -6969,7 +6984,7 @@
   <!-- 시간표 패널 -->
   <div class="tab-panel" id="panel-schedule">
     <h2>시간표 설정</h2>
-    <p class="desc">하루 / 일주일 / 한달 단위로 가능한 시간을 설정하세요. 이 정보만 매칭에 사용돼요.</p>
+    <p class="desc">내 일정과 '예약 가능 시간'을 관리해요. 친구는 내가 열어둔 예약 가능 시간에만 약속을 신청할 수 있어요.</p>
 
     <div class="segment-control" id="scheduleSegment">
       <button class="segment-btn active" data-view="day">하루</button>
@@ -9715,7 +9730,7 @@ function homeOnboardingSteps(){
     },
     {
       id: 'plan', title: '첫 약속 잡기',
-      desc: '친구 빈 시간에 예약하거나 같이 비는 시간을 찾아요',
+      desc: '친구가 열어둔 시간에 신청하거나, 링크로 되는 시간을 물어봐요',
       done: Object.values(CHAT_ROOMS).some(r => (r.pinnedSchedules || []).some(p => p.dateLabel)),
     },
   ];
@@ -25295,6 +25310,87 @@ function setMatchSlotEnd(slot, endMin){
   syncMatchSlotLabel(slot);
 }
 
+// ---------- 예약 가능 시간을 열어둔 날 수 (약속 잡기 추천 / 매칭 결과 0개 안내에 사용) ----------
+// 매칭은 "두 사람 모두 예약 가능 시간으로 열어둔 칸"만 찾기 때문에, 결과가 없을 땐 누가 안 열었는지 알려줘야 덜 헷갈림
+function myAvailableDayCount(startDate, endDate){
+  let n = 0;
+  const d = new Date(startDate);
+  d.setHours(0, 0, 0, 0);
+  while(d <= endDate){
+    if(getEventsForDate(d).some(e => e.type === 'available')) n++;
+    d.setDate(d.getDate() + 1);
+  }
+  return n;
+}
+// 친구가 열어둔 날 수 - 한달 API(bookable)로 셈. 데모 친구거나 못 불러오면 null
+async function friendAvailableDayCount(friend, startDate, endDate){
+  if(!friend || !friend.username || friend.id === DEMO_FRIEND.id || !authToken) return null;
+  clearFriendScheduleCache(friend); // 친구가 방금 시간을 열었을 수도 있어서 항상 새로 받음
+  const months = [];
+  const m = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+  while(m <= endDate){
+    months.push([m.getFullYear(), m.getMonth() + 1]);
+    m.setMonth(m.getMonth() + 1);
+  }
+  await Promise.all(months.map(([y, mo]) => loadFriendMonthData(friend, y, mo)));
+  const startKey = toDateInputValue(startDate), endKey = toDateInputValue(endDate);
+  let n = 0, loaded = false;
+  months.forEach(([y, mo]) => {
+    const data = friendMonthDataCache[`${friend.username}::${y}-${mo}`];
+    if(!data) return;
+    loaded = true;
+    (data.days || []).forEach(day => {
+      if(day.date >= startKey && day.date <= endKey && (day.bookable || []).some(Boolean)) n++;
+    });
+  });
+  return loaded ? n : null;
+}
+// 내 "예약 가능 시간" 추가 화면을 바로 엶
+function openMyAvailabilityForm(){
+  scheduleFocusDate = new Date(TODAY);
+  switchTopTab('schedule');
+  switchScheduleView('day');
+  openEventForm();
+  setEventTypeUI('available');
+  showToast('친구가 약속을 걸 수 있는 시간을 골라 주세요.');
+}
+
+let matchEmptyHelpSeq = 0;
+async function renderMatchEmptyHelp(body, startDate, endDate){
+  const seq = ++matchEmptyHelpSeq;
+  const friend = activeMatchFriendId ? FRIENDS.find(f => f.id === activeMatchFriendId) : null;
+  const mine = myAvailableDayCount(startDate, endDate);
+  const theirs = friend ? await friendAvailableDayCount(friend, startDate, endDate) : null;
+  if(seq !== matchEmptyHelpSeq || !document.getElementById('calendarMatchView').classList.contains('active')) return;
+
+  const status = (n) => n === null ? '' : (n > 0 ? `<span class="ok">${n}일 열어둠</span>` : '<span class="no">아직 안 열었어요</span>');
+  const who = [`<div>나 · ${status(mine)}</div>`];
+  if(friend && theirs !== null) who.push(`<div>${escapeHtml(friend.name)}님 · ${status(theirs)}</div>`);
+
+  const actions = [];
+  if(mine === 0) actions.push('<button type="button" class="primary" data-match-help="mine">내 예약 가능 시간 열기</button>');
+  if(friend && theirs > 0) actions.push(`<button type="button"${mine === 0 ? '' : ' class="primary"'} data-match-help="reserve">${escapeHtml(friend.name)}님이 열어둔 시간에 신청하기</button>`);
+  if(friend) actions.push('<button type="button" data-match-help="link">링크로 되는 시간 물어보기</button>');
+
+  const help = document.createElement('div');
+  help.className = 'match-empty-why';
+  help.innerHTML = `
+    캐치미는 <b>모두가 '예약 가능 시간'으로 열어둔 시간</b> 중에서 겹치는 시간을 찾아요. 일반 일정이 없다고 비는 시간으로 치진 않아요.
+    <div class="match-empty-who">${who.join('')}</div>
+    ${actions.length ? `<div class="match-empty-actions">${actions.join('')}</div>` : ''}`;
+  body.appendChild(help);
+
+  help.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-match-help]');
+    if(!btn) return;
+    const kind = btn.dataset.matchHelp;
+    dismissView(closeCalendarMatchView);
+    if(kind === 'mine') openMyAvailabilityForm();
+    else if(kind === 'reserve' && friend) openFriendCalendar(friend.id, 'reserve');
+    else if(kind === 'link'){ inviteState.fromList = false; openInviteList(true); }
+  });
+}
+
 async function runCalendarMatch(){
   const memberNames = getMatchMemberNames();
   const body = document.getElementById('matchPanelBody');
@@ -25355,6 +25451,7 @@ async function runCalendarMatch(){
   if(dayResults.length === 0){
     body.innerHTML = `<div class="search-empty">이 기간엔 ${minHours}시간 동안 만날 수 있는 시간이 없어요.</div>`;
     renderProposeSelectedBtn();
+    renderMatchEmptyHelp(body, startDate, endDate);
     return;
   }
 
@@ -26019,98 +26116,146 @@ document.getElementById('inviteCloseBtn').addEventListener('click', () => {
 
 // ---------- 약속 잡기 (한 곳에서 시작) ----------
 // 약속 잡는 방법이 상단 링크 / 친구 캘린더 / 채팅방 메뉴(예약하기·매칭하기)에 흩어져 있어서 처음 쓰는 사람이
-// 뭘 눌러야 할지 헷갈림. 그래서 여기서 "어떻게 잡을지"부터 고르게 하고, 고른 뒤엔 원래 있던 화면을 그대로 염
-const PLAN_METHODS = [
-  {
-    id: 'reserve', needsFriend: true,
-    title: '친구 빈 시간에 바로 예약',
-    desc: '친구가 열어둔 "예약 가능 시간" 중에 골라서 요청해요',
-    icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/>',
-  },
-  {
-    id: 'match', needsFriend: true,
-    title: '서로 비는 시간 찾기',
-    desc: '내 캘린더와 친구 캘린더에서 같이 비는 시간을 찾아줘요',
-    icon: '<path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/>',
-  },
-  {
-    id: 'link', needsFriend: false,
-    title: '링크로 여러 명에게 물어보기',
-    desc: '가능한 시간을 골라 링크를 보내면, 가입 안 한 사람도 응답할 수 있어요',
-    icon: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
-  },
-];
+// 뭘 눌러야 할지 헷갈림. 그래서 여기서 시작하게 함. 사람은 "누구랑?"을 먼저 떠올리니까 친구부터 고르고,
+// 그 친구와 내가 예약 가능 시간을 열어뒀는지 보고 지금 되는 방법을 추천함 (안 되는 방법은 이유와 함께 흐리게)
+const PLAN_LOOKAHEAD_DAYS = 14;
+const PLAN_ICONS = {
+  reserve: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/>',
+  match: '<path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  mine: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+};
+let planFriendSeq = 0;
 function openPlanStart(){
-  renderPlanStartMethods();
+  renderPlanStartFriends();
   const ov = document.getElementById('planStartOverlay');
   if(ov.classList.contains('show')) return;
   ov.classList.add('show');
   pushViewState(closePlanStart);
 }
 function closePlanStart(){
+  planFriendSeq++; // 친구 시간 불러오는 중에 닫으면 늦게 온 응답은 무시
   document.getElementById('planStartOverlay').classList.remove('show');
 }
-function renderPlanStartMethods(){
-  document.getElementById('planStartTitle').textContent = '어떻게 약속을 잡을까요?';
-  document.getElementById('planStartBody').innerHTML = PLAN_METHODS.map(m => `
-    <button type="button" class="plan-option" data-plan="${m.id}">
-      <span class="plan-option-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${m.icon}</svg></span>
-      <span><b>${m.title}</b><small>${m.desc}</small></span>
-    </button>`).join('');
+function planOptionHtml(o){
+  return `
+    <button type="button" class="plan-option${o.recommended ? ' recommended' : ''}${o.disabled ? ' unavailable' : ''}" data-plan="${o.id}"${o.disabled ? ' disabled' : ''}>
+      <span class="plan-option-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PLAN_ICONS[o.icon || o.id]}</svg></span>
+      <span><b>${o.title}${o.recommended ? '<span class="plan-option-badge">추천</span>' : ''}</b><small>${o.desc}${o.status ? `<br/><span class="plan-option-status">${o.status}</span>` : ''}</small></span>
+    </button>`;
 }
 function planFriendAvatarHtml(f){
   return f.avatar
     ? `<span class="plan-friend-avatar" style="background-image:url('${escapeHtml(f.avatar)}')"></span>`
     : `<span class="plan-friend-avatar" style="background:${escapeHtml(f.color || 'var(--accent)')}">${escapeHtml((f.name || '?').slice(0, 1))}</span>`;
 }
-function renderPlanStartFriends(method){
+const PLAN_LINK_OPTION = {
+  id: 'link',
+  title: '링크로 되는 시간 물어보기',
+  desc: '링크를 보내면 가입 안 한 사람도 되는 시간을 골라줘요. 여러 명일 때도 좋아요',
+};
+function renderPlanStartFriends(){
+  planFriendSeq++;
   document.getElementById('planStartTitle').textContent = '누구랑 만날까요?';
   const body = document.getElementById('planStartBody');
+  delete body.dataset.friendId;
   if(!FRIENDS.length){
     body.innerHTML = `
-      <div class="plan-empty">아직 친구가 없어요.<br/>친구를 추가하거나, 링크로 먼저 물어볼 수 있어요.</div>
-      <button type="button" class="plan-option" data-plan-go="friends"><span><b>친구 추가하러 가기</b><small>아이디로 친구를 찾아 추가해요</small></span></button>
-      <button type="button" class="plan-option" data-plan="link"><span><b>링크로 물어보기</b><small>가입 안 한 친구도 응답할 수 있어요</small></span></button>
-      <button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 방법 고르기</button>`;
+      <div class="plan-empty">아직 친구가 없어요.<br/>링크로 먼저 물어보면, 받은 사람이 가입하면서 친구가 될 수 있어요.</div>
+      ${planOptionHtml({ ...PLAN_LINK_OPTION, recommended: true })}
+      <button type="button" class="plan-option" data-plan-go="friends"><span><b>아이디로 친구 추가하기</b><small>이미 캐치미를 쓰는 친구라면 찾아서 추가해요</small></span></button>`;
     return;
   }
   body.innerHTML = `
     <div class="plan-friend-list">
       ${FRIENDS.map(f => `
-        <button type="button" class="plan-friend-row" data-plan-friend="${escapeHtml(f.id)}" data-plan-method="${method}">
+        <button type="button" class="plan-friend-row" data-plan-friend="${escapeHtml(f.id)}">
           ${planFriendAvatarHtml(f)}
           <span>${escapeHtml(f.name)}<small>@${escapeHtml(f.username || '')}</small></span>
         </button>`).join('')}
     </div>
-    <button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 방법 고르기</button>`;
+    <div class="plan-link-row">${planOptionHtml(PLAN_LINK_OPTION)}</div>`;
+}
+async function renderPlanStartMethods(friendId){
+  const friend = FRIENDS.find(f => f.id === friendId);
+  if(!friend) return;
+  const seq = ++planFriendSeq;
+  const name = escapeHtml(friend.name);
+  document.getElementById('planStartTitle').textContent = `${friend.name}님과 어떻게 잡을까요?`;
+  const body = document.getElementById('planStartBody');
+  body.innerHTML = `<div class="plan-empty">${name}님이 열어둔 시간을 확인하는 중...</div>`;
+
+  const start = new Date(TODAY);
+  const end = new Date(TODAY);
+  end.setDate(end.getDate() + PLAN_LOOKAHEAD_DAYS - 1);
+  const mine = myAvailableDayCount(start, end);
+  const theirs = await friendAvailableDayCount(friend, start, end);
+  if(seq !== planFriendSeq) return;
+
+  const known = theirs !== null;
+  const reserve = {
+    id: 'reserve',
+    title: `${name}님이 열어둔 시간에 신청하기`,
+    desc: `${name}님의 '예약 가능 시간' 중에 골라 요청하면, ${name}님이 수락해요`,
+    status: !known ? '' : (theirs > 0 ? `앞으로 2주 중 ${theirs}일 열려 있어요` : `${name}님이 아직 예약 가능 시간을 안 열었어요`),
+    disabled: known && theirs === 0,
+  };
+  const match = {
+    id: 'match',
+    title: '둘 다 되는 시간 찾기',
+    desc: '두 사람이 모두 예약 가능 시간으로 열어둔 시간 중 겹치는 때를 찾아요',
+    status: !known ? '' : (mine === 0 && theirs === 0 ? '두 사람 다 아직 안 열었어요'
+      : mine === 0 ? '내 예약 가능 시간이 아직 없어요'
+      : theirs === 0 ? `${name}님이 아직 안 열었어요` : '둘 다 열어둔 시간이 있어요'),
+    disabled: known && (mine === 0 || theirs === 0),
+  };
+  const link = { ...PLAN_LINK_OPTION };
+  let options;
+  if(known && theirs > 0 && mine > 0){ match.recommended = true; options = [match, reserve, link]; }
+  else if(known && theirs > 0){ reserve.recommended = true; options = [reserve, link, match]; }
+  else if(known){ link.recommended = true; options = [link, reserve, match]; }
+  else options = [reserve, match, link];
+  // 친구는 열었는데 나만 안 열었으면, 내 시간을 열어두면 "둘 다 되는 시간"도 쓸 수 있다고 알려줌
+  if(known && mine === 0) options.push({ id: 'mine', icon: 'mine', title: '내 예약 가능 시간 열어두기', desc: '열어두면 친구도 내 시간에 바로 신청할 수 있어요' });
+
+  body.innerHTML = options.map(planOptionHtml).join('') + `<button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 친구 고르기</button>`;
+  body.dataset.friendId = friendId;
 }
 document.getElementById('planStartBody').addEventListener('click', (e) => {
+  const body = document.getElementById('planStartBody');
   const methodBtn = e.target.closest('[data-plan]');
   if(methodBtn){
-    const m = PLAN_METHODS.find(x => x.id === methodBtn.dataset.plan);
-    if(!m) return;
-    if(m.needsFriend){ renderPlanStartFriends(m.id); return; }
+    if(methodBtn.disabled) return;
+    const method = methodBtn.dataset.plan;
+    const friendId = body.dataset.friendId;
     dismissView(closePlanStart);
-    inviteState.fromList = false;
-    openInviteList(true);
+    if(method === 'link'){
+      inviteState.fromList = false;
+      openInviteList(true);
+    } else if(method === 'mine'){
+      openMyAvailabilityForm();
+    } else if(friendId){
+      calendarOpenedFromChat = null;
+      if(method === 'match') openCalendarMatch(friendId);
+      else openFriendCalendar(friendId, 'reserve');
+    }
     return;
   }
   const friendBtn = e.target.closest('[data-plan-friend]');
   if(friendBtn){
-    const friendId = friendBtn.dataset.planFriend;
-    const method = friendBtn.dataset.planMethod;
-    dismissView(closePlanStart);
-    calendarOpenedFromChat = null;
-    if(method === 'match') openCalendarMatch(friendId);
-    else openFriendCalendar(friendId, 'reserve');
+    renderPlanStartMethods(friendBtn.dataset.planFriend);
     return;
   }
   if(e.target.closest('[data-plan-go="friends"]')){
     dismissView(closePlanStart);
     switchTopTab('friends');
+    document.getElementById('addFriendBtn').click();
     return;
   }
-  if(e.target.closest('[data-plan-back]')) renderPlanStartMethods();
+  if(e.target.closest('[data-plan-back]')){
+    delete body.dataset.friendId;
+    renderPlanStartFriends();
+  }
 });
 document.getElementById('planStartCloseBtn').addEventListener('click', () => goBackOrClose(closePlanStart));
 document.getElementById('planStartOverlay').addEventListener('click', (e) => {
