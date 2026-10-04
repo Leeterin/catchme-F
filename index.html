@@ -3582,6 +3582,7 @@
     flex:1 1 auto;
     min-height:0;
     overflow-y:auto;
+    overflow-x:hidden;
     padding:4px 2px 12px;
     scrollbar-width:none;
     -ms-overflow-style:none;
@@ -3691,7 +3692,6 @@
     color:#FFFFFF;
     border-bottom-right-radius:4px;
   }
-  .msg-bubble{ cursor:pointer; }
   /* 보낸 메시지가 아래에서 살짝 튀어오르며 나타나는 모션 (카톡/인스타 느낌) */
   .msg-row.me.msg-pop .msg-bubble{
     transform-origin:100% 100%;
@@ -3759,9 +3759,12 @@
   }
   .chat-search-hit-card{ box-shadow:0 0 0 2px #FFE76A !important; }
   .msg-row.search-current .chat-search-hit-card{ box-shadow:0 0 0 2.5px #FFC93C !important; }
-  .msg-bubble-image{
-    padding:4px;
-    background:var(--surface-2);
+  /* 사진은 말풍선 없이 사진만 */
+  .msg-row.me .msg-bubble-image,
+  .msg-row.other .msg-bubble-image{
+    padding:0;
+    background:transparent;
+    border-radius:12px;
     max-width:60%;
   }
   .msg-bubble-image img{
@@ -3789,20 +3792,27 @@
     max-height:100%;
     border-radius:8px;
   }
-  .image-preview-reply-btn{
+  /* 밀어서 답장 - 왼쪽으로 미는 동안 오른쪽 끝에서 답장 아이콘이 나타남 */
+  .msg-row{ position:relative; }
+  .msg-swipe-reply-icon{
     position:absolute;
-    left:50%;
-    bottom:calc(24px + env(safe-area-inset-bottom));
-    transform:translateX(-50%);
-    padding:10px 22px;
-    border:none;
-    border-radius:999px;
-    background:rgba(255,255,255,0.18);
-    color:#fff;
-    font-size:15px;
-    font-weight:600;
-    cursor:pointer;
+    right:-34px;
+    top:50%;
+    width:26px;
+    height:26px;
+    margin-top:-13px;
+    border-radius:50%;
+    background:var(--surface-2);
+    color:var(--text-dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    opacity:0;
+    transform:scale(.6);
+    transition:opacity .12s ease, transform .12s ease;
+    pointer-events:none;
   }
+  .msg-swipe-reply-icon.ready{ opacity:1; transform:scale(1); color:var(--accent); }
   .msg-quote-block{
     display:block;
     border-radius:8px;
@@ -13640,26 +13650,17 @@ async function sendChatImageMessage(dataUrl){
 }
 
 // 이미지 크게 보기 (탭하면 화면 전체로)
-// replyMsg를 넘기면(채팅 사진) 아래에 "답장" 버튼이 같이 뜸
-let imagePreviewReplyMsg = null;
-function openImagePreview(url, replyMsg){
+function openImagePreview(url){
   let overlay = document.getElementById('imagePreviewOverlay');
   if(!overlay){
     overlay = document.createElement('div');
     overlay.id = 'imagePreviewOverlay';
     overlay.className = 'image-preview-overlay';
-    overlay.innerHTML = '<img id="imagePreviewImg" src="" alt="사진 크게 보기" /><button type="button" class="image-preview-reply-btn" id="imagePreviewReplyBtn">답장</button>';
+    overlay.innerHTML = '<img id="imagePreviewImg" src="" alt="사진 크게 보기" />';
     overlay.addEventListener('click', () => overlay.classList.remove('show'));
-    overlay.querySelector('#imagePreviewReplyBtn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      overlay.classList.remove('show');
-      if(imagePreviewReplyMsg) startReplyTo(imagePreviewReplyMsg);
-    });
     document.body.appendChild(overlay);
   }
-  imagePreviewReplyMsg = replyMsg || null;
   document.getElementById('imagePreviewImg').src = url;
-  document.getElementById('imagePreviewReplyBtn').style.display = imagePreviewReplyMsg ? '' : 'none';
   overlay.classList.add('show');
 }
 
@@ -24012,12 +24013,12 @@ function renderChatMessages(){
     } else if(m.type === 'image'){
       const imgHtml = `<div class="msg-bubble msg-bubble-image"><img src="${m.imageUrl}" alt="사진" loading="lazy" /></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + imgHtml) : (imgHtml + metaHtml);
-      // 사진을 누르면 크게 보기만 열림 (예전엔 말풍선의 "누르면 답장"까지 같이 눌려서 키보드가 올라왔음) - 답장은 크게 보기 화면의 버튼으로
-      row.querySelector('img').addEventListener('click', (e) => {
-        e.stopPropagation();
-        openImagePreview(m.imageUrl, m.id ? m : null);
+      // 사진을 누르면 크게 보기만 열림 - 답장은 메시지를 왼쪽으로 밀어서
+      row.querySelector('img').addEventListener('click', () => {
+        if(Date.now() - chatSwipeReplyAt < 400) return;
+        openImagePreview(m.imageUrl);
       });
-      attachReplyTapToCard(row.querySelector('.msg-bubble-image'), m);
+      if(m.id) row._replyMsg = m;
     } else {
       const quoteHtml = m.replyTo ? `
         <div class="msg-quote-block">
@@ -24042,10 +24043,8 @@ function renderChatMessages(){
           scrollToChatMessage(originalMsg ? originalMsg.id : m.replyTo.msgId);
         });
       }
-      // 말풍선을 누르면 그 메시지에 답장
-      if(m.id){
-        row.querySelector('.msg-bubble').addEventListener('click', () => startReplyTo(m));
-      }
+      // 말풍선을 왼쪽으로 밀면 그 메시지에 답장 (setupChatSwipeReply)
+      if(m.id) row._replyMsg = m;
     }
 
     // 상대가 보낸 메시지엔 왼쪽에 프로필 아이콘 (카톡처럼 같은 사람이 같은 분에 이어 보낸 건 첫 메시지에만, 나머지는 자리만 비워 줄 맞춤)
@@ -24270,14 +24269,64 @@ function cancelReply(){
 }
 document.getElementById('chatReplyPreviewClose').addEventListener('click', cancelReply);
 
-// 카드/말풍선을 눌렀을 때 그 메시지에 답장 시작 (카드 안 버튼 클릭은 제외)
-function attachReplyTapToCard(el, m){
-  if(!el || !m || !m.id) return;
-  el.addEventListener('click', (e) => {
-    if(e.target.closest('button, a, input, textarea, .chat-date-link')) return;
-    startReplyTo(m);
-  });
-}
+// 메시지를 왼쪽으로 밀면 답장 (카톡처럼). 오른쪽으로 미는 건 채팅방 나가기라 방향을 반대로 둠.
+// 행이 다시 그려져도 계속 동작하게 메시지 목록에 한 번만 걸어둠 - 답장 가능한 행에는 row._replyMsg가 있음
+let chatSwipeReplyAt = 0;
+(function setupChatSwipeReply(){
+  const box = document.getElementById('chatMessages');
+  if(!box) return;
+  const THRESHOLD = 56, MAX = 72;
+  let row = null, icon = null, startX = 0, startY = 0, dx = 0, dragging = false, ready = false;
+  const reset = () => {
+    if(row){
+      const r = row, ic = icon;
+      r.style.transition = 'transform .18s ease';
+      r.style.transform = '';
+      setTimeout(() => { r.style.transition = ''; if(ic) ic.remove(); }, 200);
+    }
+    row = null; icon = null; dragging = false; ready = false; dx = 0;
+  };
+  box.addEventListener('touchstart', (e) => {
+    if(e.touches.length !== 1) return;
+    const r = e.target.closest('.msg-row');
+    if(!r || !r._replyMsg || e.target.closest('button, a, input, textarea')) return;
+    row = r; startX = e.touches[0].clientX; startY = e.touches[0].clientY; dx = 0; dragging = false; ready = false;
+  }, { passive: true });
+  box.addEventListener('touchmove', (e) => {
+    if(!row) return;
+    const mx = e.touches[0].clientX - startX, my = e.touches[0].clientY - startY;
+    if(!dragging){
+      if(Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+      // 왼쪽으로, 위아래보다 확실히 가로로 움직일 때만 (위아래 스크롤은 그대로)
+      if(!(mx < 0 && -mx > Math.abs(my) * 1.5)){ row = null; return; }
+      dragging = true;
+      row.style.transition = 'none';
+      icon = document.createElement('div');
+      icon.className = 'msg-swipe-reply-icon';
+      icon.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>';
+      row.appendChild(icon);
+    }
+    e.preventDefault();
+    dx = Math.max(-MAX, Math.min(0, mx));
+    row.style.transform = `translateX(${dx}px)`;
+    const nowReady = -dx >= THRESHOLD;
+    if(nowReady !== ready){
+      ready = nowReady;
+      icon.classList.toggle('ready', ready);
+      if(ready) hapticTick();
+    }
+  }, { passive: false });
+  const end = () => {
+    if(!row) return;
+    const m = row._replyMsg;
+    const doReply = dragging && ready;
+    if(dragging) chatSwipeReplyAt = Date.now();
+    reset();
+    if(doReply) startReplyTo(m);
+  };
+  box.addEventListener('touchend', end);
+  box.addEventListener('touchcancel', end);
+})();
 
 function sendChatMessage(){
   const input = document.getElementById('chatInput');
