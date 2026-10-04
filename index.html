@@ -6429,7 +6429,6 @@
     justify-content:space-around;
     align-items:center;
     padding:13px 6px calc(13px + env(safe-area-inset-bottom));
-    margin-top:14px;
     border-top:1px solid var(--glass-border);
     background:var(--glass-bg-strong);
     backdrop-filter:blur(18px) saturate(160%);
@@ -6438,6 +6437,9 @@
     position:sticky;
     bottom:0;
   }
+  /* 하단 바 바로 앞 빈칸 - 내용이 짧은 화면(홈 등)에선 남는 높이를 채워 바를 화면 맨 아래로 내리고,
+     내용이 길면 예전 margin-top처럼 14px만 띄움 (예전엔 홈에서 바가 화면 중간에 떠 있었음) */
+  .bottom-nav-spacer{ flex:1 0 14px; }
   .nav-item{
     display:flex;
     flex-direction:column;
@@ -8568,6 +8570,7 @@
   </div>
 
   <!-- Bottom nav -->
+  <div class="bottom-nav-spacer" aria-hidden="true"></div>
   <div class="bottom-nav">
     <div class="nav-item" data-tab="home">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
