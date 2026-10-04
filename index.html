@@ -13683,6 +13683,9 @@ function saveProfileToServer(){
   }).then((data) => {
     showToast('프로필을 저장했어요.');
     if(currentUser){
+      if(currentUser.profileImageUrl !== myProfileData.profileImageUrl) bumpAvatarVersion('avatar', currentUser.id);
+      if((currentUser.reviewAvatarUrl || null) !== (data.user.reviewAvatarUrl || null)) bumpAvatarVersion('review', currentUser.id);
+      currentUser.reviewAvatarUrl = data.user.reviewAvatarUrl || null;
       currentUser.profileImageUrl = myProfileData.profileImageUrl;
       currentUser.name = myProfileData.name;
       currentUser.username = data.user.username;
@@ -13796,6 +13799,7 @@ function saveReviewProfileToServer(){
     // currentUser도 같이 갱신해서 다시 로컬에 저장해둬야 함 - 안 그러면 새로고침했을 때
     // localStorage에 저장돼있던 예전 currentUser로 되돌아가면서 방금 만든 리뷰용 프로필이 사라져 보이는 버그가 생김.
     if(currentUser){
+      if(currentUser.reviewAvatarUrl !== myProfileData.reviewAvatarUrl) bumpAvatarVersion('review', currentUser.id);
       currentUser.reviewNickname = myProfileData.reviewNickname;
       currentUser.reviewAvatarUrl = myProfileData.reviewAvatarUrl;
       persistSession();
@@ -19179,13 +19183,31 @@ const FRIEND_DIRECTORY = [];
 // 프로필 사진 생성 - 외부 요청 없이 SVG를 직접 그려서 데이터 URI로 반환
 // (성별에 맞는 헤어스타일 실루엣 + 배경색 + 이목구비를 코드로 그림)
 // 친구/채팅 목록처럼 자주 다시 불러오는 화면에서, 사진을 매번 통째로 다시 받지 않고 브라우저 캐시를 쓰게 하는 주소
+// 서버는 5분마다 사진이 바뀌었는지 확인하게 해두었지만, 내가 방금 바꾼 내 사진은 기다리지 않고 바로 보이도록 주소에 버전을 붙임
+// (함수 선언만 끌어올려지고 변수는 아니라서, 이 줄보다 먼저 실행되는 코드에서 불려도 안 깨지게 처음 쓸 때 읽어옴)
+function avatarBustMap(){
+  if(!window.__avatarBust){
+    try { window.__avatarBust = JSON.parse(localStorage.getItem('catchme_avatar_bust') || '{}') || {}; } catch(e){ window.__avatarBust = {}; }
+  }
+  return window.__avatarBust;
+}
+function bumpAvatarVersion(kind, userId){
+  if(!userId) return;
+  const map = avatarBustMap();
+  map[`${kind}:${userId}`] = Date.now();
+  try { localStorage.setItem('catchme_avatar_bust', JSON.stringify(map)); } catch(e){}
+}
+function withAvatarBust(url, kind, userId){
+  const v = avatarBustMap()[`${kind}:${userId}`];
+  return v ? `${url}?v=${v}` : url;
+}
 function cachedAvatarUrl(userId){
-  return `${API_BASE_URL}/users/${userId}/avatar`;
+  return withAvatarBust(`${API_BASE_URL}/users/${userId}/avatar`, 'avatar', userId);
 }
 
 // "리뷰용 프로필" 사진 주소 - 실명 프로필 사진과 별개로 소식/커뮤니티 화면에서만 씀 (hasReviewAvatar가 true일 때만 유효)
 function cachedReviewAvatarUrl(userId){
-  return `${API_BASE_URL}/users/${userId}/review-avatar`;
+  return withAvatarBust(`${API_BASE_URL}/users/${userId}/review-avatar`, 'review', userId);
 }
 
 // 소식/커뮤니티 화면에서 보여줄 이름 - 리뷰용 닉네임을 설정해뒀으면 그걸, 아니면 실명을 씀
