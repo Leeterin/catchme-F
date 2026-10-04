@@ -6309,22 +6309,6 @@
     touch-action:none;
   }
   /* ---------------- 약속 초대 링크 (비회원 참여) ---------------- */
-  .invite-top-btn{
-    height:36px;
-    padding:0 12px;
-    border-radius:10px;
-    border:1px solid var(--accent);
-    background:var(--accent-soft);
-    color:var(--accent);
-    font-size:12.5px;
-    font-weight:700;
-    display:flex;
-    align-items:center;
-    gap:5px;
-    cursor:pointer;
-    white-space:nowrap;
-  }
-  .invite-top-btn svg{ width:15px; height:15px; flex-shrink:0; }
   .invite-overlay{
     display:none;
     position:fixed;
@@ -6901,10 +6885,6 @@
       <span class="brand-name">CATCHME</span>
     </div>
     <div class="top-actions">
-      <button class="invite-top-btn" id="inviteTopBtn" type="button" title="약속 링크 만들기">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        약속 잡기
-      </button>
       <button class="icon-btn login" id="myProfileBtn" title="내 프로필">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </button>
@@ -25992,11 +25972,6 @@ document.getElementById('inviteCloseBtn').addEventListener('click', () => {
     return;
   }
   closeInviteOverlay();
-});
-
-document.getElementById('inviteTopBtn').addEventListener('click', () => {
-  if(!authToken) return;
-  openPlanStart();
 });
 
 // ---------- 약속 잡기 (한 곳에서 시작) ----------
