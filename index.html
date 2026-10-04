@@ -5744,6 +5744,7 @@
     cursor:pointer;
   }
   .visibility-pick-btn.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  .visibility-hint{ margin-top:7px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
   .visibility-pick-btn.private.on{ border-color:var(--cta); color:var(--cta); background:rgba(255,107,74,0.1); }
   /* 일정 폼 - 이 일정 하나에만 쓸 색 고르기 (자동 / 기본 팔레트 / 직접 고르기) */
   .event-color-picker{
@@ -7245,6 +7246,7 @@
       <div class="mp-input-group" id="visibilityPickerGroup">
         <label>공개 설정 <span style="font-weight:400;color:var(--text-dim);">(그룹은 여러 개 동시에 선택할 수 있어요)</span></label>
         <div class="visibility-picker" id="visibilityPicker"></div>
+        <div class="visibility-hint" id="visibilityHint"></div>
       </div>
       </div>
       <div class="event-form-footer">
@@ -14871,6 +14873,24 @@ document.getElementById('ecmDone').addEventListener('click', closeEventColorMixe
 // 일정 폼의 공개설정 UI(전체공개/나만보기/그룹들 버튼)를 formVisibility 상태에 맞게 다시 그림
 function renderVisibilityPicker(){
   document.getElementById('visibilityPicker').innerHTML = visibilityButtonsHtml(formVisibility, 'visibility-pick-btn');
+  renderVisibilityHint();
+}
+// 고른 공개설정이 친구에게 실제로 어떻게 보이는지 한 줄로 알려줌 (버튼 이름만으로는 제목까지 보이는지 알 수 없어서)
+// 일반 일정: 공개 범위 밖 친구에게도 그 시간은 '일정 있음'으로 보임(서버 원칙). 예약 가능 시간: 공개 범위 안 친구만 예약 가능
+function renderVisibilityHint(){
+  const el = document.getElementById('visibilityHint');
+  if(!el) return;
+  const isPrivate = !!(formVisibility && formVisibility.private);
+  const hasGroups = !isPrivate && formVisibility && (formVisibility.groupIds || []).length > 0;
+  if(formEventType === 'available'){
+    el.textContent = isPrivate ? '친구에게 보이지 않아서 이 시간엔 예약을 받을 수 없어요.'
+      : hasGroups ? '고른 그룹의 친구만 이 시간에 예약할 수 있어요.'
+      : '모든 친구가 이 시간에 예약할 수 있어요.';
+  } else {
+    el.textContent = isPrivate ? "친구에게는 제목 없이 '일정 있음'으로만 보여요."
+      : hasGroups ? "고른 그룹의 친구에게만 제목까지 보이고, 다른 친구에게는 '일정 있음'으로만 보여요."
+      : '모든 친구에게 제목까지 보여요.';
+  }
 }
 
 // 예약 가능 시간 - 주간 그리드 다중 선택 상태
@@ -15089,6 +15109,7 @@ function defaultUntilDateValue(){
 
 function setEventTypeUI(type){
   formEventType = type;
+  renderVisibilityHint();
   // 예약 가능이 아닌 유형으로 바꾸면, 두 번 눌러서 합쳐뒀던 다른 예약 가능 일정은 원래대로 둠 (저장할 때 지워지지 않게)
   if(type !== 'available' && absorbedAvailIds.length){
     editingLinkedPieceIds = editingLinkedPieceIds.filter(id => !absorbedAvailIds.includes(id));
