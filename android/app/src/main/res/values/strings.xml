@@ -4,4 +4,7 @@
     <string name="title_activity_main">캐치미</string>
     <string name="package_name">com.catchme.app</string>
     <string name="custom_url_scheme">com.catchme.app</string>
+    <string name="widget_desc_small">바로 다음 약속을 보여줘요</string>
+    <string name="widget_desc_medium">다가오는 약속 3개를 보여줘요</string>
+    <string name="widget_desc_large">다음 약속과 그 뒤 약속들을 보여줘요</string>
 </resources>

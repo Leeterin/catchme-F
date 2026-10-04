@@ -8614,6 +8614,7 @@ function handleSessionExpired(){
   authToken = null;
   refreshTokenValue = null;
   currentUser = null;
+  try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
   try { localStorage.removeItem('catchme_session'); } catch(e) {}
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
   showToast('로그인이 만료됐어요. 다시 로그인해주세요.');
@@ -8627,6 +8628,7 @@ async function performLogout(){
   authToken = null;
   refreshTokenValue = null;
   currentUser = null;
+  try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
   try { localStorage.removeItem('catchme_session'); } catch(e) {}
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
 
@@ -9800,7 +9802,48 @@ function renderHomeDash(){
   });
 }
 // 채팅방/핀/친구/일정이 새로 불러와지면 홈이 열려 있을 때 바로 반영
+// ---------- 홈 화면 위젯 (iOS/안드로이드) ----------
+// 위젯은 앱 밖에서 그려져서 서버에 직접 못 물어봄. 그래서 앱이 다가오는 약속 목록을 네이티브 저장소(CatchmeWidget 플러그인)에
+// 넘겨두면 위젯이 그걸 읽어서 보여줌. 날짜 라벨(오늘/내일)은 위젯이 그릴 때 시각 기준으로 다시 계산함
+const WIDGET_MAX_ITEMS = 8;
+let widgetSyncTimer = null;
+let lastWidgetPayload = null;
+function widgetPlugin(){
+  const cap = window.Capacitor;
+  if(!cap || !cap.isNativePlatform || !cap.isNativePlatform() || !cap.registerPlugin) return null;
+  if(!widgetPlugin.cached) widgetPlugin.cached = cap.registerPlugin('CatchmeWidget');
+  return widgetPlugin.cached;
+}
+function buildWidgetPayload(){
+  if(!authToken) return { loggedIn: false, items: [] };
+  const items = homeUpcomingAppointments().slice(0, WIDGET_MAX_ITEMS).map(x => {
+    const mins = x.pin.timeLabel ? parseTimeLabelMinutes(x.pin.timeLabel) : null;
+    const day = x.pin.dateObj.getTime();
+    return {
+      title: x.room.name || '약속',
+      dayMs: day,
+      startMs: mins ? day + mins.startMin * 60000 : null,
+      endMs: mins ? day + mins.endMin * 60000 : null,
+      timeLabel: x.pin.timeLabel || '',
+      places: roomMeetPlaces(x.room, x.pin).map(p => p.location).join(' → '),
+    };
+  });
+  return { loggedIn: true, items };
+}
+function syncWidgetData(){
+  if(!widgetPlugin()) return;
+  clearTimeout(widgetSyncTimer);
+  widgetSyncTimer = setTimeout(() => {
+    try {
+      const json = JSON.stringify(buildWidgetPayload());
+      if(json === lastWidgetPayload) return;
+      lastWidgetPayload = json;
+      widgetPlugin().update({ data: json }).catch(() => {});
+    } catch(e){}
+  }, 800);
+}
 function refreshHomeDashIfVisible(){
+  try { syncWidgetData(); } catch(e){}
   try {
     if(currentTopTab === null && document.getElementById('homeDash').style.display !== 'none') renderHomeDash();
   } catch(e){} // 앱 시작 직후(변수들이 아직 준비 전)에 불려도 조용히 넘어감

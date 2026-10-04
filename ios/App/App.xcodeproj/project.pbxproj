@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0F4D97FD691EC8FE19E2450B /* CatchmeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C73465B7556222333837E8E6 /* CatchmeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		2597CACF145DCF7DF01DE7F4 /* CatchmeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34776CB287D7251773A20DB7 /* CatchmeWidget.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -15,12 +17,44 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		5C3C64BD88DE83445336CBA1 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 44DF3936C4C27C627F7630C7 /* SwiftUI.framework */; };
+		6CBB68F28E0DA4C9770D5BD9 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DB9957AB2669F3896789C50F /* Foundation.framework */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		A1F0CA012F00000100C0FFEE /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = A1F0CA022F00000100C0FFEE /* FirebaseMessaging */; };
+		A76D1CA7BF6C564316B67D5A /* CatchmeWidgetPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62D11E829D6D23C4805AF39 /* CatchmeWidgetPlugin.swift */; };
+		CEF8F51CE07A559CE8107FCA /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DE20C55AA53EC5DF26C134C /* MainViewController.swift */; };
+		E94F9FA848C0E3B960C84E90 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D1259DAD5074DEE88251ED78 /* WidgetKit.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		078B93060BB70C062CC4DBED /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7C9FF76D98BE45D6BE58470B;
+			remoteInfo = CatchmeWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		69F0DE8077F7A09E33145725 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				0F4D97FD691EC8FE19E2450B /* CatchmeWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		086042874BEAA35B2EB31854 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		34776CB287D7251773A20DB7 /* CatchmeWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CatchmeWidget.swift; sourceTree = "<group>"; };
+		44DF3936C4C27C627F7630C7 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS14.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -31,10 +65,25 @@
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		9DE20C55AA53EC5DF26C134C /* MainViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		A1F0CA042F00000100C0FFEE /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		A62D11E829D6D23C4805AF39 /* CatchmeWidgetPlugin.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CatchmeWidgetPlugin.swift; sourceTree = "<group>"; };
+		C73465B7556222333837E8E6 /* CatchmeWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CatchmeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		D1259DAD5074DEE88251ED78 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS14.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
+		DB9957AB2669F3896789C50F /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS14.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		2DD4AD347E83D0A04BD27B22 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6CBB68F28E0DA4C9770D5BD9 /* Foundation.framework in Frameworks */,
+				E94F9FA848C0E3B960C84E90 /* WidgetKit.framework in Frameworks */,
+				5C3C64BD88DE83445336CBA1 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3011FED79650016851F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -53,6 +102,8 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				72E5A1DC61A8E4EA7BD2D574 /* Frameworks */,
+				EF3F37B1A8C82FE550C17CFC /* CatchmeWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -60,6 +111,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				C73465B7556222333837E8E6 /* CatchmeWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -77,8 +129,38 @@
 				A1F0CA042F00000100C0FFEE /* App.entitlements */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				A62D11E829D6D23C4805AF39 /* CatchmeWidgetPlugin.swift */,
+				9DE20C55AA53EC5DF26C134C /* MainViewController.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		72E5A1DC61A8E4EA7BD2D574 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				C80F6D713328BD970B6F90E1 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C80F6D713328BD970B6F90E1 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				DB9957AB2669F3896789C50F /* Foundation.framework */,
+				D1259DAD5074DEE88251ED78 /* WidgetKit.framework */,
+				44DF3936C4C27C627F7630C7 /* SwiftUI.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		EF3F37B1A8C82FE550C17CFC /* CatchmeWidget */ = {
+			isa = PBXGroup;
+			children = (
+				34776CB287D7251773A20DB7 /* CatchmeWidget.swift */,
+				086042874BEAA35B2EB31854 /* Info.plist */,
+			);
+			name = CatchmeWidget;
+			path = CatchmeWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -91,10 +173,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				69F0DE8077F7A09E33145725 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				51A9F7CFE34833D14E7917DC /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -104,6 +188,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		7C9FF76D98BE45D6BE58470B /* CatchmeWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3830B6E0300FFB9F20C33705 /* Build configuration list for PBXNativeTarget "CatchmeWidgetExtension" */;
+			buildPhases = (
+				D814D66741B39F282930CCCD /* Sources */,
+				2DD4AD347E83D0A04BD27B22 /* Frameworks */,
+				CC7EBB19443ADE2EC229059A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CatchmeWidgetExtension;
+			productName = CatchmeWidgetExtension;
+			productReference = C73465B7556222333837E8E6 /* CatchmeWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -139,6 +240,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				7C9FF76D98BE45D6BE58470B /* CatchmeWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -157,6 +259,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC7EBB19443ADE2EC229059A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -166,10 +275,29 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				A76D1CA7BF6C564316B67D5A /* CatchmeWidgetPlugin.swift in Sources */,
+				CEF8F51CE07A559CE8107FCA /* MainViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D814D66741B39F282930CCCD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2597CACF145DCF7DF01DE7F4 /* CatchmeWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		51A9F7CFE34833D14E7917DC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = CatchmeWidgetExtension;
+			target = 7C9FF76D98BE45D6BE58470B /* CatchmeWidgetExtension */;
+			targetProxy = 078B93060BB70C062CC4DBED /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -346,9 +474,71 @@
 			};
 			name = Release;
 		};
+		53638C5D763BE37893333FD3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3V2KZKTUN3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CatchmeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "캐치미";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.catchme.app.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C9E269429B5FBDD9C0614963 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3V2KZKTUN3;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CatchmeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "캐치미";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.catchme.app.dev.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		3830B6E0300FFB9F20C33705 /* Build configuration list for PBXNativeTarget "CatchmeWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				53638C5D763BE37893333FD3 /* Release */,
+				C9E269429B5FBDD9C0614963 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
