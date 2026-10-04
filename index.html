@@ -181,6 +181,17 @@
   .home-appt-info{ flex:1; min-width:0; }
   .home-appt-name{ font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .home-appt-sub{ font-size:12px; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* 홈: 내 예약 가능 시간 - 앞으로 2주 중 열어둔 날을 한 줄로 */
+  .home-avail-strip{ display:grid; grid-template-columns:repeat(14, minmax(0, 1fr)); gap:3px; margin:2px 0 8px; }
+  .home-avail-day{ display:flex; flex-direction:column; align-items:center; gap:3px; font-size:9.5px; color:var(--text-dim); }
+  .home-avail-day i{ display:block; width:100%; height:18px; border-radius:5px; background:var(--surface-2); border:1px solid var(--line); }
+  .home-avail-day.on i{ background:var(--accent); border-color:var(--accent); }
+  .home-avail-day.today{ color:var(--accent); font-weight:700; }
+  .home-avail-status{ font-size:12.5px; color:var(--text-dim); line-height:1.45; }
+  .home-avail-status.warn{ color:#e5484d; font-weight:600; }
+  .home-avail-actions{ display:flex; gap:6px; margin-top:10px; }
+  .home-avail-actions button{ flex:1; padding:9px 6px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); color:var(--text); font-size:12.5px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
+  .home-avail-actions button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .home-empty{ font-size:13px; color:var(--text-dim); line-height:1.5; padding:4px 2px 2px; }
   .onboarding-close{ border:none; background:none; color:var(--text-dim); font-size:12px; cursor:pointer; padding:0; font-family:'Inter',sans-serif; }
   .onboarding-bar{ height:5px; border-radius:3px; background:var(--surface-2); overflow:hidden; margin-bottom:6px; }
@@ -4203,7 +4214,7 @@
     display:none !important;
   }
   #panel-schedule.home-clean-mode::before{
-    content:'시간표';
+    content:'캘린더';
     display:block;
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
@@ -6949,11 +6960,21 @@
     <div id="homeOnboarding"></div>
     <button type="button" class="home-plan-cta" id="homePlanCta">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v6M9 16h6"/></svg>
-      <span><b>약속 잡기</b><small>친구를 고르면 지금 바로 잡을 수 있는 방법을 알려줘요</small></span>
+      <span><b>약속 잡기</b><small>친구만 고르면 잡을 수 있는 방법을 알려줘요</small></span>
     </button>
     <div class="home-card">
       <div class="home-card-title"><span>다가오는 약속</span></div>
       <div id="homeUpcomingList"></div>
+    </div>
+    <!-- 내 예약 가능 시간 - 친구가 나에게 약속을 걸 수 있는 시간이 얼마나 열려 있는지 (홈에 큰 달력 대신) -->
+    <div class="home-card">
+      <div class="home-card-title"><span>내 예약 가능 시간</span></div>
+      <div class="home-avail-strip" id="homeAvailStrip"></div>
+      <div class="home-avail-status" id="homeAvailStatus"></div>
+      <div class="home-avail-actions">
+        <button type="button" class="primary" id="homeAvailQuickBtn">빠르게 열기</button>
+        <button type="button" id="homeAvailCalBtn">캘린더에서 보기</button>
+      </div>
     </div>
   </div>
 
@@ -7012,8 +7033,8 @@
 
   <!-- 시간표 패널 -->
   <div class="tab-panel" id="panel-schedule">
-    <h2>시간표 설정</h2>
-    <p class="desc">내 일정과 '예약 가능 시간'을 관리해요. 친구는 내가 열어둔 예약 가능 시간에만 약속을 신청할 수 있어요.</p>
+    <h2>내 캘린더</h2>
+    <p class="desc">내 일정과 '예약 가능 시간'을 관리해요. 친구는 내가 열어둔 예약 가능 시간에만 예약을 요청할 수 있어요.</p>
 
     <!-- 예약 가능 시간 빠르게 열기 입구 - 항상 보이게 둬서 4주가 지나 비었을 때도 바로 다시 열 수 있게 함 -->
     <button type="button" class="quick-avail-entry" id="quickAvailEntryBtn">
@@ -7037,7 +7058,7 @@
         <div style="display:flex;align-items:center;gap:8px;">
           <button class="profile-back" id="dayViewChatBackBtn" style="display:none;padding:0 4px;font-size:14px;font-weight:700;white-space:nowrap;">&#8249; 채팅방</button>
           <div>
-            <div class="day-header-title">내 시간표</div>
+            <div class="day-header-title">내 캘린더</div>
             <div class="day-header-sub">
               <span id="dayViewLabel">-</span>
               <span class="day-today-chip" id="dayViewTodayChip"></span>
@@ -7222,7 +7243,7 @@
       <div class="friends-header">
         <div>
           <h2>친구</h2>
-          <p class="desc">함께 시간표를 맞출 친구들이에요.</p>
+          <p class="desc">함께 약속을 잡을 친구들이에요.</p>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;">
           <button class="add-friend-btn" id="openGroupsBtn" style="background:var(--surface);border:1.5px solid var(--line);color:var(--text-dim);" title="친구 그룹 관리"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
@@ -7616,7 +7637,7 @@
     <div class="calendar-match-view" id="calendarMatchView">
       <div class="match-panel-header">
         <button class="profile-back" id="matchBackBtn">&#8249;</button>
-        <span id="matchViewTitle">캘린더 매칭</span>
+        <span id="matchViewTitle">둘 다 되는 시간 찾기</span>
       </div>
       <div class="event-form-time-row">
         <div class="mp-input-group">
@@ -7672,7 +7693,7 @@
     <div class="mini-confirm-card quick-avail-card">
       <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
-      <p class="quick-avail-desc">고른 시간이 <b>앞으로 4주 동안</b> 예약 가능 시간으로 열려요. 친구는 이 시간에만 약속을 신청할 수 있어요.</p>
+      <p class="quick-avail-desc">고른 시간이 <b>앞으로 4주 동안</b> 예약 가능 시간으로 열려요. 친구는 이 시간에만 예약을 요청할 수 있어요.</p>
       <div class="quick-avail-presets" id="quickAvailPresets"></div>
       <div class="quick-avail-grid" id="quickAvailGrid"></div>
       <p class="quick-avail-hint">요일이나 시간대 이름을 누르면 한 줄을 통째로 고를 수 있어요. 이미 일정이 있는 시간은 빼고 열어요.</p>
@@ -7934,11 +7955,11 @@
             </div>
             <div class="chat-extra-option" id="extraReserveOption">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
-              <span>예약하기</span>
+              <span>열어둔 시간에 예약하기</span>
             </div>
             <div class="chat-extra-option" id="extraMatchOption">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
-              <span>매칭하기</span>
+              <span id="extraMatchOptionLabel">둘 다 되는 시간 찾기</span>
             </div>
             <div class="chat-extra-option" id="extraRecommendLocationOption" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
@@ -8372,7 +8393,7 @@
     </div>
     <div class="nav-item" data-tab="schedule">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
-      <span>시간표</span>
+      <span>캘린더</span>
     </div>
     <div class="nav-item" data-tab="friends" style="position:relative;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -9666,16 +9687,9 @@ function showTab(tabKey){
 
   if(tabKey === null){
     document.querySelector('.nav-item[data-tab="home"]').classList.add('active');
+    // 홈은 "약속" 중심 - 달력은 캘린더 탭에만 둠 (홈과 캘린더 탭에 같은 달력이 두 번 나와서 헷갈렸음)
     homeDash.style.display = 'flex';
     renderHomeDash();
-    const defaultView = settingsState.default_schedule_view || 'month';
-    if(defaultView === 'month'){
-      calendarCard.style.display = 'block';
-      renderCalendar();
-    } else {
-      panels['schedule'].classList.add('active', 'home-clean-mode');
-      switchScheduleView(defaultView);
-    }
   } else {
     panels[tabKey].classList.add('active');
     document.querySelector(`.nav-item[data-tab="${tabKey}"]`).classList.add('active');
@@ -9780,7 +9794,7 @@ function homeOnboardingSteps(){
     },
     {
       id: 'plan', title: '첫 약속 잡기',
-      desc: '친구가 열어둔 시간에 신청하거나, 링크로 되는 시간을 물어봐요',
+      desc: '친구가 열어둔 시간에 예약하거나, 링크로 되는 시간을 물어봐요',
       done: Object.values(CHAT_ROOMS).some(r => (r.pinnedSchedules || []).some(p => p.dateLabel)),
     },
   ];
@@ -9829,10 +9843,31 @@ function runOnboardingStep(id){
     openPlanStart();
   }
 }
+function renderHomeAvailCard(){
+  const strip = document.getElementById('homeAvailStrip');
+  if(!strip) return;
+  let n = 0, html = '';
+  for(let i = 0; i < 14; i++){
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() + i);
+    const on = getEventsForDate(d).some(e => e.type === 'available');
+    if(on) n++;
+    html += `<span class="home-avail-day${on ? ' on' : ''}${i === 0 ? ' today' : ''}" title="${d.getMonth() + 1}/${d.getDate()}"><i></i>${i === 0 ? '오늘' : WEEKDAY_KO[d.getDay()]}</span>`;
+  }
+  strip.innerHTML = html;
+  const status = document.getElementById('homeAvailStatus');
+  status.classList.toggle('warn', n === 0);
+  status.textContent = n > 0
+    ? `앞으로 2주 중 ${n}일 열려 있어요. 친구는 이 시간에 나에게 예약할 수 있어요.`
+    : '열어둔 시간이 없어서 친구가 나에게 예약할 수 없어요.';
+}
+document.getElementById('homeAvailQuickBtn').addEventListener('click', () => openQuickAvail());
+document.getElementById('homeAvailCalBtn').addEventListener('click', () => switchTopTab('schedule'));
 function renderHomeDash(){
   const listEl = document.getElementById('homeUpcomingList');
   if(!listEl) return;
   renderHomeOnboarding();
+  renderHomeAvailCard();
   const items = homeUpcomingAppointments();
   if(!items.length){
     listEl.innerHTML = `<div class="home-empty">아직 잡힌 약속이 없어요. 위의 <b>약속 잡기</b>로 시작해 보세요.</div>`;
@@ -10355,7 +10390,7 @@ function openSettingsDetail(id){
       <div class="settings-detail-desc">앱 버전과 저장공간을 관리해요.</div>
       ${toggleRowHTML('dark_mode', '다크 모드', '어두운 화면으로 바꿔요', false)}
       <div class="settings-simple-row" style="flex-direction:column;align-items:stretch;gap:8px;">
-        <span>시간표 탭 기본 화면</span>
+        <span>캘린더 탭 기본 화면</span>
         <div class="repeat-toggle-row" id="defaultScheduleViewPicker">
           <button class="repeat-mode-btn${settingsState.default_schedule_view === 'day' ? ' active' : ''}" data-view="day" type="button">하루</button>
           <button class="repeat-mode-btn${settingsState.default_schedule_view === 'week' ? ' active' : ''}" data-view="week" type="button">일주일</button>
@@ -10379,7 +10414,7 @@ function openSettingsDetail(id){
         settingsState.default_schedule_view = btn.dataset.view;
         document.getElementById('defaultScheduleViewPicker').querySelectorAll('.repeat-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
         saveSettingToServer('default_schedule_view');
-        showToast(`시간표 기본 화면을 "${btn.textContent}"(으)로 설정했어요.`);
+        showToast(`캘린더 기본 화면을 "${btn.textContent}"(으)로 설정했어요.`);
       });
     });
     document.getElementById('clearCacheBtn').addEventListener('click', clearLocalCaches);
@@ -14080,6 +14115,7 @@ function getEventsForDate(dateObj){
 // SCHEDULE_EVENTS 전체를 기준으로 시간 단위 배열(scheduleData/scheduleText/scheduleBookable)을 다시 계산
 // -> 일주일/한달/캘린더 매칭 등 기존 기능이 계속 정확한 데이터를 참조하도록 동기화
 function resyncAllScheduleEvents(){
+  refreshHomeDashIfVisible(); // 홈의 "내 예약 가능 시간" 카드도 일정이 바뀔 때마다 갱신 (SCHEDULE_EVENTS를 바로 읽음)
   Object.keys(scheduleData).forEach(k => delete scheduleData[k]);
   Object.keys(scheduleText).forEach(k => delete scheduleText[k]);
   Object.keys(scheduleBookable).forEach(k => delete scheduleBookable[k]);
@@ -17007,7 +17043,7 @@ function renderMonthSelectedPanel(){
   panel.innerHTML = `
     <div class="month-selected-header">
       <div class="month-selected-title">${dateLabel}</div>
-      <button class="month-selected-open-btn" id="monthSelectedOpenBtn">하루 시간표 열기 &#8250;</button>
+      <button class="month-selected-open-btn" id="monthSelectedOpenBtn">하루 일정 자세히 보기 &#8250;</button>
     </div>
     ${rowsHtml}
   `;
@@ -18692,7 +18728,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   if(myOverlap){
     const myOverlapDisp = getEventDisplayRangeForDate(myOverlap, date);
     openScheduleOverlapConfirm(
-      `이 날 ${minutesToLabel(myOverlapDisp.startMin)}-${minutesToLabel(myOverlapDisp.endMin)}에 이미 "${myOverlap.title}" 일정이 있어요. 그래도 예약 신청할까요?`,
+      `이 날 ${minutesToLabel(myOverlapDisp.startMin)}-${minutesToLabel(myOverlapDisp.endMin)}에 이미 "${myOverlap.title}" 일정이 있어요. 그래도 예약을 요청할까요?`,
       proceedReservationSubmit
     );
     return;
@@ -24799,11 +24835,13 @@ function updateChatExtraOptionForRoom(){
     option.dataset.mode = 'members';
     option.innerHTML = `${EXTRA_OPTION_ICON_MEMBERS}<span>멤버보기</span>`;
     reserveOption.style.display = 'none'; // 그룹은 "매칭하기"로 시간을 맞추는 방식이라, 개별 예약하기는 안 보여줌
+    document.getElementById('extraMatchOptionLabel').textContent = '모두 되는 시간 찾기';
     recommendOption.style.display = room.isRealRoom ? '' : 'none'; // 실제 서버 방(참가자 출발지를 모을 수 있는 방)에서만 보임
   } else {
     option.dataset.mode = 'calendar';
     option.innerHTML = `${EXTRA_OPTION_ICON_CALENDAR}<span>캘린더 보기</span>`;
     reserveOption.style.display = '';
+    document.getElementById('extraMatchOptionLabel').textContent = '둘 다 되는 시간 찾기';
     recommendOption.style.display = (room && room.isRealRoom) ? '' : 'none'; // 1:1 실제 방에서도 두 사람 출발지로 추천받을 수 있음
   }
   document.getElementById('extraMuteOptionLabel').textContent = (room && room.muted) ? '알림 켜기' : '알림 끄기';
@@ -25285,7 +25323,7 @@ function openCalendarMatch(friendId){
   activeMatchFriendId = friendId;
   activeMatchGroupRoomId = null;
   const friend = FRIENDS.find(f => f.id === friendId);
-  document.getElementById('matchViewTitle').textContent = friend ? `${friend.name}님과 캘린더 매칭` : '캘린더 매칭';
+  document.getElementById('matchViewTitle').textContent = friend ? `${friend.name}님과 둘 다 되는 시간` : '둘 다 되는 시간 찾기';
 
   const start = new Date(TODAY);
   const end = new Date(TODAY);
@@ -25309,7 +25347,7 @@ function openGroupCalendarMatch(roomId){
   activeMatchGroupRoomId = roomId;
   activeMatchFriendId = null;
   const room = CHAT_ROOMS[roomId];
-  document.getElementById('matchViewTitle').textContent = room ? `${room.name} 멤버들과 캘린더 매칭` : '캘린더 매칭';
+  document.getElementById('matchViewTitle').textContent = room ? `${room.name} 모두 되는 시간` : '모두 되는 시간 찾기';
 
   const start = new Date(TODAY);
   const end = new Date(TODAY);
@@ -25451,7 +25489,7 @@ function renderQuickAvailEntry(){
   el.classList.toggle('warn', n === 0);
   el.textContent = n > 0
     ? `앞으로 2주 중 ${n}일 열려 있어요 · 요일·시간대로 더 열기`
-    : '앞으로 2주 동안 열어둔 시간이 없어요. 친구가 신청할 수 없어요';
+    : '앞으로 2주 동안 열어둔 시간이 없어요. 친구가 예약할 수 없어요';
 }
 document.getElementById('quickAvailEntryBtn').addEventListener('click', openQuickAvail);
 function closeQuickAvail(){
@@ -25579,7 +25617,7 @@ async function renderMatchEmptyHelp(body, startDate, endDate){
 
   const actions = [];
   if(mine === 0) actions.push('<button type="button" class="primary" data-match-help="mine">내 예약 가능 시간 열기</button>');
-  if(friend && theirs > 0) actions.push(`<button type="button"${mine === 0 ? '' : ' class="primary"'} data-match-help="reserve">${escapeHtml(friend.name)}님이 열어둔 시간에 신청하기</button>`);
+  if(friend && theirs > 0) actions.push(`<button type="button"${mine === 0 ? '' : ' class="primary"'} data-match-help="reserve">${escapeHtml(friend.name)}님이 열어둔 시간에 예약하기</button>`);
   if(friend) actions.push('<button type="button" data-match-help="link">링크로 되는 시간 물어보기</button>');
 
   const help = document.createElement('div');
@@ -26405,7 +26443,7 @@ async function renderPlanStartMethods(friendId){
   const known = theirs !== null;
   const reserve = {
     id: 'reserve',
-    title: `${name}님이 열어둔 시간에 신청하기`,
+    title: `${name}님이 열어둔 시간에 예약하기`,
     desc: `${name}님의 '예약 가능 시간' 중에 골라 요청하면, ${name}님이 수락해요`,
     status: !known ? '' : (theirs > 0 ? `앞으로 2주 중 ${theirs}일 열려 있어요` : `${name}님이 아직 예약 가능 시간을 안 열었어요`),
     disabled: known && theirs === 0,
@@ -26426,7 +26464,7 @@ async function renderPlanStartMethods(friendId){
   else if(known){ link.recommended = true; options = [link, reserve, match]; }
   else options = [reserve, match, link];
   // 친구는 열었는데 나만 안 열었으면, 내 시간을 열어두면 "둘 다 되는 시간"도 쓸 수 있다고 알려줌
-  if(known && mine === 0) options.push({ id: 'mine', icon: 'mine', title: '내 예약 가능 시간 열어두기', desc: '열어두면 친구도 내 시간에 바로 신청할 수 있어요' });
+  if(known && mine === 0) options.push({ id: 'mine', icon: 'mine', title: '내 예약 가능 시간 열어두기', desc: '열어두면 친구도 내 시간에 바로 예약할 수 있어요' });
 
   body.innerHTML = options.map(planOptionHtml).join('') + `<button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 친구 고르기</button>`;
   body.dataset.friendId = friendId;
