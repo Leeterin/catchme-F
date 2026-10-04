@@ -947,6 +947,14 @@
     padding:2px;
   }
 
+  .friend-reserve-days{ margin:0 0 10px; }
+  .frd-label{ font-size:11.5px; color:var(--text-dim); margin-bottom:6px; }
+  .frd-row{ display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch; }
+  .frd-day{ flex:0 0 44px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 0; border-radius:10px; border:1.5px solid var(--line); background:var(--surface); color:var(--text-dim); opacity:0.45; cursor:default; }
+  .frd-day small{ font-size:10.5px; }
+  .frd-day b{ font-size:14px; }
+  .frd-day.open{ opacity:1; border-color:var(--accent); color:var(--text); cursor:pointer; }
+  .frd-day.open.on{ background:var(--accent); color:#fff; }
   .search-result-row{
     display:flex;
     align-items:center;
@@ -4413,6 +4421,8 @@
     align-items:center;
     margin-bottom:8px;
   }
+  /* + 혼자 떨어져 있으면 뭔지 몰라서 글자를 붙임 */
+  .schedule-add-btn.wide{ width:auto; padding:0 12px; font-size:12.5px; gap:2px; }
   .schedule-add-btn{
     width:30px;
     height:30px;
@@ -5805,6 +5815,10 @@
   .avail-for-btn.active{ border-color:var(--af-color); color:var(--af-color); background:color-mix(in srgb, var(--af-color) 12%, transparent); }
   .avail-for-hint{ margin-top:6px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
   .quick-avail-for{ margin:0 0 12px; }
+  .quick-avail-for-toggle{ display:block; margin:0 auto; background:none; border:none; padding:4px 8px; font-size:12.5px; color:var(--text-dim); cursor:pointer; }
+  .quick-avail-for-toggle b{ color:var(--text); }
+  .quick-avail-for-toggle span{ color:var(--accent); margin-left:4px; }
+  #quickAvailForBody{ margin-top:8px; }
   .weekday-picker{
     display:flex;
     gap:5px;
@@ -6483,6 +6497,9 @@
     pointer-events:auto; /* 떠 있는 동안엔 손가락으로 아래로 쓸어서 내릴 수 있게 */
     touch-action:none;
   }
+  /* 채팅방 안에서는 가장 최근 메시지(방금 보낸 예약 카드의 "요청 취소" 등)가 입력창 바로 위에 있어서 아래 토스트가 가렸음 - 위쪽에 띄움 */
+  body.chat-open .global-toast{ bottom:auto; top:calc(env(safe-area-inset-top, 0px) + 72px); transform:translateX(-50%) translateY(-16px); }
+  body.chat-open .global-toast.show{ transform:translateX(-50%) translateY(0); }
   /* ---------------- 약속 초대 링크 (비회원 참여) ---------------- */
   .invite-overlay{
     display:none;
@@ -6882,6 +6899,10 @@
   }
   .auth-form button:disabled{ opacity:0.6; cursor:default; }
   .auth-error{ font-size:12px; color:var(--cta); min-height:16px; }
+  .auth-agree{ display:flex; align-items:flex-start; gap:8px; font-size:13px; color:var(--text-dim); margin:4px 0 12px; line-height:1.5; cursor:pointer; }
+  .auth-agree input{ width:18px; height:18px; margin:1px 0 0; flex-shrink:0; accent-color:var(--accent); }
+  .auth-agree-link, .auth-form .auth-agree-link{ width:auto; height:auto; margin:0; background:none; border:none; border-radius:0; padding:0; font:inherit; font-weight:600; color:var(--text); text-decoration:underline; cursor:pointer; box-shadow:none; display:inline; }
+  .auth-social-note{ font-size:11px; color:var(--text-dim); text-align:center; margin-top:10px; line-height:1.5; }
   .auth-hint{
     margin-top:16px;
     font-size:11px;
@@ -7020,6 +7041,8 @@
         <div class="auth-field-group"><label>이메일</label><input type="email" id="signupEmail" placeholder="이메일을 입력하세요" /></div>
         <div class="auth-field-group"><label>전화번호 <span style="font-weight:400;opacity:0.7;">(선택)</span></label><input type="tel" id="signupPhone" placeholder="010-1234-5678" /></div>
         <div class="auth-field-group"><label>비밀번호</label><input type="password" id="signupPassword" placeholder="8자 이상, 영문+숫자" /></div>
+        <!-- 약관·개인정보 수집 동의 - 가입 전에 반드시 받아야 함 (예전엔 동의 없이 바로 가입됐음) -->
+        <label class="auth-agree"><input type="checkbox" id="signupAgree" /> <span><button type="button" class="auth-agree-link" data-legal="terms">이용약관</button>과 <button type="button" class="auth-agree-link" data-legal="privacy">개인정보 처리방침</button>에 동의해요 (필수)</span></label>
         <button id="signupSubmitBtn" type="button">회원가입</button>
         <div class="auth-error" id="signupError"></div>
       </div>
@@ -7050,6 +7073,7 @@
         <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M16.3 3v9.5L7.7 3H3v18h5.4v-9.5l8.6 9.5H21V3z"/></svg>
         네이버로 로그인
       </button>
+      <div class="auth-social-note" id="authSocialNote">카카오·네이버로 처음 시작하면 <button type="button" class="auth-agree-link" data-legal="terms">이용약관</button>과 <button type="button" class="auth-agree-link" data-legal="privacy">개인정보 처리방침</button>에 동의하는 것으로 봐요.</div>
 
     </div>
   </div>
@@ -7079,16 +7103,16 @@
 
   <!-- 홈 상단: 약속 잡기 버튼 + 다가오는 약속 (앱을 켜자마자 "약속 잡는 앱"이라는 게 보이게) -->
   <div class="home-dash" id="homeDash" style="display:none;">
+    <!-- 답할 차례 - 친구가 보낸 예약 요청/시간 제안/친구 요청 중 내가 답해야 진행되는 것. 가장 급하니까 맨 위 -->
+    <div class="home-card home-pending-card" id="homePendingCard" style="display:none;">
+      <div class="home-card-title"><span>답할 차례</span></div>
+      <div id="homePendingList"></div>
+    </div>
     <div id="homeOnboarding"></div>
     <button type="button" class="home-plan-cta" id="homePlanCta">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v6M9 16h6"/></svg>
       <span><b>약속 잡기</b><small>친구만 고르면 잡을 수 있는 방법을 알려줘요</small></span>
     </button>
-    <!-- 답할 차례 - 친구가 보낸 예약 요청/시간 제안 중 내가 답해야 약속이 진행되는 것 (채팅방 안에만 있으면 놓치기 쉬움) -->
-    <div class="home-card home-pending-card" id="homePendingCard" style="display:none;">
-      <div class="home-card-title"><span>답할 차례</span></div>
-      <div id="homePendingList"></div>
-    </div>
     <div class="home-card">
       <div class="home-card-title"><span>다가오는 약속</span><button type="button" class="home-card-link" id="homePastApptBtn">지난 약속</button></div>
       <div id="homeUpcomingList"></div>
@@ -7215,7 +7239,7 @@
       </div>
       <div class="week-color-settings-row">
         <button id="weekColorSettingsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><path d="M12 2a10 10 0 1 0 10 10c0-1.5-1-2.5-2.5-2.5H17a2.5 2.5 0 0 1 0-5h.5C19 4.5 16 2 12 2z"/><circle cx="7.5" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="11" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="8.5" r="1.2" fill="currentColor" stroke="none"/></svg> 색상 설정</button>
-        <button id="weekAddEventBtn" class="schedule-add-btn" title="일정 추가">+</button>
+        <button id="weekAddEventBtn" class="schedule-add-btn wide" title="일정 추가">+ 일정 추가</button>
       </div>
       <div class="week-color-panel" id="weekColorPanel" style="display:none;">
         <div class="week-color-panel-title">테마 선택</div>
@@ -7237,7 +7261,7 @@
         <button id="monthSchedNext">&#8250;</button>
       </div>
       <div class="week-color-settings-row" style="justify-content:flex-end;">
-        <button id="monthAddEventBtn" class="schedule-add-btn" title="일정 추가">+</button>
+        <button id="monthAddEventBtn" class="schedule-add-btn wide" title="일정 추가">+ 일정 추가</button>
       </div>
       <div class="weekday-row">
         <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
@@ -7701,6 +7725,8 @@
       <div class="friend-calendar-title" id="friendCalendarTitle"></div>
 
       <div class="friend-cal-main active" id="friendCalendarMain">
+        <!-- 예약하기: 앞으로 2주 중 친구가 열어둔 날을 한 줄로 - 누르면 그 날로 바로 감 (하루씩 넘기며 찾지 않게) -->
+        <div class="friend-reserve-days" id="friendReserveDays" style="display:none;"></div>
         <div class="friend-cal-datenav" id="friendCalDateNav">
           <button type="button" id="friendCalDatePrevBtn">&#8249;</button>
           <span id="friendCalDateNavLabel">-</span>
@@ -7833,9 +7859,13 @@
       <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
       <p class="quick-avail-desc">고른 시간이 <b>앞으로 4주 동안</b> 예약 가능 시간으로 열려요. 지금 열려 있는 칸을 끄면 그 시간은 닫혀요.</p>
+      <!-- 누구에게 열지는 대부분 "모두"면 돼서 접어둠 - 처음 쓰는 사람에게 모두/친구만/업무용을 바로 고르게 하면 헷갈렸음 -->
       <div class="quick-avail-for">
-        <div class="avail-for-row" id="quickAvailForRow"></div>
-        <div class="avail-for-hint" id="quickAvailForHint"></div>
+        <button type="button" class="quick-avail-for-toggle" id="quickAvailForToggle"></button>
+        <div id="quickAvailForBody" style="display:none;">
+          <div class="avail-for-row" id="quickAvailForRow"></div>
+          <div class="avail-for-hint" id="quickAvailForHint"></div>
+        </div>
       </div>
       <div class="quick-avail-presets" id="quickAvailPresets"></div>
       <div class="quick-avail-grid" id="quickAvailGrid"></div>
@@ -8064,7 +8094,7 @@
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
         <div>
           <h2>채팅</h2>
-          <p class="desc">친구·모임과 나눈 대화가 여기 모여요. 약속도 채팅방에서 정해져요.</p>
+          <p class="desc">친구와 나눈 대화가 여기 모여요. 약속도 채팅방에서 정해져요.</p>
         </div>
         <div class="new-chat-wrap">
           <button class="icon-btn" id="newGroupBtn" title="새 채팅" aria-haspopup="true" aria-expanded="false">
@@ -8941,6 +8971,7 @@ function showAuthForm(formId){
   document.querySelector('.social-login-divider').style.display = isPasswordFlow ? 'none' : '';
   document.getElementById('kakaoLoginBtn').style.display = isPasswordFlow ? 'none' : '';
   document.getElementById('naverLoginBtn').style.display = isPasswordFlow ? 'none' : '';
+  document.getElementById('authSocialNote').style.display = isPasswordFlow ? 'none' : '';
   ['loginError', 'signupError', 'forgotPasswordError', 'resetPasswordError'].forEach(id => {
     document.getElementById(id).textContent = '';
   });
@@ -9037,6 +9068,10 @@ document.getElementById('loginSubmitBtn').addEventListener('click', async () => 
   }
 });
 
+document.querySelectorAll('.auth-agree-link').forEach(b => b.addEventListener('click', (e) => {
+  e.preventDefault(); // 라벨 안이라 누르면 체크박스까지 같이 바뀌는 걸 막음
+  openLegalPage(b.dataset.legal);
+}));
 document.getElementById('signupSubmitBtn').addEventListener('click', async () => {
   const btn = document.getElementById('signupSubmitBtn');
   const errorEl = document.getElementById('signupError');
@@ -9048,6 +9083,10 @@ document.getElementById('signupSubmitBtn').addEventListener('click', async () =>
   const password = document.getElementById('signupPassword').value;
 
   errorEl.textContent = '';
+  if(!document.getElementById('signupAgree').checked){
+    errorEl.textContent = '이용약관과 개인정보 처리방침에 동의해 주세요.';
+    return;
+  }
   btn.disabled = true;
   btn.textContent = '가입 중...';
   try {
@@ -9083,6 +9122,12 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   myProfileData.reviewAvatarUrl = user.reviewAvatarUrl || null;
 
   document.getElementById('authGateView').style.display = 'none';
+  // 로그인/앱 시작 직후 첫 화면은 홈(약속 중심) - 이게 없으면 예전 달력 화면이 먼저 보이고 아래 탭도 아무것도 선택 안 돼 있었음.
+  // 앱 시작 때는 이 함수가 showTab 정의보다 먼저 불려서, 스크립트가 다 읽힌 뒤에 실행되게 미룸
+  setTimeout(() => {
+    if(currentTopTab === null && document.getElementById('settingsView').style.display !== 'block'
+      && document.getElementById('myProfileView').style.display !== 'block') showTab(null);
+  }, 0);
 
   if(!skipSave){
     persistSession();
@@ -10049,10 +10094,24 @@ function renderHomePending(){
   const card = document.getElementById('homePendingCard');
   const listEl = document.getElementById('homePendingList');
   if(!card || !listEl) return;
-  const items = homePendingItems.filter(x => CHAT_ROOMS[x.roomId]);
+  // 받은 친구 요청도 같이 - 예전엔 아래 친구 탭 숫자로만 보여서 놓치기 쉬웠음
+  const friendReqs = (typeof INCOMING_FRIEND_REQUESTS !== 'undefined' ? INCOMING_FRIEND_REQUESTS : [])
+    .map(u => ({ kind: 'friendRequest', user: u }));
+  const items = friendReqs.concat(homePendingItems.filter(x => CHAT_ROOMS[x.roomId]));
   card.style.display = items.length ? '' : 'none';
   if(!items.length){ listEl.innerHTML = ''; return; }
   listEl.innerHTML = items.slice(0, 5).map((x, i) => {
+    if(x.kind === 'friendRequest'){
+      return `
+      <button type="button" class="home-pending-row" data-idx="${i}">
+        <span class="home-pending-dot"></span>
+        <span class="home-appt-info">
+          <div class="home-appt-name">${escapeHtml(x.user.name)}님이 친구 요청을 보냈어요</div>
+          <div class="home-appt-sub">@${escapeHtml(x.user.username)} · 수락하면 서로 시간을 보고 약속을 잡을 수 있어요</div>
+        </span>
+        <span class="home-pending-go">답하기 &rsaquo;</span>
+      </button>`;
+    }
     const room = CHAT_ROOMS[x.roomId];
     const who = (x.sender && x.sender.name) || room.name || '친구';
     const title = x.kind === 'reservation'
@@ -10075,6 +10134,7 @@ function renderHomePending(){
     btn.addEventListener('click', () => {
       const x = items[parseInt(btn.dataset.idx, 10)];
       if(!x) return;
+      if(x.kind === 'friendRequest'){ switchTopTab('friends'); return; }
       switchTopTab('chat');
       openChatRoom(x.roomId);
     });
@@ -11947,8 +12007,7 @@ function feedPostCardHtml(post){
       ${feedAuthorAvatarHtml(post.author)}
       <div class="feed-ig-author-name">${escapeHtml(feedAuthorDisplayName(post.author))}</div>
       ${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}
-      ${renderFirstReviewerBadgeHtml(post)}
-      ${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}
+      <!-- 목록에선 배지를 하나만 - 이름 옆에 배지가 3개씩 붙어 장소보다 배지가 먼저 보였음 (첫 리뷰어/맛집왕은 글 상세에서) -->
     </div>
     <div class="feed-ig-tag-row">
       <button type="button" class="feed-ig-place-tag">${ICO.pin} ${escapeHtml(post.title || '')}</button>
@@ -12587,7 +12646,7 @@ function renderFeedTagList(){
       row.innerHTML = `
         <div class="feed-tag-list-thumb">${cover ? `<img loading="lazy" src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
         <div class="feed-tag-list-body">
-          <div class="feed-tag-list-author">${escapeHtml(feedAuthorDisplayName(post.author))}${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}${renderFirstReviewerBadgeHtml(post)}${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}</div>
+          <div class="feed-tag-list-author">${escapeHtml(feedAuthorDisplayName(post.author))}${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}</div>
           ${typeof post.avgRating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.avgRating)} ${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</div>` : ''}
           <div class="feed-tag-list-note">${escapeHtml(post.note || '')}</div>
         </div>
@@ -15327,7 +15386,7 @@ function defaultUntilDateValue(){
 function renderEventAvailFor(){
   document.getElementById('eventAvailForRow').innerHTML = availForButtonsHtml(formAvailableFor);
   document.getElementById('eventAvailForHint').textContent = AVAILABLE_FOR_META[formAvailableFor].hint;
-  // "일만"은 친구에게 아예 안 보이니 친구 공개 설정은 의미가 없어서 숨김
+  // "업무용"은 친구에게 아예 안 보이니 친구 공개 설정은 의미가 없어서 숨김
   document.getElementById('visibilityPickerGroup').style.display = (formEventType === 'available' && formAvailableFor === 'work') ? 'none' : '';
 }
 document.getElementById('eventAvailForRow').addEventListener('click', (e) => {
@@ -16855,12 +16914,12 @@ function colorForScheduleText(text){
 const AVAILABLE_EVENT_COLOR = '#38BDF8';
 const APPOINTMENT_EVENT_COLOR = '#F43F5E';
 
-// 예약 가능 시간을 누구에게 열지 - 모두(앱 친구 + 일용 링크) / 친구만 / 일만(일용 링크로만)
+// 예약 가능 시간을 누구에게 열지 - 모두(앱 친구 + 업무용 링크) / 친구만 / 업무용(업무용 링크로만)
 // 캘린더에서 한눈에 구분되게 용도마다 색과 이름이 다름 (친구 화면엔 이름이 안 나가서 내 캘린더에서만 보임)
 const AVAILABLE_FOR_META = {
-  all:     { label: '모두',   title: '예약 가능',         color: AVAILABLE_EVENT_COLOR, hint: '친구도, 일용 링크를 받은 사람도 이 시간에 신청할 수 있어요.' },
-  friends: { label: '친구만', title: '👥 친구만 예약 가능', color: '#34D399', hint: '앱 친구만 신청할 수 있어요. 일용 링크에는 안 보여요.' },
-  work:    { label: '일만',   title: '💼 일만 예약 가능',   color: '#818CF8', hint: '일용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 일 때문에 열어둔 시간이라는 것도 드러나지 않아요.' },
+  all:     { label: '모두',   title: '예약 가능',         color: AVAILABLE_EVENT_COLOR, hint: '친구도, 업무용 링크를 받은 사람도 이 시간에 신청할 수 있어요.' },
+  friends: { label: '친구만', title: '👥 친구만 예약 가능', color: '#34D399', hint: '앱 친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
+  work:    { label: '업무용', title: '💼 업무용 예약 가능', color: '#818CF8', hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
 };
 function availableForOf(ev){ return (ev && AVAILABLE_FOR_META[ev.availableFor]) ? ev.availableFor : 'all'; }
 function availableTitleFor(f){ return (AVAILABLE_FOR_META[f] || AVAILABLE_FOR_META.all).title; }
@@ -18178,6 +18237,7 @@ function openFriendCalendar(friendId, mode){
   friendMonthFocusYear = TODAY.getFullYear();
   friendMonthFocusMonth = TODAY.getMonth() + 1;
   friendMonthSelectedDate = new Date(TODAY);
+  friendReserveOpenKeys = null;
 
   // 친구의 이전 조회 결과 캐시를 지워서, 캘린더를 열 때마다 항상 최신 데이터를 새로 받아오게 함
   // (친구가 방금 "예약 가능" 시간을 바꿨는데 예전 캐시 때문에 안 보이는 문제 방지)
@@ -18224,6 +18284,7 @@ async function jumpToFirstFriendOpenDay(friend){
   const endKey = toDateInputValue(end);
   const nowHour = new Date().getHours();
   let firstKey = null, loaded = false;
+  const openKeys = new Set();
   months.forEach(([y, m]) => {
     const data = friendMonthDataCache[`${friend.username}::${y}-${m}`];
     if(!data) return;
@@ -18232,10 +18293,13 @@ async function jumpToFirstFriendOpenDay(friend){
     (data.days || []).forEach(day => {
       if(day.date < startKey || day.date > endKey) return;
       const open = (day.bookable || []).some((b, i) => b && (day.date !== startKey || (hours[i] ?? 0) > nowHour));
+      if(open) openKeys.add(day.date);
       if(open && (!firstKey || day.date < firstKey)) firstKey = day.date;
     });
   });
   if(!loaded) return;
+  friendReserveOpenKeys = openKeys;
+  renderFriendReserveDays();
   if(!firstKey){
     showToast(`앞으로 2주 동안 ${friend.name}님이 열어둔 시간이 없어요.`);
     return;
@@ -18285,7 +18349,40 @@ function loadFriendScheduleForFocusWindow(){
 }
 
 // 날짜 이동 바(◀ 날짜 ▶ 오늘) 라벨 갱신 - 탭에 따라 하루/일주일 범위/이번달을 보여줌 (한달 탭은 이 바 대신 자체 월 네비게이션을 씀)
+let friendReserveOpenKeys = null;
+function renderFriendReserveDays(){
+  const el = document.getElementById('friendReserveDays');
+  if(friendCalendarMode !== 'reserve' || !friendReserveOpenKeys || !friendReserveOpenKeys.size){ el.style.display = 'none'; return; }
+  const activeSegBtn = document.querySelector('#friendCalendarSegment .segment-btn.active');
+  const dayView = !activeSegBtn || activeSegBtn.dataset.view === 'today';
+  const focusKey = toDateInputValue(friendDayFocusDate);
+  let html = '';
+  for(let i = 0; i < PLAN_LOOKAHEAD_DAYS; i++){
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() + i);
+    const key = toDateInputValue(d);
+    const open = friendReserveOpenKeys.has(key);
+    html += `<button type="button" class="frd-day${open ? ' open' : ''}${dayView && key === focusKey ? ' on' : ''}" data-key="${key}" ${open ? '' : 'disabled'}>`
+      + `<small>${i === 0 ? '오늘' : WEEKDAY_KO[d.getDay()]}</small><b>${d.getDate()}</b></button>`;
+  }
+  el.innerHTML = `<div class="frd-label">열린 날을 누르면 바로 그 날로 가요</div><div class="frd-row">${html}</div>`;
+  el.style.display = '';
+}
+document.getElementById('friendReserveDays').addEventListener('click', (e) => {
+  const b = e.target.closest('.frd-day.open');
+  if(!b) return;
+  friendDayFocusDate = parseDateInputValue(b.dataset.key);
+  friendWeekFocusDate = getWeekStart(friendDayFocusDate);
+  document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(x => x.classList.toggle('active', x.dataset.view === 'today'));
+  document.querySelectorAll('#friendCalendarView .friend-cal-view').forEach(v => v.classList.remove('active'));
+  document.getElementById('friendCalView-today').classList.add('active');
+  renderFriendCalDateNav();
+  renderFriendToday();
+  renderFriendWeek();
+  loadFriendScheduleForFocusWindow();
+});
 function renderFriendCalDateNav(){
+  renderFriendReserveDays();
   const activeSegBtn = document.querySelector('#friendCalendarSegment .segment-btn.active');
   const activeView = (activeSegBtn && activeSegBtn.dataset.view) || 'today';
   document.getElementById('friendCalDateNav').style.display = activeView === 'month' ? 'none' : '';
@@ -19430,11 +19527,41 @@ async function renderSearchResults(query){
       const row = document.createElement('div');
       row.className = 'search-result-row';
       row.style.cursor = 'pointer';
+      // 결과 줄에 바로 친구 요청 버튼 - 예전엔 이름을 눌러 프로필에 들어가야 요청 버튼이 보여서 못 찾는 사람이 많았음
+      const isFriend = FRIENDS.some(f => f.id === user.id);
+      const requested = OUTGOING_FRIEND_REQUESTS.some(f => f.id === user.id);
+      const incoming = INCOMING_FRIEND_REQUESTS.find(f => f.id === user.id);
+      const btnLabel = isFriend ? '친구' : requested ? '요청됨' : incoming ? '수락' : '친구 요청';
       row.innerHTML = `
         <div class="placeholder-avatar" style="background:${colorForFriendId(user.id)}">${escapeHtml(user.name[0])}</div>
         <div class="search-result-info"><b>${escapeHtml(user.name)}</b><span>@${escapeHtml(user.username)}</span></div>
+        <button type="button" class="search-add-btn" style="margin-left:auto;flex-shrink:0;" ${isFriend || requested ? 'disabled' : ''}>${btnLabel}</button>
       `;
       row.addEventListener('click', () => openPersonProfile(user, 'search'));
+      const addBtn = row.querySelector('.search-add-btn');
+      addBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if(addBtn.disabled) return;
+        addBtn.disabled = true;
+        try {
+          if(incoming){
+            await apiRequest(`/friends/requests/${incoming.requestId}/accept`, { method: 'POST' });
+            addBtn.textContent = '친구';
+            showToast(`${user.name}님과 친구가 됐어요!`);
+          } else {
+            await apiRequest('/friends/requests', { method: 'POST', body: JSON.stringify({ username: user.username }) });
+            addBtn.textContent = '요청됨';
+            showToast('친구 요청을 보냈어요.');
+          }
+          await loadFriendsFromServer();
+          renderIncomingFriendRequests();
+          updateFriendsNavBadge();
+          renderFriendsList();
+        } catch(err){
+          addBtn.disabled = false;
+          showToast(err.message);
+        }
+      });
       container.appendChild(row);
     });
   } catch(err){
@@ -22660,6 +22787,13 @@ function renderChatList(){
     return (b.lastActivity || 0) - (a.lastActivity || 0);
   });
 
+  // 채팅이 하나도 없을 때 텅 빈 화면 대신 뭘 하면 되는지 알려줌
+  if(!sortedEntries.length){
+    container.innerHTML = `<div class="search-empty" style="padding:28px 8px;text-align:center;line-height:1.6;">아직 채팅이 없어요.<br/>친구에게 약속을 신청하면 채팅방이 자동으로 생겨요.<br/><button type="button" class="search-add-btn" id="chatEmptyPlanBtn" style="margin-top:12px;">약속 잡기</button></div>`;
+    document.getElementById('chatEmptyPlanBtn').addEventListener('click', () => { if(authToken) openPlanStart(); });
+    return;
+  }
+
   sortedEntries.forEach(([id, room]) => {
     const last = room.messages[room.messages.length - 1];
     let previewText = '';
@@ -23696,6 +23830,15 @@ var chatRenderCount = 60; // 지금 화면에 그리는 최근 메시지 수 (�
 var chatHasMoreAbove = false;
 const CHAT_RENDER_STEP = 60;
 
+// 수락/거절 응답을 화면의 메시지에 반영. 버튼을 그린 뒤 채팅방 메시지를 서버에서 새로 받아오면(예: 홈 "답하기"로 들어온 직후)
+// 클릭한 m은 옛 객체라 그것만 바꾸면 카드가 계속 "요청됨"+수락/거절로 남았음 - 지금 목록에 있는 같은 메시지도 같이 바꿈
+function applyReservationUpdate(m, serverMsg){
+  const fresh = mapServerReservationMessage(serverMsg);
+  Object.assign(m, fresh);
+  const room = CHAT_ROOMS[activeChatRoomId];
+  const cur = room && (room.messages || []).find(x => x !== m && x._serverId && x._serverId === m._serverId);
+  if(cur) Object.assign(cur, fresh);
+}
 function renderChatMessages(){
   const room = CHAT_ROOMS[activeChatRoomId];
   const box = document.getElementById('chatMessages');
@@ -23786,7 +23929,7 @@ function renderChatMessages(){
           if(m._serverId){
             try {
               const data = await apiRequest(`/chats/messages/${m._serverId}/accept`, { method: 'POST' });
-              Object.assign(m, mapServerReservationMessage(data.message));
+              applyReservationUpdate(m, data.message);
               await loadPinsFromServer(activeChatRoomId, room);
               loadScheduleFromServer(); // 확정되면서 서버에서 정리된 "예약 가능" 등이 내 캘린더에도 바로 반영되게
               if(m.location) addHotplaceNoticeMessage(activeChatRoomId, m.location, m.locationLat, m.locationLon);
@@ -23826,7 +23969,7 @@ function renderChatMessages(){
           if(m._serverId){
             try {
               const data = await apiRequest(`/chats/messages/${m._serverId}/decline`, { method: 'POST' });
-              Object.assign(m, mapServerReservationMessage(data.message));
+              applyReservationUpdate(m, data.message);
               renderChatMessages();
               renderChatList();
             } catch(err){
@@ -26087,7 +26230,14 @@ let quickAvailFor = 'all'; // 빠르게 열기로 새로 여는 시간을 누구
 function renderQuickAvailFor(){
   document.getElementById('quickAvailForRow').innerHTML = availForButtonsHtml(quickAvailFor);
   document.getElementById('quickAvailForHint').textContent = AVAILABLE_FOR_META[quickAvailFor].hint;
+  const open = document.getElementById('quickAvailForBody').style.display !== 'none';
+  document.getElementById('quickAvailForToggle').innerHTML = `누구에게 열지: <b>${AVAILABLE_FOR_META[quickAvailFor].label}</b> <span>${open ? '접기' : '바꾸기 ›'}</span>`;
 }
+document.getElementById('quickAvailForToggle').addEventListener('click', () => {
+  const body = document.getElementById('quickAvailForBody');
+  body.style.display = body.style.display === 'none' ? '' : 'none';
+  renderQuickAvailFor();
+});
 document.getElementById('quickAvailForRow').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-avail-for]');
   if(!btn) return;
@@ -26096,6 +26246,8 @@ document.getElementById('quickAvailForRow').addEventListener('click', (e) => {
 });
 function openQuickAvail(){
   quickAvailCells.clear();
+  // 업무용/친구만을 골라둔 채로 다시 열면 펼쳐서 보여줌 (모두면 접어둠)
+  document.getElementById('quickAvailForBody').style.display = quickAvailFor === 'all' ? 'none' : '';
   renderQuickAvailFor();
   // 지금 열려 있는 칸을 켜진 채로 보여줌 - 여기서 끄면 닫히고, 켜면 열림
   quickAvailInitial = quickAvailCurrentPattern();
@@ -26305,7 +26457,8 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
   dismissView(closeQuickAvail);
   refreshActiveScheduleView();
   refreshHomeDashIfVisible();
-  showToast(`${openedDays.size}일에 예약 가능 시간을 열었어요.${closedMsg ? ' ' + closedMsg : ''}`);
+  // "27일에 열었어요"는 27일(날짜)처럼 읽혀서, 기간이 드러나게 바꿈
+  showToast(`앞으로 4주 동안 ${openedDays.size}일, 예약 가능 시간을 열었어요.${closedMsg ? ' ' + closedMsg : ''}`);
   // 한꺼번에 수십 개를 쏘지 않게 하나씩 순서대로 저장 (실패하면 syncEventCreateToServer가 알려줌)
   for(const ev of created){
     try { await syncEventCreateToServer(ev); } catch(e){}
@@ -27210,15 +27363,24 @@ async function renderPlanStartMethods(friendId){
     disabled: known && (mine === 0 || theirs === 0),
   };
   const link = { ...PLAN_LINK_OPTION };
-  let options;
-  if(known && theirs > 0 && mine > 0){ match.recommended = true; options = [match, reserve, link]; }
-  else if(known && theirs > 0){ reserve.recommended = true; options = [reserve, link, match]; }
-  else if(known){ link.recommended = true; options = [link, reserve, match]; }
+  // 지금 쓸 수 있는 방법만 보여줌 - 예전엔 안 되는 방법(회색)과 링크/내 시간 열기까지 4개가 한꺼번에 나와 헷갈렸음
+  let options, note = '';
+  if(known && theirs > 0 && mine > 0){ match.recommended = true; options = [match, reserve]; }
+  else if(known && theirs > 0){
+    // 친구가 열어둔 시간에 예약하는 것 하나뿐이면 고르게 하지 않고 바로 예약 화면으로
+    dismissView(closePlanStart);
+    calendarOpenedFromChat = planStartChatRoomId;
+    openFriendCalendar(friendId, 'reserve');
+    return;
+  }
+  else if(known){
+    note = `<div class="plan-empty">${name}님이 아직 예약 가능 시간을 안 열었어요.<br/>링크로 되는 시간을 물어보면 ${name}님이 골라줘요.</div>`;
+    link.recommended = true;
+    options = [link];
+  }
   else options = [reserve, match, link];
-  // 친구는 열었는데 나만 안 열었으면, 내 시간을 열어두면 "둘 다 되는 시간"도 쓸 수 있다고 알려줌
-  if(known && mine === 0) options.push({ id: 'mine', icon: 'mine', title: '내 예약 가능 시간 열어두기', desc: '열어두면 친구도 내 시간에 바로 예약할 수 있어요' });
 
-  body.innerHTML = options.map(planOptionHtml).join('') + `<button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 친구 고르기</button>`;
+  body.innerHTML = note + options.map(planOptionHtml).join('') + `<button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 친구 고르기</button>`;
   body.dataset.friendId = friendId;
 }
 document.getElementById('planStartBody').addEventListener('click', (e) => {
@@ -27306,7 +27468,7 @@ function openInviteCreate(fromList, opts = {}){
     calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
     calDates: new Set(),
     calError: '',
-    audience: 'friends', // 친구용(모두 + 친구만 시간) / 일용(모두 + 일만 시간)
+    audience: 'friends', // 친구용(모두 + 친구만 시간) / 업무용(모두 + 업무용 시간)
     place: opts.place || null, // 추천 게시물에서 "약속 장소로 선택"하고 들어오면 장소가 붙어있음
   };
   inviteState.fromList = !!fromList;
@@ -27555,16 +27717,18 @@ function renderInviteCreateHtml(){
       <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
     </div>`;
   const placeHtml = d.place ? `<div class="inv-section"><label class="inv-label">약속 장소</label>${invitePlaceHtml(d.place, true)}</div>` : '';
-  const audienceHtml = `
+  // 친구만/업무용으로 열어둔 시간이 하나도 없으면 친구용/업무용 링크 내용이 똑같아서 고르는 칸 자체를 안 보여줌
+  const hasSplitAvail = SCHEDULE_EVENTS.some(e => e.type === 'available' && availableForOf(e) !== 'all');
+  const audienceHtml = !hasSplitAvail ? '' : `
     <div class="inv-section">
       <label class="inv-label">누구에게 보낼 링크인가요?</label>
       <div class="inv-src-tabs" style="margin-bottom:6px;">
         <button type="button" data-act="aud" data-aud="friends" class="${d.audience === 'friends' ? 'on' : ''}">👥 친구용</button>
-        <button type="button" data-act="aud" data-aud="work" class="${d.audience === 'work' ? 'on' : ''}">💼 일용</button>
+        <button type="button" data-act="aud" data-aud="work" class="${d.audience === 'work' ? 'on' : ''}">💼 업무용</button>
       </div>
       <div class="avail-for-hint">${d.audience === 'work'
-        ? '"모두"와 "일만"으로 열어둔 시간이 담겨요. 친구만 열어둔 시간은 안 보여요.'
-        : '"모두"와 "친구만"으로 열어둔 시간이 담겨요. 일만 열어둔 시간은 안 보여요.'}</div>
+        ? '"모두"와 "업무용"으로 열어둔 시간이 담겨요. 친구만 열어둔 시간은 안 보여요.'
+        : '"모두"와 "친구만"으로 열어둔 시간이 담겨요. 업무용으로 열어둔 시간은 안 보여요.'}</div>
     </div>`;
   if(d.source === 'calendar') return placeHtml + tabs + audienceHtml + titleHtml + renderInviteCalendarPickHtml(d);
   return placeHtml + tabs + titleHtml + `
