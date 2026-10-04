@@ -5799,6 +5799,12 @@
   }
   .event-type-btn.active{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .event-type-btn.active[data-type="available"]{ border-color:#38BDF8; color:#38BDF8; background:rgba(56,189,248,0.12); }
+  /* 예약 가능 시간을 누구에게 열지 (모두 / 친구만 / 일만) - 색은 캘린더 블록 색과 같음 */
+  .avail-for-row{ display:flex; gap:6px; }
+  .avail-for-btn{ flex:1; padding:9px 0; border-radius:9px; border:1.5px solid var(--line); background:var(--surface); color:var(--text-dim); font-size:12.5px; font-weight:600; cursor:pointer; }
+  .avail-for-btn.active{ border-color:var(--af-color); color:var(--af-color); background:color-mix(in srgb, var(--af-color) 12%, transparent); }
+  .avail-for-hint{ margin-top:6px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
+  .quick-avail-for{ margin:0 0 12px; }
   .weekday-picker{
     display:flex;
     gap:5px;
@@ -7321,6 +7327,11 @@
 
       <div id="availableGridGroup" style="display:none;">
         <div class="mp-input-group">
+          <label>누구에게 열까요?</label>
+          <div class="avail-for-row" id="eventAvailForRow"></div>
+          <div class="avail-for-hint" id="eventAvailForHint"></div>
+        </div>
+        <div class="mp-input-group">
           <label>예약 가능 시간 선택 <span style="font-weight:400;color:var(--text-dim);">(탭하면 한 칸, 꾹 누른 채 밀면 여러 칸)</span></label>
           <div class="schedule-nav" style="margin-bottom:8px;">
             <button id="availWeekPrev" type="button">&#8249;</button>
@@ -7821,6 +7832,10 @@
       <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
       <p class="quick-avail-desc">고른 시간이 <b>앞으로 4주 동안</b> 예약 가능 시간으로 열려요. 지금 열려 있는 칸을 끄면 그 시간은 닫혀요.</p>
+      <div class="quick-avail-for">
+        <div class="avail-for-row" id="quickAvailForRow"></div>
+        <div class="avail-for-hint" id="quickAvailForHint"></div>
+      </div>
       <div class="quick-avail-presets" id="quickAvailPresets"></div>
       <div class="quick-avail-grid" id="quickAvailGrid"></div>
       <p class="quick-avail-hint">요일이나 시간대 이름을 누르면 한 줄을 통째로 고를 수 있어요. 이미 일정이 있는 시간은 빼고 열어요.</p>
@@ -14646,6 +14661,7 @@ function syncEventCreateToServer(ev){
       endTime: endTime.toISOString(),
       status: ev.type === 'available' ? 'AVAILABLE' : 'BUSY',
       eventType: ev.type,
+      availableFor: ev.type === 'available' ? availableForOf(ev) : undefined,
       visibility: ev.visibility,
       sourceChatRoomId: ev.sourceChatRoomId || undefined,
       color: ev.color || undefined,
@@ -14682,6 +14698,7 @@ function syncEventUpdateToServer(ev){
       endTime: endTime.toISOString(),
       status: ev.type === 'available' ? 'AVAILABLE' : 'BUSY',
       eventType: ev.type,
+      availableFor: ev.type === 'available' ? availableForOf(ev) : undefined,
       visibility: ev.visibility,
       color: ev.color || null,
       recurringWeekdays: recurringPayload ? recurringPayload.weekdays : [],
@@ -14750,6 +14767,7 @@ async function loadScheduleFromServer(){
         endMin: spansDays * 1440 + endD.getHours() * 60 + endD.getMinutes(),
         visibility: sev.visibility,
         type: sev.eventType,
+        availableFor: sev.availableFor || 'all',
         recurring,
         dateRange,
         dateKey: (isRecurring || dateRange) ? null : dateKeyOf(startD),
@@ -14847,9 +14865,9 @@ function restoreAvailabilityLocal(dateKey, startMin, endMin){
     // 한 번도 예약 가능으로 설정한 적 없는 시간에 예약 요청만 했다가 취소해도 "예약 가능"이 생겨버렸음)
     if(!left && !right) return;
     let mergedStart = seg.start, mergedEnd = seg.end;
-    let title = '예약 가능', visibility = { groupIds: [], private: false };
-    if(left){ mergedStart = left.startMin; title = left.title; visibility = left.visibility; }
-    if(right){ mergedEnd = right.endMin; title = right.title; visibility = right.visibility; }
+    let title = '예약 가능', visibility = { groupIds: [], private: false }, availableFor = 'all';
+    if(left){ mergedStart = left.startMin; title = left.title; visibility = left.visibility; availableFor = availableForOf(left); }
+    if(right){ mergedEnd = right.endMin; title = right.title; visibility = right.visibility; availableFor = availableForOf(right); }
     [left, right].forEach(adjEv => {
       if(!adjEv) return;
       const i = SCHEDULE_EVENTS.indexOf(adjEv);
@@ -14857,7 +14875,7 @@ function restoreAvailabilityLocal(dateKey, startMin, endMin){
       if(adjEv.serverId) syncEventDeleteToServer(adjEv);
     });
     createScheduleEvent({
-      title, startMin: mergedStart, endMin: mergedEnd, visibility,
+      title, startMin: mergedStart, endMin: mergedEnd, visibility, availableFor,
       recurringWeekdays: null, until: null, dateKey, dateRange: null, type: 'available',
     });
   });
@@ -14908,13 +14926,14 @@ function deleteScheduleEventAndLinked(ev){
   resyncAllScheduleEvents();
 }
 
-function createScheduleEvent({ title, startMin, endMin, visibility, recurringWeekdays, until, dateKey, dateRange, type, linkGroupId, color }){
+function createScheduleEvent({ title, startMin, endMin, visibility, recurringWeekdays, until, dateKey, dateRange, type, linkGroupId, color, availableFor }){
   const ev = {
     id: 'ev' + (scheduleEventIdCounter++),
     title, startMin, endMin,
     color: color || null,
     visibility,
     type: type || 'busy',
+    availableFor: availableFor || 'all',
     recurring: recurringWeekdays ? { weekdays: recurringWeekdays, until: until || null, exceptions: [] } : null,
     dateRange: (!recurringWeekdays && dateRange) ? dateRange : null,
     dateKey: (!recurringWeekdays && !dateRange) ? dateKey : null,
@@ -14930,6 +14949,7 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
 
 let formRepeatMode = 'once';
 let formEventType = 'busy';
+let formAvailableFor = 'all'; // 예약 가능 시간을 누구에게 열지 (모두/친구만/일만)
 let editingEventId = null;
 let absorbedAvailIds = []; // 예약 가능 수정 중 두 번 눌러서 이번 수정에 합친 다른 예약 가능 일정 id들
 let editingLinkedPieceIds = []; // 예전 방식(linkGroupId)으로 여러 날짜 조각으로 쪼개져 저장된 일정을 수정할 때,
@@ -15303,6 +15323,19 @@ function defaultUntilDateValue(){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+function renderEventAvailFor(){
+  document.getElementById('eventAvailForRow').innerHTML = availForButtonsHtml(formAvailableFor);
+  document.getElementById('eventAvailForHint').textContent = AVAILABLE_FOR_META[formAvailableFor].hint;
+  // "일만"은 친구에게 아예 안 보이니 친구 공개 설정은 의미가 없어서 숨김
+  document.getElementById('visibilityPickerGroup').style.display = (formEventType === 'available' && formAvailableFor === 'work') ? 'none' : '';
+}
+document.getElementById('eventAvailForRow').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-avail-for]');
+  if(!btn) return;
+  formAvailableFor = btn.dataset.availFor;
+  renderEventAvailFor();
+});
+
 function setEventTypeUI(type){
   formEventType = type;
   renderVisibilityHint();
@@ -15332,6 +15365,7 @@ function setEventTypeUI(type){
     renderAvailSelectGrid();
   }
 
+  renderEventAvailFor();
   if(type === 'available'){
     titleInput.value = '예약 가능';
     titleInput.disabled = true;
@@ -15357,6 +15391,7 @@ function openEventForm(existingEvent){
   updateRecurringDeleteUI();
   pushViewState(closeEventForm);
 
+  formAvailableFor = existingEvent ? availableForOf(existingEvent) : 'all';
   if(existingEvent){
     setEventTypeUI(existingEvent.type || 'busy');
     document.getElementById('eventFormTitle').value = existingEvent.title;
@@ -16158,11 +16193,12 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     availFineTuneBlocks.forEach(block => {
       const ev = {
         id: 'ev' + (scheduleEventIdCounter++),
-        title: '예약 가능',
+        title: availableTitleFor(formAvailableFor),
         startMin: block.startMin,
         endMin: block.endMin,
         visibility: { ...formVisibility },
         type: 'available',
+        availableFor: formAvailableFor,
         recurring: null,
         dateKey: block.dateKey,
       };
@@ -16804,6 +16840,8 @@ function getScheduleTextOrderIndex(text){
 // 일정마다 등장 순서에 따라 같은 색 계열에서 점점 어두워지는 단색을 배정
 function colorForScheduleText(text){
   if(text === '예약 가능') return '#38BDF8'; // 예약 가능 시간은 테마와 상관없이 항상 하늘색으로 고정
+  const afKey = Object.keys(AVAILABLE_FOR_META).find(k => AVAILABLE_FOR_META[k].title === text);
+  if(afKey) return AVAILABLE_FOR_META[afKey].color;
   if(scheduleColorOverrides[text]) return scheduleColorOverrides[text];
   const idx = getScheduleTextOrderIndex(text);
   const steps = 6; // 6단계로 밝기를 순환 (그 이후엔 다시 밝은 단계부터 반복)
@@ -16816,11 +16854,26 @@ function colorForScheduleText(text){
 const AVAILABLE_EVENT_COLOR = '#38BDF8';
 const APPOINTMENT_EVENT_COLOR = '#F43F5E';
 
+// 예약 가능 시간을 누구에게 열지 - 모두(앱 친구 + 일용 링크) / 친구만 / 일만(일용 링크로만)
+// 캘린더에서 한눈에 구분되게 용도마다 색과 이름이 다름 (친구 화면엔 이름이 안 나가서 내 캘린더에서만 보임)
+const AVAILABLE_FOR_META = {
+  all:     { label: '모두',   title: '예약 가능',         color: AVAILABLE_EVENT_COLOR, hint: '친구도, 일용 링크를 받은 사람도 이 시간에 신청할 수 있어요.' },
+  friends: { label: '친구만', title: '👥 친구만 예약 가능', color: '#34D399', hint: '앱 친구만 신청할 수 있어요. 일용 링크에는 안 보여요.' },
+  work:    { label: '일만',   title: '💼 일만 예약 가능',   color: '#818CF8', hint: '일용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 일 때문에 열어둔 시간이라는 것도 드러나지 않아요.' },
+};
+function availableForOf(ev){ return (ev && AVAILABLE_FOR_META[ev.availableFor]) ? ev.availableFor : 'all'; }
+function availableTitleFor(f){ return (AVAILABLE_FOR_META[f] || AVAILABLE_FOR_META.all).title; }
+function availForButtonsHtml(current){
+  return Object.keys(AVAILABLE_FOR_META).map(k =>
+    `<button type="button" class="avail-for-btn${k === current ? ' active' : ''}" data-avail-for="${k}" style="--af-color:${AVAILABLE_FOR_META[k].color}">${AVAILABLE_FOR_META[k].label}</button>`
+  ).join('');
+}
+
 // 일정 객체 기준 색 - 이 일정에 직접 고른 색이 있으면 그걸 쓰고, 없으면 종류별 기본색 / 일정 이름 기준 테마 색
 function colorForEvent(ev){
   if(ev && ev.color) return ev.color;
   if(ev && ev.isReservationLinked) return APPOINTMENT_EVENT_COLOR;
-  if(ev && ev.type === 'available') return AVAILABLE_EVENT_COLOR;
+  if(ev && ev.type === 'available') return AVAILABLE_FOR_META[availableForOf(ev)].color;
   return colorForScheduleText(ev ? ev.title : '');
 }
 
@@ -26025,8 +26078,20 @@ function closeQuickAvailKeys(removedKeys){
 }
 function quickPresetKeys(p){ return p.dows.flatMap(dow => p.bands.map(b => quickAvailKey(dow, b))); }
 
+let quickAvailFor = 'all'; // 빠르게 열기로 새로 여는 시간을 누구에게 열지
+function renderQuickAvailFor(){
+  document.getElementById('quickAvailForRow').innerHTML = availForButtonsHtml(quickAvailFor);
+  document.getElementById('quickAvailForHint').textContent = AVAILABLE_FOR_META[quickAvailFor].hint;
+}
+document.getElementById('quickAvailForRow').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-avail-for]');
+  if(!btn) return;
+  quickAvailFor = btn.dataset.availFor;
+  renderQuickAvailFor();
+});
 function openQuickAvail(){
   quickAvailCells.clear();
+  renderQuickAvailFor();
   // 지금 열려 있는 칸을 켜진 채로 보여줌 - 여기서 끄면 닫히고, 켜면 열림
   quickAvailInitial = quickAvailCurrentPattern();
   quickAvailInitial.forEach(k => quickAvailCells.add(k));
@@ -26204,11 +26269,12 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
       const dateKey = dateKeyOf(d);
       created.push({
         id: 'ev' + (scheduleEventIdCounter++),
-        title: '예약 가능',
+        title: availableTitleFor(quickAvailFor),
         startMin: r.s,
         endMin: r.e,
         visibility: { ...visibility },
         type: 'available',
+        availableFor: quickAvailFor,
         recurring: null,
         dateKey,
       });
@@ -27235,6 +27301,7 @@ function openInviteCreate(fromList, opts = {}){
     calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
     calDates: new Set(),
     calError: '',
+    audience: 'friends', // 친구용(모두 + 친구만 시간) / 일용(모두 + 일만 시간)
     place: opts.place || null, // 추천 게시물에서 "약속 장소로 선택"하고 들어오면 장소가 붙어있음
   };
   inviteState.fromList = !!fromList;
@@ -27247,7 +27314,7 @@ function openInviteCreate(fromList, opts = {}){
 async function loadInviteCalendarDays(){
   const d = inviteState.draft;
   try {
-    const data = await apiRequest('/invites/availability');
+    const data = await apiRequest(`/invites/availability?audience=${d.audience}`);
     if(inviteState.draft !== d) return;
     d.calDays = data.days || [];
     d.calDates = new Set(d.calDays.slice(0, 14).map(x => x.date));
@@ -27479,11 +27546,22 @@ function renderInviteCreateHtml(){
     </div>`;
   const titleHtml = `
     <div class="inv-section">
-      <label class="inv-label" for="invTitleInput">친구에게 보낼 말</label>
+      <label class="inv-label" for="invTitleInput">${d.source === 'calendar' && d.audience === 'work' ? '받는 분께 보낼 말' : '친구에게 보낼 말'}</label>
       <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
     </div>`;
   const placeHtml = d.place ? `<div class="inv-section"><label class="inv-label">약속 장소</label>${invitePlaceHtml(d.place, true)}</div>` : '';
-  if(d.source === 'calendar') return placeHtml + tabs + titleHtml + renderInviteCalendarPickHtml(d);
+  const audienceHtml = `
+    <div class="inv-section">
+      <label class="inv-label">누구에게 보낼 링크인가요?</label>
+      <div class="inv-src-tabs" style="margin-bottom:6px;">
+        <button type="button" data-act="aud" data-aud="friends" class="${d.audience === 'friends' ? 'on' : ''}">👥 친구용</button>
+        <button type="button" data-act="aud" data-aud="work" class="${d.audience === 'work' ? 'on' : ''}">💼 일용</button>
+      </div>
+      <div class="avail-for-hint">${d.audience === 'work'
+        ? '"모두"와 "일만"으로 열어둔 시간이 담겨요. 친구만 열어둔 시간은 안 보여요.'
+        : '"모두"와 "친구만"으로 열어둔 시간이 담겨요. 일만 열어둔 시간은 안 보여요.'}</div>
+    </div>`;
+  if(d.source === 'calendar') return placeHtml + tabs + audienceHtml + titleHtml + renderInviteCalendarPickHtml(d);
   return placeHtml + tabs + titleHtml + `
     <div class="inv-section">
       <label class="inv-label">날짜 <small>· 여러 개 고를 수 있어요 (최대 14일)</small></label>
@@ -27888,6 +27966,15 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
     st.draft.source = actEl.dataset.src;
     renderInviteOverlay();
   }
+  else if(act === 'aud' && st.draft && st.draft.audience !== actEl.dataset.aud){
+    // 링크 용도가 바뀌면 보여줄 예약 가능 시간도 달라지니 다시 불러옴
+    st.draft.audience = actEl.dataset.aud;
+    st.draft.calDays = null;
+    st.draft.calDates = new Set();
+    st.draft.calError = '';
+    renderInviteOverlay();
+    loadInviteCalendarDays();
+  }
   else if(act === 'calDay' && st.draft){
     const ymd = actEl.dataset.date;
     if(st.draft.calDates.has(ymd)) st.draft.calDates.delete(ymd);
@@ -27985,7 +28072,7 @@ async function createInviteFromDraft(){
       method: 'POST',
       body: JSON.stringify({
         ...(d.source === 'calendar'
-          ? { title, dates: [...d.calDates].sort(), fromCalendar: true }
+          ? { title, dates: [...d.calDates].sort(), fromCalendar: true, audience: d.audience }
           : { title, dates: [...d.dates].sort(), startHour: d.startHour, endHour: d.endHour }),
         ...(d.place ? { place: d.place } : {}),
       }),
