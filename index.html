@@ -14431,7 +14431,7 @@ function createPendingHoldLocal(dateObj, startMin, endMin, reservationMsgId, fri
     title: friendName ? `${friendName}님에게 예약 요청중` : '예약중...',
     startMin: newStartMin,
     endMin: newEndMin,
-    visibility: { groupIds: [], private: false },
+    visibility: { groupIds: [], private: true },
     type: 'busy',
     recurring: null,
     dateRange: null,
