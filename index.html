@@ -3899,6 +3899,7 @@
   .reservation-card-status.declined{ background:var(--mask); color:var(--text-dim); }
   .reservation-card-status.cancelled{ background:var(--mask); color:var(--cta); }
   .reservation-card-status.withdrawn{ background:var(--mask); color:var(--text-dim); }
+  .reservation-card-status.expired{ background:var(--mask); color:var(--text-dim); }
   .reservation-card-actions{
     display:flex;
     gap:8px;
@@ -14123,6 +14124,7 @@ function mapServerReservationMessage(m){
     locationLat: r.locationLat,
     locationLon: r.locationLon,
     status: RESERVATION_STATUS_MAP[r.status] || 'pending',
+    startMs: startD.getTime(), // 답 없이 시간이 지난 요청인지 확인용
     time: m.createdAt,
   };
 }
@@ -23618,8 +23620,10 @@ function renderChatMessages(){
     const metaHtml = buildMsgMetaHtml(m);
 
     if(m.type === 'reservation'){
-      const statusLabel = m.status === 'confirmed' ? '예약 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
-      const showActions = m.who === 'other' && m.status === 'pending';
+      // 답을 못 받은 채 약속 시간이 지난 요청은 수락/거절 버튼 대신 "시간이 지났어요"로 (서버도 지난 요청은 수락을 막음)
+      const expired = m.status === 'pending' && m.startMs && m.startMs < Date.now();
+      const statusLabel = expired ? '시간이 지났어요' : m.status === 'confirmed' ? '예약 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
+      const showActions = m.who === 'other' && m.status === 'pending' && !expired;
       const showWithdraw = m.who === 'me' && m.status === 'pending';
       const showConfirmedExtras = m.status === 'confirmed';
       const cardHtml = `
@@ -23628,7 +23632,7 @@ function renderChatMessages(){
           <div class="reservation-card-time chat-date-link">${m.dateLabel} ${m.timeLabel}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           <div class="reservation-card-note">${ICO.pin} ${m.location ? escapeHtml(m.location) : '장소 미정 (만나서 정해요)'}</div>
-          <div class="reservation-card-status ${m.status}">${statusLabel}</div>
+          <div class="reservation-card-status ${expired ? 'expired' : m.status}">${statusLabel}</div>
           ${showActions ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn decline">거절</button>
