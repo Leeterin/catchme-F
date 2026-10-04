@@ -14020,6 +14020,12 @@ const DAY_HOURS = Array.from({length:24}, (_,i) => i); // 00시 ~ 23시 (개인 
 // 날짜를 문자열 키로 바꿈. toDateInputValue()랑 반드시 똑같은 형식(YYYY-MM-DD, 월을 1부터 셈)이어야
 // parseDateInputValue()로 다시 파싱했을 때 한 달씩 밀리는 일이 없음 (실제로 이 불일치 때문에 버그가 있었음)
 function dateKeyOf(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+// 반복 일정 종료일(recurring.until)은 "YYYY-MM-DD" 문자열로 통일 - 예전에 폼에서 만든 건 Date 객체였고 서버에서 불러온 건 문자열이라
+// 섞여 있었음(반복 일정 저장 실패/날짜 계산 오류의 원인). 혹시 남아 있는 Date도 여기서 문자열로 맞춰서 씀
+function recurringUntilKey(u){
+  if(!u) return null;
+  return typeof u === 'string' ? u : dateKeyOf(new Date(u));
+}
 
 function hashString(str){
   let h = 0;
@@ -14350,7 +14356,7 @@ function splitAbsoluteEndMin(baseDateKey, absEndMin){
 function eventAppliesToDate(ev, dNum, dow, key){
   if(ev.recurring){
     return ev.recurring.weekdays.includes(dow)
-      && (!ev.recurring.until || dNum <= dateKeyNum(ev.recurring.until))
+      && (!ev.recurring.until || key <= recurringUntilKey(ev.recurring.until))
       && !(ev.recurring.exceptions && ev.recurring.exceptions.includes(key));
   }
   if(ev.dateRange){
@@ -14674,7 +14680,7 @@ function getEffectiveSingleDayKey(ev){
 // 서버에는 "매주 반복" 개념만 있으므로, 여러 날짜에 걸친 "기간지정" 일정은 "매일 반복 + 종료일=기간 끝"으로 인코딩해서 보냄
 // (하루짜리 기간지정은 그냥 일반 단일 일정으로 취급 - 굳이 반복으로 encoding할 필요 없음)
 function getRecurringSyncPayload(ev){
-  if(ev.recurring) return { weekdays: ev.recurring.weekdays, until: ev.recurring.until, exceptions: ev.recurring.exceptions || [] };
+  if(ev.recurring) return { weekdays: ev.recurring.weekdays, until: recurringUntilKey(ev.recurring.until), exceptions: ev.recurring.exceptions || [] };
   if(ev.dateRange && dateKeyOf(ev.dateRange.start) !== dateKeyOf(ev.dateRange.end)){
     return { weekdays: [0,1,2,3,4,5,6], until: dateKeyOf(ev.dateRange.end), exceptions: [] };
   }
@@ -15480,7 +15486,7 @@ function openEventForm(existingEvent){
       if(on) formSelectedWeekdays.add(parseInt(b.dataset.dow, 10));
     });
     document.getElementById('eventFormUntil').value = (existingEvent.recurring && existingEvent.recurring.until)
-      ? `${existingEvent.recurring.until.getFullYear()}-${String(existingEvent.recurring.until.getMonth()+1).padStart(2,'0')}-${String(existingEvent.recurring.until.getDate()).padStart(2,'0')}`
+      ? recurringUntilKey(existingEvent.recurring.until)
       : defaultUntilDateValue();
 
     formVisibility = {
@@ -16300,8 +16306,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   if(formRepeatMode === 'weekly'){
     const untilStr = document.getElementById('eventFormUntil').value;
     if(!untilStr){ showToast('반복 종료일을 선택해주세요.'); return; }
-    const [uy, um, ud] = untilStr.split('-').map(Number);
-    until = new Date(uy, um - 1, ud);
+    until = untilStr; // "YYYY-MM-DD" 그대로 (서버에서 불러온 반복 일정과 같은 형식)
   }
 
   // 이 일정이 적용될 날짜(들)와, 그 날짜의 실제 시간 범위를 구함(여러 날짜에 걸치는 일정은 날짜별로 범위가 다름:
@@ -17129,6 +17134,7 @@ function renderWeekView(){
           actions.querySelector('.week-cal-block-edit').addEventListener('click', (e) => {
             e.stopPropagation();
             block.classList.remove('show-actions');
+            scheduleFocusDate = new Date(d); // "이 날만 삭제"가 이 블록의 날짜를 지우도록 (위 한달 보기와 같은 이유)
             openEventForm(matchedEv);
           });
           // 휴지통은 dblclick으로만 삭제되는데, 첫 번째 클릭이 그대로 block으로 버블링되면
@@ -17409,6 +17415,8 @@ function renderMonthSelectedPanel(){
       e.stopPropagation();
       const evId = btn.closest('.month-selected-row').dataset.ev;
       const ev = SCHEDULE_EVENTS.find(x => x.id === evId);
+      // 폼의 "이 날만 삭제"는 scheduleFocusDate 기준이라, 지금 고른 날짜로 맞춰둠 (안 맞추면 반복 일정의 엉뚱한 날(예: 오늘)이 지워졌음)
+      scheduleFocusDate = new Date(monthSelectedDate);
       if(ev) openEventForm(ev);
     });
   });
@@ -26292,7 +26300,7 @@ function futureAvailableEvents(){
   const todayKey = dateKeyOf(TODAY);
   return SCHEDULE_EVENTS.filter(ev => {
     if(ev.type !== 'available') return false;
-    if(ev.recurring) return !ev.recurring.until || ev.recurring.until >= todayKey;
+    if(ev.recurring) return !ev.recurring.until || recurringUntilKey(ev.recurring.until) >= todayKey;
     if(ev.dateRange) return dateKeyOf(ev.dateRange.end) >= todayKey;
     return ev.dateKey && ev.dateKey >= todayKey;
   });
