@@ -5073,6 +5073,9 @@
   }
   .mini-confirm-btn:hover{ background:var(--mask); }
   .mini-confirm-btn.danger{ color:var(--cta); }
+  /* 다음으로 진행하는 주 버튼 - 회색 보조 버튼(취소)과 확실히 구분되게 채워진 강조색 */
+  .mini-confirm-btn.primary{ background:var(--accent); color:#FFFFFF; }
+  .mini-confirm-btn.primary:hover{ background:var(--accent); opacity:0.9; }
 
   /* ---------------- 약속 잡기 - 방법 고르기 / 친구 고르기 ---------------- */
   .plan-start-card{ max-width:360px; }
@@ -7790,7 +7793,7 @@
             <button type="button" id="locationClearBtn" title="다시 검색">✕</button>
           </div>
         </div>
-        <button class="profile-chat-btn" id="friendReserveSubmitBtn">예약 요청 보내기</button>
+        <button class="profile-chat-btn" id="friendReserveSubmitBtn">약속 요청 보내기</button>
       </div>
     </div>
 
@@ -7878,7 +7881,7 @@
 
   <div class="mini-confirm-overlay" id="reservationCancelConfirmOverlay">
     <div class="mini-confirm-card">
-      <div class="mini-confirm-title" id="reservationCancelConfirmTitle">예약을 취소하시겠습니까?</div>
+      <div class="mini-confirm-title" id="reservationCancelConfirmTitle">약속을 취소할까요?</div>
       <div class="mini-confirm-actions">
         <button type="button" id="reservationCancelConfirmKeepBtn" class="mini-confirm-btn">예약 가능 일정 남겨두기</button>
         <button type="button" id="reservationCancelConfirmDeleteBtn" class="mini-confirm-btn danger">그냥 삭제하기</button>
@@ -7892,7 +7895,7 @@
        전까지는(바깥을 눌러도 안 닫히고) 방에 다시 들어올 때마다 계속 뜸 -->
   <div class="mini-confirm-overlay" id="restoreAvailPromptOverlay">
     <div class="mini-confirm-card">
-      <div class="mini-confirm-title" id="restoreAvailPromptTitle">예약이 취소됐어요</div>
+      <div class="mini-confirm-title" id="restoreAvailPromptTitle">약속이 취소됐어요</div>
       <div class="mini-confirm-actions">
         <button type="button" id="restoreAvailPromptKeepBtn" class="mini-confirm-btn">예약 가능으로 남기기</button>
         <button type="button" id="restoreAvailPromptNoBtn" class="mini-confirm-btn danger">괜찮아요</button>
@@ -7951,8 +7954,8 @@
         <label class="report-reason-row"><input type="radio" name="recommendMode" value="CONSIDERATE" /> 먼 사람 배려 (최장 시간 최소화)</label>
       </div>
       <div class="mini-confirm-actions">
-        <button type="button" id="recommendModeCancelBtn" class="mini-confirm-btn danger">취소</button>
-        <button type="button" id="recommendModeNextBtn" class="mini-confirm-btn">다음</button>
+        <button type="button" id="recommendModeNextBtn" class="mini-confirm-btn primary">다음</button>
+        <button type="button" id="recommendModeCancelBtn" class="mini-confirm-btn">취소</button>
       </div>
     </div>
   </div>
@@ -8133,7 +8136,7 @@
             </div>
             <div class="chat-extra-option" id="extraReserveOption" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
-              <span>열어둔 시간에 예약하기</span>
+              <span>열어둔 시간에 약속 잡기</span>
             </div>
             <div class="chat-extra-option" id="extraRecommendLocationOption" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
@@ -9312,8 +9315,8 @@ function connectRealtimeSocket(){
         addIncomingMessageUnread(roomId);
         if(settingsState.notif_message && !room.muted){
           showToast(mapped.status === 'cancelled'
-            ? `${room.name}: ${mapped.dateLabel} ${mapped.timeLabel} 예약이 취소됐어요`
-            : `${room.name}: 예약 관련 알림이 있어요`);
+            ? `${room.name}: ${mapped.dateLabel} ${mapped.timeLabel} 약속이 취소됐어요`
+            : `${room.name}: 약속 관련 알림이 있어요`);
         }
       }
       renderChatList();
@@ -9989,7 +9992,7 @@ function homeOnboardingSteps(){
     },
     {
       id: 'plan', title: '첫 약속 잡기',
-      desc: '친구가 열어둔 시간에 예약하거나, 링크로 되는 시간을 물어봐요',
+      desc: '친구가 열어둔 시간에 약속을 요청하거나, 링크로 되는 시간을 물어봐요',
       done: Object.values(CHAT_ROOMS).some(r => (r.pinnedSchedules || []).some(p => p.dateLabel)),
     },
   ];
@@ -10056,10 +10059,10 @@ function renderHomeAvailCard(){
   const onboardingShown = !!document.querySelector('#homeOnboarding .onboarding-card');
   status.classList.toggle('warn', n === 0 && !onboardingShown);
   status.textContent = n > 0
-    ? `앞으로 2주 중 ${n}일 열려 있어요. 친구는 이 시간에 나에게 예약할 수 있어요.`
+    ? `앞으로 2주 중 ${n}일 열려 있어요. 친구는 이 시간에 나에게 약속을 요청할 수 있어요.`
     : onboardingShown
-      ? '아직 열어둔 시간이 없어요. 열어두면 친구가 이 시간에 예약할 수 있어요.'
-      : '열어둔 시간이 없어서 친구가 나에게 예약할 수 없어요.';
+      ? '아직 열어둔 시간이 없어요. 열어두면 친구가 이 시간에 약속을 요청할 수 있어요.'
+      : '열어둔 시간이 없어서 친구가 나에게 약속을 요청할 수 없어요.';
 }
 document.getElementById('homeAvailQuickBtn').addEventListener('click', () => openQuickAvail());
 document.getElementById('homeAvailCalBtn').addEventListener('click', () => switchTopTab('schedule'));
@@ -10115,7 +10118,7 @@ function renderHomePending(){
     const room = CHAT_ROOMS[x.roomId];
     const who = (x.sender && x.sender.name) || room.name || '친구';
     const title = x.kind === 'reservation'
-      ? `${escapeHtml(who)}님이 예약을 요청했어요`
+      ? `${escapeHtml(who)}님이 약속을 요청했어요`
       : `${escapeHtml(room.isGroup ? room.name : who)}${room.isGroup ? '에' : '님이'} 시간 후보 ${x.optionCount || ''}개${room.isGroup ? '가 올라왔어요' : '를 보냈어요'}`;
     const sub = x.kind === 'reservation'
       ? `${homePendingWhen(x.start, x.end)} · 수락하거나 거절해 주세요`
@@ -10619,7 +10622,7 @@ function openSettingsDetail(id){
         <div><b>전체 공개</b> · 모든 친구에게 제목까지 보여요</div>
         <div><b>친구 그룹</b> · 고른 그룹의 친구에게만 제목이 보여요</div>
         <div><b>나만 보기</b> · 친구에게는 제목 없이 '일정 있음'으로만 보여요</div>
-        <div class="privacy-rules-note">어떤 설정이든 그 시간이 비어 있는 것처럼 보이지는 않아서, 친구가 겹치는 시간에 예약할 수 없어요. 친구가 예약할 수 있는 건 내가 연 '예약 가능 시간'뿐이에요.</div>
+        <div class="privacy-rules-note">어떤 설정이든 그 시간이 비어 있는 것처럼 보이지는 않아서, 친구가 겹치는 시간에 약속을 요청할 수 없어요. 친구가 약속을 요청할 수 있는 건 내가 연 '예약 가능 시간'뿐이에요.</div>
       </div>
       ${toggleRowHTML('priv_stranger_chat', '친구가 아닌 사람의 채팅 요청 허용', '끄면 친구만 나에게 새 채팅을 걸 수 있어요', false)}
     `;
@@ -13543,7 +13546,7 @@ const myProfileData = {
   phone: '010-1234-5678',
   email: 'me@catchme.com',
   phonePublic: false,
-  emailPublic: true,
+  emailPublic: false,
   profileImageUrl: null,
   reviewNickname: '', // 리뷰용(커뮤니티) 프로필 닉네임 - 실명으로 리뷰 달기 창피할 때 대신 쓰는 이름. 비어있으면 실명을 씀
   reviewAvatarUrl: null, // 리뷰용 프로필 사진 - 비어있으면 실명 프로필 사진을 그대로 씀
@@ -14880,7 +14883,7 @@ function createPendingHoldLocal(dateObj, startMin, endMin, reservationMsgId, fri
 
   const ev = {
     id: 'ev' + (scheduleEventIdCounter++),
-    title: friendName ? `${friendName}님에게 예약 요청중` : '예약중...',
+    title: friendName ? `${friendName}님에게 약속 요청중` : '약속 요청중...',
     startMin: newStartMin,
     endMin: newEndMin,
     visibility: { groupIds: [], private: true },
@@ -15159,9 +15162,9 @@ function renderVisibilityHint(){
   const isPrivate = !!(formVisibility && formVisibility.private);
   const hasGroups = !isPrivate && formVisibility && (formVisibility.groupIds || []).length > 0;
   if(formEventType === 'available'){
-    el.textContent = isPrivate ? '친구에게 보이지 않아서 이 시간엔 예약을 받을 수 없어요.'
-      : hasGroups ? '고른 친구 그룹의 친구만 이 시간에 예약할 수 있어요.'
-      : '모든 친구가 이 시간에 예약할 수 있어요.';
+    el.textContent = isPrivate ? '친구에게 보이지 않아서 이 시간엔 약속 요청을 받을 수 없어요.'
+      : hasGroups ? '고른 친구 그룹의 친구만 이 시간에 약속을 요청할 수 있어요.'
+      : '모든 친구가 이 시간에 약속을 요청할 수 있어요.';
   } else {
     el.textContent = isPrivate ? "친구에게는 제목 없이 '일정 있음'으로만 보여요."
       : hasGroups ? "고른 친구 그룹의 친구에게만 제목까지 보이고, 다른 친구에게는 '일정 있음'으로만 보여요."
@@ -17366,7 +17369,9 @@ function renderMonthSchedView(){
     // 같은 일정은 위의 레인 배정 덕분에 그 주 안에서 같은 줄에 나와서, 칸이 나뉘어도 이어지는 게 보임
     const labelsHtml = shownEvents.map(ev => {
       const bg = ev.isPendingHold ? '#F59E0B' : colorForEvent(ev);
-      return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(ev.title))}</div>`;
+      // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 "가능"으로 짧게 보여줌 (색으로 구분됨)
+      const label = ev.type === 'available' ? '가능' : ev.title;
+      return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
     const moreHtml = events.length > shownEvents.length
       ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
@@ -18244,7 +18249,7 @@ function openFriendCalendar(friendId, mode){
   clearFriendScheduleCache(friend);
 
   document.getElementById('friendCalendarTitle').textContent = friendCalendarMode === 'reserve'
-    ? `${friend.name}님에게 예약하기`
+    ? `${friend.name}님과 약속 잡기`
     : `${friend.name}님의 캘린더`;
   document.getElementById('friendCalendarBackBtn').style.display = '';
   document.getElementById('friendCalendarTitle').style.display = '';
@@ -18319,8 +18324,8 @@ function renderFriendCalPrivacyNote(){
   const note = document.getElementById('friendCalPrivacyNote');
   const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
   note.innerHTML = friendCalendarMode === 'reserve'
-    ? `${icon} 예약 가능한 시간만 모아서 보여줘요. 원하는 시간을 누르면 예약 요청을 보낼 수 있어요.`
-    : `${icon} 나에게 "친구"로 공개해둔 일정만 내용이 보여요. 가능한 시간을 누르면 예약할 수 있어요.`;
+    ? `${icon} 예약 가능한 시간만 모아서 보여줘요. 원하는 시간을 누르면 약속 요청을 보낼 수 있어요.`
+    : `${icon} 나에게 "친구"로 공개해둔 일정만 내용이 보여요. 가능한 시간을 누르면 약속을 요청할 수 있어요.`;
 }
 
 // 지금 활성화된 뷰(하루/일주일/한달)가 보여줄 범위만큼 서버에서 실제 데이터를 불러옴 - 서로 독립적으로 로드됨
@@ -18758,7 +18763,7 @@ function renderFriendMonthView(){
           return (h + 1) * 60 > nowMin;
         });
       }
-      if(hasBookable) markupExtra = `<div class="month-event-label" style="background:var(--accent);color:#fff;">예약 가능</div>`;
+      if(hasBookable) markupExtra = `<div class="month-event-label" style="background:var(--accent);color:#fff;">가능</div>`; // 칸이 좁아 "예약 가능"은 잘림
     } else {
       const busyCount = dayInfo.busy.filter(Boolean).length;
       const titledHours = dayInfo.titles.filter(Boolean);
@@ -18930,7 +18935,7 @@ function openFriendReserve(dateObj, hour){
   // 예약 요청 시간은 분 단위까지 고를 수 있어야 해서, 창(window) 경계도 분 단위로 들고 있음(시간 경계를 *60한 것 뿐)
   friendReserveContext = { date: dateObj, friendId: friend.id, windowStartMin: windowStartHour * 60, windowEndMin: windowEndHour * 60 };
 
-  document.getElementById('friendReserveTitle').textContent = `${friend.name}님에게 예약 요청`;
+  document.getElementById('friendReserveTitle').textContent = `${friend.name}님에게 약속 요청`;
   document.getElementById('friendReserveDateLabel').textContent =
     `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 ${WEEKDAY_KO[dateObj.getDay()]}요일`;
   // "연속으로 비어있는 만큼만 선택 가능" 대신 실제로 고를 수 있는 범위를 시간으로 보여줌
@@ -19193,7 +19198,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   if(myOverlap){
     const myOverlapDisp = getEventDisplayRangeForDate(myOverlap, date);
     openScheduleOverlapConfirm(
-      `이 날 ${minutesToLabel(myOverlapDisp.startMin)}-${minutesToLabel(myOverlapDisp.endMin)}에 이미 "${myOverlap.title}" 일정이 있어요. 그래도 예약을 요청할까요?`,
+      `이 날 ${minutesToLabel(myOverlapDisp.startMin)}-${minutesToLabel(myOverlapDisp.endMin)}에 이미 "${myOverlap.title}" 일정이 있어요. 그래도 약속을 요청할까요?`,
       proceedReservationSubmit
     );
     return;
@@ -19241,7 +19246,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
       document.getElementById('friendsListView').classList.add('active');
       showTab('chat');
       openChatRoom(roomId);
-      showToast('예약 요청을 보냈어요.');
+      showToast('약속 요청을 보냈어요.');
     } catch(err){
       showToast(err.message);
     } finally {
@@ -19290,7 +19295,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   document.getElementById('friendsListView').classList.add('active');
   showTab('chat');
   openChatRoom(roomId);
-  showToast('예약 요청을 보냈어요.');
+  showToast('약속 요청을 보냈어요.');
   submitBtn.disabled = false;
   } // proceedReservationSubmit 끝
 });
@@ -21162,7 +21167,7 @@ function withdrawReservation(m){
         loadScheduleFromServer(); // 서버에서 정리된 "예약중..." 홀드를 내 캘린더에도 바로 반영
         renderChatMessages();
         renderChatList();
-        showToast('예약 요청을 취소했어요.');
+        showToast('약속 요청을 취소했어요.');
       })
       .catch(err => showToast(err.message));
     return;
@@ -21174,7 +21179,7 @@ function withdrawReservation(m){
   refreshActiveScheduleView();
   renderChatMessages();
   renderChatList();
-  showToast('예약 요청을 취소했어요.');
+  showToast('약속 요청을 취소했어요.');
 }
 
 function cancelReservation(m, restoreAvailability){
@@ -21190,7 +21195,7 @@ function cancelReservation(m, restoreAvailability){
         loadScheduleFromServer(); // 취소되면서 서버에서 지워진 "약속" 일정을 내 캘린더에도 바로 반영
         renderChatMessages();
         renderChatList();
-        showToast('예약을 취소했어요.');
+        showToast('약속을 취소했어요.');
       })
       .catch(err => showToast(err.message));
     return;
@@ -21211,7 +21216,7 @@ function cancelReservation(m, restoreAvailability){
     type: 'system-notice',
     id: 'sys' + (locationMsgIdCounter++),
     icon: 'x',
-    text: `예약이 취소됐어요 (${m.dateLabel} ${m.timeLabel})`,
+    text: `약속이 취소됐어요 (${m.dateLabel} ${m.timeLabel})`,
     time: new Date(),
   });
 
@@ -21219,7 +21224,7 @@ function cancelReservation(m, restoreAvailability){
   renderChatMessages();
   renderPinnedSchedule();
   renderChatList();
-  showToast('예약을 취소했어요.');
+  showToast('약속을 취소했어요.');
 }
 
 // 그룹 투표로 확정된 시간을 취소
@@ -21545,7 +21550,7 @@ document.addEventListener('click', (e) => {
 
 function openCancelConfirm(action, title){
   pendingCancelAction = action;
-  document.getElementById('reservationCancelConfirmTitle').textContent = title || '예약을 취소하시겠습니까?';
+  document.getElementById('reservationCancelConfirmTitle').textContent = title || '약속을 취소할까요?';
   document.getElementById('reservationCancelConfirmOverlay').classList.add('show');
 }
 function closeReservationCancelConfirm(){
@@ -21602,7 +21607,7 @@ function checkPendingRestoreAvailPrompts(roomId){
   pendingRestoreAvailMessage = m;
   pendingRestoreAvailRoomId = roomId;
   restoreAvailPromptShowing = true;
-  document.getElementById('restoreAvailPromptTitle').textContent = `${m.dateLabel} ${m.timeLabel}까지 예약이 취소됐어요. 이 시간을 예약 가능으로 남겨두시겠어요?`;
+  document.getElementById('restoreAvailPromptTitle').textContent = `${m.dateLabel} ${m.timeLabel}까지 약속이 취소됐어요. 이 시간을 예약 가능으로 남겨두시겠어요?`;
   document.getElementById('restoreAvailPromptOverlay').classList.add('show');
 }
 function closeRestoreAvailPrompt(){
@@ -22801,8 +22806,8 @@ function renderChatList(){
     try {
     if(last){
       if(last.type === 'reservation'){
-        const statusLabel = last.status === 'confirmed' ? '예약 확정됨' : (last.status === 'declined' ? '거절됨' : (last.status === 'cancelled' ? '취소됨' : (last.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
-        previewText = `${ICO.calendar} 예약 요청 (${statusLabel})`;
+        const statusLabel = last.status === 'confirmed' ? '약속 확정됨' : (last.status === 'declined' ? '거절됨' : (last.status === 'cancelled' ? '취소됨' : (last.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
+        previewText = `${ICO.calendar} 약속 요청 (${statusLabel})`;
       } else if(last.type === 'location-suggest'){
         const statusLabel = last.status === 'confirmed' ? '장소로 확정됨' : (last.status === 'cancelled' ? '제안 취소됨' : '제안됨');
         previewText = `${ICO.pin} 장소 제안 - ${escapeHtml(last.place)} (${statusLabel})`;
@@ -23894,13 +23899,13 @@ function renderChatMessages(){
     if(m.type === 'reservation'){
       // 답을 못 받은 채 약속 시간이 지난 요청은 수락/거절 버튼 대신 "시간이 지났어요"로 (서버도 지난 요청은 수락을 막음)
       const expired = m.status === 'pending' && m.startMs && m.startMs < Date.now();
-      const statusLabel = expired ? '시간이 지났어요' : m.status === 'confirmed' ? '예약 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
+      const statusLabel = expired ? '시간이 지났어요' : m.status === 'confirmed' ? '약속 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
       const showActions = m.who === 'other' && m.status === 'pending' && !expired;
       const showWithdraw = m.who === 'me' && m.status === 'pending';
       const showConfirmedExtras = m.status === 'confirmed';
       const cardHtml = `
         <div class="reservation-card">
-          <div class="reservation-card-header">${ICO.calendar} 예약 요청</div>
+          <div class="reservation-card-header">${ICO.calendar} 약속 요청</div>
           <div class="reservation-card-time chat-date-link">${m.dateLabel} ${m.timeLabel}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           <div class="reservation-card-note">${ICO.pin} ${m.location ? escapeHtml(m.location) : '장소 미정 (만나서 정해요)'}</div>
@@ -23916,7 +23921,7 @@ function renderChatMessages(){
             </div>` : ''}
           ${showConfirmedExtras ? `
             <div class="reservation-card-actions">
-              <button class="reservation-btn cancel">예약 취소</button>
+              <button class="reservation-btn cancel">약속 취소</button>
             </div>` : ''}
         </div>
       `;
@@ -24458,7 +24463,7 @@ let replyingToMsg = null; // { msgId, preview }
 
 function getMsgPreviewText(m){
   if(!m) return '';
-  if(m.type === 'reservation') return '예약 요청';
+  if(m.type === 'reservation') return '약속 요청';
   if(m.type === 'location-suggest') return '장소 제안';
   if(m.type === 'location-fixed') return '장소 확정';
   if(m.type === 'location-recommend') return m.status === 'COMPLETED' ? '모임 장소 추천 결과' : (m.status === 'CANCELLED' ? '모임 장소 추천이 취소됐어요' : '모임 장소 추천 - 출발지를 입력해주세요');
@@ -25627,7 +25632,7 @@ document.getElementById('extraReserveOption').addEventListener('click', (e) => {
     ? activeChatRoomId.replace('dm-', '')
     : (FRIENDS.find(f => f.username === room.counterpartUsername) || {}).id;
   if(!friendId || !FRIENDS.some(f => f.id === friendId)){
-    showToast('친구로 추가된 사람만 예약할 수 있어요.');
+    showToast('친구로 추가된 사람만 약속을 요청할 수 있어요.');
     return;
   }
   calendarOpenedFromChat = activeChatRoomId;
@@ -26368,7 +26373,7 @@ document.getElementById('quickAvailCloseAllBtn').addEventListener('click', async
   const hasRecurring = targets.some(ev => ev.recurring || ev.dateRange);
   const ok = await appConfirm({
     title: '열어둔 시간 모두 닫기',
-    html: `앞으로 열어둔 예약 가능 시간 <b>${targets.length}개</b>를 모두 닫을까요?<br/>친구가 더 이상 나에게 예약할 수 없게 돼요.${hasRecurring ? '<br/>반복으로 열어둔 시간도 함께 지워져요.' : ''}<br/><small>일반 일정과 이미 잡힌 약속은 그대로예요.</small>`,
+    html: `앞으로 열어둔 예약 가능 시간 <b>${targets.length}개</b>를 모두 닫을까요?<br/>친구가 더 이상 나에게 약속을 요청할 수 없게 돼요.${hasRecurring ? '<br/>반복으로 열어둔 시간도 함께 지워져요.' : ''}<br/><small>일반 일정과 이미 잡힌 약속은 그대로예요.</small>`,
     yesText: '모두 닫기',
     noText: '취소',
   });
@@ -26457,8 +26462,9 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
   dismissView(closeQuickAvail);
   refreshActiveScheduleView();
   refreshHomeDashIfVisible();
-  // "27일에 열었어요"는 27일(날짜)처럼 읽혀서, 기간이 드러나게 바꿈
-  showToast(`앞으로 4주 동안 ${openedDays.size}일, 예약 가능 시간을 열었어요.${closedMsg ? ' ' + closedMsg : ''}`);
+  // 열린 날 수(4주 기준)를 그대로 말하면 다른 곳의 "앞으로 2주 중 N일"과 숫자가 달라 헷갈림 -
+  // 여기선 "얼마 동안 열렸는지"만 말하고, 지금 열린 정도는 상태 문구(앞으로 2주 중 N일)로 통일
+  showToast(`예약 가능 시간을 앞으로 ${QUICK_AVAIL_WEEKS}주 동안 열었어요.${closedMsg ? ' ' + closedMsg : ''}`);
   // 한꺼번에 수십 개를 쏘지 않게 하나씩 순서대로 저장 (실패하면 syncEventCreateToServer가 알려줌)
   for(const ev of created){
     try { await syncEventCreateToServer(ev); } catch(e){}
@@ -26479,7 +26485,7 @@ async function renderMatchEmptyHelp(body, startDate, endDate){
 
   const actions = [];
   if(mine === 0) actions.push('<button type="button" class="primary" data-match-help="mine">내 예약 가능 시간 열기</button>');
-  if(friend && theirs > 0) actions.push(`<button type="button"${mine === 0 ? '' : ' class="primary"'} data-match-help="reserve">${escapeHtml(friend.name)}님이 열어둔 시간에 예약하기</button>`);
+  if(friend && theirs > 0) actions.push(`<button type="button"${mine === 0 ? '' : ' class="primary"'} data-match-help="reserve">${escapeHtml(friend.name)}님이 열어둔 시간에 약속 잡기</button>`);
   if(friend) actions.push('<button type="button" data-match-help="link">링크로 되는 시간 물어보기</button>');
 
   const help = document.createElement('div');
@@ -27348,7 +27354,7 @@ async function renderPlanStartMethods(friendId){
   const known = theirs !== null;
   const reserve = {
     id: 'reserve',
-    title: `${name}님이 열어둔 시간에 예약하기`,
+    title: `${name}님이 열어둔 시간에 약속 잡기`,
     desc: `${name}님의 '예약 가능 시간' 중에 골라 요청하면, ${name}님이 수락해요`,
     status: !known ? '' : (theirs > 0 ? `앞으로 2주 중 ${theirs}일 열려 있어요` : `${name}님이 아직 예약 가능 시간을 안 열었어요`),
     disabled: known && theirs === 0,
