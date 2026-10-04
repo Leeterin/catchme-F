@@ -152,6 +152,37 @@
     margin-top:4px;
   }
 
+  /* ---------------- 홈: 약속 잡기 + 다가오는 약속 ---------------- */
+  .home-dash{ margin:16px 14px 0; display:flex; flex-direction:column; gap:12px; }
+  .home-plan-cta{
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:16px; border:none; border-radius:18px;
+    background:var(--accent); color:#fff;
+    text-align:left; font-family:'Inter',sans-serif; cursor:pointer;
+    box-shadow:0 6px 18px rgba(23,24,29,0.12);
+  }
+  .home-plan-cta svg{ width:26px; height:26px; flex-shrink:0; }
+  .home-plan-cta b{ display:block; font-size:17px; }
+  .home-plan-cta small{ display:block; font-size:12.5px; opacity:0.9; margin-top:2px; line-height:1.4; }
+  .home-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:18px;
+    padding:14px; box-shadow:0 2px 14px rgba(23,24,29,0.05);
+  }
+  .home-card-title{ display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:700; color:var(--text-dim); margin-bottom:8px; }
+  .home-appt-row{
+    display:flex; align-items:center; gap:12px; width:100%;
+    padding:10px 4px; border:none; border-top:1px solid var(--line); background:none;
+    color:var(--text); text-align:left; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .home-appt-row:first-of-type{ border-top:none; }
+  .home-appt-when{ flex-shrink:0; width:58px; text-align:center; }
+  .home-appt-when b{ display:block; font-size:13px; color:var(--accent); }
+  .home-appt-when small{ display:block; font-size:11px; color:var(--text-dim); margin-top:2px; }
+  .home-appt-info{ flex:1; min-width:0; }
+  .home-appt-name{ font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .home-appt-sub{ font-size:12px; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .home-empty{ font-size:13px; color:var(--text-dim); line-height:1.5; padding:4px 2px 2px; }
+
   /* ---------------- Calendar ---------------- */
   .calendar-card{
     margin:18px 14px 0;
@@ -6866,6 +6897,19 @@
     <div class="today-date" id="todayDate"></div>
   </div>
 
+  <!-- 홈 상단: 약속 잡기 버튼 + 다가오는 약속 (앱을 켜자마자 "약속 잡는 앱"이라는 게 보이게) -->
+  <div class="home-dash" id="homeDash" style="display:none;">
+    <div id="homeOnboarding"></div>
+    <button type="button" class="home-plan-cta" id="homePlanCta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v6M9 16h6"/></svg>
+      <span><b>약속 잡기</b><small>친구 빈 시간에 예약하거나, 같이 비는 시간을 찾아요</small></span>
+    </button>
+    <div class="home-card">
+      <div class="home-card-title"><span>다가오는 약속</span></div>
+      <div id="homeUpcomingList"></div>
+    </div>
+  </div>
+
   <!-- Calendar (홈 화면 메인 콘텐츠) -->
   <div class="calendar-card" id="calendarCard">
     <div class="cal-nav">
@@ -9381,6 +9425,7 @@ let selectedDate = new Date(TODAY);
 const eventsByDate = {};
 
 function renderCalendar(){
+  refreshHomeDashIfVisible();
   document.getElementById('monthLabel').textContent = `${viewYear}년 ${viewMonth+1}월`;
   const grid = document.getElementById('dayGrid');
   grid.innerHTML = '';
@@ -9524,6 +9569,7 @@ function goToDaySchedule(dateObj){
 // ============================================================
 const navItems = document.querySelectorAll('.nav-item');
 const calendarCard = document.getElementById('calendarCard');
+const homeDash = document.getElementById('homeDash');
 const panels = {
   schedule: document.getElementById('panel-schedule'),
   friends: document.getElementById('panel-friends'),
@@ -9539,11 +9585,14 @@ function showTab(tabKey){
   document.getElementById('myProfileView').style.display = 'none';
   document.getElementById('settingsView').style.display = 'none';
   calendarCard.style.display = 'none';
+  homeDash.style.display = 'none';
   document.querySelector('.bottom-nav').style.display = 'flex';
   Object.values(panels).forEach(p => p.classList.remove('active'));
   navItems.forEach(n => n.classList.remove('active'));
 
   if(tabKey === null){
+    homeDash.style.display = 'flex';
+    renderHomeDash();
     const defaultView = settingsState.default_schedule_view || 'month';
     if(defaultView === 'month'){
       calendarCard.style.display = 'block';
@@ -9611,6 +9660,74 @@ navItems.forEach(item => {
 
 // 홈(브랜드 로고) 클릭 시 캘린더 메인 화면으로 복귀
 document.getElementById('homeBtn').addEventListener('click', () => switchTopTab(null));
+
+// ---------- 홈 상단: 약속 잡기 버튼 + 다가오는 약속 ----------
+// 모든 채팅방의 상단 고정 카드(확정된 일정) 중 오늘 이후 것을 날짜/시간 순으로 모아서 보여줌
+function homeUpcomingAppointments(){
+  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  const list = [];
+  Object.keys(CHAT_ROOMS).forEach(roomId => {
+    const room = CHAT_ROOMS[roomId];
+    (room.pinnedSchedules || []).forEach(pin => {
+      if(!pin.dateObj || pin.dateObj < todayStart) return;
+      const mins = pin.timeLabel ? parseTimeLabelMinutes(pin.timeLabel) : null;
+      list.push({ roomId, room, pin, sortKey: pin.dateObj.getTime() + (mins ? mins.startMin : 0) * 60000 });
+    });
+  });
+  return list.sort((a, b) => a.sortKey - b.sortKey);
+}
+function homeDayLabel(dateObj){
+  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  const diff = Math.round((dateObj - todayStart) / 86400e3);
+  if(diff === 0) return '오늘';
+  if(diff === 1) return '내일';
+  if(diff < 7) return `${WEEKDAY_KO[dateObj.getDay()]}요일`;
+  return `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
+}
+const HOME_UPCOMING_MAX = 4;
+// 처음 쓰는 사람용 시작 안내 (아직 없음)
+function renderHomeOnboarding(){}
+function renderHomeDash(){
+  const listEl = document.getElementById('homeUpcomingList');
+  if(!listEl) return;
+  renderHomeOnboarding();
+  const items = homeUpcomingAppointments();
+  if(!items.length){
+    listEl.innerHTML = `<div class="home-empty">아직 잡힌 약속이 없어요. 위의 <b>약속 잡기</b>로 시작해 보세요.</div>`;
+    return;
+  }
+  const shown = items.slice(0, HOME_UPCOMING_MAX);
+  listEl.innerHTML = shown.map((x, i) => {
+    const places = roomMeetPlaces(x.room, x.pin).map(p => p.location);
+    const sub = [x.pin.timeLabel, places.length ? places.join(' → ') : '장소 미정'].filter(Boolean).join(' · ');
+    return `
+      <button type="button" class="home-appt-row" data-idx="${i}">
+        <span class="home-appt-when"><b>${escapeHtml(homeDayLabel(x.pin.dateObj))}</b><small>${escapeHtml(x.pin.dateLabel || '')}</small></span>
+        <span class="home-appt-info">
+          <div class="home-appt-name">${escapeHtml(x.room.name || '약속')}</div>
+          <div class="home-appt-sub">${escapeHtml(sub)}</div>
+        </span>
+      </button>`;
+  }).join('') + (items.length > shown.length ? `<div class="home-empty" style="text-align:center;">외 ${items.length - shown.length}개 더 있어요</div>` : '');
+  listEl.querySelectorAll('.home-appt-row').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const x = shown[parseInt(btn.dataset.idx, 10)];
+      if(!x) return;
+      switchTopTab('chat');
+      openChatRoom(x.roomId);
+    });
+  });
+}
+// 채팅방/핀/친구/일정이 새로 불러와지면 홈이 열려 있을 때 바로 반영
+function refreshHomeDashIfVisible(){
+  try {
+    if(currentTopTab === null && document.getElementById('homeDash').style.display !== 'none') renderHomeDash();
+  } catch(e){} // 앱 시작 직후(변수들이 아직 준비 전)에 불려도 조용히 넘어감
+}
+document.getElementById('homePlanCta').addEventListener('click', () => {
+  if(!authToken) return;
+  openPlanStart();
+});
 
 // 설정 버튼 -> 설정 화면 열기
 document.getElementById('settingsBtn').addEventListener('click', openSettings);
@@ -9856,6 +9973,7 @@ function openSettings(){
   settingsReturnTab = currentTopTab;
   showTab(null);
   calendarCard.style.display = 'none';
+  homeDash.style.display = 'none';
   document.getElementById('settingsView').style.display = 'block';
   document.getElementById('settingsHeaderLabel').textContent = '설정';
   document.getElementById('settingsListView').classList.add('active');
@@ -12930,6 +13048,7 @@ function openMyProfile(){
     showTab(null);
   }
   calendarCard.style.display = 'none';
+  homeDash.style.display = 'none';
   document.getElementById('myProfileView').style.display = 'block';
   myProfileEditing = false;
   renderMyProfile();
@@ -12940,6 +13059,7 @@ function closeMyProfile(){
   if(myProfileOpenedFromSettings){
     document.getElementById('myProfileView').style.display = 'none';
     calendarCard.style.display = 'none';
+    homeDash.style.display = 'none';
     document.getElementById('settingsView').style.display = 'block';
   } else {
     showTab(myProfileReturnTab);
@@ -17077,6 +17197,7 @@ function renderProfileBadgeTiers(count, currentTier){
 }
 
 function renderFriendsList(){
+  refreshHomeDashIfVisible();
   const container = document.getElementById('friendsListContainer');
   container.innerHTML = '';
 
@@ -21875,6 +21996,7 @@ function scrollToChatMessage(msgId){
 function renderChatList(){
   const container = document.getElementById('chatListContainer');
   container.innerHTML = '';
+  refreshHomeDashIfVisible();
 
   const sortedEntries = Object.entries(CHAT_ROOMS).sort(([, a], [, b]) => {
     const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
