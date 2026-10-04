@@ -232,6 +232,38 @@
     background:rgba(56,189,248,0.12); color:var(--text); font-size:12.5px; line-height:1.55; text-align:left;
   }
   .avail-first-tip b{ display:block; margin-bottom:2px; }
+  .first-event-card{ flex-direction:column; align-items:stretch; cursor:default; }
+  .first-event-actions{ display:flex; gap:8px; }
+  .first-event-actions button{ flex:1; border:none; cursor:pointer; font-family:'Inter',sans-serif; text-align:center; }
+  .first-event-import{ padding:8px 12px; border-radius:10px; background:var(--surface); color:var(--accent); font-size:13px; font-weight:700; border:1px solid var(--accent) !important; }
+  /* 캘린더 불러오기 */
+  .cal-import-card{ max-width:400px; max-height:calc(100vh - 48px); overflow-y:auto; text-align:left; }
+  .cal-import-desc{ font-size:12.5px; line-height:1.55; color:var(--text-dim); text-align:center; margin:0 0 14px; }
+  .cal-import-desc b{ color:var(--text); }
+  .cal-import-section{ border-top:1px solid var(--line); padding-top:12px; margin-top:12px; }
+  .cal-import-section:first-child{ border-top:none; padding-top:0; margin-top:0; }
+  .cal-import-label{ font-size:13px; font-weight:700; margin-bottom:8px; }
+  .cal-import-help{ font-size:12px; line-height:1.6; color:var(--text-dim); margin:8px 0 0; }
+  .cal-import-help summary{ cursor:pointer; color:var(--accent); font-weight:600; }
+  .cal-import-help ol{ margin:6px 0 4px; padding-left:18px; }
+  .cal-import-row{ display:flex; gap:8px; }
+  .cal-import-row .search-input{ margin-bottom:0; flex:1; min-width:0; font-size:14px; }
+  .cal-import-row button{ flex-shrink:0; width:auto; padding:0 14px; }
+  .cal-import-file{ display:block; margin-top:10px; font-size:12.5px; color:var(--accent); font-weight:600; cursor:pointer; text-align:center; }
+  .cal-import-file input{ display:none; }
+  .cal-import-cal{ display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); font-size:13.5px; cursor:pointer; }
+  .cal-import-cal:last-child{ border-bottom:none; }
+  .cal-import-cal i{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+  .cal-import-cal span{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cal-import-cal small{ color:var(--text-dim); font-size:11.5px; }
+  .cal-import-result{ text-align:center; font-size:14px; margin:4px 0 12px; }
+  .cal-import-result b{ font-size:22px; display:block; margin-bottom:2px; }
+  .cal-import-error{ color:#e5484d; font-size:12.5px; margin-top:8px; }
+  /* 첫 일정 뒤 링크 제안 */
+  .invite-prompt-card{ max-width:340px; text-align:center; }
+  .invite-prompt-emoji{ font-size:34px; margin-bottom:6px; }
+  .invite-prompt-desc{ font-size:13px; line-height:1.6; color:var(--text-dim); margin:0 0 16px; }
+  .invite-prompt-desc b{ color:var(--text); }
 
   /* ---------------- Calendar ---------------- */
   .calendar-card{
@@ -7198,10 +7230,14 @@
     <p class="desc">내 일정과 '예약 가능 시간'을 관리해요.</p>
 
     <!-- 처음 쓰는 사람(내 일정 0개)에겐 예약 가능 시간 입구 대신 이것만 - 가입하자마자 첫 일정부터 넣게 함 -->
-    <button type="button" class="first-event-card" id="firstEventCard" style="display:none;">
-      <span class="first-event-text"><b>첫 일정을 추가해 보세요</b><small>수업, 약속, 알바… 무엇이든 괜찮아요</small></span>
-      <span class="first-event-go">+ 일정 추가</span>
-    </button>
+    <!-- 이미 다른 캘린더를 쓰던 사람은 옮겨 적지 않고 한 번에 불러오게 - 빈 캘린더는 다시 열 이유가 없음 -->
+    <div class="first-event-card" id="firstEventCard" style="display:none;">
+      <div class="first-event-text"><b>첫 일정을 추가해 보세요</b><small>수업, 약속, 알바… 무엇이든 괜찮아요</small></div>
+      <div class="first-event-actions">
+        <button type="button" class="first-event-go" id="firstEventAddBtn">+ 일정 추가</button>
+        <button type="button" class="first-event-import" id="firstEventImportBtn">캘린더 불러오기</button>
+      </div>
+    </div>
     <!-- 예약 가능 시간 빠르게 열기 입구 - 항상 보이게 둬서 4주가 지나 비었을 때도 바로 다시 열 수 있게 함 -->
     <button type="button" class="quick-avail-entry" id="quickAvailEntryBtn">
       <span class="quick-avail-entry-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
@@ -7890,6 +7926,27 @@
       <button type="button" class="profile-chat-btn" id="quickAvailSubmitBtn">열어두기</button>
       <button type="button" class="plan-back-btn" id="quickAvailDetailBtn">시간을 직접 세밀하게 고를래요 &rsaquo;</button>
       <button type="button" class="plan-back-btn quick-avail-close-all" id="quickAvailCloseAllBtn" style="display:none;">앞으로 열어둔 시간 모두 닫기</button>
+    </div>
+  </div>
+
+  <!-- 다른 캘린더(휴대폰 캘린더 / 구글·아이폰 캘린더 주소 / .ics 파일)에서 일정 불러오기 -->
+  <div class="mini-confirm-overlay" id="calImportOverlay">
+    <div class="mini-confirm-card cal-import-card">
+      <button type="button" class="mini-confirm-close" id="calImportCloseBtn" aria-label="닫기">&times;</button>
+      <div class="mini-confirm-title" style="margin-bottom:6px;">캘린더 불러오기</div>
+      <p class="cal-import-desc">앞으로 3개월 일정을 캐치미로 가져와요.<br>가져온 일정은 <b>나만 보기</b>라, 친구에게는 제목 없이 '일정 있음'으로만 보여요.</p>
+      <div id="calImportBody"></div>
+    </div>
+  </div>
+
+  <!-- 첫 일정을 넣은 직후 딱 한 번 - 링크로 되는 시간 물어보기 (받는 사람은 가입 없이 응답) -->
+  <div class="mini-confirm-overlay" id="invitePromptOverlay">
+    <div class="mini-confirm-card invite-prompt-card">
+      <div class="invite-prompt-emoji">🗓️</div>
+      <div class="mini-confirm-title" style="margin-bottom:6px;">이번 주에 만날 사람 있어요?</div>
+      <p class="invite-prompt-desc">링크 하나만 보내면 친구가 <b>가입 없이</b> 되는 시간을 골라줘요.<br>단톡방에서 "언제 돼?" 안 물어봐도 돼요.</p>
+      <button type="button" class="profile-chat-btn" id="invitePromptGoBtn">링크로 시간 물어보기</button>
+      <button type="button" class="plan-back-btn" id="invitePromptLaterBtn">나중에 할게요</button>
     </div>
   </div>
 
@@ -9220,6 +9277,7 @@ async function initPushNotifications(){
 }
 async function handlePushTap(data){
   if(!authToken) return;
+  trackEvent('push_open', { type: data.type || '' });
   if(data.type === 'chat' && data.roomId){
     if(!CHAT_ROOMS[data.roomId]) await loadChatRoomsFromServer();
     if(!CHAT_ROOMS[data.roomId]) return;
@@ -9230,6 +9288,15 @@ async function handlePushTap(data){
     switchTopTab('friends');
   } else if(data.type === 'invite'){
     switchTopTab('schedule');
+  } else if(data.type === 'today'){
+    // 아침 "오늘 일정" 알림 - 오늘 하루 보기로
+    scheduleFocusDate = new Date(TODAY);
+    switchTopTab('schedule');
+    switchScheduleView('day');
+  } else if(data.type === 'openAvail'){
+    // 일요일 저녁 "다음 주 시간 열어둘까요?" 알림 - 바로 빠르게 열기 화면
+    switchTopTab('schedule');
+    openQuickAvail();
   }
 }
 // 로그아웃하면 이 기기로 더 이상 내 알림이 안 오게 서버에서 토큰을 지움
@@ -10193,6 +10260,7 @@ const SETTINGS_MENU = [
   { id: 'account', label: '계정·로그인', icon: '<circle cx="12" cy="7" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
   { id: 'locations', label: '자주 쓰는 출발지', icon: '<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3Z" opacity="0"/><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>' },
   { id: 'privacy', label: '개인/보안', icon: '<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3Z"/>' },
+  { id: 'calimport', label: '캘린더 불러오기', icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v5M9.5 15.5 12 18l2.5-2.5"/>', action: () => openCalImport('settings') },
   { id: 'notifications', label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
   { id: 'friends', label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
   { id: 'chat', label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
@@ -10475,6 +10543,33 @@ function bindToggleRows(container){
   });
 }
 
+// 정기 알림(아침 오늘 일정 / 일요일 다음 주 시간) - 일반 설정과 따로 서버(/engagement/prefs)에 저장됨
+async function renderEngagementPrefRows(){
+  const wrap = document.getElementById('engagementPrefRows');
+  if(!wrap || !authToken) return;
+  let prefs = { morningBrief: true, weeklyNudge: true };
+  try { prefs = await apiRequest('/engagement/prefs'); } catch(e){}
+  if(!document.body.contains(wrap)) return;
+  const row = (key, label, sub) => `
+    <div class="settings-toggle-row">
+      <div><div class="stt-label">${label}</div><div class="stt-sub">${sub}</div></div>
+      <div class="toggle${prefs[key] ? ' on' : ''}" data-eng-key="${key}"><div class="knob"></div></div>
+    </div>`;
+  wrap.innerHTML = row('morningBrief', '아침 오늘 일정 알림', '일정이 있는 날 아침 8시에 오늘 일정을 알려줘요')
+    + row('weeklyNudge', '다음 주 시간 열기 알림', '일요일 저녁, 다음 주에 열어둔 시간이 없으면 알려줘요');
+  wrap.querySelectorAll('[data-eng-key]').forEach(el => el.addEventListener('click', async () => {
+    const key = el.dataset.engKey;
+    const next = !el.classList.contains('on');
+    el.classList.toggle('on', next);
+    try {
+      await apiRequest('/engagement/prefs', { method: 'PATCH', body: JSON.stringify({ [key]: next }) });
+    } catch(err){
+      el.classList.toggle('on', !next);
+      showToast(err.message || '알림 설정을 저장하지 못했어요.');
+    }
+  }));
+}
+
 // 차단 목록 불러와서 보여줌 (각 항목에 차단 해제 버튼 포함)
 async function renderBlockedList(){
   const container = document.getElementById('blockedListContainer');
@@ -10579,9 +10674,11 @@ function openSettingsDetail(id){
     body.innerHTML = `
       <div class="settings-detail-desc">받고 싶은 알림만 골라서 켜두세요.</div>
       ${toggleRowHTML('notif_message', 'CATCHME 푸시 알림 받기', '새 메시지, 친구 요청, 약속 확정 알림을 받아요', false)}
+      <div id="engagementPrefRows"></div>
       ${toggleRowHTML('notif_marketing', '마케팅/이벤트 알림', '이벤트와 혜택 소식을 받아요', false)}
     `;
     bindToggleRows(body);
+    renderEngagementPrefRows();
 
   } else if(id === 'friends'){
     body.innerHTML = `
@@ -16424,6 +16521,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           color: formColor,
         });
         showToast('일정이 추가됐어요.');
+        if(formEventType !== 'available') setTimeout(() => maybePromptFirstInvite(false), 900);
       }
     } catch(err){
       // 저장 도중 예상 못 한 오류가 나더라도, 폼이 화면에 계속 떠있는 상태로 남지 않게 함
@@ -26254,6 +26352,7 @@ function renderQuickAvailEntry(){
     // 아직 일정이 하나도 없으면 "첫 일정 추가"만 보여줌 - 예약 가능 시간은 일정을 넣어본 뒤에 발견하게
     const fresh = !SCHEDULE_EVENTS.length;
     document.getElementById('firstEventCard').style.display = fresh ? '' : 'none';
+    if(fresh) document.getElementById('firstEventImportBtn').textContent = deviceCalendarPlugin() ? '휴대폰 캘린더 불러오기' : '캘린더 불러오기';
     document.getElementById('quickAvailEntryBtn').style.display = fresh ? 'none' : '';
     const end = new Date(TODAY);
     end.setDate(end.getDate() + 13);
@@ -26268,10 +26367,462 @@ function renderQuickAvailEntry(){
     : '아직 열어둔 시간이 없어요 · 요일·시간대만 고르면 4주치가 한 번에 열려요';
 }
 document.getElementById('quickAvailEntryBtn').addEventListener('click', openQuickAvail);
-document.getElementById('firstEventCard').addEventListener('click', () => {
+document.getElementById('firstEventAddBtn').addEventListener('click', () => {
   scheduleFocusDate = new Date(TODAY);
   openEventForm();
 });
+document.getElementById('firstEventImportBtn').addEventListener('click', () => openCalImport('first_card'));
+// ---------- 사용 지표 기록 (화면에서만 알 수 있는 행동) ----------
+// 실패해도 아무 영향 없게 조용히 넘어감 - 서버가 정해진 이름만 받음
+function trackEvent(name, props){
+  if(!authToken) return;
+  apiRequest('/engagement/track', { method: 'POST', body: JSON.stringify({ name, props }) }).catch(() => {});
+}
+
+// ---------- 캘린더 불러오기 ----------
+// 빈 캘린더는 다시 열 이유가 없어서, 쓰던 캘린더의 일정을 한 번에 가져옴. 가져온 일정은 서버에서 "나만 보기"로 저장됨.
+//  - 새 앱(휴대폰 캘린더 플러그인 있음): 휴대폰 캘린더에서 바로 (구글/아이폰/삼성 캘린더 계정이 다 들어있음)
+//  - 그 외(웹/예전 앱): 구글·아이폰 캘린더 주소(ICS)나 .ics 파일
+const CAL_IMPORT_DAYS = 90; // 서버에서 일정 불러오는 범위(앞으로 90일)와 맞춤
+const calImportState = { step: 'start', calendars: [], picked: new Set(), events: [], source: '', error: '', busy: false };
+
+function deviceCalendarPlugin(){
+  const cap = window.Capacitor;
+  if(!cap || typeof cap.isNativePlatform !== 'function' || !cap.isNativePlatform()) return null;
+  if(typeof cap.isPluginAvailable === 'function' && !cap.isPluginAvailable('CapacitorCalendar')) return null;
+  return (cap.Plugins && cap.Plugins.CapacitorCalendar) || null;
+}
+function calImportRange(){
+  const from = new Date(TODAY); from.setHours(0, 0, 0, 0);
+  const to = new Date(from); to.setDate(to.getDate() + CAL_IMPORT_DAYS);
+  return { from, to };
+}
+
+function openCalImport(from){
+  Object.assign(calImportState, { step: 'start', calendars: [], picked: new Set(), events: [], source: '', error: '', busy: false });
+  renderCalImport();
+  const ov = document.getElementById('calImportOverlay');
+  if(ov.classList.contains('show')) return;
+  ov.classList.add('show');
+  pushViewState(closeCalImport);
+  trackEvent('import_opened', { from: from || '' });
+}
+function closeCalImport(){
+  document.getElementById('calImportOverlay').classList.remove('show');
+}
+document.getElementById('calImportCloseBtn').addEventListener('click', () => goBackOrClose(closeCalImport));
+document.getElementById('calImportOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'calImportOverlay') goBackOrClose(closeCalImport);
+});
+
+function renderCalImport(){
+  const st = calImportState;
+  const body = document.getElementById('calImportBody');
+  const err = st.error ? `<div class="cal-import-error">${escapeHtml(st.error)}</div>` : '';
+  if(st.step === 'pickCalendars'){
+    body.innerHTML = `
+      <div class="cal-import-label">어떤 캘린더를 가져올까요?</div>
+      <div>${st.calendars.map(c => `
+        <label class="cal-import-cal">
+          <input type="checkbox" data-cal-id="${escapeHtml(c.id)}" ${st.picked.has(c.id) ? 'checked' : ''} />
+          <i style="background:${escapeHtml(c.color || '#999')}"></i>
+          <span>${escapeHtml(c.title || '캘린더')}</span>
+          ${c.accountName ? `<small>${escapeHtml(c.accountName)}</small>` : ''}
+        </label>`).join('')}</div>
+      ${err}
+      <button type="button" class="profile-chat-btn" id="calImportDeviceGoBtn" style="margin-top:14px;" ${st.busy ? 'disabled' : ''}>${st.busy ? '찾는 중...' : '일정 찾기'}</button>`;
+    body.querySelectorAll('[data-cal-id]').forEach(cb => cb.addEventListener('change', () => {
+      if(cb.checked) st.picked.add(cb.dataset.calId); else st.picked.delete(cb.dataset.calId);
+    }));
+    document.getElementById('calImportDeviceGoBtn').addEventListener('click', readDeviceEvents);
+    return;
+  }
+  if(st.step === 'preview'){
+    const n = st.events.length;
+    body.innerHTML = n ? `
+      <div class="cal-import-result"><b>${n}개</b>일정을 찾았어요</div>
+      <p class="cal-import-help" style="text-align:center;margin:0 0 12px;">이미 캐치미에 있는 같은 일정은 건너뛰어요.</p>
+      ${err}
+      <button type="button" class="profile-chat-btn" id="calImportSaveBtn" ${st.busy ? 'disabled' : ''}>${st.busy ? '불러오는 중...' : `${n}개 일정 불러오기`}</button>
+      <button type="button" class="plan-back-btn" id="calImportBackBtn">처음으로</button>` : `
+      <div class="cal-import-result">앞으로 3개월 안에 가져올 일정이 없어요.</div>
+      <button type="button" class="plan-back-btn" id="calImportBackBtn">처음으로</button>`;
+    const save = document.getElementById('calImportSaveBtn');
+    if(save) save.addEventListener('click', saveImportedEvents);
+    document.getElementById('calImportBackBtn').addEventListener('click', () => {
+      Object.assign(st, { step: 'start', events: [], error: '' });
+      renderCalImport();
+    });
+    return;
+  }
+  // 처음 화면
+  const hasDevice = !!deviceCalendarPlugin();
+  const urlSection = `
+    <div class="cal-import-section">
+      <div class="cal-import-label">${hasDevice ? '또는 ' : ''}캘린더 주소로 불러오기</div>
+      <div class="cal-import-row">
+        <input type="url" class="search-input" id="calImportUrlInput" placeholder="https://calendar.google.com/... 또는 webcal://..." autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <button type="button" class="profile-chat-btn" id="calImportUrlBtn" ${st.busy ? 'disabled' : ''}>${st.busy && st.source === 'ics' ? '...' : '찾기'}</button>
+      </div>
+      <details class="cal-import-help">
+        <summary>주소는 어디서 찾나요?</summary>
+        <b>구글 캘린더</b> (컴퓨터에서)
+        <ol><li>calendar.google.com → 왼쪽 내 캘린더의 ⋮ → 설정 및 공유</li><li>'캘린더 통합'의 <b>iCal 형식의 비공개 주소</b> 복사</li></ol>
+        <b>아이폰 캘린더</b>
+        <ol><li>캘린더 앱 → 아래 '캘린더' → 가져올 캘린더의 ⓘ</li><li>'공개 캘린더' 켜기 → 링크 공유 → 복사</li></ol>
+        주소를 아는 사람은 누구나 그 캘린더를 볼 수 있으니, 다 불러온 뒤엔 공개를 다시 꺼도 돼요.
+      </details>
+      <label class="cal-import-file">.ics 파일 선택하기<input type="file" id="calImportFileInput" accept=".ics,text/calendar" /></label>
+      ${err}
+    </div>`;
+  body.innerHTML = (hasDevice ? `
+    <div class="cal-import-section">
+      <button type="button" class="profile-chat-btn" id="calImportDeviceBtn" ${st.busy ? 'disabled' : ''}>${st.busy && st.source === 'device' ? '여는 중...' : '휴대폰 캘린더에서 불러오기'}</button>
+      <p class="cal-import-help" style="text-align:center;">구글·아이폰·삼성 캘린더 등 휴대폰에 연결된 캘린더를 모두 가져올 수 있어요.</p>
+    </div>` : '') + urlSection;
+  if(hasDevice) document.getElementById('calImportDeviceBtn').addEventListener('click', startDeviceImport);
+  document.getElementById('calImportUrlBtn').addEventListener('click', importFromUrl);
+  document.getElementById('calImportUrlInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') importFromUrl(); });
+  document.getElementById('calImportFileInput').addEventListener('change', importFromFile);
+}
+
+function calImportFail(message){
+  Object.assign(calImportState, { busy: false, error: message });
+  renderCalImport();
+}
+
+// --- 휴대폰 캘린더 ---
+async function startDeviceImport(){
+  const plugin = deviceCalendarPlugin();
+  if(!plugin) return;
+  const st = calImportState;
+  Object.assign(st, { busy: true, source: 'device', error: '' });
+  renderCalImport();
+  try {
+    const isAndroid = window.Capacitor.getPlatform() === 'android';
+    const perm = isAndroid ? await plugin.requestReadOnlyCalendarAccess() : await plugin.requestFullCalendarAccess();
+    if(!perm || perm.result !== 'granted'){
+      calImportFail('캘린더 접근이 허용되지 않았어요. 휴대폰 설정 → 캐치미 → 캘린더에서 허용해 주세요.');
+      return;
+    }
+    const { result } = await plugin.listCalendars();
+    // 공휴일·생일 캘린더는 기본으로 빼둠 - 하루 종일 "바쁨"으로 잡혀서 예약 가능 시간까지 막아버림
+    const skip = /공휴일|휴일|holiday|생일|birthday|기념일/i;
+    st.calendars = (result || []).filter(c => c && c.id);
+    st.picked = new Set(st.calendars.filter(c => !skip.test(c.title || '') && c.type !== 4).map(c => c.id));
+    Object.assign(st, { step: 'pickCalendars', busy: false });
+    renderCalImport();
+  } catch(err){
+    console.error('[cal import] device', err);
+    calImportFail('휴대폰 캘린더를 열지 못했어요. 캘린더 주소로 불러와 주세요.');
+  }
+}
+async function readDeviceEvents(){
+  const plugin = deviceCalendarPlugin();
+  const st = calImportState;
+  if(!plugin || !st.picked.size){ calImportFail('가져올 캘린더를 하나 이상 골라 주세요.'); return; }
+  Object.assign(st, { busy: true, error: '' });
+  renderCalImport();
+  try {
+    const { from, to } = calImportRange();
+    const { result } = await plugin.listEventsInRange({ from: from.getTime(), to: to.getTime() });
+    const list = [];
+    (result || []).forEach(ev => {
+      if(!ev || !st.picked.has(ev.calendarId)) return;
+      if(ev.availability === 1) return; // "한가함"으로 표시된 일정은 시간을 막지 않음
+      let start = new Date(ev.startDate), end = new Date(ev.endDate);
+      if(ev.isAllDay){
+        start = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        const last = new Date(end.getTime() - 1);
+        end = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1);
+      }
+      pushImportedEvent(list, ev.title, start, end);
+    });
+    Object.assign(st, { events: list, step: 'preview', busy: false });
+    renderCalImport();
+  } catch(err){
+    console.error('[cal import] read', err);
+    calImportFail('일정을 읽지 못했어요. 잠시 후 다시 시도해 주세요.');
+  }
+}
+
+// --- 캘린더 주소 / 파일 ---
+async function importFromUrl(){
+  const input = document.getElementById('calImportUrlInput');
+  const url = (input && input.value || '').trim();
+  if(!url){ calImportFail('캘린더 주소를 붙여넣어 주세요.'); return; }
+  Object.assign(calImportState, { busy: true, source: 'ics', error: '' });
+  renderCalImport();
+  document.getElementById('calImportUrlInput').value = url;
+  try {
+    const res = await fetch(`${API_BASE_URL}/events/ics?url=${encodeURIComponent(url)}`, { headers: { Authorization: `Bearer ${authToken}` } });
+    if(!res.ok){
+      let msg = '캘린더를 불러오지 못했어요.';
+      try { msg = (await res.json()).message || msg; } catch(e){}
+      calImportFail(msg);
+      return;
+    }
+    showIcsPreview(await res.text());
+  } catch(err){
+    calImportFail('캘린더를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.');
+  }
+}
+function importFromFile(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(file.size > 5 * 1024 * 1024){ calImportFail('파일이 너무 커요 (최대 5MB).'); return; }
+  calImportState.source = 'ics';
+  const reader = new FileReader();
+  reader.onload = () => showIcsPreview(String(reader.result || ''));
+  reader.onerror = () => calImportFail('파일을 읽지 못했어요.');
+  reader.readAsText(file);
+}
+function showIcsPreview(text){
+  if(!/BEGIN:VCALENDAR/.test(text)){ calImportFail('캘린더(.ics) 형식이 아니에요.'); return; }
+  let events;
+  try { events = parseIcsEvents(text); } catch(err){
+    console.error('[cal import] parse', err);
+    calImportFail('캘린더를 읽는 중 문제가 생겼어요.');
+    return;
+  }
+  Object.assign(calImportState, { events, step: 'preview', busy: false, error: '' });
+  renderCalImport();
+}
+
+function pushImportedEvent(list, title, start, end){
+  const { from, to } = calImportRange();
+  if(isNaN(start) || isNaN(end) || end <= start) return;
+  if(end <= from || start >= to) return;
+  list.push({ title: String(title || '').trim().slice(0, 60) || '일정', startTime: start.toISOString(), endTime: end.toISOString() });
+}
+
+async function saveImportedEvents(){
+  const st = calImportState;
+  if(st.busy || !st.events.length) return;
+  Object.assign(st, { busy: true, error: '' });
+  renderCalImport();
+  try {
+    let created = 0;
+    for(let i = 0; i < st.events.length; i += 500){
+      // eslint-disable-next-line no-await-in-loop
+      const data = await apiRequest('/events/import', {
+        method: 'POST',
+        body: JSON.stringify({ source: st.source, events: st.events.slice(i, i + 500) }),
+      });
+      created += data.created || 0;
+    }
+    await loadScheduleFromServer();
+    goBackOrClose(closeCalImport);
+    showToast(created ? `일정 ${created}개를 불러왔어요.` : '새로 불러올 일정이 없었어요 (이미 다 있어요).');
+    if(created) setTimeout(() => maybePromptFirstInvite(true), 900);
+  } catch(err){
+    calImportFail(err.message || '일정을 저장하지 못했어요.');
+  }
+}
+
+// --- ICS 파서 (구글/아이폰/아웃룩이 내보내는 형식) ---
+// 반복 일정은 앞으로 3개월 안의 날짜로 풀어서 하루짜리 일정들로 가져옴 (캐치미 반복은 "매주 요일"만 돼서)
+function parseIcsEvents(text){
+  const lines = text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r?\n/);
+  const vevents = [];
+  let cur = null;
+  for(const line of lines){
+    if(line === 'BEGIN:VEVENT'){ cur = {}; continue; }
+    if(line === 'END:VEVENT'){ if(cur) vevents.push(cur); cur = null; continue; }
+    if(!cur) continue;
+    const m = line.match(/^([A-Z-]+)((?:;[^:]*)?):(.*)$/);
+    if(!m) continue;
+    const name = m[1];
+    const params = {};
+    m[2].split(';').filter(Boolean).forEach(p => { const [k, v] = p.split('='); params[k] = (v || '').replace(/^"|"$/g, ''); });
+    const prop = { value: m[3], params };
+    if(name === 'EXDATE'){ (cur.EXDATE = cur.EXDATE || []).push(prop); continue; }
+    cur[name] = prop;
+  }
+
+  const { from, to } = calImportRange();
+  const list = [];
+  // 반복 중 일부만 바꾼 일정(RECURRENCE-ID)은 원래 반복에서 그 날짜를 빼고 바뀐 걸로 따로 넣음
+  const overridden = new Set();
+  vevents.forEach(v => {
+    if(v['RECURRENCE-ID'] && v.UID){
+      const d = icsDate(v['RECURRENCE-ID']);
+      if(d) overridden.add(v.UID.value + '|' + d.date.getTime());
+    }
+  });
+  vevents.forEach(v => {
+    if(!v.DTSTART) return;
+    if(v.STATUS && v.STATUS.value === 'CANCELLED') return;
+    if(v.TRANSP && v.TRANSP.value === 'TRANSPARENT') return; // "한가함" 일정(생일·공휴일 등 대부분)은 시간을 막지 않음
+    const s = icsDate(v.DTSTART);
+    if(!s) return;
+    let durMs;
+    const e = v.DTEND ? icsDate(v.DTEND) : null;
+    if(e) durMs = e.date - s.date;
+    else if(v.DURATION) durMs = icsDuration(v.DURATION.value);
+    else durMs = s.allDay ? 86400e3 : 0;
+    if(!(durMs > 0)) return;
+    const title = icsText(v.SUMMARY ? v.SUMMARY.value : '');
+    if(!v.RRULE || v['RECURRENCE-ID']){
+      pushImportedEvent(list, title, s.date, new Date(s.date.getTime() + durMs));
+      return;
+    }
+    const ex = new Set();
+    (v.EXDATE || []).forEach(p => p.value.split(',').forEach(val => {
+      const d = icsDate({ value: val, params: p.params });
+      if(d) ex.add(d.date.getTime());
+    }));
+    const uid = v.UID ? v.UID.value : '';
+    icsExpand(s.date, v.RRULE.value, from, to).forEach(start => {
+      if(ex.has(start.getTime()) || overridden.has(uid + '|' + start.getTime())) return;
+      if(start.getTime() + durMs <= from.getTime()) return;
+      // 하루 종일 일정은 날짜 기준이라 기간도 날짜로 (서머타임 없는 한국에선 사실상 같음)
+      pushImportedEvent(list, title, start, new Date(start.getTime() + durMs));
+    });
+  });
+  return list;
+}
+function icsText(s){
+  return s.replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1').trim();
+}
+// "20261005T090000Z" / TZID=Asia/Seoul:"20261005T090000" / VALUE=DATE:"20261005" → Date
+function icsDate(prop){
+  const v = (prop.value || '').trim();
+  const m = v.match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/);
+  if(!m) return null;
+  const [y, mo, d] = [+m[1], +m[2] - 1, +m[3]];
+  if(!m[4]) return { date: new Date(y, mo, d), allDay: true };
+  const [h, mi, se] = [+m[4], +m[5], +(m[6] || 0)];
+  if(m[7]) return { date: new Date(Date.UTC(y, mo, d, h, mi, se)), allDay: false };
+  const tz = prop.params && prop.params.TZID;
+  return { date: tz ? wallTimeInZone(y, mo, d, h, mi, se, tz) : new Date(y, mo, d, h, mi, se), allDay: false };
+}
+// 다른 시간대(예: America/New_York)로 적힌 시각을 실제 시각으로 - 모르는 시간대 이름이면 내 휴대폰 시간대로 봄
+function wallTimeInZone(y, mo, d, h, mi, se, tz){
+  const guess = Date.UTC(y, mo, d, h, mi, se);
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const offsetAt = (ts) => {
+      const p = Object.fromEntries(fmt.formatToParts(new Date(ts)).map(x => [x.type, x.value]));
+      return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - ts;
+    };
+    let ts = guess - offsetAt(guess);
+    ts = guess - offsetAt(ts);
+    return new Date(ts);
+  } catch(e){
+    return new Date(y, mo, d, h, mi, se);
+  }
+}
+function icsDuration(s){
+  const m = String(s).match(/^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/);
+  if(!m) return 0;
+  return ((+(m[2] || 0) * 7 + +(m[3] || 0)) * 86400 + +(m[4] || 0) * 3600 + +(m[5] || 0) * 60 + +(m[6] || 0)) * 1000;
+}
+// RRULE을 [시작, 끝) 안의 발생 시각들로 풀기 - DAILY/WEEKLY(BYDAY)/MONTHLY(BYMONTHDAY, 2TU 같은 n번째 요일)/YEARLY + INTERVAL/COUNT/UNTIL
+function icsExpand(dtstart, rrule, rangeStart, rangeEnd){
+  const r = Object.fromEntries(rrule.split(';').map(p => p.split('=')));
+  const freq = r.FREQ;
+  const interval = Math.max(1, parseInt(r.INTERVAL || '1', 10));
+  const count = r.COUNT ? parseInt(r.COUNT, 10) : Infinity;
+  const until = r.UNTIL ? icsDate({ value: r.UNTIL, params: {} }) : null;
+  const untilTs = until ? (until.allDay ? until.date.getTime() + 86400e3 - 1 : until.date.getTime()) : Infinity;
+  const endTs = Math.min(rangeEnd.getTime(), untilTs);
+  const DAY_CODES = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+  const byday = r.BYDAY ? r.BYDAY.split(',').map(x => { const mm = x.match(/^([+-]?\d+)?([A-Z]{2})$/); return mm ? { n: mm[1] ? +mm[1] : 0, dow: DAY_CODES.indexOf(mm[2]) } : null; }).filter(x => x && x.dow >= 0) : [];
+  const bymonthday = r.BYMONTHDAY ? r.BYMONTHDAY.split(',').map(Number) : [];
+  const out = [];
+  let n = 0;
+  const at = (y, mo, d) => new Date(y, mo, d, dtstart.getHours(), dtstart.getMinutes(), dtstart.getSeconds());
+  const emit = (dt) => {
+    if(dt < dtstart) return true;
+    if(dt.getTime() > endTs || n >= count) return false;
+    n++;
+    out.push(dt);
+    return true;
+  };
+  // 몇 년 전에 시작한 반복이면 앞부분은 건너뜀 (안 그러면 2000번 안에 3개월 범위까지 못 감).
+  // COUNT가 있으면 처음부터 세야 해서 건너뛰지 않음 - 그런 반복은 보통 짧음
+  let i0 = 0;
+  const diffDays = Math.floor((rangeStart - dtstart) / 86400e3);
+  if(count === Infinity && diffDays > 0){
+    const per = { DAILY: 1, WEEKLY: 7, MONTHLY: 31, YEARLY: 366 }[freq] || 1;
+    i0 = Math.max(0, Math.floor(diffDays / per / interval) - 1);
+  }
+  for(let i = i0; i < i0 + 2000; i++){
+    let cands = [];
+    if(freq === 'DAILY'){
+      cands = [at(dtstart.getFullYear(), dtstart.getMonth(), dtstart.getDate() + i * interval)];
+    } else if(freq === 'WEEKLY'){
+      const weekStart = at(dtstart.getFullYear(), dtstart.getMonth(), dtstart.getDate() - dtstart.getDay() + i * 7 * interval);
+      const days = byday.length ? byday.map(b => b.dow) : [dtstart.getDay()];
+      cands = days.sort((a, b) => a - b).map(dow => at(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dow));
+    } else if(freq === 'MONTHLY'){
+      const y = dtstart.getFullYear(), mo = dtstart.getMonth() + i * interval;
+      const dim = new Date(y, mo + 1, 0).getDate();
+      if(byday.length){
+        byday.forEach(b => {
+          const days = [];
+          for(let d = 1; d <= dim; d++) if(new Date(y, mo, d).getDay() === b.dow) days.push(d);
+          const pick = b.n > 0 ? [days[b.n - 1]] : b.n < 0 ? [days[days.length + b.n]] : days;
+          pick.filter(Boolean).forEach(d => cands.push(at(y, mo, d)));
+        });
+      } else {
+        (bymonthday.length ? bymonthday : [dtstart.getDate()]).forEach(d => {
+          const day = d < 0 ? dim + d + 1 : d;
+          if(day >= 1 && day <= dim) cands.push(at(y, mo, day));
+        });
+      }
+      cands.sort((a, b) => a - b);
+    } else if(freq === 'YEARLY'){
+      const c = at(dtstart.getFullYear() + i * interval, dtstart.getMonth(), dtstart.getDate());
+      if(c.getDate() === dtstart.getDate()) cands = [c]; // 2/29 같은 날짜는 없는 해엔 건너뜀
+    } else {
+      break;
+    }
+    let keepGoing = true;
+    for(const c of cands){ if(!emit(c)){ keepGoing = false; break; } }
+    if(!keepGoing) break;
+    if(cands.length && cands[0].getTime() > endTs) break;
+  }
+  return out;
+}
+
+// ---------- 첫 일정 뒤 "링크로 시간 물어보기" 제안 (딱 한 번) ----------
+// 받는 사람은 가입 없이 응답할 수 있어서, 보낸 사람은 시간이 쉽게 정해지는 걸 바로 겪고 받은 사람은 캐치미를 처음 맛봄
+function invitePromptKey(){
+  return 'catchme_invite_prompt_' + (currentUser && currentUser.id ? currentUser.id : 'anon');
+}
+// afterImport: 캘린더를 막 불러온 직후면 일정 개수와 상관없이 (불러오면 일정이 한꺼번에 많아지니까)
+function maybePromptFirstInvite(afterImport){
+  // 원래 쓰던 사람(내 일정이 이미 여러 개)에게는 안 띄움 - 막 시작한 사람용
+  const own = SCHEDULE_EVENTS.filter(e => e.type !== 'available' && !e.sourceChatRoomId && !e.isPendingHold).length;
+  if(!afterImport && own > 3) return;
+  try { if(localStorage.getItem(invitePromptKey())) return; } catch(e){ return; }
+  if(document.querySelector('.mini-confirm-overlay.show')) return; // 다른 팝업이 떠 있으면 겹치지 않게 다음 기회로
+  try { localStorage.setItem(invitePromptKey(), '1'); } catch(e){}
+  document.getElementById('invitePromptOverlay').classList.add('show');
+  pushViewState(closeInvitePrompt);
+  trackEvent('invite_prompt_shown');
+}
+function closeInvitePrompt(){
+  document.getElementById('invitePromptOverlay').classList.remove('show');
+}
+document.getElementById('invitePromptLaterBtn').addEventListener('click', () => goBackOrClose(closeInvitePrompt));
+document.getElementById('invitePromptOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'invitePromptOverlay') goBackOrClose(closeInvitePrompt);
+});
+document.getElementById('invitePromptGoBtn').addEventListener('click', () => {
+  trackEvent('invite_prompt_click');
+  const open = () => openInviteCreate(false, { source: SCHEDULE_EVENTS.some(e => e.type === 'available') ? 'calendar' : 'manual' });
+  if(viewCloseStack[viewCloseStack.length - 1] === closeInvitePrompt){
+    window.addEventListener('popstate', () => setTimeout(open, 0), { once: true });
+    history.back();
+  } else {
+    closeInvitePrompt();
+    open();
+  }
+});
+
 // 예약 가능 시간을 처음 만들 때만(아직 하나도 없을 때) 이게 왜 좋은지 한 줄 안내 - 빠르게 열기/일정 추가 화면 둘 다
 function syncAvailFirstTip(){
   const show = !SCHEDULE_EVENTS.some(e => e.type === 'available');
@@ -27460,7 +28011,7 @@ function openInviteCreate(fromList, opts = {}){
   sat.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7));
   // 기본은 "내 캘린더의 예약 가능 시간"으로 - 직접 고르기는 탭으로 바꿀 수 있음
   inviteState.draft = {
-    source: 'calendar',
+    source: opts.source || 'calendar',
     dates: new Set([inviteYmd(sat)]), title: '', startHour: 10, endHour: 22,
     calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
     calDates: new Set(),
@@ -28304,6 +28855,7 @@ async function copyInviteLink(withText){
   }
   if(ok){
     showToast('링크를 복사했어요. 카톡에 붙여넣어 보내보세요!');
+    trackEvent('invite_link_shared', { via: 'copy' });
     return;
   }
   openInviteManualCopy(link);
@@ -28338,6 +28890,7 @@ async function shareInviteLink(){
   if(navigator.share){
     try {
       await navigator.share({ title: inv.title, text: inviteShareText(inv), url: inviteLink(inv.token) });
+      trackEvent('invite_link_shared', { via: 'share' });
       return;
     } catch(e) {
       if(e && e.name === 'AbortError') return;

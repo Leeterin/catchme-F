@@ -75,4 +75,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 휴대폰 캘린더 일정 불러오기 (읽기만) -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
 </manifest>
