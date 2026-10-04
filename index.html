@@ -3459,6 +3459,15 @@
     font-size:12.5px;
     color:var(--text-dim);
   }
+  .appt-detail-actions{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .appt-detail-chat-btn{
+    width:100%; padding:14px; border:none; border-radius:12px;
+    background:var(--accent); color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .appt-detail-sub-btn{
+    width:100%; padding:12px; border:1px solid var(--line); border-radius:12px;
+    background:transparent; color:var(--text); font-size:13px; font-weight:600; cursor:pointer;
+  }
   .appt-detail-location-card{
     display:flex;
     align-items:center;
@@ -9890,8 +9899,11 @@ function renderHomeDash(){
     btn.addEventListener('click', () => {
       const x = shown[parseInt(btn.dataset.idx, 10)];
       if(!x) return;
+      // 채팅방을 밑에 깔고 그 위에 약속 상세를 띄움 - 뒤로가기는 홈으로, "채팅으로 가기"는 밑의 채팅방으로
       switchTopTab('chat');
       openChatRoom(x.roomId);
+      apptDetailFromHome = true;
+      openAppointmentDetailView(x.roomId, x.pin.id);
     });
   });
 }
@@ -22564,6 +22576,8 @@ function openApptLocationMap(title, location, lat, lon){
 
 // 약속 상세보기를 닫을 때 어느 화면으로 돌아갈지 (기본은 채팅방이지만, "지난 약속" 목록에서 들어온 경우엔 그 목록으로 돌아가야 함)
 let apptDetailReturnViewId = 'chatRoomView';
+// 홈의 "다가오는 약속"에서 들어온 경우 - 닫으면 채팅방이 아니라 홈으로 돌아감
+let apptDetailFromHome = false;
 
 // 날짜/시간 -> 장소 -> 친구가 추천해서 수락한 장소들(시간순) 순서로 보여줌
 function openAppointmentDetailView(roomId, pinId, returnViewId){
@@ -22588,6 +22602,11 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
     <div class="appt-detail-section">
+      <div class="appt-detail-label">함께하는 사람</div>
+      <div class="appt-detail-datetime">${escapeHtml(room.name || '')}</div>
+      ${pin.note ? `<div class="appt-detail-place-sub">${escapeHtml(pin.note)}</div>` : ''}
+    </div>
+    <div class="appt-detail-section">
       <div class="appt-detail-label">${ICO.calendar} 날짜 · 시간</div>
       ${pin.dateLabel
         ? `<div class="appt-detail-datetime">${escapeHtml(pin.dateLabel)} ${escapeHtml(pin.timeLabel || '')}</div>`
@@ -22596,7 +22615,8 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
     <div class="appt-detail-section">
       <div class="appt-detail-label">${ICO.pin} 장소${multiPlaces ? ` (${meetPlaces.length}곳)` : ''}</div>
       ${meetPlaces.length === 0
-        ? `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>`
+        ? `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>
+           <button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">장소 정하기</button>`
         : meetPlaces.map(({ pin: p, srcMsg }, idx) => {
             const senderLabel = srcMsg
               ? (srcMsg.who === 'me' ? '내가 추천' : `${escapeHtml(getGroupSenderName(room, srcMsg) || room.name)}님이 추천`)
@@ -22617,11 +22637,33 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
           }).join('')}
       ${meetPlaces.length ? `<button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">+ 장소 추가 (${meetPlaceOrderLabel(meetPlaces.length)})</button>` : ''}
     </div>
+    ${apptDetailFromHome ? `
+    <div class="appt-detail-actions">
+      <button type="button" class="appt-detail-chat-btn" id="apptDetailChatBtn">${escapeHtml(room.name || '')} 채팅으로 가기</button>
+      ${pin.dateObj ? `<button type="button" class="appt-detail-sub-btn" id="apptDetailDayBtn">이 날 내 캘린더 보기</button>` : ''}
+    </div>` : ''}
   `;
+
+  const chatBtn = document.getElementById('apptDetailChatBtn');
+  if(chatBtn){
+    chatBtn.addEventListener('click', () => {
+      apptDetailFromHome = false; // 닫을 때 홈이 아니라 밑에 깔린 채팅방이 보이게
+      goBackOrClose(closeAppointmentDetailView);
+    });
+  }
+  const dayBtn = document.getElementById('apptDetailDayBtn');
+  if(dayBtn){
+    dayBtn.addEventListener('click', () => {
+      apptDetailFromHome = false;
+      dismissView(closeAppointmentDetailView); // 상세는 닫고(채팅방 위로) 그날 캘린더로 - 거기서 뒤로가면 채팅방
+      viewDayFromChat(new Date(pin.dateObj));
+    });
+  }
 
   const addPlaceBtn = document.getElementById('apptDetailAddPlaceBtn');
   if(addPlaceBtn){
     addPlaceBtn.addEventListener('click', () => {
+      apptDetailFromHome = false; // 장소 정하기는 채팅방에서 이어지므로 채팅방으로 돌아감
       goBackOrClose(closeAppointmentDetailView);
       addMeetPlace(room, roomId, pin);
     });
@@ -22652,6 +22694,12 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
 }
 function closeAppointmentDetailView(){
   document.getElementById('appointmentDetailView').classList.remove('active');
+  if(apptDetailFromHome){
+    apptDetailFromHome = false;
+    closeChatRoomView();
+    switchTopTab(null);
+    return;
+  }
   document.getElementById(apptDetailReturnViewId).classList.add('active');
 }
 document.getElementById('appointmentDetailBackBtn').addEventListener('click', () => goBackOrClose(closeAppointmentDetailView));
