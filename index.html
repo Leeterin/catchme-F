@@ -168,6 +168,7 @@
     background:var(--surface); border:1px solid var(--line); border-radius:18px;
     padding:14px; box-shadow:0 2px 14px rgba(23,24,29,0.05);
   }
+  .home-card-link{ border:none; background:none; padding:2px 0; font-size:12px; font-weight:600; color:var(--text-dim); cursor:pointer; }
   .home-card-title{ display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:700; color:var(--text-dim); margin-bottom:8px; }
   .home-appt-row{
     display:flex; align-items:center; gap:12px; width:100%;
@@ -6972,7 +6973,7 @@
       <span><b>약속 잡기</b><small>친구만 고르면 잡을 수 있는 방법을 알려줘요</small></span>
     </button>
     <div class="home-card">
-      <div class="home-card-title"><span>다가오는 약속</span></div>
+      <div class="home-card-title"><span>다가오는 약속</span><button type="button" class="home-card-link" id="homePastApptBtn">지난 약속</button></div>
       <div id="homeUpcomingList"></div>
     </div>
     <!-- 내 예약 가능 시간 - 친구가 나에게 약속을 걸 수 있는 시간이 얼마나 열려 있는지 (홈에 큰 달력 대신) -->
@@ -9872,6 +9873,10 @@ function renderHomeAvailCard(){
 }
 document.getElementById('homeAvailQuickBtn').addEventListener('click', () => openQuickAvail());
 document.getElementById('homeAvailCalBtn').addEventListener('click', () => switchTopTab('schedule'));
+document.getElementById('homePastApptBtn').addEventListener('click', () => {
+  switchTopTab('chat');
+  openPastAppointmentsView(null); // null = 모든 채팅방의 지난 약속
+});
 function renderHomeDash(){
   const listEl = document.getElementById('homeUpcomingList');
   if(!listEl) return;
@@ -22709,28 +22714,41 @@ document.getElementById('appointmentDetailBackBtn').addEventListener('click', ()
 // 그러면 나중에 "그때 어디서 만나기로 했었지?" 같은 걸 다시 찾아볼 방법이 없어서(채팅 기록을 일일이 스크롤하는
 // 것 말고는) 추가함. 채팅방 안의 "추가 기능" 메뉴에서 열 수 있음
 let pastAppointmentsRoomId = null;
+// roomId 없이 열면(홈의 "지난 약속") 모든 채팅방의 지난 약속을 모아서 보여주고, 닫으면 홈으로 돌아감
+let pastAppointmentsAllRooms = false;
 
 function openPastAppointmentsView(roomId){
-  const room = CHAT_ROOMS[roomId];
-  if(!room) return;
-  pastAppointmentsRoomId = roomId;
+  pastAppointmentsAllRooms = !roomId;
+  if(roomId && !CHAT_ROOMS[roomId]) return;
+  pastAppointmentsRoomId = roomId || null;
   renderPastAppointmentsList();
-  document.getElementById('chatRoomView').classList.remove('active');
+  document.getElementById(pastAppointmentsAllRooms ? 'chatListView' : 'chatRoomView').classList.remove('active');
   document.getElementById('pastAppointmentsView').classList.add('active');
   pushViewState(closePastAppointmentsView);
 }
 function closePastAppointmentsView(){
   document.getElementById('pastAppointmentsView').classList.remove('active');
-  document.getElementById('chatRoomView').classList.add('active');
   pastAppointmentsRoomId = null;
+  if(pastAppointmentsAllRooms){
+    pastAppointmentsAllRooms = false;
+    document.getElementById('chatListView').classList.add('active');
+    switchTopTab(null);
+    return;
+  }
+  document.getElementById('chatRoomView').classList.add('active');
 }
 function renderPastAppointmentsList(){
   const body = document.getElementById('pastAppointmentsBody');
-  const room = CHAT_ROOMS[pastAppointmentsRoomId];
   const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-  const pastPins = room && room.pinnedSchedules
-    ? room.pinnedSchedules.filter(p => p.dateObj && p.dateObj < todayStart).slice().sort((a, b) => b.dateObj - a.dateObj)
-    : [];
+  const roomIds = pastAppointmentsAllRooms ? Object.keys(CHAT_ROOMS) : [pastAppointmentsRoomId];
+  const pastPins = [];
+  roomIds.forEach(roomId => {
+    const room = CHAT_ROOMS[roomId];
+    (room && room.pinnedSchedules || []).forEach(p => {
+      if(p.dateObj && p.dateObj < todayStart) pastPins.push({ roomId, room, pinned: p });
+    });
+  });
+  pastPins.sort((a, b) => b.pinned.dateObj - a.pinned.dateObj);
 
   if(pastPins.length === 0){
     body.innerHTML = `<div class="search-empty">지난 약속이 없어요.</div>`;
@@ -22740,7 +22758,7 @@ function renderPastAppointmentsList(){
   body.innerHTML = '';
   const listEl = document.createElement('div');
   listEl.className = 'past-appt-list';
-  pastPins.forEach(pinned => {
+  pastPins.forEach(({ roomId, room, pinned }) => {
     const { dateLabel, timeLabel, note, location } = pinned;
     const card = document.createElement('div');
     card.className = 'past-appt-card';
@@ -22748,11 +22766,12 @@ function renderPastAppointmentsList(){
       <span class="past-appt-icon">${ICO.pushpin}</span>
       <div class="past-appt-info">
         ${dateLabel ? `<div class="past-appt-time">${escapeHtml(dateLabel)} ${escapeHtml(timeLabel || '')}</div>` : ''}
+        ${pastAppointmentsAllRooms ? `<div class="past-appt-note"><b>${escapeHtml(room.name || '')}</b></div>` : ''}
         ${note ? `<div class="past-appt-note">${escapeHtml(note)}</div>` : ''}
         ${location ? `<div class="past-appt-note">${ICO.pin} ${escapeHtml(location)}</div>` : ''}
       </div>
     `;
-    card.addEventListener('click', () => openAppointmentDetailView(pastAppointmentsRoomId, pinned.id, 'pastAppointmentsView'));
+    card.addEventListener('click', () => openAppointmentDetailView(roomId, pinned.id, 'pastAppointmentsView'));
     listEl.appendChild(card);
   });
   body.appendChild(listEl);
@@ -22787,7 +22806,7 @@ function closeDayViewFromChat(){
   panels['schedule'].classList.remove('home-clean-mode');
   if(roomId){
     showTab('chat');
-    openChatRoom(roomId);
+    openChatRoom(roomId, { noPush: true }); // 채팅방 히스토리 항목은 하루 보기 밑에 그대로 남아 있음 - 또 쌓으면 뒤로가기를 한 번 더 눌러야 함
   } else {
     document.querySelector('.bottom-nav').style.display = 'flex';
   }
