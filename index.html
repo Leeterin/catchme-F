@@ -6247,7 +6247,7 @@
     gap:5px;
     color:var(--text-dim);
     cursor:pointer;
-    padding:7px 16px;
+    padding:7px 11px;
     border-radius:12px;
     transition:color .15s ease, transform .15s ease;
   }
@@ -8015,8 +8015,8 @@
   <div class="tab-panel" id="panel-community">
     <div class="community-header">
       <div>
-        <h2>추천</h2>
-        <p class="desc">다른 유저들이 추천한 맛집·카페·체험을 볼 수 있어요.</p>
+        <h2>장소 추천</h2>
+        <p class="desc">약속 장소로 좋은 맛집·카페·체험을 다른 유저들이 추천해요.</p>
       </div>
       <div class="location-picker-wrap">
         <button class="location-btn" id="locationBtn">
@@ -8321,6 +8321,10 @@
 
   <!-- Bottom nav -->
   <div class="bottom-nav">
+    <div class="nav-item" data-tab="home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/></svg>
+      <span>홈</span>
+    </div>
     <div class="nav-item" data-tab="schedule">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
       <span>시간표</span>
@@ -8337,7 +8341,7 @@
     </div>
     <div class="nav-item" data-tab="community">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z"/></svg>
-      <span>추천</span>
+      <span>장소</span>
     </div>
   </div>
 
@@ -9614,6 +9618,7 @@ function showTab(tabKey){
   navItems.forEach(n => n.classList.remove('active'));
 
   if(tabKey === null){
+    document.querySelector('.nav-item[data-tab="home"]').classList.add('active');
     homeDash.style.display = 'flex';
     renderHomeDash();
     const defaultView = settingsState.default_schedule_view || 'month';
@@ -9677,7 +9682,7 @@ function switchTopTab(tabKey){
 }
 navItems.forEach(item => {
   item.addEventListener('click', () => {
-    switchTopTab(item.dataset.tab);
+    switchTopTab(item.dataset.tab === 'home' ? null : item.dataset.tab);
   });
 });
 
