@@ -19288,6 +19288,10 @@ async function renderSearchResults(query){
     container.innerHTML = `<div class="search-empty">아이디로 친구를 검색해보세요.</div>${friendInviteBoxHtml()}`;
     return;
   }
+  if(q.length < 2){
+    container.innerHTML = `<div class="search-empty">두 글자 이상 입력해주세요.</div>`;
+    return;
+  }
 
   try {
     const data = await apiRequest('/friends/search?query=' + encodeURIComponent(q));
@@ -19536,7 +19540,8 @@ async function renderSuggestions(){
       const avatarInner = user.hasAvatar
         ? `<img src="${cachedAvatarUrl(user.id)}" alt="${escapeHtml(user.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`
         : escapeHtml(user.name[0]);
-      const distanceLabel = user.distanceKm < 1 ? `${Math.round(user.distanceKm * 1000)}m` : `${user.distanceKm.toFixed(1)}km`;
+      // 서버는 개인정보 보호를 위해 대략적인 거리만 줌 (0.5km 단위, 1km 안쪽은 1)
+      const distanceLabel = user.distanceKm <= 1 ? '1km 이내' : `약 ${user.distanceKm.toFixed(1)}km`;
       card.innerHTML = `
         <div class="placeholder-avatar" style="${user.hasAvatar ? '' : `background:${colorForFriendId(user.id)}`}">${avatarInner}</div>
         <div class="suggest-info">
@@ -28129,7 +28134,9 @@ async function handleSocialLoginRedirect(){
   }
   const search = new URLSearchParams(location.search);
   if(search.get('authError')){
-    showToast('소셜 로그인에 실패했어요. 다시 시도해주세요.');
+    showToast(search.get('authError') === 'suspended'
+      ? '이용이 제한된 계정이라 로그인할 수 없어요.'
+      : '소셜 로그인에 실패했어요. 다시 시도해주세요.');
     history.replaceState(null, '', location.pathname);
   }
   return false;
