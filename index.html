@@ -3397,6 +3397,16 @@
     margin-top:2px;
   }
   /* 친구 프로필의 뱃지 등급표 (단골 → 친밀 → 각별) */
+  .profile-plan-btn{
+    width:100%; margin-top:16px; padding:14px; border:none; border-radius:12px;
+    background:var(--accent); color:#fff; font-size:15px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .profile-plan-btn + .person-profile-actions{ margin-top:8px; }
+  details.profile-badge-tiers > summary{ cursor:pointer; list-style:none; margin-bottom:0; }
+  details.profile-badge-tiers > summary::-webkit-details-marker{ display:none; }
+  details.profile-badge-tiers > summary::after{ content:' ▾'; }
+  details.profile-badge-tiers[open] > summary{ margin-bottom:9px; }
+  details.profile-badge-tiers[open] > summary::after{ content:' ▴'; }
   .profile-badge-tiers{
     margin-top:12px;
     padding:12px;
@@ -5010,6 +5020,8 @@
   .plan-option .plan-option-status{ color:var(--accent); font-weight:600; }
   .plan-option.unavailable .plan-option-status{ color:var(--text-dim); }
   .plan-link-row{ margin-top:10px; }
+  .plan-section-label{ margin:12px 2px 6px; font-size:11.5px; font-weight:700; color:var(--text-dim); }
+  .plan-section-label + .plan-friend-list{ max-height:170px; }
   /* 예약 가능 시간 빠르게 열기 */
   /* 시간표 탭 위 "예약 가능 시간 빠르게 열기" 입구 */
   .quick-avail-entry{
@@ -7269,13 +7281,15 @@
       <div class="profile-avatar-lg" id="profileAvatarLg"></div>
       <div class="profile-name" id="profileName"></div>
       <div class="profile-status" id="profileStatus"></div>
-      <div class="profile-meet-badge" id="profileMeetBadge"></div>
-      <div class="profile-badge-tiers" id="profileBadgeTiers"></div>
-      <div id="profileContactInfo" style="margin-top:6px;"></div>
+      <!-- 친구 화면의 주 행동은 "이 친구와 약속 잡기" - 뱃지/등급보다 먼저 보이게 맨 위에 둠 -->
+      <button type="button" class="profile-plan-btn" id="profilePlanBtn">약속 잡기</button>
       <div class="person-profile-actions">
         <button class="person-action-btn request" id="friendCalendarBtn">캘린더 보기</button>
-        <button class="person-action-btn chat" id="profileChatBtn">채팅하기</button>
+        <button class="person-action-btn request" id="profileChatBtn">채팅하기</button>
       </div>
+      <div id="profileContactInfo" style="margin-top:6px;"></div>
+      <div class="profile-meet-badge" id="profileMeetBadge"></div>
+      <details class="profile-badge-tiers" id="profileBadgeTiers"></details>
       <div class="mp-input-group" style="margin-top:14px;">
         <label>그룹 <span style="font-weight:400;color:var(--text-dim);">(이 친구를 넣을 그룹을 골라두면, 그 그룹에만 공개한 내 일정을 이 친구가 볼 수 있어요)</span></label>
         <div class="group-chip-picker" id="friendGroupChipPicker"></div>
@@ -7959,17 +7973,17 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
           <div class="chat-extra-dropdown" id="chatExtraDropdown">
+            <div class="chat-extra-option" id="extraMatchOption">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
+              <span id="extraMatchOptionLabel">약속 잡기</span>
+            </div>
             <div class="chat-extra-option" id="extraCalendarOption" data-mode="calendar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
               <span id="extraCalendarOptionLabel">캘린더 보기</span>
             </div>
-            <div class="chat-extra-option" id="extraReserveOption">
+            <div class="chat-extra-option" id="extraReserveOption" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
               <span>열어둔 시간에 예약하기</span>
-            </div>
-            <div class="chat-extra-option" id="extraMatchOption">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/></svg>
-              <span id="extraMatchOptionLabel">둘 다 되는 시간 찾기</span>
             </div>
             <div class="chat-extra-option" id="extraRecommendLocationOption" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
@@ -9692,6 +9706,8 @@ function showTab(tabKey){
   calendarCard.style.display = 'none';
   homeDash.style.display = 'none';
   document.querySelector('.bottom-nav').style.display = 'flex';
+  // "TODAY 날짜" 헤더는 홈에서만 - 다른 탭에서는 화면 제목부터 바로 보이게 (캘린더 탭에선 날짜가 두 번 나왔음)
+  document.querySelector('.date-header').style.display = tabKey === null ? '' : 'none';
   Object.values(panels).forEach(p => p.classList.remove('active'));
   navItems.forEach(n => n.classList.remove('active'));
 
@@ -9838,6 +9854,7 @@ function renderHomeOnboarding(){
   document.getElementById('onboardingCloseBtn').addEventListener('click', () => {
     try { localStorage.setItem(onboardingDismissKey(), '1'); } catch(e){}
     el.innerHTML = '';
+    renderHomeAvailCard(); // 안내를 닫으면 예약 가능 시간 경고를 원래대로 보여줌
   });
   el.querySelectorAll('.onboarding-step:not(.done)').forEach(btn => {
     btn.addEventListener('click', () => runOnboardingStep(btn.dataset.step));
@@ -9866,10 +9883,14 @@ function renderHomeAvailCard(){
   }
   strip.innerHTML = html;
   const status = document.getElementById('homeAvailStatus');
-  status.classList.toggle('warn', n === 0);
+  // 시작하기 안내가 떠 있는 동안엔 거기 1번이 같은 걸 안내하니까, 막 가입한 사람에게 빨간 경고까지 겹쳐 보이지 않게 함
+  const onboardingShown = !!document.querySelector('#homeOnboarding .onboarding-card');
+  status.classList.toggle('warn', n === 0 && !onboardingShown);
   status.textContent = n > 0
     ? `앞으로 2주 중 ${n}일 열려 있어요. 친구는 이 시간에 나에게 예약할 수 있어요.`
-    : '열어둔 시간이 없어서 친구가 나에게 예약할 수 없어요.';
+    : onboardingShown
+      ? '아직 열어둔 시간이 없어요. 열어두면 친구가 이 시간에 예약할 수 있어요.'
+      : '열어둔 시간이 없어서 친구가 나에게 예약할 수 없어요.';
 }
 document.getElementById('homeAvailQuickBtn').addEventListener('click', () => openQuickAvail());
 document.getElementById('homeAvailCalBtn').addEventListener('click', () => switchTopTab('schedule'));
@@ -17415,8 +17436,9 @@ function renderProfileBadgeTiers(count, currentTier){
   const el = document.getElementById('profileBadgeTiers');
   if(!el) return;
   const tiers = [...MEET_BADGE_TIERS].sort((a, b) => a.min - b.min);
+  el.open = false; // 등급표는 접어두고 필요할 때만 펼쳐 봄
   el.innerHTML = `
-    <div class="profile-badge-tiers-title">뱃지 등급</div>
+    <summary class="profile-badge-tiers-title">뱃지 등급 보기</summary>
     <div class="profile-badge-tier-list">
       ${tiers.map(t => {
         const earned = count >= t.min;
@@ -17530,6 +17552,8 @@ function openFriendProfile(friendId){
 
   document.getElementById('profileChatBtn').dataset.friendId = friend.id;
   document.getElementById('friendCalendarBtn').dataset.friendId = friend.id;
+  document.getElementById('friendCalendarBtn').textContent = `${friend.name}님 캘린더`;
+  document.getElementById('profilePlanBtn').dataset.friendId = friend.id;
   document.getElementById('removeFriendBtn').dataset.friendId = friend.id;
 
   document.getElementById('friendGroupChipPicker').dataset.friendId = friend.id;
@@ -18883,6 +18907,9 @@ document.getElementById('friendCalendarBtn').addEventListener('click', () => {
   openFriendCalendar(document.getElementById('friendCalendarBtn').dataset.friendId);
 });
 document.getElementById('friendCalendarBackBtn').addEventListener('click', () => goBackOrClose(closeFriendCalendar));
+document.getElementById('profilePlanBtn').addEventListener('click', () => {
+  openPlanStart(document.getElementById('profilePlanBtn').dataset.friendId);
+});
 
 document.getElementById('removeFriendBtn').addEventListener('click', async () => {
   const friendId = document.getElementById('removeFriendBtn').dataset.friendId;
@@ -24901,14 +24928,15 @@ function updateChatExtraOptionForRoom(){
   if(room && room.isGroup){
     option.dataset.mode = 'members';
     option.innerHTML = `${EXTRA_OPTION_ICON_MEMBERS}<span>멤버보기</span>`;
-    reserveOption.style.display = 'none'; // 그룹은 "매칭하기"로 시간을 맞추는 방식이라, 개별 예약하기는 안 보여줌
-    document.getElementById('extraMatchOptionLabel').textContent = '모두 되는 시간 찾기';
+    reserveOption.style.display = 'none';
+    document.getElementById('extraMatchOptionLabel').textContent = '약속 잡기 · 모두 되는 시간';
     recommendOption.style.display = room.isRealRoom ? '' : 'none'; // 실제 서버 방(참가자 출발지를 모을 수 있는 방)에서만 보임
   } else {
     option.dataset.mode = 'calendar';
-    option.innerHTML = `${EXTRA_OPTION_ICON_CALENDAR}<span>캘린더 보기</span>`;
-    reserveOption.style.display = '';
-    document.getElementById('extraMatchOptionLabel').textContent = '둘 다 되는 시간 찾기';
+    option.innerHTML = `${EXTRA_OPTION_ICON_CALENDAR}<span>${room ? escapeHtml(room.name) + '님 ' : ''}캘린더 보기</span>`;
+    // 예약하기/둘 다 되는 시간 찾기는 "약속 잡기" 하나로 묶음 - 홈과 같은 시트에서 이 친구 기준으로 방법을 추천
+    reserveOption.style.display = 'none';
+    document.getElementById('extraMatchOptionLabel').textContent = '약속 잡기';
     recommendOption.style.display = (room && room.isRealRoom) ? '' : 'none'; // 1:1 실제 방에서도 두 사람 출발지로 추천받을 수 있음
   }
   document.getElementById('extraMuteOptionLabel').textContent = (room && room.muted) ? '알림 켜기' : '알림 끄기';
@@ -25011,10 +25039,10 @@ document.getElementById('extraMatchOption').addEventListener('click', () => {
     ? activeChatRoomId.replace('dm-', '')
     : (FRIENDS.find(f => f.username === room.counterpartUsername) || {}).id;
   if(!friendId || !FRIENDS.some(f => f.id === friendId)){
-    showToast('친구로 추가된 사람만 매칭할 수 있어요.');
+    showToast('친구로 추가된 사람만 약속을 잡을 수 있어요.');
     return;
   }
-  openCalendarMatch(friendId);
+  openPlanStart(friendId, activeChatRoomId);
 });
 
 // ---------- 다중 모임 자동 장소 추천 ----------
@@ -25553,10 +25581,11 @@ function renderQuickAvailEntry(){
     end.setDate(end.getDate() + 13);
     n = myAvailableDayCount(TODAY, end);
   } catch(e){ return; } // 앱 시작 직후(변수들이 아직 준비 전)에 불려도 조용히 넘어감
-  el.classList.toggle('warn', n === 0);
+  // 빨간 경고는 홈 카드 한 곳에서만 - 여기는 버튼 설명이라 담담하게 안내만 함
+  el.classList.remove('warn');
   el.textContent = n > 0
     ? `앞으로 2주 중 ${n}일 열려 있어요 · 요일·시간대로 더 열기`
-    : '앞으로 2주 동안 열어둔 시간이 없어요. 친구가 예약할 수 없어요';
+    : '아직 열어둔 시간이 없어요 · 요일·시간대만 고르면 4주치가 한 번에 열려요';
 }
 document.getElementById('quickAvailEntryBtn').addEventListener('click', openQuickAvail);
 function closeQuickAvail(){
@@ -25946,6 +25975,20 @@ function renderMatchFineRows(wide){
 }
 
 // 체크해둔 여러 시간을 한 번에 그룹 채팅에 제안 (그룹원들이 그중에서 골라볼 수 있도록)
+// 시간 제안을 보낸 뒤 그 방을 보여줌. 채팅방 위에서 찾기를 열었으면 밑의 방으로 돌아가고,
+// 홈/친구 화면에서 열었으면(밑에 다른 방이 깔려 있거나 아무 방도 없음) 그 방을 새로 엶
+function showRoomAfterProposal(roomId){
+  dismissView(closeCalendarMatchView);
+  if(activeChatRoomId === roomId && currentTopTab === 'chat'){
+    document.getElementById('chatRoomView').classList.add('active');
+    document.body.classList.add('chat-open'); // 채팅방으로 돌아왔으니 스크롤 잠금도 다시 켬
+    renderChatMessages();
+    renderPinnedSchedule();
+  } else {
+    switchTopTab('chat');
+    openChatRoom(roomId);
+  }
+}
 async function proposeGroupTimeOptions(roomId, slots){
   const room = CHAT_ROOMS[roomId];
   if(!room || slots.length === 0) return;
@@ -25966,13 +26009,7 @@ async function proposeGroupTimeOptions(roomId, slots){
       if(data.message.proposal.status === 'CONFIRMED') await loadPinsFromServer(roomId, room);
       touchRoom(roomId);
       selectedGroupMatchSlots = [];
-      document.getElementById('calendarMatchView').classList.remove('active');
-      document.getElementById('chatRoomView').classList.add('active');
-      document.body.classList.add('chat-open');
-      if(activeChatRoomId === roomId){
-        renderChatMessages();
-        renderPinnedSchedule();
-      }
+      showRoomAfterProposal(roomId);
       renderChatList();
       showToast(slots.length === 1 ? '그룹에 이 시간을 제안했어요.' : '그룹에 시간 후보를 제안했어요.');
     } catch(err){
@@ -26006,12 +26043,7 @@ async function proposeGroupTimeOptions(roomId, slots){
 
   touchRoom(roomId);
   selectedGroupMatchSlots = [];
-  document.getElementById('calendarMatchView').classList.remove('active');
-  document.getElementById('chatRoomView').classList.add('active');
-  document.body.classList.add('chat-open'); // 채팅방으로 돌아왔으니 스크롤 잠금도 다시 켬
-  if(activeChatRoomId === roomId){
-    renderChatMessages();
-  }
+  showRoomAfterProposal(roomId);
   renderChatList();
   showToast(slots.length === 1 ? '그룹에 이 시간을 제안했어요.' : '그룹에 시간 후보를 제안했어요.');
 }
@@ -26441,8 +26473,13 @@ const PLAN_ICONS = {
   mine: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
 };
 let planFriendSeq = 0;
-function openPlanStart(){
-  renderPlanStartFriends();
+// 채팅방 메뉴에서 열었으면 그 방 id - 예약/매칭 화면을 닫을 때 채팅방이 밑에 그대로 보이게 표시용으로 넘김
+let planStartChatRoomId = null;
+// friendId를 주면(친구 프로필/1:1 채팅방에서 열 때) 친구 고르기를 건너뛰고 바로 방법 추천부터
+function openPlanStart(friendId, chatRoomId){
+  planStartChatRoomId = chatRoomId || null;
+  if(friendId && FRIENDS.some(f => f.id === friendId)) renderPlanStartMethods(friendId);
+  else renderPlanStartFriends();
   const ov = document.getElementById('planStartOverlay');
   if(ov.classList.contains('show')) return;
   ov.classList.add('show');
@@ -26489,7 +26526,22 @@ function renderPlanStartFriends(){
           <span>${escapeHtml(f.name)}<small>@${escapeHtml(f.username || '')}</small></span>
         </button>`).join('')}
     </div>
+    ${planGroupRooms().length ? `
+    <div class="plan-section-label">그룹</div>
+    <div class="plan-friend-list">
+      ${planGroupRooms().map(r => `
+        <button type="button" class="plan-friend-row" data-plan-group="${escapeHtml(r.id)}">
+          ${planFriendAvatarHtml({ name: r.name, color: r.color, avatar: r.avatar })}
+          <span>${escapeHtml(r.name)}<small>${r.members.length}명 · 모두 되는 시간 찾기</small></span>
+        </button>`).join('')}
+    </div>` : ''}
     <div class="plan-link-row">${planOptionHtml(PLAN_LINK_OPTION)}</div>`;
+}
+// 약속 잡기 시트에 보여줄 그룹 채팅방 (멤버가 나 말고도 있는 방만)
+function planGroupRooms(){
+  return Object.keys(CHAT_ROOMS)
+    .map(id => ({ id, ...CHAT_ROOMS[id] }))
+    .filter(r => r.isGroup && r.members && r.members.length > 1);
 }
 async function renderPlanStartMethods(friendId){
   const friend = FRIENDS.find(f => f.id === friendId);
@@ -26550,10 +26602,16 @@ document.getElementById('planStartBody').addEventListener('click', (e) => {
     } else if(method === 'mine'){
       openMyAvailabilityForm();
     } else if(friendId){
-      calendarOpenedFromChat = null;
+      calendarOpenedFromChat = planStartChatRoomId;
       if(method === 'match') openCalendarMatch(friendId);
       else openFriendCalendar(friendId, 'reserve');
     }
+    return;
+  }
+  const groupBtn = e.target.closest('[data-plan-group]');
+  if(groupBtn){
+    dismissView(closePlanStart);
+    openGroupCalendarMatch(groupBtn.dataset.planGroup);
     return;
   }
   const friendBtn = e.target.closest('[data-plan-friend]');
