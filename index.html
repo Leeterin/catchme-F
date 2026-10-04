@@ -9390,6 +9390,9 @@ function connectRealtimeSocket(){
     if(kind === 'confirmed'){
       showToast(`'${title}' 약속 시간이 정해졌어요! 내 캘린더에 담았어요.`, 3000);
       loadScheduleFromServer();
+    } else if(kind === 'cancelled'){
+      showToast(`'${title}' 약속이 취소됐어요. 내 캘린더에서도 지웠어요.`, 3000);
+      loadScheduleFromServer();
     } else if(kind === 'responded'){
       showToast(`${name}님이 '${title}'에 되는 시간을 보냈어요.`);
     }
@@ -27619,6 +27622,11 @@ function renderInviteFoot(){
     foot.innerHTML = main + `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite">${st.armed === 'cancel' ? '한 번 더 누르면 약속이 취소돼요' : '약속 취소하기'}</button>`;
     return;
   }
+  // 확정된 약속도 시작 전이면 만든 사람이 취소할 수 있음 (모두의 캘린더에서 지워지고 회원 참여자에게 알림)
+  if(st.mode === 'manage' && inv.status === 'CONFIRMED' && inv.confirmedStart && new Date(inv.confirmedStart).getTime() > Date.now()){
+    foot.innerHTML = `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite"${st.busy ? ' disabled' : ''}>${st.armed === 'cancel' ? '한 번 더 누르면 모두의 캘린더에서 약속이 취소돼요' : '확정된 약속 취소하기'}</button>`;
+    return;
+  }
   if(st.mode === 'guest' && inv.status === 'OPEN'){
     const n = st.myCells.size;
     const label = st.busy ? '보내는 중...'
@@ -28015,11 +28023,13 @@ async function cancelInviteNow(){
   if(st.busy || !inv) return;
   st.busy = true;
   try {
+    const wasConfirmed = inv.status === 'CONFIRMED';
     const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/cancel`, { method: 'POST' });
     st.busy = false;
     applyInviteData(data.invite, true);
     st.myInvites = st.myInvites.map(x => x.token === data.invite.token ? data.invite : x);
     renderInviteOverlay();
+    if(wasConfirmed) loadScheduleFromServer(); // 서버에서 지운 약속 일정을 내 캘린더에도 바로 반영
     showToast('약속을 취소했어요.');
   } catch(err) {
     st.busy = false;
