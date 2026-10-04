@@ -3236,6 +3236,11 @@
     border-color:var(--cta);
     color:var(--cta);
   }
+  /* 약속 장소가 여러 개(1차, 2차...)면 한 줄씩 - 장소를 누르면 그 장소만 변경, 옆 삭제는 그 장소만 삭제 */
+  .chat-pinned-schedule .pin-places{ display:flex; flex-direction:column; gap:6px; width:100%; }
+  .chat-pinned-schedule .pin-place-row{ display:flex; align-items:stretch; gap:6px; }
+  .chat-pinned-schedule .pin-place-row .pin-set-loc{ flex:1; min-width:0; }
+  .chat-pinned-schedule .pin-place-order{ font-size:10.5px; font-weight:800; color:var(--text-dim); }
 
   .past-appt-list{
     display:flex;
@@ -11709,7 +11714,6 @@ function findPlaceReviewCandidate(roomId){
   if(!room || !room.isRealRoom || !room.pinnedSchedules) return null;
   const now = Date.now();
   const done = new Set(loadPlaceReviewDone());
-  const placeOnlyPin = [...room.pinnedSchedules].reverse().find(p => !p.dateLabel && p.location);
   const myTitles = new Set(currentUser ? ['food', 'cafe', 'experience'].flatMap(c => FEED_POSTS[c] || [])
     .filter(p => p.author && p.author.id === currentUser.id).map(p => placeReviewNorm(p.title)) : []);
   const list = room.pinnedSchedules
@@ -11717,18 +11721,19 @@ function findPlaceReviewCandidate(roomId){
     .filter(x => x.end && x.end.getTime() <= now && now - x.end.getTime() <= PLACE_REVIEW_WINDOW_DAYS * 86400e3)
     .sort((a, b) => b.end - a.end);
   for(const { pin, end } of list){
-    const placePin = pin.location ? pin : placeOnlyPin;
-    if(!placePin || !placePin.location) continue;
-    const name = placePin.location.trim();
-    const key = `${roomId}|${pin.serverId || (pin.dateLabel + ' ' + (pin.timeLabel || ''))}|${placeReviewNorm(name)}`;
-    if(done.has(key) || placeReviewSkippedThisSession.has(key)) continue;
-    if(myTitles.has(placeReviewNorm(name))) continue; // 이미 이 장소 후기를 올렸으면 안 물어봄
-    return {
-      key, roomId, pin, end, name,
-      lat: typeof placePin.locationLat === 'number' ? placePin.locationLat : null,
-      lon: typeof placePin.locationLon === 'number' ? placePin.locationLon : null,
-      address: placePin.locationAddress || '',
-    };
+    // 장소가 여러 곳(1차, 2차...)이면 아직 후기를 안 물어본 곳부터 차례로
+    for(const placePin of roomMeetPlaces(room, pin)){
+      const name = placePin.location.trim();
+      const key = `${roomId}|${pin.serverId || (pin.dateLabel + ' ' + (pin.timeLabel || ''))}|${placeReviewNorm(name)}`;
+      if(done.has(key) || placeReviewSkippedThisSession.has(key)) continue;
+      if(myTitles.has(placeReviewNorm(name))) continue; // 이미 이 장소 후기를 올렸으면 안 물어봄
+      return {
+        key, roomId, pin, end, name,
+        lat: typeof placePin.locationLat === 'number' ? placePin.locationLat : null,
+        lon: typeof placePin.locationLon === 'number' ? placePin.locationLon : null,
+        address: placePin.locationAddress || '',
+      };
+    }
   }
   return null;
 }
@@ -19661,34 +19666,59 @@ document.getElementById('appConfirmOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'appConfirmOverlay') closeAppConfirm(false);
 });
 
-// 이 방에서 "장소만" 정해둔 핀들(장소 제안 수락 등으로 생긴 것)을 지움 - keepPin은 남김.
-// 약속 카드에서 장소를 새로 고르거나 삭제했을 때, 예전에 정해졌던 장소가 다시 튀어나오지 않게 하려고 씀
-function dropRoomPlaceOnlyPins(room, keepPin){
-  const olds = (room.pinnedSchedules || []).filter(p => p !== keepPin && !p.dateLabel && p.location);
+// 이 방에서 "장소만" 정해둔 핀 중 이름이 name인 것들을 지움 - keepPin은 남김.
+// 일정 카드에 들어간 장소와 같은 곳(투표/픽스로 정해져서 일정 카드에도 채워진 것)이 따로 또 남지 않게 하려고 씀
+function dropRoomPlaceOnlyPins(room, keepPin, name){
+  const key = (name || '').trim().toLowerCase();
+  if(!key) return;
+  const olds = (room.pinnedSchedules || []).filter(p => p !== keepPin && !p.dateLabel && (p.location || '').trim().toLowerCase() === key);
   if(!olds.length) return;
   room.pinnedSchedules = room.pinnedSchedules.filter(p => !olds.includes(p));
   olds.forEach(p => syncPinDeleteToServer(room, p));
 }
 
-function removePinnedLocation(pinId){
+// 이 약속의 장소 목록 (1차, 2차...) - 일정 카드에 직접 정해둔 장소가 맨 앞, 그 뒤로 투표/픽스로 정해진
+// "장소만 있는 핀"들을 정해진 순서대로. 같은 장소가 두 군데 다 있으면 한 번만 보여줌
+function roomMeetPlaces(room, pin){
+  const seen = new Set();
+  const out = [];
+  const add = (p) => {
+    const key = (p.location || '').trim().toLowerCase();
+    if(!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(p);
+  };
+  if(pin && pin.location) add(pin);
+  (room.pinnedSchedules || []).filter(p => !p.dateLabel).forEach(add);
+  return out;
+}
+function meetPlaceOrderLabel(idx){
+  return `${idx + 1}차`;
+}
+
+// 장소 목록에서 장소 하나를 지움 - placePin이 일정 카드 자체면 그 카드의 장소만 비우고, "장소만 있는 핀"이면 핀을 지움
+function removePinnedLocation(pinId, placePinId){
   const roomId = activeChatRoomId;
   const room = CHAT_ROOMS[roomId];
   if(!room || !room.pinnedSchedules) return;
   const pin = room.pinnedSchedules.find(p => p.id === pinId);
   if(!pin) return;
-  // 카드에 보이는 장소가 이 핀 자체 장소가 아니라 "장소만 정해둔 핀"에서 온 것일 수도 있음
-  const hasPlaceOnly = room.pinnedSchedules.some(p => p !== pin && !p.dateLabel && p.location);
-  if(!pin.location && !hasPlaceOnly) return;
+  const placePin = room.pinnedSchedules.find(p => p.id === (placePinId || pinId));
+  if(!placePin || !placePin.location) return;
+  const name = placePin.location;
 
-  if(pin.location){
-    pin.location = null;
-    pin.locationAddress = null;
-    pin.locationLat = null;
-    pin.locationLon = null;
-    syncPinLocationUpdateToServer(room, pin);
+  if(placePin.dateLabel){
+    placePin.location = null;
+    placePin.locationAddress = null;
+    placePin.locationLat = null;
+    placePin.locationLon = null;
+    syncPinLocationUpdateToServer(room, placePin);
+  } else {
+    room.pinnedSchedules = room.pinnedSchedules.filter(p => p !== placePin);
+    syncPinDeleteToServer(room, placePin);
   }
-  // 예전에 정해졌던 장소가 대신 다시 뜨지 않도록 같이 지움
-  if(pin.dateLabel) dropRoomPlaceOnlyPins(room, null);
+  // 같은 장소가 "장소만 있는 핀"으로도 남아있으면 대신 다시 뜨지 않도록 같이 지움
+  dropRoomPlaceOnlyPins(room, null, name);
 
   // "근처에서 만나요" 카드가 있었으면 그 카드가 "약속 장소가 삭제됐어요"로 바뀌니 알림을 따로 또 넣지 않음
   const hadNotice = room.messages.some(m => m.type === 'hotplace' && !m.superseded);
@@ -19697,7 +19727,7 @@ function removePinnedLocation(pinId){
     type: 'system-notice',
     id: 'sys' + (locationMsgIdCounter++),
     icon: 'pin',
-    text: '약속 장소가 삭제됐어요',
+    text: `약속 장소에서 "${name}"이(가) 삭제됐어요`,
     time: new Date(),
   });
 
@@ -19705,7 +19735,7 @@ function removePinnedLocation(pinId){
   renderChatMessages();
   renderPinnedSchedule();
   renderChatList();
-  showToast('장소를 삭제했어요.');
+  showToast(`"${name}"을(를) 삭제했어요.`);
 }
 
 // 상단 고정 카드 자체를 완전히 지움 (날짜/장소가 없어서 자동으로 안 없어지는 오래된 핀을 직접 정리할 때 사용)
@@ -19819,7 +19849,7 @@ async function fixHotplaceLocation(post){
       renderPinnedSchedule();
       renderChatList();
       dismissView(closeHotplaceView);
-      showToast(`장소가 "${post.place}"(으)로 확정됐어요!`);
+      showToast(`"${post.place}"을(를) 약속 장소로 정했어요!`);
     } catch(err){
       showToast(err.message);
     }
@@ -19842,7 +19872,7 @@ async function fixHotplaceLocation(post){
   renderPinnedSchedule();
   renderChatList();
   dismissView(closeHotplaceView);
-  showToast(`장소가 "${post.place}"(으)로 확정됐어요!`);
+  showToast(`"${post.place}"을(를) 약속 장소로 정했어요!`);
 }
 
 // 받은 장소 제안 수락 (채팅 카드의 "수락" / 제안 지도 보기의 "이 장소로 수락" 공용)
@@ -20081,7 +20111,7 @@ async function afterLocationSuggestChange(roomId, room, beforePending){
   refreshPlaceViewer();
   if(confirmedNow){
     if(placeViewerState) goBackOrClose(closePlaceSuggestionMap);
-    showToast(`"${confirmedNow.place}"(으)로 약속 장소가 정해졌어요!`);
+    showToast(`"${confirmedNow.place}"이(가) 약속 장소로 정해졌어요!`);
   }
 }
 
@@ -20139,7 +20169,8 @@ document.getElementById('placeViewerAddBtn').addEventListener('click', () => {
   goBackOrClose(closePlaceSuggestionMap);
   if(!room) return;
   const pin = pinned || (room.pinnedSchedules || []).find(p => p.dateObj) || null;
-  if(pin){
+  // 이미 정해진 장소가 있으면 바꾸지 않고 다음 차수 장소로 추가됨
+  if(pin && !roomMeetPlaces(room, pin).length){
     changePinLocation(room, roomId, pin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
   } else {
     openLocationPicker('', null, null, (label, lat, lon) => fixHotplaceLocation({ place: label, location: '', lat, lon }), { roomId });
@@ -21944,12 +21975,14 @@ let activeChatRoomId = null;
 // afterPicked(label, lat, lon)로 화면마다 다른 마무리 동작(핫플 열기, 상세보기 다시 그리기 등)을 넘김
 function changePinLocation(room, roomId, pin, afterPicked, pickerOpts){
   openLocationPicker(pin.location || '', pin.locationLat, pin.locationLon, async (label, lat, lon, addr) => {
+    const oldName = pin.location;
     pin.location = label;
     pin.locationAddress = addr && addr !== label ? addr : null;
     pin.locationLat = lat;
     pin.locationLon = lon;
-    // 새로 고른 장소만 남기고, 예전에 정해졌던 장소(장소만 있는 핀)는 지움
-    dropRoomPlaceOnlyPins(room, pin.dateLabel ? null : pin);
+    // 바꾸기 전 장소가 "장소만 있는 핀"으로도 남아있으면 같이 지움 (안 그러면 예전 장소가 다음 차수로 다시 튀어나옴).
+    // 다른 차수의 장소들은 그대로 둠
+    dropRoomPlaceOnlyPins(room, pin, oldName);
     const syncResult = await syncPinLocationUpdateToServer(room, pin);
     if(syncResult && syncResult.message){
       // 서버가 만들어준 알림 메시지를 그대로 써서 내 화면에도 반영 (상대방에게는 이미 실시간으로 전달됨).
@@ -21967,7 +22000,22 @@ function changePinLocation(room, roomId, pin, afterPicked, pickerOpts){
   }, pickerOpts);
 }
 
-// 고정 카드에 보여줄 장소 주소 - 저장된 주소가 있으면 그걸, 없으면(예전에 정한 장소) 좌표로 한 번만 주소를 찾아서 채움
+// "장소 정하기" / "+ 장소 추가" - 투표 중인 장소 후보가 있으면 후보 목록(투표/픽스) 화면부터 열고, 없으면 지도가 열림.
+// 아직 장소가 없으면 이 약속 카드에 첫 장소를 넣고, 이미 있으면 다음 차수(2차, 3차...) 장소로 바로 추가함
+function addMeetPlace(room, roomId, pinned){
+  if(hasPendingLocationSuggests(room)){
+    openPlaceSuggestionMap(roomId, null, pinned);
+    return;
+  }
+  if(!pinned || !roomMeetPlaces(room, pinned).length){
+    if(pinned) changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
+    else openLocationPicker('', null, null, (label, lat, lon, addr) => fixHotplaceLocation({ place: label, location: addr || '', lat, lon }), { roomId });
+    return;
+  }
+  openLocationPicker('', null, null, (label, lat, lon, addr) => fixHotplaceLocation({ place: label, location: addr && addr !== label ? addr : '', lat, lon }), { roomId });
+}
+
+// 고정 카드에 보여줄 장소 주소 -저장된 주소가 있으면 그걸, 없으면(예전에 정한 장소) 좌표로 한 번만 주소를 찾아서 채움
 function pinnedLocationAddress(pin){
   if(pin.locationAddress && pin.locationAddress !== pin.location) return pin.locationAddress;
   if(pin._geoAddress !== undefined) return pin._geoAddress && pin._geoAddress !== pin.location ? pin._geoAddress : '';
@@ -22030,15 +22078,12 @@ function renderPinnedSchedule(){
   listEl.className = 'pin-list' + (room.pinnedCollapsed ? ' collapsed' : '');
   el.appendChild(listEl);
 
-  // 날짜 없이 "장소만" 확정된 핀(장소 투표/픽스로 정해진 곳) - 장소가 아직 비어있는 일정 카드엔 이 장소를 대신 보여줌
-  const placeOnlyPin = [...room.pinnedSchedules].reverse().find(p => !p.dateLabel && p.location);
-
   // 확정된 예약/장소가 여러 개면 전부 카드로 보여줌
   pins.forEach(pinned => {
     const { dateLabel, timeLabel, note, dateObj } = pinned;
-    const placePin = pinned.location ? pinned : placeOnlyPin;
-    const location = placePin ? placePin.location : null;
-    const locationAddress = placePin ? pinnedLocationAddress(placePin) : '';
+    // 이 약속의 장소들 (1차, 2차...) - 일정 카드에 장소가 없으면 투표/픽스로 정해진 "장소만 있는 핀"들을 보여줌
+    const places = roomMeetPlaces(room, pinned);
+    const multi = places.length > 1;
 
     const card = document.createElement('div');
     card.className = 'pin-card';
@@ -22048,15 +22093,23 @@ function renderPinnedSchedule(){
         <div class="pin-info">
           ${dateLabel ? `<div class="pin-time">${dateLabel} ${timeLabel}</div>` : ''}
           ${note ? `<div class="pin-note">${escapeHtml(note)}</div>` : ''}
-          ${location ? `<div class="pin-note">${ICO.pin} ${escapeHtml(location)}</div>` : ''}
+          ${places.length ? `<div class="pin-note">${ICO.pin} ${places.map(p => escapeHtml(p.location)).join(' → ')}</div>` : ''}
         </div>
       </div>
       <div class="pin-actions">
+        ${places.length ? `<div class="pin-places">${places.map((p, idx) => {
+          const addr = pinnedLocationAddress(p);
+          return `
+          <div class="pin-place-row">
+            <button type="button" class="pin-action-btn pin-set-loc has-loc" data-place-idx="${idx}">
+              ${multi ? `<span class="pin-place-order">${meetPlaceOrderLabel(idx)}</span>` : ''}
+              <span class="pin-loc-name">${ICO.pin} ${escapeHtml(p.location)}</span>${addr ? `<span class="pin-loc-addr">${escapeHtml(addr)}</span>` : ''}
+            </button>
+            <button type="button" class="pin-action-btn danger pin-remove-loc" data-place-idx="${idx}">삭제</button>
+          </div>`;
+        }).join('')}</div>` : ''}
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 일정 보기</button>` : ''}
-        <button type="button" class="pin-action-btn pin-set-loc${location ? ' has-loc' : ''}">${location
-          ? `<span class="pin-loc-name">${ICO.pin} ${escapeHtml(location)}</span>${locationAddress ? `<span class="pin-loc-addr">${escapeHtml(locationAddress)}</span>` : ''}`
-          : '장소 정하기'}</button>
-        ${location ? `<button type="button" class="pin-action-btn danger pin-remove-loc">장소 삭제</button>` : ''}
+        <button type="button" class="pin-action-btn pin-add-loc">${places.length ? '+ 장소 추가' : '장소 정하기'}</button>
         ${!dateObj ? `<button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>` : ''}
       </div>
     `;
@@ -22072,23 +22125,25 @@ function renderPinnedSchedule(){
       goDayBtn.addEventListener('click', () => viewDayFromChat(new Date(dateObj)));
     }
 
-    const setLocBtn = card.querySelector('.pin-set-loc');
-    if(setLocBtn){
-      setLocBtn.addEventListener('click', () => {
-        const roomId = activeChatRoomId;
-        // 투표 중인 장소 후보가 있으면 후보 목록(투표/픽스) 화면부터, 없으면 바로 지도가 열림 - 지도 상단에
-        // "모임 장소 추천받기", 아래에 "제안 후보 담기"가 있어서 거기서 다 할 수 있음
-        if(hasPendingLocationSuggests(room)){
-          openPlaceSuggestionMap(roomId, null, pinned);
-          return;
-        }
-        changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
+    // 장소를 누르면 그 장소만 다른 곳으로 변경 (다른 차수의 장소는 그대로)
+    card.querySelectorAll('.pin-set-loc').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
+        if(!placePin) return;
+        changePinLocation(room, activeChatRoomId, placePin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId: activeChatRoomId });
       });
-    }
+    });
 
-    const removeLocBtn = card.querySelector('.pin-remove-loc');
-    if(removeLocBtn){
-      removeLocBtn.addEventListener('click', () => removePinnedLocation(pinned.id));
+    card.querySelectorAll('.pin-remove-loc').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
+        if(placePin) removePinnedLocation(pinned.id, placePin.id);
+      });
+    });
+
+    const addLocBtn = card.querySelector('.pin-add-loc');
+    if(addLocBtn){
+      addLocBtn.addEventListener('click', () => addMeetPlace(room, activeChatRoomId, pinned));
     }
 
     const deleteItemBtn = card.querySelector('.pin-delete-item');
@@ -22133,16 +22188,15 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
 
   document.getElementById('appointmentDetailTitle').textContent = pin.dateLabel ? `${pin.dateLabel} 약속` : '약속 상세';
 
-  // "친구가 추천해서 수락한 장소" = 날짜 없이 장소만 있는 핀 중에서, 사람이 직접 "장소 정하기"로 입력한 게
-  // 아니라 "장소 제안"이 수락/즉시확정돼서 생긴 것(sourceMsgId가 있는 것)만. 실제로 저장된 핀 자체를 갖고
-  // 보여주기 때문에, 아래에서 변경/삭제 버튼이 이 핀에 바로 반영됨(채팅 기록만 보고 표시하면 지우거나
-  // 바꿀 수 있는 실체가 없음)
-  const acceptedPlaces = (room.pinnedSchedules || [])
-    .filter(p => !p.dateObj && p.sourceMsgId)
-    .map(p => ({
-      pin: p,
-      srcMsg: (room.messages || []).find(m => m.id === p.sourceMsgId || m._serverId === p.sourceMsgId),
-    }));
+  // 이 약속의 장소들 (1차, 2차...) - 실제로 저장된 핀 자체를 갖고 보여주기 때문에, 아래 삭제 버튼이 이 핀에
+  // 바로 반영됨. 장소 제안이 확정돼서 생긴 장소면 누가 추천했는지도 같이 보여줌
+  const meetPlaces = roomMeetPlaces(room, pin).map(p => ({
+    pin: p,
+    srcMsg: !p.dateLabel && p.sourceMsgId
+      ? (room.messages || []).find(m => m.type === 'location-suggest' && (m.id === p.sourceMsgId || m._serverId === p.sourceMsgId))
+      : null,
+  }));
+  const multiPlaces = meetPlaces.length > 1;
 
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
@@ -22153,60 +22207,56 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
         : `<div class="appt-detail-empty">아직 날짜가 정해지지 않았어요.</div>`}
     </div>
     <div class="appt-detail-section">
-      <div class="appt-detail-label">${ICO.pin} 장소</div>
-      ${pin.location
-        ? `<div class="appt-detail-location-card" id="apptDetailLocationCard">${ICO.pin} ${escapeHtml(pin.location)}</div>
-           <button type="button" class="hotplace-notice-btn" id="apptDetailHotplaceBtn" style="margin-top:8px;">${ICO.pin} 주변 핫플 보기</button>`
-        : `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>`}
-    </div>
-    <div class="appt-detail-section">
-      <div class="appt-detail-label">${ICO.check} 친구가 추천해서 수락한 장소</div>
-      ${acceptedPlaces.length === 0
-        ? `<div class="appt-detail-empty">아직 수락된 장소 제안이 없어요.</div>`
-        : acceptedPlaces.map(({ pin: p, srcMsg }, idx) => {
+      <div class="appt-detail-label">${ICO.pin} 장소${multiPlaces ? ` (${meetPlaces.length}곳)` : ''}</div>
+      ${meetPlaces.length === 0
+        ? `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>`
+        : meetPlaces.map(({ pin: p, srcMsg }, idx) => {
             const senderLabel = srcMsg
               ? (srcMsg.who === 'me' ? '내가 추천' : `${escapeHtml(getGroupSenderName(room, srcMsg) || room.name)}님이 추천`)
-              : '추천된 장소';
+              : '';
             const timeLabel = srcMsg ? ` · ${formatMessageTime(srcMsg.time)}` : '';
+            const addr = p.locationAddress && p.locationAddress !== p.location ? p.locationAddress : (srcMsg && srcMsg.location) || '';
             return `
               <div class="appt-detail-place-row" data-idx="${idx}">
-                <div class="appt-detail-place-name">${idx + 1}. ${escapeHtml(p.location)}</div>
-                ${srcMsg && srcMsg.location ? `<div class="appt-detail-place-sub">${escapeHtml(srcMsg.location)}</div>` : ''}
-                <div class="appt-detail-place-meta">${senderLabel}${timeLabel}</div>
+                <div class="appt-detail-place-name">${multiPlaces ? `${meetPlaceOrderLabel(idx)} · ` : ''}${escapeHtml(p.location)}</div>
+                ${addr ? `<div class="appt-detail-place-sub">${escapeHtml(addr)}</div>` : ''}
+                ${senderLabel ? `<div class="appt-detail-place-meta">${senderLabel}${timeLabel}</div>` : ''}
                 <div class="appt-detail-place-actions">
+                  <button type="button" class="appt-place-action-btn appt-place-hotplace" data-idx="${idx}">주변 핫플</button>
                   <button type="button" class="appt-place-action-btn danger appt-place-delete" data-idx="${idx}">삭제</button>
                 </div>
               </div>
             `;
           }).join('')}
+      ${meetPlaces.length ? `<button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">+ 장소 추가 (${meetPlaceOrderLabel(meetPlaces.length)})</button>` : ''}
     </div>
   `;
 
-  const locCard = document.getElementById('apptDetailLocationCard');
-  if(locCard){
-    locCard.addEventListener('click', () => openApptLocationMap(pin.location, pin.location, pin.locationLat, pin.locationLon));
-  }
-  const hotplaceBtn = document.getElementById('apptDetailHotplaceBtn');
-  if(hotplaceBtn){
-    hotplaceBtn.addEventListener('click', () => openHotplaceView(pin.location, pin.locationLat, pin.locationLon));
+  const addPlaceBtn = document.getElementById('apptDetailAddPlaceBtn');
+  if(addPlaceBtn){
+    addPlaceBtn.addEventListener('click', () => {
+      goBackOrClose(closeAppointmentDetailView);
+      addMeetPlace(room, roomId, pin);
+    });
   }
   body.querySelectorAll('.appt-detail-place-row').forEach(row => {
     const idx = parseInt(row.dataset.idx, 10);
-    const entry = acceptedPlaces[idx];
+    const entry = meetPlaces[idx];
     if(!entry) return;
+    const { pin: p, srcMsg } = entry;
     row.addEventListener('click', (e) => {
       if(e.target.closest('button')) return;
-      const { pin: p, srcMsg } = entry;
-      openApptLocationMap((srcMsg && srcMsg.place) || p.location, (srcMsg && srcMsg.location) || p.location, p.locationLat, p.locationLon);
+      openApptLocationMap((srcMsg && srcMsg.place) || p.location, (srcMsg && srcMsg.location) || p.locationAddress || p.location, p.locationLat, p.locationLon);
     });
-    const deleteBtn = row.querySelector('.appt-place-delete');
-    if(deleteBtn){
-      deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deletePinnedItem(entry.pin.id);
-        openAppointmentDetailView(roomId, pinId, apptDetailReturnViewId);
-      });
-    }
+    row.querySelector('.appt-place-hotplace').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openHotplaceView(p.location, p.locationLat, p.locationLon);
+    });
+    row.querySelector('.appt-place-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      removePinnedLocation(pin.id, p.id);
+      openAppointmentDetailView(roomId, pinId, apptDetailReturnViewId);
+    });
   });
 
   document.getElementById(apptDetailReturnViewId).classList.remove('active');
