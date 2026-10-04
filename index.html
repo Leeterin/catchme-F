@@ -182,6 +182,29 @@
   .home-appt-name{ font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .home-appt-sub{ font-size:12px; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .home-empty{ font-size:13px; color:var(--text-dim); line-height:1.5; padding:4px 2px 2px; }
+  .onboarding-close{ border:none; background:none; color:var(--text-dim); font-size:12px; cursor:pointer; padding:0; font-family:'Inter',sans-serif; }
+  .onboarding-bar{ height:5px; border-radius:3px; background:var(--surface-2); overflow:hidden; margin-bottom:6px; }
+  .onboarding-bar span{ display:block; height:100%; background:var(--accent); border-radius:3px; }
+  .onboarding-step{
+    display:flex; align-items:center; gap:10px; width:100%;
+    padding:10px 2px; border:none; border-top:1px solid var(--line); background:none;
+    color:var(--text); text-align:left; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .onboarding-bar + .onboarding-step{ border-top:none; }
+  .onboarding-step:disabled{ cursor:default; }
+  .onboarding-check{
+    flex-shrink:0; width:24px; height:24px; border-radius:50%;
+    border:1.5px solid var(--line); color:var(--text-dim);
+    display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700;
+  }
+  .onboarding-step.next .onboarding-check{ border-color:var(--accent); color:var(--accent); }
+  .onboarding-step.done .onboarding-check{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .onboarding-text{ flex:1; min-width:0; }
+  .onboarding-text b{ display:block; font-size:13.5px; }
+  .onboarding-step.done .onboarding-text b{ color:var(--text-dim); text-decoration:line-through; }
+  .onboarding-text small{ display:block; font-size:11.5px; color:var(--text-dim); margin-top:2px; }
+  .onboarding-step.done .onboarding-text small{ display:none; }
+  .onboarding-go{ flex-shrink:0; color:var(--accent); font-size:20px; line-height:1; }
 
   /* ---------------- Calendar ---------------- */
   .calendar-card{
@@ -9685,8 +9708,81 @@ function homeDayLabel(dateObj){
   return `${dateObj.getMonth() + 1}/${dateObj.getDate()}`;
 }
 const HOME_UPCOMING_MAX = 4;
-// 처음 쓰는 사람용 시작 안내 (아직 없음)
-function renderHomeOnboarding(){}
+// ---------- 처음 쓰는 사람용 시작 안내 (3단계) ----------
+// 캐치미는 "내가 예약 가능 시간을 열어두고 → 친구가 그 시간에 예약"하는 구조라, 시간을 안 열어두거나 친구가 없으면
+// 핵심 기능을 아예 못 써봄. 그래서 홈 맨 위에 해야 할 일 3개를 보여주고, 다 하거나 닫으면 다시 안 뜸
+function onboardingDismissKey(){
+  return 'catchme_onboarding_dismissed_' + (currentUser && currentUser.id ? currentUser.id : 'anon');
+}
+function homeOnboardingSteps(){
+  return [
+    {
+      id: 'available', title: '내 예약 가능 시간 열어두기',
+      desc: '친구들이 이 시간 안에서 나에게 약속을 걸 수 있어요',
+      done: SCHEDULE_EVENTS.some(e => e.type === 'available'),
+    },
+    {
+      id: 'friend', title: '친구 추가하기',
+      desc: '아이디로 찾거나, 약속 링크로 초대해요',
+      done: FRIENDS.length > 0,
+    },
+    {
+      id: 'plan', title: '첫 약속 잡기',
+      desc: '친구 빈 시간에 예약하거나 같이 비는 시간을 찾아요',
+      done: Object.values(CHAT_ROOMS).some(r => (r.pinnedSchedules || []).some(p => p.dateLabel)),
+    },
+  ];
+}
+function renderHomeOnboarding(){
+  const el = document.getElementById('homeOnboarding');
+  if(!el) return;
+  let dismissed = false;
+  try { dismissed = localStorage.getItem(onboardingDismissKey()) === '1'; } catch(e){}
+  const steps = homeOnboardingSteps();
+  const doneCount = steps.filter(s => s.done).length;
+  if(dismissed || doneCount === steps.length){
+    el.innerHTML = '';
+    return;
+  }
+  const nextIdx = steps.findIndex(s => !s.done);
+  el.innerHTML = `
+    <div class="home-card onboarding-card">
+      <div class="home-card-title">
+        <span>캐치미 시작하기 · ${doneCount}/${steps.length}</span>
+        <button type="button" class="onboarding-close" id="onboardingCloseBtn">닫기</button>
+      </div>
+      <div class="onboarding-bar"><span style="width:${Math.round(doneCount / steps.length * 100)}%"></span></div>
+      ${steps.map((s, i) => `
+        <button type="button" class="onboarding-step${s.done ? ' done' : ''}${i === nextIdx ? ' next' : ''}" data-step="${s.id}" ${s.done ? 'disabled' : ''}>
+          <span class="onboarding-check">${s.done ? '✓' : i + 1}</span>
+          <span class="onboarding-text"><b>${s.title}</b><small>${s.desc}</small></span>
+          ${s.done ? '' : '<span class="onboarding-go">&rsaquo;</span>'}
+        </button>`).join('')}
+    </div>`;
+  document.getElementById('onboardingCloseBtn').addEventListener('click', () => {
+    try { localStorage.setItem(onboardingDismissKey(), '1'); } catch(e){}
+    el.innerHTML = '';
+  });
+  el.querySelectorAll('.onboarding-step:not(.done)').forEach(btn => {
+    btn.addEventListener('click', () => runOnboardingStep(btn.dataset.step));
+  });
+}
+function runOnboardingStep(id){
+  if(id === 'available'){
+    // 일정 추가 화면을 "예약 가능 시간" 유형으로 바로 엶
+    scheduleFocusDate = new Date(TODAY);
+    switchTopTab('schedule');
+    switchScheduleView('day');
+    openEventForm();
+    setEventTypeUI('available');
+    showToast('가능한 시간을 골라서 추가해 주세요.');
+  } else if(id === 'friend'){
+    switchTopTab('friends');
+    document.getElementById('addFriendBtn').click();
+  } else if(id === 'plan'){
+    openPlanStart();
+  }
+}
 function renderHomeDash(){
   const listEl = document.getElementById('homeUpcomingList');
   if(!listEl) return;
