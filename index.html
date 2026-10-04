@@ -3789,6 +3789,20 @@
     max-height:100%;
     border-radius:8px;
   }
+  .image-preview-reply-btn{
+    position:absolute;
+    left:50%;
+    bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translateX(-50%);
+    padding:10px 22px;
+    border:none;
+    border-radius:999px;
+    background:rgba(255,255,255,0.18);
+    color:#fff;
+    font-size:15px;
+    font-weight:600;
+    cursor:pointer;
+  }
   .msg-quote-block{
     display:block;
     border-radius:8px;
@@ -13626,17 +13640,26 @@ async function sendChatImageMessage(dataUrl){
 }
 
 // 이미지 크게 보기 (탭하면 화면 전체로)
-function openImagePreview(url){
+// replyMsg를 넘기면(채팅 사진) 아래에 "답장" 버튼이 같이 뜸
+let imagePreviewReplyMsg = null;
+function openImagePreview(url, replyMsg){
   let overlay = document.getElementById('imagePreviewOverlay');
   if(!overlay){
     overlay = document.createElement('div');
     overlay.id = 'imagePreviewOverlay';
     overlay.className = 'image-preview-overlay';
-    overlay.innerHTML = '<img id="imagePreviewImg" src="" alt="사진 크게 보기" />';
+    overlay.innerHTML = '<img id="imagePreviewImg" src="" alt="사진 크게 보기" /><button type="button" class="image-preview-reply-btn" id="imagePreviewReplyBtn">답장</button>';
     overlay.addEventListener('click', () => overlay.classList.remove('show'));
+    overlay.querySelector('#imagePreviewReplyBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      overlay.classList.remove('show');
+      if(imagePreviewReplyMsg) startReplyTo(imagePreviewReplyMsg);
+    });
     document.body.appendChild(overlay);
   }
+  imagePreviewReplyMsg = replyMsg || null;
   document.getElementById('imagePreviewImg').src = url;
+  document.getElementById('imagePreviewReplyBtn').style.display = imagePreviewReplyMsg ? '' : 'none';
   overlay.classList.add('show');
 }
 
@@ -23989,7 +24012,11 @@ function renderChatMessages(){
     } else if(m.type === 'image'){
       const imgHtml = `<div class="msg-bubble msg-bubble-image"><img src="${m.imageUrl}" alt="사진" loading="lazy" /></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + imgHtml) : (imgHtml + metaHtml);
-      row.querySelector('img').addEventListener('click', () => openImagePreview(m.imageUrl));
+      // 사진을 누르면 크게 보기만 열림 (예전엔 말풍선의 "누르면 답장"까지 같이 눌려서 키보드가 올라왔음) - 답장은 크게 보기 화면의 버튼으로
+      row.querySelector('img').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openImagePreview(m.imageUrl, m.id ? m : null);
+      });
       attachReplyTapToCard(row.querySelector('.msg-bubble-image'), m);
     } else {
       const quoteHtml = m.replyTo ? `
