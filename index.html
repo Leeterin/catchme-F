@@ -7306,11 +7306,11 @@
         </div>
         <div class="event-form-time-row" id="eventFormDateRangeRow">
           <div class="mp-input-group">
-            <label>시작 날짜</label>
+            <label id="eventFormStartDateLabel">시작 날짜</label>
             <input type="hidden" id="eventFormStartDate" />
             <button type="button" class="date-picker-btn" data-target="eventFormStartDate">-</button>
           </div>
-          <div class="mp-input-group">
+          <div class="mp-input-group" id="eventFormEndDateGroup">
             <label>종료 날짜</label>
             <input type="hidden" id="eventFormEndDate" />
             <button type="button" class="date-picker-btn" data-target="eventFormEndDate">-</button>
@@ -14357,6 +14357,7 @@ function eventAppliesToDate(ev, dNum, dow, key){
   if(ev.recurring){
     return ev.recurring.weekdays.includes(dow)
       && (!ev.recurring.until || key <= recurringUntilKey(ev.recurring.until))
+      && (!ev.recurringAnchorDateKey || key >= ev.recurringAnchorDateKey) // 반복 시작일 전엔 안 나옴
       && !(ev.recurring.exceptions && ev.recurring.exceptions.includes(key));
   }
   if(ev.dateRange){
@@ -14966,6 +14967,16 @@ function deleteScheduleEventAndLinked(ev){
   resyncAllScheduleEvents();
 }
 
+// 날짜 줄: 반복 안 함이면 시작/종료 날짜, 요일 반복이면 "반복 시작일"만 보여줌 (예전엔 반복이면 날짜 줄이 통째로 숨어서
+// 시작일을 정할 수 없었고, 반복이 과거로 끝없이 펼쳐졌음)
+function applyRepeatModeDateUI(){
+  const weekly = formRepeatMode === 'weekly';
+  document.getElementById('eventFormDateRangeRow').style.display = 'flex';
+  document.getElementById('eventFormEndDateGroup').style.display = weekly ? 'none' : '';
+  document.getElementById('eventFormStartDateLabel').textContent = weekly ? '반복 시작일' : '시작 날짜';
+  refreshDateDisplay('eventFormStartDate');
+}
+
 function createScheduleEvent({ title, startMin, endMin, visibility, recurringWeekdays, until, dateKey, dateRange, type, linkGroupId, color, availableFor }){
   const ev = {
     id: 'ev' + (scheduleEventIdCounter++),
@@ -15441,7 +15452,7 @@ function openEventForm(existingEvent){
     document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === formRepeatMode));
     document.getElementById('weekdayPicker').style.display = formRepeatMode === 'weekly' ? 'flex' : 'none';
     document.getElementById('repeatUntilGroup').style.display = formRepeatMode === 'weekly' ? 'block' : 'none';
-    document.getElementById('eventFormDateRangeRow').style.display = formRepeatMode === 'once' ? 'flex' : 'none';
+    applyRepeatModeDateUI();
 
     if(existingEvent.dateRange){
       document.getElementById('eventFormStart').value = minutesToLabel(existingEvent.startMin);
@@ -15475,9 +15486,11 @@ function openEventForm(existingEvent){
     } else {
       document.getElementById('eventFormStart').value = minutesToLabel(existingEvent.startMin);
       document.getElementById('eventFormEnd').value = minutesToLabel(existingEvent.endMin);
-      document.getElementById('eventFormStartDate').value = toDateInputValue(scheduleFocusDate);
+      // 반복 일정이면 시작 날짜 칸 = 저장된 반복 시작일
+      document.getElementById('eventFormStartDate').value = (existingEvent.recurring && existingEvent.recurringAnchorDateKey) || toDateInputValue(scheduleFocusDate);
       document.getElementById('eventFormEndDate').value = toDateInputValue(scheduleFocusDate);
     }
+    applyRepeatModeDateUI();
 
     formSelectedWeekdays.clear();
     document.querySelectorAll('.weekday-pick-btn').forEach(b => {
@@ -15528,7 +15541,6 @@ function openEventForm(existingEvent){
     document.getElementById('eventFormTitle').value = '';
     document.getElementById('eventFormStartDate').value = toDateInputValue(scheduleFocusDate);
     document.getElementById('eventFormEndDate').value = toDateInputValue(scheduleFocusDate);
-    document.getElementById('eventFormDateRangeRow').style.display = 'flex';
     document.getElementById('eventFormStart').value = '09:00';
     document.getElementById('eventFormEnd').value = '10:00';
 
@@ -15536,6 +15548,7 @@ function openEventForm(existingEvent){
     document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === 'once'));
     document.getElementById('weekdayPicker').style.display = 'none';
     document.getElementById('repeatUntilGroup').style.display = 'none';
+    applyRepeatModeDateUI();
     document.getElementById('eventFormUntil').value = defaultUntilDateValue();
     formSelectedWeekdays.clear();
     document.querySelectorAll('.weekday-pick-btn').forEach(b => b.classList.remove('on'));
@@ -16139,7 +16152,7 @@ document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(btn => {
     formRepeatMode = btn.dataset.mode;
     document.getElementById('weekdayPicker').style.display = formRepeatMode === 'weekly' ? 'flex' : 'none';
     document.getElementById('repeatUntilGroup').style.display = formRepeatMode === 'weekly' ? 'block' : 'none';
-    document.getElementById('eventFormDateRangeRow').style.display = formRepeatMode === 'once' ? 'flex' : 'none';
+    applyRepeatModeDateUI();
     if(formRepeatMode === 'weekly' && !document.getElementById('eventFormUntil').value){
       document.getElementById('eventFormUntil').value = defaultUntilDateValue();
     }
@@ -16303,9 +16316,12 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   }
 
   let until = null;
+  let recurringStartKey = null;
   if(formRepeatMode === 'weekly'){
     const untilStr = document.getElementById('eventFormUntil').value;
     if(!untilStr){ showToast('반복 종료일을 선택해주세요.'); return; }
+    recurringStartKey = document.getElementById('eventFormStartDate').value || dateKeyOf(scheduleFocusDate);
+    if(untilStr < recurringStartKey){ showToast('반복 종료일은 반복 시작일보다 뒤여야 해요.'); return; }
     until = untilStr; // "YYYY-MM-DD" 그대로 (서버에서 불러온 반복 일정과 같은 형식)
   }
 
@@ -16314,7 +16330,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   let dailyWindows;
   if(formRepeatMode === 'weekly'){
     dailyWindows = Array.from(formSelectedWeekdays).map(dow => {
-      const d = new Date(scheduleFocusDate);
+      const d = parseDateInputValue(recurringStartKey);
       d.setDate(d.getDate() + (dow - d.getDay() + 7) % 7);
       return { date: d, winStart: startMin, winEnd: endMin };
     });
@@ -16370,7 +16386,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           ev.color = formColor;
           const prevExceptions = (ev.recurring && ev.recurring.exceptions) || [];
           ev.recurring = formRepeatMode === 'weekly' ? { weekdays: Array.from(formSelectedWeekdays), until, exceptions: prevExceptions } : null;
-          ev.recurringAnchorDateKey = formRepeatMode === 'weekly' ? anchorForRecurring : null;
+          ev.recurringAnchorDateKey = formRepeatMode === 'weekly' ? (recurringStartKey || anchorForRecurring) : null;
           ev.startMin = startMin;
           ev.endMin = endMin;
           ev.dateRange = null;
@@ -16403,7 +16419,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           recurringWeekdays: formRepeatMode === 'weekly' ? Array.from(formSelectedWeekdays) : null,
           until,
           dateRange: null,
-          dateKey: formRepeatMode === 'weekly' ? dateKeyOf(scheduleFocusDate) : baseDateKey,
+          dateKey: formRepeatMode === 'weekly' ? recurringStartKey : baseDateKey,
           type: formEventType,
           color: formColor,
         });
