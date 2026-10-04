@@ -3813,6 +3813,23 @@
     pointer-events:none;
   }
   .msg-swipe-reply-icon.ready{ opacity:1; transform:scale(1); color:var(--accent); }
+  /* 컴퓨터(마우스)에서는 밀 수가 없어서, 메시지에 마우스를 올리면 옆에 답장 버튼이 나타남 */
+  .msg-hover-reply-btn{
+    align-self:center;
+    flex:none;
+    width:26px;
+    height:26px;
+    border:none;
+    border-radius:50%;
+    background:var(--surface-2);
+    color:var(--text-dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    padding:0;
+  }
+  .msg-hover-reply-btn:hover{ color:var(--accent); }
   .msg-quote-block{
     display:block;
     border-radius:8px;
@@ -11372,7 +11389,7 @@ async function renderMeetupRequests(){
     }
     body.innerHTML = requests.map(r => `
       <div class="meetup-request-row" data-user-id="${r.userId}">
-        <div class="placeholder-avatar" style="background:${colorForFriendId(r.userId)}">${r.hasAvatar ? `<img src="${cachedAvatarUrl(r.userId)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />` : escapeHtml(r.name[0])}</div>
+        <div class="placeholder-avatar" style="background:${colorForFriendId(r.userId)}">${r.hasAvatar ? `<img loading="lazy" src="${cachedAvatarUrl(r.userId)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />` : escapeHtml(r.name[0])}</div>
         <div class="meetup-request-info"><b>${escapeHtml(r.name)}</b><div class="bio">@${escapeHtml(r.username)}</div>${r.intro ? `<div class="bio" style="margin-top:2px;">${escapeHtml(r.intro)}</div>` : ''}</div>
         <div class="meetup-request-actions">
           <button class="meetup-request-approve-btn" data-action="approve">수락</button>
@@ -11730,7 +11747,7 @@ function feedSelfReviewAvatarHtml(){
   const name = myProfileData.reviewNickname || myProfileData.name || '?';
   const img = myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl;
   if(img){
-    return `<div class="placeholder-avatar"><img src="${img}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
+    return `<div class="placeholder-avatar"><img loading="lazy" src="${img}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
   }
   return `<div class="placeholder-avatar" style="background:${myProfileData.color}">${escapeHtml(name[0])}</div>`;
 }
@@ -11887,10 +11904,10 @@ renderFeedPosts();
 // 그것도 없으면 다른 곳과 동일하게 이름(리뷰 닉네임 우선) 첫 글자 이니셜을 색상 원으로 보여줌 (목록 카드/상세보기 공용)
 function feedAuthorAvatarHtml(author){
   if(author && author.hasReviewAvatar){
-    return `<div class="placeholder-avatar"><img src="${cachedReviewAvatarUrl(author.id)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
+    return `<div class="placeholder-avatar"><img loading="lazy" src="${cachedReviewAvatarUrl(author.id)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
   }
   if(author && author.hasAvatar){
-    return `<div class="placeholder-avatar"><img src="${cachedAvatarUrl(author.id)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
+    return `<div class="placeholder-avatar"><img loading="lazy" src="${cachedAvatarUrl(author.id)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
   }
   const key = author ? (author.username || author.id) : '?';
   const displayName = feedAuthorDisplayName(author);
@@ -11906,7 +11923,7 @@ function feedPostCardHtml(post){
   return `
     ${photos.length > 0 ? `
       <div class="feed-ig-photos">
-        <div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img src="${p}" />`).join('')}</div>
+        <div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img loading="lazy" src="${p}" />`).join('')}</div>
         ${photos.length > 1 ? `<div class="feed-ig-photo-count">📷 ${photos.length}</div>` : ''}
       </div>
     ` : ''}
@@ -11992,7 +12009,7 @@ function feedPostDetailHtml(post){
   return `
     ${photos.length > 0 ? `
       <div class="feed-detail-photos">
-        ${photos.map(p => `<img src="${p}" />`).join('')}
+        ${photos.map(p => `<img loading="lazy" src="${p}" />`).join('')}
       </div>
     ` : ''}
     <div class="feed-detail-body">
@@ -12552,7 +12569,7 @@ function renderFeedTagList(){
       const row = document.createElement('div');
       row.className = 'feed-tag-list-row';
       row.innerHTML = `
-        <div class="feed-tag-list-thumb">${cover ? `<img src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
+        <div class="feed-tag-list-thumb">${cover ? `<img loading="lazy" src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
         <div class="feed-tag-list-body">
           <div class="feed-tag-list-author">${escapeHtml(feedAuthorDisplayName(post.author))}${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}${renderFirstReviewerBadgeHtml(post)}${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}</div>
           ${typeof post.avgRating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.avgRating)} ${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</div>` : ''}
@@ -12574,7 +12591,7 @@ function renderFeedTagList(){
       const photo = document.createElement('div');
       photo.className = 'feed-tag-grid-photo';
       if(cover){
-        photo.innerHTML = `<img src="${cover}" alt="" />`;
+        photo.innerHTML = `<img loading="lazy" src="${cover}" alt="" />`;
       } else {
         // 사진 없이 별점/한줄평만 올린 글 - 빈 박스 대신 리뷰 내용을 그대로 카드처럼 보여줌
         photo.innerHTML = `
@@ -17672,7 +17689,7 @@ function renderFriendsList(){
       const row = document.createElement('div');
       row.className = 'placeholder-row';
       row.style.opacity = '0.6';
-      const avatarInner = req.avatar ? `<img src="${req.avatar}" alt="${escapeHtml(req.name)}" />` : escapeHtml(req.name[0]);
+      const avatarInner = req.avatar ? `<img loading="lazy" src="${req.avatar}" alt="${escapeHtml(req.name)}" />` : escapeHtml(req.name[0]);
       row.innerHTML = `
         <div class="placeholder-avatar" style="${req.avatar ? '' : `background:${req.color}`}">${avatarInner}</div>
         <div class="placeholder-text" style="flex:1;"><b>${escapeHtml(req.name)}</b><span>수락 대기 중</span></div>
@@ -17714,7 +17731,7 @@ function renderFriendsList(){
     const row = document.createElement('div');
     row.className = 'placeholder-row';
     const avatarInner = friend.avatar
-      ? `<img src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />`
+      ? `<img loading="lazy" src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />`
       : escapeHtml(friend.name[0]);
     row.innerHTML = `
       <div class="placeholder-avatar" style="${friend.avatar ? '' : `background:${friend.color}`}">${avatarInner}</div>
@@ -17954,7 +17971,7 @@ function renderGroupMemberCheckList(group){
   FRIENDS.forEach(friend => {
     const row = document.createElement('div');
     row.className = 'group-member-row';
-    const avatarInner = friend.avatar ? `<img src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />` : escapeHtml(friend.name[0]);
+    const avatarInner = friend.avatar ? `<img loading="lazy" src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />` : escapeHtml(friend.name[0]);
     row.innerHTML = `
       <div class="placeholder-avatar" style="${friend.avatar ? '' : `background:${friend.color}`}">${avatarInner}</div>
       <div class="placeholder-text" style="flex:1;"><b>${escapeHtml(friend.name)}</b><span>${escapeHtml(friend.status)}</span></div>
@@ -19542,7 +19559,7 @@ async function renderSuggestions(){
       card.className = 'suggest-card';
       card.style.cursor = 'pointer';
       card.innerHTML = `
-        <div class="placeholder-avatar"><img src="${avatarUrl(user)}" alt="${escapeHtml(user.name)}" /></div>
+        <div class="placeholder-avatar"><img loading="lazy" src="${avatarUrl(user)}" alt="${escapeHtml(user.name)}" /></div>
         <div class="suggest-info">
           <div class="suggest-name-row"><b>${escapeHtml(user.name)}</b><span class="suggest-distance">${ICO.pin} ${escapeHtml(user.distance)}</span></div>
           <span class="bio">${escapeHtml(user.bio)}</span>
@@ -19587,7 +19604,7 @@ async function renderSuggestions(){
       card.className = 'suggest-card';
       card.style.cursor = 'pointer';
       const avatarInner = user.hasAvatar
-        ? `<img src="${cachedAvatarUrl(user.id)}" alt="${escapeHtml(user.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`
+        ? `<img loading="lazy" src="${cachedAvatarUrl(user.id)}" alt="${escapeHtml(user.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`
         : escapeHtml(user.name[0]);
       // 서버는 개인정보 보호를 위해 대략적인 거리만 줌 (0.5km 단위, 1km 안쪽은 1)
       const distanceLabel = user.distanceKm <= 1 ? '1km 이내' : `약 ${user.distanceKm.toFixed(1)}km`;
@@ -19940,7 +19957,7 @@ function buildFeedPostCard(post, category, distKm){
           <button type="button" class="feed-post-btn fix">장소 픽스</button>
         </div>
       </div>
-      ${coverPhoto ? `<div class="feed-post-thumb"><img src="${coverPhoto}" alt="" /></div>` : ''}
+      ${coverPhoto ? `<div class="feed-post-thumb"><img loading="lazy" src="${coverPhoto}" alt="" /></div>` : ''}
     </div>
   `;
   const suggestBtn = card.querySelector('.feed-post-btn.suggest');
@@ -20002,7 +20019,7 @@ function buildFeedPlaceGroupCard(group, category, distKm){
           <button type="button" class="feed-post-btn fix">장소 픽스</button>
         </div>
       </div>
-      ${coverPhoto ? `<div class="feed-post-thumb"><img src="${coverPhoto}" alt="" /></div>` : ''}
+      ${coverPhoto ? `<div class="feed-post-thumb"><img loading="lazy" src="${coverPhoto}" alt="" /></div>` : ''}
     </div>
   `;
   const suggestBtn = card.querySelector('.feed-post-btn.suggest');
@@ -20137,7 +20154,7 @@ function renderHotplacePlaceReviewsBody(group, category, distKm){
     <div class="feed-tag-list">
       ${posts.map(post => `
         <div class="feed-tag-list-row" style="cursor:default;">
-          <div class="feed-tag-list-thumb">${(post.photos && post.photos[0]) ? `<img src="${post.photos[0]}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
+          <div class="feed-tag-list-thumb">${(post.photos && post.photos[0]) ? `<img loading="lazy" src="${post.photos[0]}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
           <div class="feed-tag-list-body">
             <div class="feed-tag-list-author">${post.author ? escapeHtml(post.author.name) : ''}</div>
             ${typeof post.rating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.rating)} ${post.rating.toFixed(1)}</div>` : ''}
@@ -22636,7 +22653,7 @@ function renderChatList(){
     const row = document.createElement('div');
     row.className = 'placeholder-row chat-row-with-menu';
     const avatarInner = room.avatar
-      ? `<img src="${room.avatar}" alt="${escapeHtml(room.name)}" />`
+      ? `<img loading="lazy" src="${room.avatar}" alt="${escapeHtml(room.name)}" />`
       : escapeHtml(room.initial);
     const unreadBadge = room.unreadCount > 0
       ? `<span class="nav-badge" style="position:static;flex-shrink:0;">${room.unreadCount > 9 ? '9+' : room.unreadCount}</span>`
@@ -24326,6 +24343,30 @@ let chatSwipeReplyAt = 0;
   };
   box.addEventListener('touchend', end);
   box.addEventListener('touchcancel', end);
+
+  // 컴퓨터(마우스)에서는 밀 수가 없으니, 메시지에 마우스를 올리면 말풍선 옆에 답장 버튼을 띄움
+  if(!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  const hoverBtn = document.createElement('button');
+  hoverBtn.type = 'button';
+  hoverBtn.className = 'msg-hover-reply-btn';
+  hoverBtn.setAttribute('aria-label', '답장');
+  hoverBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>';
+  let hoverRow = null;
+  hoverBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const m = hoverRow && hoverRow._replyMsg;
+    hoverBtn.remove(); hoverRow = null;
+    if(m) startReplyTo(m);
+  });
+  box.addEventListener('mouseover', (e) => {
+    const r = e.target.closest('.msg-row');
+    if(r === hoverRow) return;
+    hoverBtn.remove(); hoverRow = null;
+    if(!r || !r._replyMsg) return;
+    hoverRow = r;
+    if(r.classList.contains('me')) r.prepend(hoverBtn); else r.append(hoverBtn);
+  });
+  box.addEventListener('mouseleave', () => { hoverBtn.remove(); hoverRow = null; });
 })();
 
 function sendChatMessage(){
@@ -25161,7 +25202,7 @@ function openGroupMembersView(roomId){
   const body = document.getElementById('groupMembersListBody');
   body.innerHTML = room.members.map((m, idx) => `
     <div class="search-result-row" style="cursor:pointer;" data-idx="${idx}">
-      <div class="placeholder-avatar" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img src="${m.avatar}" alt="${escapeHtml(m.name)}" />` : escapeHtml(m.name[0])}</div>
+      <div class="placeholder-avatar" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="${escapeHtml(m.name)}" />` : escapeHtml(m.name[0])}</div>
       <div class="search-result-info"><b>${escapeHtml(m.name)}</b>${m.name === '나' ? '<span>나</span>' : '<span>탭해서 프로필 보기</span>'}</div>
     </div>
   `).join('');
