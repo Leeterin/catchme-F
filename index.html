@@ -2013,6 +2013,7 @@
   /* .placeholder-text span{display:block}이 등급 뱃지(inline-flex로 아이콘+글자를 나란히 두는 칩)까지
      깨버려서, 이 카드 안에서만 뱃지의 inline-flex를 다시 살려줌(specificity로 덮어씀) */
   .feed-review-profile-card .meet-badge-chip{ display:inline-flex; }
+  .feed-review-profile-card .feed-review-profile-mine{ display:block; margin-top:3px; font-size:12px; font-weight:600; color:var(--accent); }
   #feedReviewProfileBadge{ cursor:pointer; }
 
   /* ===== [출시 초기 임시 숨김] 근처 모임 / 추천 친구 =====
@@ -8384,8 +8385,9 @@
           <b id="feedReviewProfileName" style="min-width:0;"></b>
           <span id="feedReviewProfileBadge" style="flex-shrink:0;"></span>
         </div>
+        <div class="feed-review-profile-mine" id="feedReviewProfileMine"></div>
       </div>
-      <button class="edit-icon-btn" id="feedReviewProfileEditBtn" type="button">&#9998;</button>
+      <button class="edit-icon-btn" id="feedReviewProfileEditBtn" type="button" title="리뷰용 닉네임/사진 수정">&#9998;</button>
     </div>
 
     <div class="segment-control" id="communitySegment">
@@ -12038,6 +12040,7 @@ function feedPlaceMapLinkUrl(name, location, lat, lon){
 }
 
 function renderFeedPosts(){
+  updateFeedReviewProfileMineCount();
   const container = document.getElementById('feedListContainer');
   container.innerHTML = '';
   _monthlyTopReviewerCache = undefined; // 게시물 목록이 새로 그려질 때마다 이달의 맛집왕도 다시 계산
@@ -14196,6 +14199,17 @@ function saveReviewProfileToServer(){
 }
 
 // 추천 탭 맨 위 리뷰용 프로필 카드 - 리뷰용 닉네임/사진이 있으면 그걸, 없으면 실명/실제 프로필 사진을 보여줌
+// 장소 탭 맨 위 내 프로필 카드의 "내 리뷰 N개 ›" - 글을 올리거나 지울 때마다(목록을 다시 그릴 때) 같이 갱신
+function updateFeedReviewProfileMineCount(){
+  const card = document.getElementById('feedReviewProfileCard');
+  const mineEl = document.getElementById('feedReviewProfileMine');
+  if(!card || !mineEl) return;
+  const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
+  // 추천을 하나도 안 올린 사람에겐 빈 화면 맨 위를 차지할 뿐이라, 첫 추천을 올린 뒤부터 보여줌
+  // (작성자 리뷰 화면을 보는 동안엔 openFeedAuthorView가 숨겨두므로 건드리지 않음)
+  if(!document.getElementById('feedAuthorView').classList.contains('active')) card.style.display = myCount > 0 ? '' : 'none';
+  mineEl.textContent = `내 리뷰 ${myCount}개 ›`;
+}
 function renderFeedReviewProfileCard(){
   const nameEl = document.getElementById('feedReviewProfileName');
   const avatarEl = document.getElementById('feedReviewProfileAvatar');
@@ -14208,8 +14222,7 @@ function renderFeedReviewProfileCard(){
   if(badgeEl){
     const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
     const myTier = getReviewerLevelTier(myCount);
-    // 추천을 하나도 안 올린 사람에겐 "나 · 등급 없음" 카드가 빈 화면 맨 위를 차지할 뿐이라, 첫 추천을 올린 뒤부터 보여줌
-    document.getElementById('feedReviewProfileCard').style.display = myCount > 0 ? '' : 'none';
+    updateFeedReviewProfileMineCount();
     // "등급 보기" 대신 실제 등급을 이름 바로 옆에 보여줌 - 리뷰 0개면 회색 "등급 없음"(눌러서 등급표 확인 가능)
     badgeEl.innerHTML = myTier
       ? renderReviewerLevelBadgeHtml(currentUser.id)
@@ -14225,8 +14238,13 @@ function renderFeedReviewProfileCard(){
     avatarEl.style.background = myProfileData.color;
   }
 }
-// 카드를 탭하면 바로 리뷰용 닉네임/사진 수정 팝업 (등급 뱃지를 누르면 등급표 - 아래 stopPropagation)
+// 카드를 누르면 내가 쓴 리뷰 모아보기로, 오른쪽 ✎를 누르면 리뷰용 닉네임/사진 수정 팝업
 document.getElementById('feedReviewProfileCard').addEventListener('click', () => {
+  if(!currentUser) return;
+  openFeedAuthorView(currentUser);
+});
+document.getElementById('feedReviewProfileEditBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
   if(!currentUser) return;
   openMyReviewProfileEdit();
 });
