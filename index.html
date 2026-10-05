@@ -1260,7 +1260,18 @@
     display:flex;
     gap:8px;
     flex-wrap:wrap;
+    position:relative;
   }
+  .feed-photo-thumb{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+  .feed-photo-thumb img{ -webkit-user-drag:none; pointer-events:auto; }
+  .feed-photo-thumb.dragging{
+    z-index:5;
+    box-shadow:0 8px 18px rgba(0,0,0,0.28);
+    opacity:0.92;
+    transition:none;
+  }
+  .feed-photo-thumb.dragging img{ transform:scale(1.06); }
+  .feed-photo-reorder-hint{ font-size:11px; color:var(--text-dim); margin-top:6px; }
   .feed-photo-add-btn{
     width:64px;height:64px;
     border-radius:10px;
@@ -8502,6 +8513,7 @@
           <div class="feed-photo-row" id="feedPhotoRow">
             <button type="button" class="feed-photo-add-btn" id="feedPhotoAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           </div>
+          <div class="feed-photo-reorder-hint" id="feedPhotoReorderHint" style="display:none;">꾹 눌러서 끌면 순서를 바꿀 수 있어요 · 1번이 대표사진</div>
           <input type="file" id="feedPhotoInput" accept="image/*" multiple style="display:none;" />
         </div>
 
@@ -13049,6 +13061,70 @@ document.querySelectorAll('#feedRatingPicker .feed-star').forEach(star => {
 
 // 사진이 2장 이상이면, 맨 처음(0번) 사진이 "대표사진"이 되어 피드 카드/장소 모아보기에 대표로 나옴.
 // 대표가 아닌 썸네일을 누르면 그 사진이 맨 앞으로 와서 새 대표사진이 됨.
+// 썸네일을 꾹 누르면(0.35초) 집어 들고, 끌어서 다른 사진 위에 놓으면 순서가 바뀜.
+let feedPhotoDrag = null;
+let feedPhotoSuppressClick = false;
+function attachFeedPhotoDrag(thumb){
+  let pressTimer = null, startX = 0, startY = 0, pointerId = null;
+  const clearPress = () => { if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } };
+  thumb.addEventListener('contextmenu', e => e.preventDefault());
+  thumb.querySelector('img').addEventListener('dragstart', e => e.preventDefault());
+  thumb.addEventListener('pointerdown', (e) => {
+    if(e.target.closest('.feed-photo-remove') || feedSelectedPhotos.length < 2) return;
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    startX = e.clientX; startY = e.clientY; pointerId = e.pointerId;
+    clearPress();
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      const row = thumb.parentElement;
+      const rowRect = row.getBoundingClientRect();
+      feedPhotoDrag = {
+        thumb, row, pointerId,
+        grabX: startX - rowRect.left - thumb.offsetLeft,
+        grabY: startY - rowRect.top - thumb.offsetTop,
+      };
+      thumb.classList.add('dragging');
+      try{ thumb.setPointerCapture(pointerId); }catch(_){}
+      if(navigator.vibrate) try{ navigator.vibrate(15); }catch(_){}
+    }, 350);
+  });
+  thumb.addEventListener('pointermove', (e) => {
+    if(pressTimer && Math.hypot(e.clientX - startX, e.clientY - startY) > 8){ clearPress(); return; }
+    const d = feedPhotoDrag;
+    if(!d || d.thumb !== thumb || e.pointerId !== d.pointerId) return;
+    e.preventDefault();
+    // 손가락 아래에 있는 다른 썸네일 자리로 옮김
+    const others = [...d.row.querySelectorAll('.feed-photo-thumb')].filter(t => t !== thumb);
+    const over = others.find(t => {
+      const r = t.getBoundingClientRect();
+      return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    });
+    if(over){
+      const all = [...d.row.querySelectorAll('.feed-photo-thumb')];
+      const from = all.indexOf(thumb), to = all.indexOf(over);
+      d.row.insertBefore(thumb, from < to ? over.nextSibling : over);
+    }
+    const rowRect = d.row.getBoundingClientRect();
+    const dx = e.clientX - rowRect.left - d.grabX - thumb.offsetLeft;
+    const dy = e.clientY - rowRect.top - d.grabY - thumb.offsetTop;
+    thumb.style.transform = `translate(${dx}px, ${dy}px)`;
+  });
+  const endDrag = () => {
+    clearPress();
+    const d = feedPhotoDrag;
+    if(!d || d.thumb !== thumb) return;
+    feedPhotoDrag = null;
+    feedPhotoSuppressClick = true;
+    setTimeout(() => { feedPhotoSuppressClick = false; }, 300);
+    const order = [...d.row.querySelectorAll('.feed-photo-thumb')].map(t => feedSelectedPhotos[parseInt(t.dataset.idx, 10)]);
+    feedSelectedPhotos = order;
+    renderFeedPhotoRow();
+  };
+  thumb.addEventListener('pointerup', endDrag);
+  thumb.addEventListener('pointercancel', endDrag);
+}
+// 집어 든 동안은 화면이 스크롤되지 않게 막음 (iOS는 touchmove를 막아야 함)
+document.addEventListener('touchmove', (e) => { if(feedPhotoDrag) e.preventDefault(); }, { passive: false });
 function renderFeedPhotoRow(){
   const row = document.getElementById('feedPhotoRow');
   const addBtn = document.getElementById('feedPhotoAddBtn');
@@ -13057,8 +13133,9 @@ function renderFeedPhotoRow(){
   feedSelectedPhotos.forEach((dataUrl, idx) => {
     const thumb = document.createElement('div');
     thumb.className = 'feed-photo-thumb';
+    thumb.dataset.idx = idx;
     thumb.innerHTML = `
-      <img src="${dataUrl}" />
+      <img src="${dataUrl}" draggable="false" />
       ${feedSelectedPhotos.length >= 2 ? `<div class="feed-photo-order-badge">${idx + 1}</div>` : ''}
       ${idx === 0 ? `<div class="feed-photo-cover-badge">대표</div>` : ''}
       <button type="button" class="feed-photo-remove">×</button>
@@ -13068,6 +13145,7 @@ function renderFeedPhotoRow(){
       const img = thumb.querySelector('img');
       img.style.cursor = 'pointer';
       img.addEventListener('click', () => {
+        if(feedPhotoSuppressClick) return;
         const [picked] = feedSelectedPhotos.splice(idx, 1);
         feedSelectedPhotos.unshift(picked);
         renderFeedPhotoRow();
@@ -13077,9 +13155,12 @@ function renderFeedPhotoRow(){
       feedSelectedPhotos.splice(idx, 1);
       renderFeedPhotoRow();
     });
+    attachFeedPhotoDrag(thumb);
     row.insertBefore(thumb, addBtn);
   });
   addBtn.style.display = feedSelectedPhotos.length >= FEED_MAX_PHOTOS ? 'none' : 'flex';
+  const hint = document.getElementById('feedPhotoReorderHint');
+  if(hint) hint.style.display = feedSelectedPhotos.length >= 2 ? 'block' : 'none';
 }
 document.getElementById('feedPhotoAddBtn').addEventListener('click', () => document.getElementById('feedPhotoInput').click());
 // 사진 한 장을 1000px 이하 JPEG(base64)로 줄임. 너무 크면 null.
