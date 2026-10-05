@@ -7476,6 +7476,13 @@
         <div class="visibility-picker" id="visibilityPicker"></div>
         <div class="visibility-hint" id="visibilityHint"></div>
       </div>
+      <!-- 바쁨 일정이어도 이 시간에 예약 가능 시간을 열고 예약을 받을 수 있게 (예: 친구랑 점심인데 다른 약속도 겹쳐 잡아도 될 때) -->
+      <div class="mp-input-group" id="allowBookingGroup">
+        <div class="settings-toggle-row" style="border-bottom:none;padding:4px 0;">
+          <div><div class="stt-label">이 시간에도 예약 받기</div><div class="stt-sub">켜면 이 일정과 겹쳐도 예약 가능 시간을 열 수 있고, 친구가 예약할 수 있어요. 친구에겐 이 일정이 보이지 않아요.</div></div>
+          <div class="toggle" id="allowBookingToggle"><div class="knob"></div></div>
+        </div>
+      </div>
       </div>
       <div class="event-form-footer">
         <button class="profile-chat-btn" id="eventFormSubmitBtn">추가하기</button>
@@ -15116,6 +15123,7 @@ function syncEventCreateToServer(ev){
       status: ev.type === 'available' ? 'AVAILABLE' : 'BUSY',
       eventType: ev.type,
       availableFor: ev.type === 'available' ? availableForOf(ev) : undefined,
+      blocksBooking: ev.type === 'available' ? undefined : blocksBooking(ev),
       visibility: ev.visibility,
       sourceChatRoomId: ev.sourceChatRoomId || undefined,
       color: ev.color || undefined,
@@ -15153,6 +15161,7 @@ function syncEventUpdateToServer(ev){
       status: ev.type === 'available' ? 'AVAILABLE' : 'BUSY',
       eventType: ev.type,
       availableFor: ev.type === 'available' ? availableForOf(ev) : undefined,
+      blocksBooking: ev.type === 'available' ? undefined : blocksBooking(ev),
       visibility: ev.visibility,
       color: ev.color || null,
       recurringWeekdays: recurringPayload ? recurringPayload.weekdays : [],
@@ -15222,6 +15231,7 @@ async function loadScheduleFromServer(){
         visibility: sev.visibility,
         type: sev.eventType,
         availableFor: sev.availableFor || 'all',
+        blocksBooking: sev.blocksBooking !== false,
         recurring,
         dateRange,
         dateKey: (isRecurring || dateRange) ? null : dateKeyOf(startD),
@@ -15390,7 +15400,7 @@ function applyRepeatModeDateUI(){
   refreshDateDisplay('eventFormStartDate');
 }
 
-function createScheduleEvent({ title, startMin, endMin, visibility, recurringWeekdays, until, dateKey, dateRange, type, linkGroupId, color, availableFor }){
+function createScheduleEvent({ title, startMin, endMin, visibility, recurringWeekdays, until, dateKey, dateRange, type, linkGroupId, color, availableFor, blocksBooking }){
   const ev = {
     id: 'ev' + (scheduleEventIdCounter++),
     title, startMin, endMin,
@@ -15398,6 +15408,7 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
     visibility,
     type: type || 'busy',
     availableFor: availableFor || 'all',
+    blocksBooking: blocksBooking !== false,
     recurring: recurringWeekdays ? { weekdays: recurringWeekdays, until: until || null, exceptions: [] } : null,
     dateRange: (!recurringWeekdays && dateRange) ? dateRange : null,
     dateKey: (!recurringWeekdays && !dateRange) ? dateKey : null,
@@ -15413,6 +15424,7 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
 
 let formRepeatMode = 'once';
 let formEventType = 'busy';
+let formAllowBooking = false; // 바쁨 일정인데 "이 시간에도 예약 받기"를 켰는지 (서버 blocksBooking=false)
 let formAvailableFor = 'all'; // 예약 가능 시간을 누구에게 열지 (친구 + 업무용 / 친구만 / 업무용만)
 let editingEventId = null;
 let absorbedAvailIds = []; // 예약 가능 수정 중 두 번 눌러서 이번 수정에 합친 다른 예약 가능 일정 id들
@@ -15621,7 +15633,7 @@ function computeAvailBlocksFromSelection(){
 function computeFreeRangeForBlock(dateKey, aroundStartMin, aroundEndMin){
   let minStart = 0, maxEnd = 24 * 60;
   SCHEDULE_EVENTS.forEach(ev => {
-    if(ev.dateKey !== dateKey) return;
+    if(ev.dateKey !== dateKey || !blocksBooking(ev)) return;
     if(ev.endMin <= aroundStartMin && ev.endMin > minStart) minStart = ev.endMin;
     if(ev.startMin >= aroundEndMin && ev.startMin < maxEnd) maxEnd = ev.startMin;
   });
@@ -15793,7 +15805,13 @@ function renderEventAvailFor(){
   document.getElementById('eventAvailForHint').textContent = AVAILABLE_FOR_META[formAvailableFor].hint;
   // 예약 가능 시간은 "누구에게 열까요?" 칩에서 친구 그룹까지 고르므로 아래 공개 설정은 숨김
   document.getElementById('visibilityPickerGroup').style.display = formEventType === 'available' ? 'none' : '';
+  document.getElementById('allowBookingGroup').style.display = formEventType === 'available' ? 'none' : '';
+  document.getElementById('allowBookingToggle').classList.toggle('on', formAllowBooking);
 }
+document.getElementById('allowBookingToggle').addEventListener('click', () => {
+  formAllowBooking = !formAllowBooking;
+  renderEventAvailFor();
+});
 document.getElementById('eventAvailForRow').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-aud-chip]');
   if(!btn) return;
@@ -15861,6 +15879,7 @@ function openEventForm(existingEvent){
   pushViewState(closeEventForm);
 
   formAvailableFor = existingEvent ? availableForOf(existingEvent) : 'all';
+  formAllowBooking = !!existingEvent && !blocksBooking(existingEvent) && existingEvent.type !== 'available';
   if(existingEvent){
     setEventTypeUI(existingEvent.type || 'busy');
     document.getElementById('eventFormTitle').value = existingEvent.title;
@@ -16359,6 +16378,7 @@ function renderAvailSelectGrid(){
       // texts만 보면 자기 자신이 차지한 칸도 그냥 "occupied"로 보여서, 수정 중엔 그 칸을 다시 못 누르게 돼버림
       const blockingEv = (dayEventsCache[key] || []).find(ev => {
         if(editingExcludeIds && editingExcludeIds.has(ev.id)) return false;
+        if(formEventType === 'available' && !blocksBooking(ev)) return false; // "이 시간에도 예약 받기" 켠 일정 위엔 열 수 있음
         const disp = getEventDisplayRangeForDate(ev, d);
         const evStartH = Math.floor(disp.startMin / 60);
         const evEndH = Math.max(evStartH + 1, Math.ceil(disp.endMin / 60));
@@ -16641,7 +16661,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
       const editingExcludeIds = editingEventId ? new Set([editingEventId, ...editingLinkedPieceIds]) : null;
       const dateObj = parseDateInputValue(block.dateKey);
       // 이미 열린 예약 가능 조각(반복 아님)과 겹치는 건 막지 않고 저장할 때 합침
-      const conflict = getEventsForDate(dateObj).find(ev => (!editingExcludeIds || !editingExcludeIds.has(ev.id)) && !isMergeableAvail(ev) && block.startMin < ev.endMin && block.endMin > ev.startMin);
+      const conflict = getEventsForDate(dateObj).find(ev => (!editingExcludeIds || !editingExcludeIds.has(ev.id)) && !isMergeableAvail(ev) && blocksBooking(ev) && block.startMin < ev.endMin && block.endMin > ev.startMin);
       if(conflict){
         showToast(conflict.type === 'available'
           ? `${availFineTuneDateLabel(block.dateKey)} ${minutesToLabel(conflict.startMin)}-${minutesToLabel(conflict.endMin)}은 반복으로 열어둔 예약 가능 시간이라 겹쳐서 열 수 없어요. 그 반복 일정을 수정해서 대상을 바꿔 주세요.`
@@ -16795,6 +16815,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
             || dateKeyOf(scheduleFocusDate);
           ev.title = title;
           ev.type = formEventType;
+          ev.blocksBooking = formEventType === 'available' || !formAllowBooking;
           ev.visibility = { ...formVisibility };
           ev.color = formColor;
           const prevExceptions = (ev.recurring && ev.recurring.exceptions) || [];
@@ -16835,6 +16856,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           dateKey: formRepeatMode === 'weekly' ? recurringStartKey : baseDateKey,
           type: formEventType,
           color: formColor,
+          blocksBooking: formEventType === 'available' || !formAllowBooking,
         });
         showToast('일정이 추가됐어요.');
         if(formEventType !== 'available') setTimeout(() => maybePromptFirstInvite(false), 900);
@@ -17335,6 +17357,8 @@ const AVAILABLE_FOR_META = {
   friends: { color: AVAILABLE_EVENT_COLOR, hint: '고른 친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
   work:    { color: AVAILABLE_WORK_COLOR,  hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
 };
+// 이 일정이 예약을 막는지 - 바쁨 일정 중 "이 시간에도 예약 받기"를 켠 것(blocksBooking=false)만 안 막음
+function blocksBooking(ev){ return !ev || ev.type === 'available' || ev.blocksBooking !== false; }
 function availableForOf(ev){ return (ev && AVAILABLE_FOR_META[ev.availableFor]) ? ev.availableFor : 'all'; }
 function groupEmojiOf(g){ return (g && g.emoji) || DEFAULT_GROUP_EMOJI; }
 function workEmoji(){ return settingsState.work_emoji || DEFAULT_WORK_EMOJI; }
@@ -27480,7 +27504,7 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
       if(last && last.e === b.s) last.e = b.e; else ranges.push({ s: b.s, e: b.e });
     });
     // 이미 있는 일정(바쁨/예약 가능/예약중 다 포함)과 겹치는 부분은 뺌 - 기존 등록 화면처럼 겹치는 예약 가능은 안 만듦
-    const dayEvents = getEventsForDate(d);
+    const dayEvents = getEventsForDate(d).filter(blocksBooking); // "이 시간에도 예약 받기" 켠 일정 위엔 그대로 엶
     const cuts = dayEvents.map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
     if(i === 0) cuts.push({ s: 0, e: nowMin });
     // 새로 켠 칸 중 이미 열린 예약 가능 조각과 겹치는 부분 -> 그 조각에 대상을 더함 (바쁨 일정/반복 예약 가능과 겹치는 곳은 건드리지 않음)
