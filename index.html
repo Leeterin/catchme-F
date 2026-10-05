@@ -5251,6 +5251,15 @@
   .qa-edit{ display:flex; align-items:center; justify-content:center; gap:4px; margin:0 8px 8px; font-size:13px; }
   .qa-edit select{ padding:4px 2px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--text); font-size:14px; font-variant-numeric:tabular-nums; }
   .qa-edit button{ margin-left:6px; border:none; background:none; color:var(--accent); font-weight:700; font-size:13px; cursor:pointer; }
+  .qa-tabs{ display:flex; gap:6px; overflow-x:auto; margin:0 -2px 4px; padding:2px; scrollbar-width:none; }
+  .qa-tabs::-webkit-scrollbar{ display:none; }
+  .qa-tab{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text-dim); font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer; white-space:nowrap; }
+  .qa-tab.active{ border-color:var(--accent); background:var(--accent); color:#fff; }
+  .qa-tab i{ width:6px; height:6px; border-radius:50%; background:var(--accent); }
+  .qa-tab.active i{ background:#fff; }
+  .qa-tab-hint{ margin:0 4px 6px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
+  .qa-other{ position:absolute; bottom:3px; height:4px; border-radius:2px; background:var(--accent); opacity:.35; pointer-events:none; z-index:0; }
+  .qa-legend i.other{ height:4px; vertical-align:1px; background:var(--accent); opacity:.35; }
   .qa-range{ margin:2px 0 4px; text-align:right; }
   .qa-range-toggle{ background:none; border:none; padding:4px 8px; font-size:12px; color:var(--text-dim); font-family:inherit; cursor:pointer; }
   .qa-range-toggle b{ color:var(--text); font-variant-numeric:tabular-nums; }
@@ -5933,7 +5942,6 @@
   .quick-avail-for-toggle{ display:block; margin:0 auto; background:none; border:none; padding:4px 8px; font-size:12.5px; color:var(--text-dim); cursor:pointer; }
   .quick-avail-for-toggle b{ color:var(--text); }
   .quick-avail-for-toggle span{ color:var(--accent); margin-left:4px; }
-  #quickAvailForBody{ margin-top:8px; }
   .weekday-picker{
     display:flex;
     gap:5px;
@@ -8017,14 +8025,9 @@
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
       <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
       <p class="quick-avail-desc">정한 시간이 <b>앞으로 4주 동안</b> 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.</p>
-      <!-- 누구에게 열지는 대부분 "친구 + 업무용"이면 돼서 접어둠 - 처음 쓰는 사람에게 바로 고르게 하면 헷갈렸음 -->
-      <div class="quick-avail-for">
-        <button type="button" class="quick-avail-for-toggle" id="quickAvailForToggle"></button>
-        <div id="quickAvailForBody" style="display:none;">
-          <div class="avail-for-row" id="quickAvailForRow"></div>
-          <div class="avail-for-hint" id="quickAvailForHint"></div>
-        </div>
-      </div>
+      <!-- 누구에게 열지는 대상마다 탭으로 나눠 정함 - 두 탭에 같은 시간을 열면 그 시간은 둘 다에게 열림 -->
+      <div class="qa-tabs" id="quickAvailTabs"></div>
+      <div class="qa-tab-hint" id="quickAvailTabHint"></div>
       <div class="qa-quick">
         <button type="button" data-qa-bulk="weekday">평일 모두 열기</button>
         <button type="button" data-qa-bulk="weekend">주말 모두 열기</button>
@@ -17566,7 +17569,7 @@ function openAvailableRangeMerging(dateKey, startMin, endMin, aud){
     cursor = Math.max(cursor, ovE);
     const idx = SCHEDULE_EVENTS.indexOf(ev);
     if(idx >= 0) SCHEDULE_EVENTS.splice(idx, 1);
-    if(ev.serverId) syncEventDeleteToServer(ev);
+    syncEventDeleteToServer(ev); // 아직 서버 저장 중이면 끝난 뒤 지움
   });
   if(cursor < endMin) pieces.push({ s: cursor, e: endMin, aud });
   // 바로 붙어 있고 대상도 같은 조각은 하나로
@@ -26872,7 +26875,79 @@ const QUICK_AXIS_PREF_KEY = 'catchme_quick_axis';
 let quickAvailBusy = {}; // 요일 -> 앞으로 4주 동안 그 요일에 있는 내 일정 [{s, e, soft, items}] - 막대 위에 회색/점선으로 보여줌
 let quickAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dow, min }
 let quickAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dow, idx }
-const quickAvailStash = {}; // 줄을 껐다 다시 켤 때 되돌릴 시간
+let quickAvailStash = {}; // 줄을 껐다 다시 켤 때 되돌릴 시간 (탭마다 따로)
+// 대상별 탭 - 모든 친구 / 그룹마다 / 업무용. 탭마다 { initial, pattern, stash }를 따로 들고 있고,
+// 지금 보는 탭의 것을 quickAvailPattern/quickAvailInitial/quickAvailStash로 가리킴
+let quickAvailTabs = {};
+let quickAvailTab = 'friends';
+function quickTabList(){
+  return [
+    { key: 'friends', label: `${DEFAULT_GROUP_EMOJI} 모든 친구` },
+    ...MY_GROUPS.map(g => ({ key: 'g:' + g.id, label: `${groupEmojiOf(g)} ${g.name}`, group: g })),
+    { key: 'work', label: `${workEmoji()} 업무용` },
+  ];
+}
+function quickTabKeys(){ return Object.keys(quickAvailTabs); }
+// 이 탭으로 새로 열 때의 대상
+function quickTabAud(key){
+  if(key === 'work') return { availableFor: 'work', visibility: { groupIds: [], private: false } };
+  if(key === 'friends') return { availableFor: 'friends', visibility: { groupIds: [], private: false } };
+  const g = MY_GROUPS.find(x => 'g:' + x.id === key);
+  return { availableFor: 'friends', visibility: { groupIds: [g ? g.id : key.slice(2)], private: false } };
+}
+// 이 예약 가능 일정이 이 탭 대상에게 열려 있는지 (그룹 탭은 그 그룹을 직접 고른 것만 - 모든 친구에게 연 건 "모든 친구" 탭에서 다룸)
+function quickTabIncludes(key, ev){
+  const f = availableForOf(ev);
+  const gids = availFriendGroupIds(f, ev.visibility);
+  if(key === 'work') return f !== 'friends';
+  if(key === 'friends') return !!gids && !gids.length;
+  return !!gids && gids.some(id => 'g:' + id === key);
+}
+// 대상에서 이 탭 대상만 뺌 - 아무 데도 안 남으면 null
+function quickAudMinus(aud, key){
+  let gids = availFriendGroupIds(aud.availableFor, aud.visibility);
+  let friendsOn = !!gids;
+  let workOn = aud.availableFor !== 'friends';
+  gids = gids ? [...gids] : [];
+  if(key === 'work') workOn = false;
+  else if(key === 'friends'){ if(!gids.length) friendsOn = false; }
+  else { gids = gids.filter(id => 'g:' + id !== key); if(!gids.length) friendsOn = false; }
+  if(!friendsOn && !workOn) return null;
+  return { availableFor: friendsOn && workOn ? 'all' : (friendsOn ? 'friends' : 'work'), visibility: { groupIds: friendsOn ? gids : [], private: false } };
+}
+function quickTabChanged(key){
+  const tb = quickAvailTabs[key];
+  return QUICK_AVAIL_DOWS.some(dow => subtractMinuteRanges(tb.pattern[dow], tb.initial[dow]).length || subtractMinuteRanges(tb.initial[dow], tb.pattern[dow]).length);
+}
+function quickMergeRanges(list){
+  const out = [];
+  [...list].sort((a, b) => a.s - b.s).forEach(r => {
+    const last = out[out.length - 1];
+    if(last && r.s <= last.e) last.e = Math.max(last.e, r.e); else out.push({ s: r.s, e: r.e });
+  });
+  return out;
+}
+function selectQuickTab(key){
+  quickAvailTab = key;
+  const tb = quickAvailTabs[key];
+  quickAvailPattern = tb.pattern;
+  quickAvailInitial = tb.initial;
+  quickAvailStash = tb.stash;
+  quickAvailEdit = null;
+  quickAvailInfo = null;
+}
+function renderQuickTabs(){
+  const list = quickTabList();
+  document.getElementById('quickAvailTabs').innerHTML = list.map(tb => {
+    const on = QUICK_AVAIL_DOWS.some(dow => quickAvailTabs[tb.key].pattern[dow].length);
+    return `<button type="button" class="qa-tab${tb.key === quickAvailTab ? ' active' : ''}" data-qa-tab="${escapeHtml(tb.key)}">${escapeHtml(tb.label)}${on ? '<i></i>' : ''}</button>`;
+  }).join('');
+  const cur = list.find(tb => tb.key === quickAvailTab);
+  document.getElementById('quickAvailTabHint').textContent = quickAvailTab === 'work'
+    ? '업무용 링크를 받은 사람만 신청할 수 있는 시간이에요. 친구에게는 안 보여요.'
+    : quickAvailTab === 'friends' ? '모든 친구가 신청할 수 있는 시간이에요. 다른 탭에 같은 시간을 열면 그쪽에도 같이 열려요.'
+    : `${cur ? cur.group.name : '이 그룹'} 친구만 신청할 수 있는 시간이에요.`;
+}
 function quickRangesTotal(ranges){ return (ranges || []).reduce((sum, r) => sum + r.e - r.s, 0); }
 function quickCloneRanges(ranges){ return (ranges || []).map(r => ({ s: r.s, e: r.e })); }
 // 월~일 일곱 줄 - 평일/주말을 한 번에 여는 건 위의 버튼으로
@@ -26903,7 +26978,7 @@ function quickAvailBusyPattern(){
 }
 // 앞으로 4주 동안 요일별로 이미 열려 있는 시간 - 5분 칸마다, 그 요일 중 절반 이상 열려 있으면 열린 걸로 봄.
 // 다른 일정 때문에 못 연 날은 그 칸 투표에서 빼서, 일정 하나 때문에 막대가 쪼개져 보이지 않게 함
-function quickAvailCurrentPattern(){
+function quickAvailCurrentPattern(tabKey){
   const slots = 1440 / QUICK_AVAIL_STEP;
   const open = {}, votes = {};
   QUICK_AVAIL_DOWS.forEach(dow => { open[dow] = new Array(slots).fill(0); votes[dow] = new Array(slots).fill(0); });
@@ -26912,7 +26987,7 @@ function quickAvailCurrentPattern(){
     d.setDate(d.getDate() + i);
     const evs = getEventsForDate(d);
     const toRange = ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; };
-    const avail = evs.filter(ev => ev.type === 'available').map(toRange);
+    const avail = evs.filter(ev => ev.type === 'available' && quickTabIncludes(tabKey, ev)).map(toRange);
     const busy = evs.filter(ev => ev.type !== 'available' && blocksBooking(ev)).map(toRange);
     const dow = d.getDay();
     for(let k = 0; k < slots; k++){
@@ -26935,9 +27010,10 @@ function quickAvailCurrentPattern(){
   });
   return pattern;
 }
-// 줄어든 시간(요일별 구간)에 해당하는 예약 가능 시간을 앞으로 4주에서 잘라냄. 일반 일정/예약 요청중 일정은 안 건드리고,
-// 반복 일정은 패턴 전체가 바뀌니 건드리지 않음(반환값으로 몇 개였는지 알려줌). 일부만 겹치면 그 부분만 잘라냄
-function closeQuickAvailCuts(cutsByDow){
+// 줄어든 시간(요일별 구간)에서 이 탭 대상을 앞으로 4주 동안 뺌. 다른 대상에도 열려 있던 시간이면 그 대상에겐 그대로 열려 있고,
+// 아무 데도 안 남으면 잘라냄. 일반 일정/예약 요청중 일정은 안 건드리고, 반복 일정은 패턴 전체가 바뀌니 건드리지 않음
+// (반환값으로 몇 개였는지 알려줌). 일부만 겹치면 그 부분만 바꿈
+function closeQuickAvailCuts(cutsByDow, tabKey){
   const result = { closedDays: new Set(), skippedRecurring: new Set(), created: [] };
   for(let i = 0; i < QUICK_AVAIL_WEEKS * 7; i++){
     const d = new Date(TODAY);
@@ -26945,26 +27021,41 @@ function closeQuickAvailCuts(cutsByDow){
     const cuts = cutsByDow[d.getDay()] || [];
     if(!cuts.length) continue;
     const dk = dateKeyOf(d);
-    SCHEDULE_EVENTS.filter(ev => ev.type === 'available').slice().forEach(ev => {
+    SCHEDULE_EVENTS.filter(ev => ev.type === 'available' && quickTabIncludes(tabKey, ev)).slice().forEach(ev => {
       if(ev.recurring || ev.dateRange){
         if(getEventsForDate(d).includes(ev) && cuts.some(c => c.s < ev.endMin && c.e > ev.startMin)) result.skippedRecurring.add(ev);
         return;
       }
       if(ev.dateKey !== dk) return;
-      const rest = subtractMinuteRanges([{ s: ev.startMin, e: ev.endMin }], cuts).filter(r => r.e - r.s >= 30);
-      if(rest.length === 1 && rest[0].s === ev.startMin && rest[0].e === ev.endMin) return; // 줄어든 시간과 안 겹침
+      const span = [{ s: ev.startMin, e: ev.endMin }];
+      const outside = subtractMinuteRanges(span, cuts);
+      if(outside.length === 1 && outside[0].s === ev.startMin && outside[0].e === ev.endMin) return; // 줄어든 시간과 안 겹침
       result.closedDays.add(dk);
-      if(!rest.length){
+      const left = quickAudMinus(availAudienceOf(ev), tabKey);
+      const inside = left ? subtractMinuteRanges(span, outside) : [];
+      const pieces = [...outside.map(r => ({ ...r, aud: null })), ...inside.map(r => ({ ...r, aud: left }))]
+        .filter(r => r.e - r.s >= 30).sort((a, b) => a.s - b.s);
+      if(!pieces.length){
         const idx = SCHEDULE_EVENTS.indexOf(ev);
         if(idx >= 0) SCHEDULE_EVENTS.splice(idx, 1);
         syncEventDeleteToServer(ev);
         return;
       }
-      ev.startMin = rest[0].s;
-      ev.endMin = rest[0].e;
+      const orig = { availableFor: ev.availableFor, visibility: { ...ev.visibility }, title: ev.title };
+      const apply = (target, p) => {
+        target.startMin = p.s;
+        target.endMin = p.e;
+        if(p.aud){
+          target.availableFor = p.aud.availableFor;
+          target.visibility = { ...p.aud.visibility };
+          target.title = availableTitleFor(p.aud.availableFor, p.aud.visibility);
+        }
+      };
+      apply(ev, pieces[0]);
       syncEventUpdateToServer(ev);
-      rest.slice(1).forEach(r => {
-        const piece = { ...ev, id: 'ev' + (scheduleEventIdCounter++), serverId: null, startMin: r.s, endMin: r.e, visibility: { ...ev.visibility } };
+      pieces.slice(1).forEach(p => {
+        const piece = { ...ev, ...orig, visibility: { ...orig.visibility }, id: 'ev' + (scheduleEventIdCounter++), serverId: null };
+        apply(piece, p);
         SCHEDULE_EVENTS.push(piece);
         result.created.push(piece);
       });
@@ -26972,44 +27063,20 @@ function closeQuickAvailCuts(cutsByDow){
   }
   return result;
 }
-
-let quickAvailFor = 'all'; // 빠르게 열기로 새로 여는 시간을 누구에게 열지
-let quickAvailVisibility = { groupIds: [], private: false }; // 친구 중 어느 그룹에 열지 (빈 배열 = 모든 친구)
-function renderQuickAvailFor(){
-  document.getElementById('quickAvailForRow').innerHTML = availAudienceChipsHtml(quickAvailFor, quickAvailVisibility);
-  document.getElementById('quickAvailForHint').textContent = AVAILABLE_FOR_META[quickAvailFor].hint;
-  const open = document.getElementById('quickAvailForBody').style.display !== 'none';
-  document.getElementById('quickAvailForToggle').innerHTML = `누구에게 열지: <b>${escapeHtml(availAudienceLabel(quickAvailFor, quickAvailVisibility))}</b> <span>${open ? '접기' : '바꾸기 ›'}</span>`;
-}
-document.getElementById('quickAvailForToggle').addEventListener('click', () => {
-  const body = document.getElementById('quickAvailForBody');
-  body.style.display = body.style.display === 'none' ? '' : 'none';
-  renderQuickAvailFor();
-});
-document.getElementById('quickAvailForRow').addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-aud-chip]');
-  if(!btn) return;
-  const next = nextAvailAudience(quickAvailFor, quickAvailVisibility, btn);
-  if(!next) return;
-  quickAvailFor = next.availableFor;
-  quickAvailVisibility = next.visibility;
-  renderQuickAvailFor();
-});
 function openQuickAvail(){
-  // 지운 그룹은 빼고, 기본(모든 친구 + 업무용 링크)이 아닌 걸 골라둔 채로 다시 열면 펼쳐서 보여줌
-  quickAvailVisibility = { groupIds: (quickAvailVisibility.groupIds || []).filter(id => MY_GROUPS.some(g => g.id === id)), private: false };
-  const quickIsDefault = quickAvailFor === 'all' && !quickAvailVisibility.groupIds.length;
-  document.getElementById('quickAvailForBody').style.display = quickIsDefault ? 'none' : '';
-  renderQuickAvailFor();
-  // 지금 열려 있는 시간을 막대로 보여줌 - 여기서 줄이거나 끄면 닫히고, 늘리면 열림
-  quickAvailInitial = quickAvailCurrentPattern();
-  quickAvailPattern = {};
-  QUICK_AVAIL_DOWS.forEach(dow => { quickAvailPattern[dow] = quickCloneRanges(quickAvailInitial[dow]); });
-  // 아직 하나도 안 열어봤으면 많이들 고르는 시간(평일 저녁 + 주말 오후)을 미리 골라둠 - 그대로 "열어두기"만 눌러도 됨
+  // 지금 열려 있는 시간을 탭(대상)마다 막대로 보여줌 - 여기서 줄이거나 끄면 그 대상에게 닫히고, 늘리면 열림
+  quickAvailTabs = {};
+  quickTabList().forEach(tb => {
+    const initial = quickAvailCurrentPattern(tb.key);
+    const pattern = {};
+    QUICK_AVAIL_DOWS.forEach(dow => { pattern[dow] = quickCloneRanges(initial[dow]); });
+    quickAvailTabs[tb.key] = { initial, pattern, stash: {} };
+  });
+  // 아직 하나도 안 열어봤으면 많이들 고르는 시간(평일 저녁 + 주말 오후)을 친구·업무용 탭에 미리 골라둠 - 그대로 "열어두기"만 눌러도 됨
   if(!SCHEDULE_EVENTS.some(e => e.type === 'available')){
-    QUICK_AVAIL_GROUPS.forEach(g => setQuickRowRanges(g, [g.def]));
+    ['friends', 'work'].forEach(k => QUICK_AVAIL_GROUPS.forEach(g => g.dows.forEach(dow => { quickAvailTabs[k].pattern[dow] = [{ ...g.def }]; })));
   }
-  Object.keys(quickAvailStash).forEach(k => { delete quickAvailStash[k]; });
+  selectQuickTab(quickAvailTabs[quickAvailTab] ? quickAvailTab : 'friends');
   quickAvailBusy = quickAvailBusyPattern();
   quickAvailInfo = null;
   quickAvailEdit = null;
@@ -27553,7 +27620,7 @@ function quickAvailEditHtml(dow, idx){
 }
 // 내 일정·이미 열어둔 시간이 있는 범위에 앞뒤 1시간 여유를 두고 맞춤 (최소 12시간). 아무것도 없으면 0~24시 전부
 function quickAxisFit(){
-  const all = QUICK_AVAIL_DOWS.flatMap(dow => [...(quickAvailInitial[dow] || []), ...(quickAvailBusy[dow] || [])]);
+  const all = QUICK_AVAIL_DOWS.flatMap(dow => [...quickTabKeys().flatMap(k => quickAvailTabs[k].initial[dow] || []), ...(quickAvailBusy[dow] || [])]);
   if(!all.length) return { s: 0, e: 24 * 60 };
   let s = Math.max(0, Math.floor((Math.min(...all.map(r => r.s)) - 60) / 60) * 60);
   let e = Math.min(24 * 60, Math.ceil((Math.max(...all.map(r => r.e)) + 60) / 60) * 60);
@@ -27565,7 +27632,7 @@ function quickAxisFit(){
 }
 // 정해둔 시간이 보이는 범위 밖이면 그 시간까지 넓힘 - 막대가 안 보이면 못 고치니까
 function quickAxisCover(axis){
-  const rs = QUICK_AVAIL_DOWS.flatMap(dow => quickAvailPattern[dow] || []);
+  const rs = QUICK_AVAIL_DOWS.flatMap(dow => quickTabKeys().flatMap(k => quickAvailTabs[k].pattern[dow] || []));
   if(!rs.length) return { s: axis.s, e: axis.e };
   return {
     s: Math.min(axis.s, Math.floor(Math.min(...rs.map(r => r.s)) / 60) * 60),
@@ -27602,6 +27669,8 @@ function renderQuickAvail(){
       : '<span class="qa-time off">안 열어요</span>';
     const busy = (quickAvailBusy[dow] || []).filter(b => b.e > quickAvailAxis.s && b.s < quickAvailAxis.e)
       .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${quickBarStyle({ s: Math.max(b.s, quickAvailAxis.s), e: Math.min(b.e, quickAvailAxis.e) })}"></i>`).join('');
+    const others = quickMergeRanges(quickTabKeys().filter(k => k !== quickAvailTab).flatMap(k => quickAvailTabs[k].pattern[dow]))
+      .map(r => `<i class="qa-other" style="${quickBarStyle(r)}"></i>`).join('');
     return `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
         <button type="button" class="qa-day${weekend ? ' weekend' : ''}" data-qa-toggle="${row.key}" aria-pressed="${on}"><i></i>${row.label}</button>
@@ -27609,14 +27678,15 @@ function renderQuickAvail(){
         ${on ? `<button type="button" class="qa-add" data-qa-add="${row.key}" aria-label="${row.label} 시간 더 넣기">+</button>` : ''}
       </div>
       ${editing >= 0 ? quickAvailEditHtml(dow, editing) : ''}
-      <div class="qa-track" data-qa-track="${row.key}">${grid}${ranges.map((r, i) => quickBarHtml(row, r, i)).join('')}${busy}</div>
+      <div class="qa-track" data-qa-track="${row.key}">${grid}${others}${ranges.map((r, i) => quickBarHtml(row, r, i)).join('')}${busy}</div>
       ${quickAvailInfo && quickAvailInfo.dow === dow ? quickAvailInfoHtml(dow, quickAvailInfo.min) : ''}
     </div>`;
   }).join('');
   html += `<div class="qa-axis">${labelTicks.map(h => `<span style="left:${quickPct(h * 60)}%">${h}시</span>`).join('')}</div>`;
   const busyAll = QUICK_AVAIL_DOWS.flatMap(dow => quickAvailBusy[dow] || []);
-  if(busyAll.length){
-    html += `<div class="qa-legend">${busyAll.some(b => !b.soft) ? '<span><i></i>내 일정</span>' : ''}${busyAll.some(b => b.soft) ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}</div>`;
+  const anyOther = quickTabKeys().some(k => k !== quickAvailTab && QUICK_AVAIL_DOWS.some(dow => quickAvailTabs[k].pattern[dow].length));
+  if(busyAll.length || anyOther){
+    html += `<div class="qa-legend">${busyAll.some(b => !b.soft) ? '<span><i></i>내 일정</span>' : ''}${busyAll.some(b => b.soft) ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>다른 탭에 연 시간</span>' : ''}</div>`;
   }
   document.getElementById('quickAvailRows').innerHTML = html;
   // 평일/주말 한 번에 열기 - 다 열려 있으면 한 번에 닫기로 바뀜
@@ -27625,14 +27695,24 @@ function renderQuickAvail(){
     b.textContent = `${g.label} 모두 ${g.dows.every(dow => quickAvailPattern[dow].length) ? '닫기' : '열기'}`;
   });
   const btn = document.getElementById('quickAvailSubmitBtn');
+  // 전체(모든 탭)를 한 번에 저장함. 시간 합계는 탭끼리 겹친 시간을 한 번만 셈
+  renderQuickTabs();
   let total = 0, initialTotal = 0, added = 0, removed = 0;
+  const keys = quickTabKeys();
+  const changedTabs = keys.filter(quickTabChanged);
   QUICK_AVAIL_DOWS.forEach(dow => {
-    total += quickRangesTotal(quickAvailPattern[dow]);
-    initialTotal += quickRangesTotal(quickAvailInitial[dow]);
-    added += quickRangesTotal(subtractMinuteRanges(quickAvailPattern[dow], quickAvailInitial[dow]));
-    removed += quickRangesTotal(subtractMinuteRanges(quickAvailInitial[dow], quickAvailPattern[dow]));
+    total += quickRangesTotal(quickMergeRanges(keys.flatMap(k => quickAvailTabs[k].pattern[dow])));
+    initialTotal += quickRangesTotal(quickMergeRanges(keys.flatMap(k => quickAvailTabs[k].initial[dow])));
+    keys.forEach(k => {
+      const tb = quickAvailTabs[k];
+      added += quickRangesTotal(subtractMinuteRanges(tb.pattern[dow], tb.initial[dow]));
+      removed += quickRangesTotal(subtractMinuteRanges(tb.initial[dow], tb.pattern[dow]));
+    });
   });
-  if(!initialTotal){
+  if(initialTotal && changedTabs.length > 1 && (added || removed)){
+    btn.textContent = '바꾼 대로 저장하기';
+    btn.disabled = false;
+  } else if(!initialTotal){
     btn.textContent = total ? `일주일에 ${quickHoursText(total)} 열어두기` : '시간을 골라 주세요';
     btn.disabled = !total;
   } else {
@@ -27675,6 +27755,11 @@ function quickAvailAddRange(row, centerMin){
 }
 document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'quickAvailOverlay'){ goBackOrClose(closeQuickAvail); return; }
+  const tabBtn = e.target.closest('[data-qa-tab]');
+  if(tabBtn){
+    if(quickAvailTabs[tabBtn.dataset.qaTab]){ selectQuickTab(tabBtn.dataset.qaTab); renderQuickAvail(); }
+    return;
+  }
   if(e.target.closest('[data-qa-range-open]')){ quickAvailRangeOpen = !quickAvailRangeOpen; renderQuickAvail(); return; }
   if(e.target.closest('[data-qa-range-auto]')){
     quickAvailAxisPref = null;
@@ -27942,48 +28027,25 @@ document.getElementById('quickAvailCloseAllBtn').addEventListener('click', async
   refreshHomeDashIfVisible();
   showToast('열어둔 예약 가능 시간을 모두 닫았어요.');
 });
-document.getElementById('quickAvailSubmitBtn').addEventListener('click', async () => {
-  // 요일마다 처음보다 줄어든 시간 = 닫을 시간
-  const removedByDow = {};
-  QUICK_AVAIL_DOWS.forEach(dow => { removedByDow[dow] = subtractMinuteRanges(quickAvailInitial[dow], quickAvailPattern[dow]); });
-  const anyRemoved = QUICK_AVAIL_DOWS.some(dow => removedByDow[dow].length);
-  const anyOpen = QUICK_AVAIL_DOWS.some(dow => quickAvailPattern[dow].length);
-  if(!anyOpen && !anyRemoved) return;
-  // 1) 줄어든 시간은 먼저 닫음
-  let closed = null;
-  if(anyRemoved){
-    closed = closeQuickAvailCuts(removedByDow);
-    for(const ev of closed.created){ try { await syncEventCreateToServer(ev); } catch(e){} }
-  }
-  if(!anyOpen){
-    resyncAllScheduleEvents();
-    dismissView(closeQuickAvail);
-    refreshActiveScheduleView();
-    refreshHomeDashIfVisible();
-    showToast((closed.closedDays.size ? `${closed.closedDays.size}일의 예약 가능 시간을 닫았어요.` : '닫을 예약 가능 시간이 없었어요.')
-      + (closed.skippedRecurring.size ? ' 반복으로 열어둔 시간은 캘린더에서 직접 지워 주세요.' : ''), 3600);
-    return;
-  }
-  // 2) 정한 시간은 기존처럼 열기 (이미 열려 있는 시간은 빼고 새로 필요한 부분만 생김)
-  //    이번에 새로 늘린 시간이 이미 열린 예약 가능 시간과 겹치면, 그 부분은 고른 대상을 더해서 합침
-  const visibility = { ...quickAvailVisibility };
-  const quickAud = { availableFor: quickAvailFor, visibility };
-  let mergedCount = 0;
+// 한 탭(대상)에서 늘린 시간을 앞으로 4주 동안 엶 - 이미 있는 일정과 겹치는 부분은 빼고,
+// 이미 열린 예약 가능 조각과 겹치면 그 조각에 이 대상을 더해서 합침. 새로 만든 일정은 바로 SCHEDULE_EVENTS에 넣음(다음 탭이 합칠 수 있게)
+function quickOpenTab(key){
+  const tb = quickAvailTabs[key];
+  const aud = quickTabAud(key);
+  const out = { created: [], mergedCount: 0, openedDays: new Set() };
   const now = new Date();
   const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30; // 오늘은 지금 이후 30분 단위부터
-  const created = [];
-  const openedDays = new Set();
   for(let i = 0; i < QUICK_AVAIL_WEEKS * 7; i++){
     const d = new Date(TODAY);
     d.setDate(d.getDate() + i);
-    const ranges = quickCloneRanges(quickAvailPattern[d.getDay()]);
+    const ranges = quickCloneRanges(tb.pattern[d.getDay()]);
     if(!ranges.length) continue;
-    // 이미 있는 일정(바쁨/예약 가능/예약중 다 포함)과 겹치는 부분은 뺌 - 기존 등록 화면처럼 겹치는 예약 가능은 안 만듦
-    const dayEvents = getEventsForDate(d).filter(blocksBooking); // "이 시간에도 예약 받기" 켠 일정 위엔 그대로 엶
+    const dateKey = dateKeyOf(d);
+    // 이미 있는 일정(바쁨/예약 가능/예약중 다 포함)과 겹치는 부분은 뺌 - "이 시간에도 예약 받기" 켠 일정 위엔 그대로 엶
+    const dayEvents = getEventsForDate(d).filter(blocksBooking);
     const cuts = dayEvents.map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
     if(i === 0) cuts.push({ s: 0, e: nowMin });
-    // 새로 늘린 시간 중 이미 열린 예약 가능 조각과 겹치는 부분 -> 그 조각에 대상을 더함 (바쁨 일정/반복 예약 가능과 겹치는 곳은 건드리지 않음)
-    const addedBands = subtractMinuteRanges(ranges, quickAvailInitial[d.getDay()]);
+    const addedBands = subtractMinuteRanges(ranges, tb.initial[d.getDay()]);
     if(addedBands.length){
       const nonMergeCuts = dayEvents.filter(ev => !isMergeableAvail(ev)).map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
       if(i === 0) nonMergeCuts.push({ s: 0, e: nowMin });
@@ -27993,52 +28055,75 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
           const s = Math.max(r.s, ev.startMin), e = Math.min(r.e, ev.endMin);
           if(e - s < 30) return;
           const before = availAudienceOf(ev);
-          if(sameAvailAudience(mergeAvailAudience(before, quickAud), before)) return; // 이미 그 대상에게 열려 있음
-          mergedCount += openAvailableRangeMerging(dateKeyOf(d), s, e, quickAud);
-          openedDays.add(dateKeyOf(d));
+          if(sameAvailAudience(mergeAvailAudience(before, aud), before)) return; // 이미 그 대상에게 열려 있음
+          out.mergedCount += openAvailableRangeMerging(dateKey, s, e, aud);
+          out.openedDays.add(dateKey);
         });
       });
     }
     subtractMinuteRanges(ranges, cuts).filter(r => r.e - r.s >= 30).forEach(r => {
-      const dateKey = dateKeyOf(d);
-      created.push({
+      const ev = {
         id: 'ev' + (scheduleEventIdCounter++),
-        title: availableTitleFor(quickAvailFor, visibility),
+        title: availableTitleFor(aud.availableFor, aud.visibility),
         startMin: r.s,
         endMin: r.e,
-        visibility: { ...visibility },
+        visibility: { ...aud.visibility },
         type: 'available',
-        availableFor: quickAvailFor,
+        availableFor: aud.availableFor,
         recurring: null,
         dateKey,
-      });
-      openedDays.add(dateKey);
+      };
+      SCHEDULE_EVENTS.push(ev);
+      out.created.push(ev);
+      out.openedDays.add(dateKey);
     });
   }
-  const closedMsg = (closed && closed.closedDays.size ? `${closed.closedDays.size}일의 시간을 닫았어요.` : '')
-    + (closed && closed.skippedRecurring.size ? ' 반복으로 열어둔 시간은 캘린더에서 직접 지워 주세요.' : '');
-  if(!created.length){
-    if(closed || mergedCount){
-      resyncAllScheduleEvents();
-      dismissView(closeQuickAvail);
-      refreshActiveScheduleView();
-      refreshHomeDashIfVisible();
-      showToast(mergedCount ? `이미 열려 있던 시간에 ${availAudienceLabel(quickAvailFor, quickAvailVisibility)}도 더했어요.${closedMsg ? ' ' + closedMsg : ''}` : (closedMsg || '바뀐 시간이 없어요.'));
-      return;
-    }
-    showToast('고른 시간엔 이미 다른 일정이 있어서 새로 열 시간이 없어요.');
+  return out;
+}
+document.getElementById('quickAvailSubmitBtn').addEventListener('click', async () => {
+  const keys = quickTabKeys().filter(quickTabChanged);
+  if(!keys.length) return;
+  const created = [];
+  const closedDays = new Set(), skippedRecurring = new Set();
+  let mergedCount = 0, opened = false, tried = false;
+  // 1) 줄어든 시간은 먼저 그 대상만 뺌 (다른 대상에도 열린 시간은 그쪽엔 그대로 열림)
+  keys.forEach(k => {
+    const tb = quickAvailTabs[k];
+    const removedByDow = {};
+    QUICK_AVAIL_DOWS.forEach(dow => { removedByDow[dow] = subtractMinuteRanges(tb.initial[dow], tb.pattern[dow]); });
+    if(!QUICK_AVAIL_DOWS.some(dow => removedByDow[dow].length)) return;
+    const r = closeQuickAvailCuts(removedByDow, k);
+    r.closedDays.forEach(x => closedDays.add(x));
+    r.skippedRecurring.forEach(x => skippedRecurring.add(x));
+    created.push(...r.created);
+  });
+  // 2) 정한 시간 열기 - 탭마다 차례로 (두 탭에 같은 시간을 열면 뒤 탭이 앞 탭 조각에 대상을 더해 하나로 합침)
+  keys.forEach(k => {
+    if(!QUICK_AVAIL_DOWS.some(dow => quickAvailTabs[k].pattern[dow].length)) return;
+    tried = true;
+    const r = quickOpenTab(k);
+    created.push(...r.created);
+    mergedCount += r.mergedCount;
+    if(r.openedDays.size) opened = true;
+  });
+  if(!opened && !closedDays.size && !skippedRecurring.size){
+    showToast(tried ? '고른 시간엔 이미 다른 일정이 있어서 새로 열 시간이 없어요.' : '바뀐 시간이 없어요.');
     return;
   }
-  created.forEach(ev => SCHEDULE_EVENTS.push(ev));
   resyncAllScheduleEvents();
   dismissView(closeQuickAvail);
   refreshActiveScheduleView();
   refreshHomeDashIfVisible();
   // 열린 날 수(4주 기준)를 그대로 말하면 다른 곳의 "앞으로 2주 중 N일"과 숫자가 달라 헷갈림 -
   // 여기선 "얼마 동안 열렸는지"만 말하고, 지금 열린 정도는 상태 문구(앞으로 2주 중 N일)로 통일
-  showToast(`예약 가능 시간을 앞으로 ${QUICK_AVAIL_WEEKS}주 동안 열었어요.${mergedCount ? ' 이미 열려 있던 시간과 겹치는 부분은 하나로 합쳤어요.' : ''}${closedMsg ? ' ' + closedMsg : ''}`);
-  // 한꺼번에 수십 개를 쏘지 않게 하나씩 순서대로 저장 (실패하면 syncEventCreateToServer가 알려줌)
+  const msgs = [];
+  if(opened) msgs.push(`예약 가능 시간을 앞으로 ${QUICK_AVAIL_WEEKS}주 동안 열었어요.${mergedCount ? ' 다른 대상에 열린 시간과 겹치는 부분은 하나로 합쳤어요.' : ''}`);
+  if(closedDays.size) msgs.push(opened ? `줄인 시간은 닫았어요.` : `${closedDays.size}일의 시간을 닫았어요.`);
+  if(skippedRecurring.size) msgs.push('반복으로 열어둔 시간은 캘린더에서 직접 지워 주세요.');
+  showToast(msgs.join(' '), skippedRecurring.size ? 3600 : undefined);
+  // 한꺼번에 수십 개를 쏘지 않게 하나씩 순서대로 저장 (합치면서 이미 없어진 조각은 건너뜀)
   for(const ev of created){
+    if(!SCHEDULE_EVENTS.includes(ev) || ev.serverId) continue;
     try { await syncEventCreateToServer(ev); } catch(e){}
   }
 });
