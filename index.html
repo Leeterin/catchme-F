@@ -5249,6 +5249,12 @@
   .qa-edit{ display:flex; align-items:center; justify-content:center; gap:4px; margin:0 8px 8px; font-size:13px; }
   .qa-edit select{ padding:4px 2px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--text); font-size:14px; font-variant-numeric:tabular-nums; }
   .qa-edit button{ margin-left:6px; border:none; background:none; color:var(--accent); font-weight:700; font-size:13px; cursor:pointer; }
+  .qa-range{ margin:2px 0 4px; text-align:right; }
+  .qa-range-toggle{ background:none; border:none; padding:4px 8px; font-size:12px; color:var(--text-dim); font-family:inherit; cursor:pointer; }
+  .qa-range-toggle b{ color:var(--text); font-variant-numeric:tabular-nums; }
+  .qa-range-toggle span{ color:var(--accent); margin-left:4px; }
+  .qa-range-edit{ justify-content:flex-end; margin-bottom:2px; }
+  .qa-range-note{ margin:0 8px 4px; font-size:11px; color:var(--text-dim); }
   .qa-quick{ display:flex; gap:6px; margin:4px 0 2px; }
   .qa-quick button{ flex:1; padding:8px 0; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text); font-size:12px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
   .qa-legend{ display:flex; justify-content:flex-end; gap:10px; margin:6px 8px 0; font-size:10px; color:var(--text-dim); }
@@ -26854,7 +26860,13 @@ const QUICK_AVAIL_GROUPS = [
 ];
 let quickAvailPattern = {}; // 요일 -> [{s, e}] 시간순 - 화면에서 정한 시간
 let quickAvailInitial = {}; // 화면을 열 때 이미 열려 있던 시간 - 저장할 때 이것과 비교해서 줄어든 부분은 닫음
-let quickAvailAxis = { s: 8 * 60, e: 24 * 60 }; // 막대가 보여주는 시간 범위
+let quickAvailAxis = { s: 0, e: 24 * 60 }; // 막대가 보여주는 시간 범위
+// 보이는 시간 범위를 직접 고른 값 (없으면 내 일정에 맞춰 자동). "보통 활동 시간" 같은 기준을 두지 않으려고
+// 새벽이든 아침이든 그 사람 일정에 맞춰 보여주고, 누구나 똑같이 바꿀 수 있게 함
+let quickAvailAxisPref = null;
+let quickAvailRangeOpen = false;
+const QUICK_AXIS_MIN_SPAN = 6 * 60;
+const QUICK_AXIS_PREF_KEY = 'catchme_quick_axis';
 let quickAvailBusy = {}; // 요일 -> 앞으로 4주 동안 그 요일에 있는 내 일정 [{s, e, soft, items}] - 막대 위에 회색/점선으로 보여줌
 let quickAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dow, min }
 let quickAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dow, idx }
@@ -26999,9 +27011,13 @@ function openQuickAvail(){
   quickAvailBusy = quickAvailBusyPattern();
   quickAvailInfo = null;
   quickAvailEdit = null;
-  // 막대는 8~24시를 보여주되, 그보다 이른 시간이 이미 열려 있으면 거기서부터
-  const earliest = Math.min(8 * 60, ...QUICK_AVAIL_DOWS.flatMap(dow => quickAvailPattern[dow].map(r => r.s)));
-  quickAvailAxis = { s: Math.floor(earliest / 60) * 60, e: 24 * 60 };
+  quickAvailRangeOpen = false;
+  quickAvailAxisPref = null;
+  try {
+    const saved = JSON.parse(localStorage.getItem(QUICK_AXIS_PREF_KEY) || 'null');
+    if(saved && saved.e - saved.s >= QUICK_AXIS_MIN_SPAN && saved.s >= 0 && saved.e <= 1440) quickAvailAxisPref = { s: saved.s, e: saved.e };
+  } catch(e) {}
+  quickAvailAxis = quickAvailAxisPref || quickAxisFit();
   renderQuickAvail();
   syncAvailFirstTip();
   const ov = document.getElementById('quickAvailOverlay');
@@ -27522,12 +27538,46 @@ function quickAvailEditHtml(dow, idx){
   const minSel = (f, v) => `<select data-qa-edit-f="${f}">${Array.from({ length: 60 / QUICK_AVAIL_STEP }, (_, k) => k * QUICK_AVAIL_STEP).map(m => `<option value="${m}"${m === v ? ' selected' : ''}>${String(m).padStart(2, '0')}</option>`).join('')}</select>`;
   return `<div class="qa-edit" data-qa-edit="${dow}|${idx}">${hourSel('sh', Math.floor(r.s / 60), 23)}:${minSel('sm', r.s % 60)} – ${hourSel('eh', Math.floor(r.e / 60), 24)}:${minSel('em', r.e % 60)}<button type="button" data-qa-edit-done>완료</button></div>`;
 }
+// 내 일정·이미 열어둔 시간이 있는 범위에 앞뒤 1시간 여유를 두고 맞춤 (최소 12시간). 아무것도 없으면 0~24시 전부
+function quickAxisFit(){
+  const all = QUICK_AVAIL_DOWS.flatMap(dow => [...(quickAvailInitial[dow] || []), ...(quickAvailBusy[dow] || [])]);
+  if(!all.length) return { s: 0, e: 24 * 60 };
+  let s = Math.max(0, Math.floor((Math.min(...all.map(r => r.s)) - 60) / 60) * 60);
+  let e = Math.min(24 * 60, Math.ceil((Math.max(...all.map(r => r.e)) + 60) / 60) * 60);
+  while(e - s < 12 * 60){
+    if(s > 0) s -= 60;
+    if(e < 24 * 60 && e - s < 12 * 60) e += 60;
+  }
+  return { s, e };
+}
+// 정해둔 시간이 보이는 범위 밖이면 그 시간까지 넓힘 - 막대가 안 보이면 못 고치니까
+function quickAxisCover(axis){
+  const rs = QUICK_AVAIL_DOWS.flatMap(dow => quickAvailPattern[dow] || []);
+  if(!rs.length) return { s: axis.s, e: axis.e };
+  return {
+    s: Math.min(axis.s, Math.floor(Math.min(...rs.map(r => r.s)) / 60) * 60),
+    e: Math.max(axis.e, Math.ceil(Math.max(...rs.map(r => r.e)) / 60) * 60),
+  };
+}
+function quickAxisRangeHtml(){
+  const a = quickAvailAxis;
+  const hourSel = (f, v, from, to) => `<select data-qa-range-f="${f}">${Array.from({ length: to - from + 1 }, (_, k) => from + k).map(h => `<option value="${h}"${h * 60 === v ? ' selected' : ''}>${h}시</option>`).join('')}</select>`;
+  const pref = quickAvailAxisPref;
+  const widened = pref && (a.s < pref.s || a.e > pref.e);
+  return `<div class="qa-range">
+    <button type="button" class="qa-range-toggle" data-qa-range-open>보이는 시간 <b>${a.s / 60}시–${a.e / 60}시</b> <span>${quickAvailRangeOpen ? '접기' : '바꾸기 ›'}</span></button>
+    ${quickAvailRangeOpen ? `<div class="qa-edit qa-range-edit">${hourSel('s', a.s, 0, 23)} – ${hourSel('e', a.e, 1, 24)}${pref ? '<button type="button" data-qa-range-auto>내 일정에 맞추기</button>' : ''}</div>
+    ${widened ? '<div class="qa-range-note">열어둔 시간이 있어서 그 시간까지 보여줘요</div>' : ''}` : ''}
+  </div>`;
+}
 function renderQuickAvail(){
-  // 3시간마다 눈금
+  quickAvailAxis = quickAxisCover(quickAvailAxisPref || quickAvailAxis);
+  // 3시간마다 눈금, 넓게 볼 땐 글자는 6시간마다
   const ticks = [];
   for(let h = Math.ceil(quickAvailAxis.s / 180) * 3; h * 60 <= quickAvailAxis.e; h += 3) ticks.push(h);
   const grid = ticks.filter(h => h * 60 > quickAvailAxis.s && h * 60 < quickAvailAxis.e).map(h => `<i class="qa-grid" style="left:${quickPct(h * 60)}%"></i>`).join('');
-  let html = quickAvailRows().map(row => {
+  const labelTicks = quickAvailAxis.e - quickAvailAxis.s > 18 * 60 ? ticks.filter(h => h % 6 === 0) : ticks;
+  let html = quickAxisRangeHtml() + quickAvailRows().map(row => {
     const dow = row.dows[0];
     const ranges = quickAvailPattern[dow];
     const on = ranges.length > 0;
@@ -27549,7 +27599,7 @@ function renderQuickAvail(){
       ${quickAvailInfo && quickAvailInfo.dow === dow ? quickAvailInfoHtml(dow, quickAvailInfo.min) : ''}
     </div>`;
   }).join('');
-  html += `<div class="qa-axis">${ticks.map(h => `<span style="left:${quickPct(h * 60)}%">${h}시</span>`).join('')}</div>`;
+  html += `<div class="qa-axis">${labelTicks.map(h => `<span style="left:${quickPct(h * 60)}%">${h}시</span>`).join('')}</div>`;
   const busyAll = QUICK_AVAIL_DOWS.flatMap(dow => quickAvailBusy[dow] || []);
   if(busyAll.length){
     html += `<div class="qa-legend">${busyAll.some(b => !b.soft) ? '<span><i></i>내 일정</span>' : ''}${busyAll.some(b => b.soft) ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}</div>`;
@@ -27611,6 +27661,14 @@ function quickAvailAddRange(row, centerMin){
 }
 document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'quickAvailOverlay'){ goBackOrClose(closeQuickAvail); return; }
+  if(e.target.closest('[data-qa-range-open]')){ quickAvailRangeOpen = !quickAvailRangeOpen; renderQuickAvail(); return; }
+  if(e.target.closest('[data-qa-range-auto]')){
+    quickAvailAxisPref = null;
+    try { localStorage.removeItem(QUICK_AXIS_PREF_KEY); } catch(err) {}
+    quickAvailAxis = quickAxisFit();
+    renderQuickAvail();
+    return;
+  }
   const bulk = e.target.closest('[data-qa-bulk]');
   if(bulk){
     const g = QUICK_AVAIL_GROUPS.find(x => x.key === bulk.dataset.qaBulk);
@@ -27663,6 +27721,20 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
 });
 // 5분 단위 시간 고르기 - 바꾼 쪽을 기준으로 30분 이상, 앞뒤 시간과 안 겹치게 맞춤
 document.getElementById('quickAvailRows').addEventListener('change', (e) => {
+  // 보이는 시간 범위 - 최소 6시간, 바꾼 쪽을 기준으로 다른 쪽을 맞춤. 다음에 열 때도 이 범위로 보여줌
+  const rf = e.target.dataset && e.target.dataset.qaRangeF;
+  if(rf){
+    const sel = k => Number(e.target.closest('.qa-range').querySelector(`[data-qa-range-f="${k}"]`).value) * 60;
+    let s = sel('s'), en = sel('e');
+    if(en - s < QUICK_AXIS_MIN_SPAN){
+      if(rf === 's'){ en = Math.min(24 * 60, s + QUICK_AXIS_MIN_SPAN); s = en - QUICK_AXIS_MIN_SPAN; }
+      else { s = Math.max(0, en - QUICK_AXIS_MIN_SPAN); en = s + QUICK_AXIS_MIN_SPAN; }
+    }
+    quickAvailAxisPref = { s, e: en };
+    try { localStorage.setItem(QUICK_AXIS_PREF_KEY, JSON.stringify(quickAvailAxisPref)); } catch(err) {}
+    renderQuickAvail();
+    return;
+  }
   const f = e.target.dataset && e.target.dataset.qaEditF;
   if(!f) return;
   const panel = e.target.closest('[data-qa-edit]');
@@ -27685,9 +27757,7 @@ document.getElementById('quickAvailRows').addEventListener('change', (e) => {
   r.s = s;
   r.e = en;
   quickAvailPattern[dow] = ranges;
-  // 막대 범위보다 이른 시간을 고르면 막대도 거기서부터 보여줌
-  if(s < quickAvailAxis.s) quickAvailAxis = { s: Math.floor(s / 60) * 60, e: quickAvailAxis.e };
-  renderQuickAvail();
+  renderQuickAvail(); // 보이는 범위 밖 시간을 고르면 renderQuickAvail에서 범위를 넓힘
 });
 // 막대 끌기 - 양 끝을 끌면 시작/끝 시간, 가운데를 끌면 통째로 옮김. 빈 곳을 톡 누르면 거기에 시간을 넣고,
 // 회색/점선(내 일정) 위를 톡 누르면 무슨 일정인지 보여줌. 막대를 톡 누르면 5분 단위로 고르는 칸이 열림
