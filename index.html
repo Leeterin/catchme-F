@@ -183,11 +183,17 @@
   .home-appt-name{ font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .home-appt-sub{ font-size:12px; color:var(--text-dim); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* 홈: 내 예약 가능 시간 - 앞으로 2주 중 열어둔 날을 한 줄로 */
-  .home-avail-strip{ display:grid; grid-template-columns:repeat(14, minmax(0, 1fr)); gap:3px; margin:2px 0 8px; }
-  .home-avail-day{ display:flex; flex-direction:column; align-items:center; gap:3px; font-size:9.5px; color:var(--text-dim); }
-  .home-avail-day i{ display:block; width:100%; height:18px; border-radius:5px; background:var(--surface-2); border:1px solid var(--line); }
-  .home-avail-day.on i{ background:var(--accent); border-color:var(--accent); }
-  .home-avail-day.today{ color:var(--accent); font-weight:700; }
+  /* 앞으로 2주를 7칸 x 2줄로 (예전엔 14칸 한 줄이라 칸이 작고 며칠인지 안 보였음) - 두 줄의 같은 칸은 같은 요일이라 요일은 맨 위에 한 번만 */
+  .home-avail-strip{ display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:5px; margin:2px 0 10px; }
+  .home-avail-wd{ text-align:center; font-size:10.5px; color:var(--text-dim); padding-bottom:1px; }
+  .home-avail-day{
+    height:30px; display:flex; align-items:center; justify-content:center;
+    border-radius:8px; background:var(--surface-2); border:1px solid var(--line);
+    font-size:12px; font-weight:600; color:var(--text-dim);
+  }
+  .home-avail-day.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .home-avail-day.today{ border:2px solid var(--accent); color:var(--accent); font-weight:800; }
+  .home-avail-day.today.on{ border-color:var(--text); color:#fff; }
   .home-avail-status{ font-size:12.5px; color:var(--text-dim); line-height:1.45; }
   .home-avail-status.warn{ color:#e5484d; font-weight:600; }
   .home-avail-actions{ display:flex; gap:6px; margin-top:10px; }
@@ -10064,12 +10070,19 @@ function renderHomeAvailCard(){
   const strip = document.getElementById('homeAvailStrip');
   if(!strip) return;
   let n = 0, html = '';
+  // 맨 위 요일 머리글 (오늘부터 7일 - 아래 두 줄의 같은 칸은 같은 요일)
+  for(let i = 0; i < 7; i++){
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() + i);
+    html += `<span class="home-avail-wd">${WEEKDAY_KO[d.getDay()]}</span>`;
+  }
   for(let i = 0; i < 14; i++){
     const d = new Date(TODAY);
     d.setDate(d.getDate() + i);
     const on = getEventsForDate(d).some(e => e.type === 'available');
     if(on) n++;
-    html += `<span class="home-avail-day${on ? ' on' : ''}${i === 0 ? ' today' : ''}" title="${d.getMonth() + 1}/${d.getDate()}"><i></i>${i === 0 ? '오늘' : WEEKDAY_KO[d.getDay()]}</span>`;
+    const label = `${d.getMonth() + 1}/${d.getDate()}${i === 0 ? ' 오늘' : ''}${on ? ' 열려 있음' : ''}`;
+    html += `<span class="home-avail-day${on ? ' on' : ''}${i === 0 ? ' today' : ''}" title="${label}" aria-label="${label}">${d.getDate()}</span>`;
   }
   strip.innerHTML = html;
   const status = document.getElementById('homeAvailStatus');
