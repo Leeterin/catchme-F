@@ -1291,6 +1291,19 @@
     border:none;
     padding:0;
   }
+  .feed-photo-order-badge{
+    position:absolute; top:3px; left:3px;
+    min-width:18px;height:18px;
+    border-radius:9px;
+    background:var(--accent);
+    color:#fff;
+    font-size:11px;
+    font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+    padding:0 4px;
+    box-sizing:border-box;
+    pointer-events:none;
+  }
   .feed-photo-cover-badge{
     position:absolute; bottom:2px; left:2px;
     background:rgba(0,0,0,0.6);
@@ -8485,11 +8498,11 @@
         </div>
 
         <div class="feed-create-section">
-          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">선택 · 최대 5장</span></div>
+          <div class="feed-create-section-label">사진 <span class="feed-create-section-hint">선택 · 여러 장 한 번에 · 최대 5장</span></div>
           <div class="feed-photo-row" id="feedPhotoRow">
             <button type="button" class="feed-photo-add-btn" id="feedPhotoAddBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>
           </div>
-          <input type="file" id="feedPhotoInput" accept="image/*" style="display:none;" />
+          <input type="file" id="feedPhotoInput" accept="image/*" multiple style="display:none;" />
         </div>
 
         <button class="profile-chat-btn" id="feedCreateSubmitBtn">올리기</button>
@@ -13046,6 +13059,7 @@ function renderFeedPhotoRow(){
     thumb.className = 'feed-photo-thumb';
     thumb.innerHTML = `
       <img src="${dataUrl}" />
+      ${feedSelectedPhotos.length >= 2 ? `<div class="feed-photo-order-badge">${idx + 1}</div>` : ''}
       ${idx === 0 ? `<div class="feed-photo-cover-badge">대표</div>` : ''}
       <button type="button" class="feed-photo-remove">×</button>
     `;
@@ -13068,39 +13082,53 @@ function renderFeedPhotoRow(){
   addBtn.style.display = feedSelectedPhotos.length >= FEED_MAX_PHOTOS ? 'none' : 'flex';
 }
 document.getElementById('feedPhotoAddBtn').addEventListener('click', () => document.getElementById('feedPhotoInput').click());
-document.getElementById('feedPhotoInput').addEventListener('change', (e) => {
-  const file = e.target.files && e.target.files[0];
-  e.target.value = '';
-  if(!file || feedSelectedPhotos.length >= FEED_MAX_PHOTOS) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    const img = new Image();
-    img.onload = () => {
-      const maxDim = 1000;
-      let { width, height } = img;
-      if(width > maxDim || height > maxDim){
-        if(width > height){ height = Math.round(height * maxDim / width); width = maxDim; }
-        else { width = Math.round(width * maxDim / height); height = maxDim; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      let quality = 0.82;
-      let dataUrl = canvas.toDataURL('image/jpeg', quality);
-      while(dataUrl.length > 650000 && quality > 0.3){
-        quality -= 0.15;
-        dataUrl = canvas.toDataURL('image/jpeg', quality);
-      }
-      if(dataUrl.length > 700000){
-        showToast('사진 용량이 너무 커요. 더 작은 사진을 선택해주세요.');
-        return;
-      }
-      feedSelectedPhotos.push(dataUrl);
-      renderFeedPhotoRow();
+// 사진 한 장을 1000px 이하 JPEG(base64)로 줄임. 너무 크면 null.
+function compressFeedPhoto(file){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onerror = () => resolve(null);
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = () => resolve(null);
+      img.onload = () => {
+        const maxDim = 1000;
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          if(width > height){ height = Math.round(height * maxDim / width); width = maxDim; }
+          else { width = Math.round(width * maxDim / height); height = maxDim; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        let quality = 0.82;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        while(dataUrl.length > 650000 && quality > 0.3){
+          quality -= 0.15;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        }
+        resolve(dataUrl.length > 700000 ? null : dataUrl);
+      };
+      img.src = ev.target.result;
     };
-    img.src = ev.target.result;
-  };
-  reader.readAsDataURL(file);
+    reader.readAsDataURL(file);
+  });
+}
+// 여러 장을 한 번에 고를 수 있음. 고른 순서대로 붙고, 남은 칸(최대 5장)을 넘는 건 버림.
+document.getElementById('feedPhotoInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []).filter(f => !f.type || f.type.startsWith('image/'));
+  e.target.value = '';
+  const room = FEED_MAX_PHOTOS - feedSelectedPhotos.length;
+  if(!files.length || room <= 0) return;
+  const picked = files.slice(0, room);
+  const results = await Promise.all(picked.map(compressFeedPhoto));
+  let failed = 0;
+  results.forEach(dataUrl => {
+    if(dataUrl && feedSelectedPhotos.length < FEED_MAX_PHOTOS) feedSelectedPhotos.push(dataUrl);
+    else failed++;
+  });
+  renderFeedPhotoRow();
+  if(files.length > room) showToast(`사진은 최대 ${FEED_MAX_PHOTOS}장까지라 앞의 ${room}장만 추가했어요.`);
+  else if(failed) showToast(`${failed}장은 용량이 너무 커서 추가하지 못했어요.`);
 });
 
 let feedCreateSelectedCategory = 'food';
