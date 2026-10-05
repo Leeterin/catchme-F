@@ -13985,9 +13985,16 @@ function setChatPlusMenu(open){
   btn.classList.toggle('open', open);
   btn.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
-document.getElementById('chatImageBtn').addEventListener('click', () => {
-  setChatPlusMenu(document.getElementById('chatPlusMenu').hidden);
-});
+// +를 눌러도 입력창 포커스를 뺏지 않게 해서 키보드가 내려가지 않게 함 (메뉴는 입력창 바로 위에 열림).
+// 터치는 touchend에서 기본 동작(포커스 이동/뒤따르는 click)을 막고 여기서 직접 열고 닫음
+const chatImageBtnEl = document.getElementById('chatImageBtn');
+const toggleChatPlusMenu = () => setChatPlusMenu(document.getElementById('chatPlusMenu').hidden);
+chatImageBtnEl.addEventListener('mousedown', (e) => e.preventDefault());
+chatImageBtnEl.addEventListener('touchend', (e) => {
+  if(e.cancelable) e.preventDefault();
+  toggleChatPlusMenu();
+}, { passive: false });
+chatImageBtnEl.addEventListener('click', toggleChatPlusMenu);
 document.getElementById('chatPlusPhotoBtn').addEventListener('click', () => {
   setChatPlusMenu(false);
   document.getElementById('chatImageInput').click();
@@ -14001,6 +14008,8 @@ document.getElementById('chatPlusPlaceBtn').addEventListener('click', () => {
   startPlaceFromChat();
 });
 document.getElementById('chatInput').addEventListener('focus', () => setChatPlusMenu(false));
+// 키보드가 떠 있는 채로 메뉴를 열었다가 입력창을 다시 누르면(이미 포커스 상태라 focus가 안 생김) 메뉴를 닫음
+document.getElementById('chatInput').addEventListener('click', () => setChatPlusMenu(false));
 document.getElementById('chatImageInput').addEventListener('change', handleChatImageSelected);
 
 async function sendChatImageMessage(dataUrl){
