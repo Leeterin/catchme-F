@@ -16844,6 +16844,7 @@ function titleMatchesAt(t, q, i){
 function titleMatchRank(title, query){
   const t = title.toLowerCase(), q = query.toLowerCase();
   if(titleMatchesAt(t, q, 0)) return 0;
+  if(q.length === 1) return -1; // 한 글자(ㅇ, 연 등)만 쳤을 땐 첫 글자가 맞는 이름만 - 중간에 그 글자가 든 이름까지 다 뜨면 너무 많음
   for(let i = 1; i <= t.length - q.length; i++) if(titleMatchesAt(t, q, i)) return 1;
   return -1;
 }
