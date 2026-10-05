@@ -2013,6 +2013,7 @@
   /* .placeholder-text span{display:block}이 등급 뱃지(inline-flex로 아이콘+글자를 나란히 두는 칩)까지
      깨버려서, 이 카드 안에서만 뱃지의 inline-flex를 다시 살려줌(specificity로 덮어씀) */
   .feed-review-profile-card .meet-badge-chip{ display:inline-flex; }
+  #feedAuthorViewMeta .meet-badge-chip{ cursor:pointer; }
   .feed-review-profile-card .feed-review-profile-mine{ display:block; margin-top:3px; font-size:12px; font-weight:600; color:var(--accent); }
   #feedReviewProfileBadge{ cursor:pointer; }
 
@@ -14321,6 +14322,21 @@ document.getElementById('feedReviewProfileBadge').addEventListener('click', (e) 
   e.stopPropagation();
   openReviewerLevelInfoOverlay();
 });
+// 내 리뷰 모아보기 화면에서도 등급 칩(이름 아래)이나 글 카드의 등급 배지를 누르면 같은 리뷰 등급표가 뜸.
+// 카드 배지는 원래 "그 사람 리뷰 모아보기"로 가는데, 이미 그 화면이라 같은 화면이 또 쌓이기만 했음 -
+// 캡처 단계에서 먼저 가로챔. 다른 사람 화면에선 등급표가 "내 등급" 기준이라 헷갈리니 열지 않고 그냥 무시
+function isViewingMyAuthorView(){
+  return document.getElementById('feedAuthorViewEditBtn').style.display !== 'none';
+}
+document.getElementById('feedAuthorViewMeta').addEventListener('click', (e) => {
+  if(!e.target.closest('.meet-badge-chip, .reviewer-level-badge') || !isViewingMyAuthorView()) return;
+  openReviewerLevelInfoOverlay();
+});
+document.getElementById('feedAuthorListContainer').addEventListener('click', (e) => {
+  if(!e.target.closest('.reviewer-level-badge')) return;
+  e.stopPropagation();
+  if(isViewingMyAuthorView()) openReviewerLevelInfoOverlay();
+}, true);
 
 // 공개/비공개 토글만 바뀐 경우 (보기 모드에서) 서버에 조용히 반영
 function saveProfileVisibility(){
