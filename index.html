@@ -7442,7 +7442,7 @@
       <div id="availableGridGroup" style="display:none;">
         <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
         <div class="mp-input-group">
-          <label>누구에게 열까요?</label>
+          <label>누구에게 열까요? <span style="font-weight:400;color:var(--text-dim);">(둘 다 켤 수 있어요)</span></label>
           <div class="avail-for-row" id="eventAvailForRow"></div>
           <div class="avail-for-hint" id="eventAvailForHint"></div>
         </div>
@@ -7950,7 +7950,7 @@
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
       <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
       <p class="quick-avail-desc">고른 시간이 <b>앞으로 4주 동안</b> 예약 가능 시간으로 열려요. 지금 열려 있는 칸을 끄면 그 시간은 닫혀요.</p>
-      <!-- 누구에게 열지는 대부분 "모두"면 돼서 접어둠 - 처음 쓰는 사람에게 모두/친구만/업무용을 바로 고르게 하면 헷갈렸음 -->
+      <!-- 누구에게 열지는 대부분 "친구 + 업무용"이면 돼서 접어둠 - 처음 쓰는 사람에게 바로 고르게 하면 헷갈렸음 -->
       <div class="quick-avail-for">
         <button type="button" class="quick-avail-for-toggle" id="quickAvailForToggle"></button>
         <div id="quickAvailForBody" style="display:none;">
@@ -14791,6 +14791,10 @@ function getEventsForDate(dateObj){
 // SCHEDULE_EVENTS 전체를 기준으로 시간 단위 배열(scheduleData/scheduleText/scheduleBookable)을 다시 계산
 // -> 일주일/한달/캘린더 매칭 등 기존 기능이 계속 정확한 데이터를 참조하도록 동기화
 function resyncAllScheduleEvents(){
+  // 예약 가능 시간 이름은 용도(친구/업무용)와 공개 범위에 따라 정해짐 - 예전 이름("👥 친구만 예약 가능" 등)이나 공개 범위를 바꾼 뒤에도 맞게
+  SCHEDULE_EVENTS.forEach(ev => {
+    if(ev.type === 'available' && !ev.isPendingHold && !ev.isReservationLinked) ev.title = availableTitleFor(availableForOf(ev), ev.visibility);
+  });
   refreshHomeDashIfVisible(); // 홈의 "내 예약 가능 시간" 카드도 일정이 바뀔 때마다 갱신 (SCHEDULE_EVENTS를 바로 읽음)
   Object.keys(scheduleData).forEach(k => delete scheduleData[k]);
   Object.keys(scheduleText).forEach(k => delete scheduleText[k]);
@@ -15000,6 +15004,7 @@ function renderDayView(){
     card.querySelectorAll('.day-event-tag').forEach(tagBtn => {
       tagBtn.addEventListener('click', () => {
         ev.visibility = nextVisibilityOnClick(ev.visibility, tagBtn.dataset.vis, tagBtn.dataset.groupId);
+        resyncAllScheduleEvents(); // 예약 가능 시간 이름(👥그룹 표시)도 바뀐 공개 범위에 맞춤
         syncEventUpdateToServer(ev);
         renderDayView();
       });
@@ -15389,7 +15394,7 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
 
 let formRepeatMode = 'once';
 let formEventType = 'busy';
-let formAvailableFor = 'all'; // 예약 가능 시간을 누구에게 열지 (모두/친구만/일만)
+let formAvailableFor = 'all'; // 예약 가능 시간을 누구에게 열지 (친구 + 업무용 / 친구만 / 업무용만)
 let editingEventId = null;
 let absorbedAvailIds = []; // 예약 가능 수정 중 두 번 눌러서 이번 수정에 합친 다른 예약 가능 일정 id들
 let editingLinkedPieceIds = []; // 예전 방식(linkGroupId)으로 여러 날짜 조각으로 쪼개져 저장된 일정을 수정할 때,
@@ -15766,13 +15771,15 @@ function defaultUntilDateValue(){
 function renderEventAvailFor(){
   document.getElementById('eventAvailForRow').innerHTML = availForButtonsHtml(formAvailableFor);
   document.getElementById('eventAvailForHint').textContent = AVAILABLE_FOR_META[formAvailableFor].hint;
-  // "업무용"은 친구에게 아예 안 보이니 친구 공개 설정은 의미가 없어서 숨김
+  // 친구에게 안 열면(업무용 링크만) 친구 공개 설정은 의미가 없어서 숨김
   document.getElementById('visibilityPickerGroup').style.display = (formEventType === 'available' && formAvailableFor === 'work') ? 'none' : '';
 }
 document.getElementById('eventAvailForRow').addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-avail-for]');
+  const btn = e.target.closest('[data-avail-toggle]');
   if(!btn) return;
-  formAvailableFor = btn.dataset.availFor;
+  const next = nextAvailFor(formAvailableFor, btn.dataset.availToggle);
+  if(!next) return;
+  formAvailableFor = next;
   renderEventAvailFor();
 });
 
@@ -16636,7 +16643,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     availFineTuneBlocks.forEach(block => {
       const ev = {
         id: 'ev' + (scheduleEventIdCounter++),
-        title: availableTitleFor(formAvailableFor),
+        title: availableTitleFor(formAvailableFor, formVisibility),
         startMin: block.startMin,
         endMin: block.endMin,
         visibility: { ...formVisibility },
@@ -17286,8 +17293,8 @@ function getScheduleTextOrderIndex(text){
 // 일정마다 등장 순서에 따라 같은 색 계열에서 점점 어두워지는 단색을 배정
 function colorForScheduleText(text){
   if(text === '예약 가능') return '#38BDF8'; // 예약 가능 시간은 테마와 상관없이 항상 하늘색으로 고정
-  const afKey = Object.keys(AVAILABLE_FOR_META).find(k => AVAILABLE_FOR_META[k].title === text);
-  if(afKey) return AVAILABLE_FOR_META[afKey].color;
+  if(text === availableTitleFor('work')) return AVAILABLE_WORK_COLOR;
+  if(text && text.startsWith('예약 가능 · ')) return AVAILABLE_EVENT_COLOR;
   if(scheduleColorOverrides[text]) return scheduleColorOverrides[text];
   const idx = getScheduleTextOrderIndex(text);
   const steps = 6; // 6단계로 밝기를 순환 (그 이후엔 다시 밝은 단계부터 반복)
@@ -17300,19 +17307,44 @@ function colorForScheduleText(text){
 const AVAILABLE_EVENT_COLOR = '#38BDF8';
 const APPOINTMENT_EVENT_COLOR = '#F43F5E';
 
-// 예약 가능 시간을 누구에게 열지 - 모두(앱 친구 + 업무용 링크) / 친구만 / 업무용(업무용 링크로만)
-// 캘린더에서 한눈에 구분되게 용도마다 색과 이름이 다름 (친구 화면엔 이름이 안 나가서 내 캘린더에서만 보임)
+// 예약 가능 시간을 누구에게 열지 - "친구에게 열기"와 "업무용 링크에 열기"를 따로 켜고 끔 (서버 저장값은 그대로 all/friends/work)
+//   all = 친구 + 업무용 링크 / friends = 친구만(업무용 링크엔 안 보임) / work = 업무용 링크만(친구에겐 빈 시간처럼 보임)
+// 친구 중 누구에게 열지는 공개 범위(전체/그룹/나만 보기)가 따로 정함
+// 색은 친구 쪽 기준(하늘색), 업무용 링크에도 열린 시간은 💼 표시 + 왼쪽 보라 줄로 구분 (친구 화면엔 이름이 안 나가서 내 캘린더에서만 보임)
+const AVAILABLE_WORK_COLOR = '#818CF8';
 const AVAILABLE_FOR_META = {
-  all:     { label: '모두',   title: '예약 가능',         short: '가능',   color: AVAILABLE_EVENT_COLOR, hint: '친구도, 업무용 링크를 받은 사람도 이 시간에 신청할 수 있어요.' },
-  friends: { label: '친구만', title: '👥 친구만 예약 가능', short: '친구만', color: '#34D399', hint: '앱 친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
-  work:    { label: '업무용', title: '💼 업무용 예약 가능', short: '업무용', color: '#818CF8', hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
+  all:     { label: '친구 + 💼업무용', short: '💼가능', color: AVAILABLE_EVENT_COLOR, hint: '친구와 업무용 링크를 받은 사람 모두 이 시간에 신청할 수 있어요.' },
+  friends: { label: '친구만',          short: '가능',   color: AVAILABLE_EVENT_COLOR, hint: '친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
+  work:    { label: '💼업무용만',      short: '💼업무', color: AVAILABLE_WORK_COLOR,  hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
 };
 function availableForOf(ev){ return (ev && AVAILABLE_FOR_META[ev.availableFor]) ? ev.availableFor : 'all'; }
-function availableTitleFor(f){ return (AVAILABLE_FOR_META[f] || AVAILABLE_FOR_META.all).title; }
+// 내 캘린더에 보이는 이름 - 예) "예약 가능 · 👥동아리 · 💼업무", 업무용만이면 "💼 업무용 예약 가능"
+function availableTitleFor(f, vis){
+  if(f === 'work') return '💼 업무용 예약 가능';
+  const parts = ['예약 가능'];
+  if(vis && vis.private) parts.push('🔒나만 보기');
+  else if(vis && vis.groupIds && vis.groupIds.length){
+    const names = vis.groupIds.map(id => (MY_GROUPS.find(g => g.id === id) || {}).name).filter(Boolean);
+    if(names.length) parts.push('👥' + names.join(','));
+  }
+  if(f !== 'friends') parts.push('💼업무');
+  return parts.join(' · ');
+}
+// 친구 + 업무용 링크에 함께 열린 시간은 띠 왼쪽에 보라 줄
+function availWorkStripeStyle(ev){
+  return (ev && ev.type === 'available' && availableForOf(ev) === 'all' && !ev.color) ? `box-shadow:inset 3px 0 0 ${AVAILABLE_WORK_COLOR};` : '';
+}
 function availForButtonsHtml(current){
-  return Object.keys(AVAILABLE_FOR_META).map(k =>
-    `<button type="button" class="avail-for-btn${k === current ? ' active' : ''}" data-avail-for="${k}" style="--af-color:${AVAILABLE_FOR_META[k].color}">${AVAILABLE_FOR_META[k].label}</button>`
-  ).join('');
+  const friendsOn = current !== 'work', workOn = current !== 'friends';
+  return `<button type="button" class="avail-for-btn${friendsOn ? ' active' : ''}" data-avail-toggle="friends" style="--af-color:${AVAILABLE_EVENT_COLOR}">👥 친구에게 열기</button>`
+    + `<button type="button" class="avail-for-btn${workOn ? ' active' : ''}" data-avail-toggle="work" style="--af-color:${AVAILABLE_WORK_COLOR}">💼 업무용 링크에 열기</button>`;
+}
+// 친구/업무용 버튼 하나를 눌렀을 때 다음 값 - 둘 다 끄면 아무도 신청을 못 하니 막음(null)
+function nextAvailFor(current, toggled){
+  let friendsOn = current !== 'work', workOn = current !== 'friends';
+  if(toggled === 'friends') friendsOn = !friendsOn; else workOn = !workOn;
+  if(!friendsOn && !workOn){ showToast('친구나 업무용 링크 중 하나는 열어야 해요.'); return null; }
+  return friendsOn && workOn ? 'all' : (friendsOn ? 'friends' : 'work');
 }
 
 // 일정 객체 기준 색 - 이 일정에 직접 고른 색이 있으면 그걸 쓰고, 없으면 종류별 기본색 / 일정 이름 기준 테마 색
@@ -17514,6 +17546,7 @@ function renderWeekView(){
         block.style.top = (blockTopPx + 1) + 'px';
         block.style.height = (blockHeightPx - 2) + 'px';
         if(!isPending && !isLinked) block.style.background = matchedEv ? colorForEvent(matchedEv) : colorForScheduleText(text);
+        if(!isPending && !isLinked && availWorkStripeStyle(matchedEv)) block.style.boxShadow = `inset 3px 0 0 ${AVAILABLE_WORK_COLOR}`;
         if(isPending && matchedEv.sourceChatRoomId) block.classList.add('has-chat');
         block.title = `${d.getMonth()+1}/${d.getDate()} ${minutesToLabel(blockRange.startMin)}-${minutesToLabel(blockRange.endMin)} - ${text}`;
 
@@ -17754,9 +17787,9 @@ function renderMonthSchedView(){
     const labelsHtml = shownEvents.map(ev => {
       const bg = ev.isPendingHold ? '#F59E0B' : colorForEvent(ev);
       // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 짧게 보여줌
-      // (모두 "가능"으로만 보이면 업무용/친구만으로 연 시간인지 몰라서 용도별로 "가능"/"친구만"/"업무용")
+      // (업무용 링크에도 열린 시간인지 알 수 있게 "가능"/"💼가능"/"💼업무")
       const label = ev.type === 'available' ? AVAILABLE_FOR_META[availableForOf(ev)].short : ev.title;
-      return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
+      return `<div class="month-event-label" style="background:${bg};${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
     const moreHtml = events.length > shownEvents.length
       ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
@@ -26632,14 +26665,16 @@ document.getElementById('quickAvailForToggle').addEventListener('click', () => {
   renderQuickAvailFor();
 });
 document.getElementById('quickAvailForRow').addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-avail-for]');
+  const btn = e.target.closest('[data-avail-toggle]');
   if(!btn) return;
-  quickAvailFor = btn.dataset.availFor;
+  const next = nextAvailFor(quickAvailFor, btn.dataset.availToggle);
+  if(!next) return;
+  quickAvailFor = next;
   renderQuickAvailFor();
 });
 function openQuickAvail(){
   quickAvailCells.clear();
-  // 업무용/친구만을 골라둔 채로 다시 열면 펼쳐서 보여줌 (모두면 접어둠)
+  // 친구만/업무용만을 골라둔 채로 다시 열면 펼쳐서 보여줌 (둘 다 열기면 접어둠)
   document.getElementById('quickAvailForBody').style.display = quickAvailFor === 'all' ? 'none' : '';
   renderQuickAvailFor();
   // 지금 열려 있는 칸을 켜진 채로 보여줌 - 여기서 끄면 닫히고, 켜면 열림
@@ -27286,7 +27321,7 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
       const dateKey = dateKeyOf(d);
       created.push({
         id: 'ev' + (scheduleEventIdCounter++),
-        title: availableTitleFor(quickAvailFor),
+        title: availableTitleFor(quickAvailFor, visibility),
         startMin: r.s,
         endMin: r.e,
         visibility: { ...visibility },
@@ -28578,7 +28613,7 @@ function renderInviteCreateHtml(){
       <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
     </div>`;
   const placeHtml = d.place ? `<div class="inv-section"><label class="inv-label">약속 장소</label>${invitePlaceHtml(d.place, true)}</div>` : '';
-  // 친구만/업무용으로 열어둔 시간이 하나도 없으면 친구용/업무용 링크 내용이 똑같아서 고르는 칸 자체를 안 보여줌
+  // 친구만/업무용만으로 열어둔 시간이 하나도 없으면 친구용/업무용 링크 내용이 똑같아서 고르는 칸 자체를 안 보여줌
   const hasSplitAvail = SCHEDULE_EVENTS.some(e => e.type === 'available' && availableForOf(e) !== 'all');
   const audienceHtml = !hasSplitAvail ? '' : `
     <div class="inv-section">
@@ -28588,8 +28623,8 @@ function renderInviteCreateHtml(){
         <button type="button" data-act="aud" data-aud="work" class="${d.audience === 'work' ? 'on' : ''}">💼 업무용</button>
       </div>
       <div class="avail-for-hint">${d.audience === 'work'
-        ? '"모두"와 "업무용"으로 열어둔 시간이 담겨요. 친구만 열어둔 시간은 안 보여요.'
-        : '"모두"와 "친구만"으로 열어둔 시간이 담겨요. 업무용으로 열어둔 시간은 안 보여요.'}</div>
+        ? '업무용 링크에 열어둔 시간이 담겨요. 친구에게만 연 시간은 안 보여요.'
+        : '친구에게 열어둔 시간이 담겨요. 업무용 링크에만 연 시간은 안 보여요.'}</div>
     </div>`;
   if(d.source === 'calendar') return placeHtml + tabs + audienceHtml + titleHtml + renderInviteCalendarPickHtml(d);
   return placeHtml + tabs + titleHtml + `
