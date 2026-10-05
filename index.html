@@ -12716,7 +12716,9 @@ let feedDetailReturnViewId = 'feedListView';
 document.addEventListener('click', () => {
   document.querySelectorAll('.feed-detail-kebab-menu.open').forEach(m => m.classList.remove('open'));
 });
+let feedDetailCurrentPost = null;
 function openFeedPostDetail(post){
+  feedDetailCurrentPost = post;
   const header = document.getElementById('feedPlaceDetailHeader');
   header.innerHTML = feedPostDetailHtml(post);
   wireFeedPostDetail(header, post);
@@ -14082,6 +14084,7 @@ function saveProfileToServer(){
     myProfileData.reviewNickname = data.user.reviewNickname || '';
     myProfileData.reviewAvatarUrl = data.user.reviewAvatarUrl || null;
     renderMyProfile();
+    refreshMyAuthorInFeed();
   }).catch(err => {
     showToast(err.message);
     myProfileData.id = previousId; // 실패했으면 아이디는 원래 값으로 되돌림
@@ -14172,6 +14175,34 @@ document.getElementById('reviewProfileSetupSkipBtn').addEventListener('click', (
   if(callback) callback();
 });
 
+// 리뷰용 프로필(닉네임/사진)이나 실명 프로필 사진을 바꾼 뒤, 이미 불러와 둔 내 글들의 작성자 정보도 새 값으로 바꾸고
+// 떠 있는 화면(목록·상세·장소 모아보기·내 리뷰)을 다시 그림 - 안 그러면 앱을 다시 켤 때까지 예전 사진/닉네임으로 보였음
+function refreshMyAuthorInFeed(){
+  if(!currentUser) return;
+  const patch = (author) => {
+    if(!author || author.id !== currentUser.id) return;
+    author.reviewNickname = myProfileData.reviewNickname || null;
+    author.hasReviewAvatar = !!myProfileData.reviewAvatarUrl;
+    author.hasAvatar = !!myProfileData.profileImageUrl;
+    if(myProfileData.name) author.name = myProfileData.name;
+  };
+  Object.values(FEED_POSTS).forEach(list => (list || []).forEach(p => patch(p.author)));
+  feedTagCurrentPosts.forEach(p => patch(p.author));
+  renderFeedPosts();
+  if(document.getElementById('feedTagView').classList.contains('active')) renderFeedTagList();
+  // 내 리뷰 화면(✎ 버튼이 보이는 경우)을 보고 있을 때만 다시 그림 - 다른 사람 리뷰 화면이면 그대로
+  const isMyAuthorView = document.getElementById('feedAuthorView').classList.contains('active')
+    && document.getElementById('feedAuthorViewEditBtn').style.display !== 'none';
+  if(isMyAuthorView) renderFeedAuthorViewContent(currentUser);
+  const detail = document.getElementById('feedPlaceDetailView');
+  if(detail.classList.contains('active') && feedDetailCurrentPost && feedDetailCurrentPost.author && feedDetailCurrentPost.author.id === currentUser.id){
+    patch(feedDetailCurrentPost.author);
+    const header = document.getElementById('feedPlaceDetailHeader');
+    header.innerHTML = feedPostDetailHtml(feedDetailCurrentPost);
+    wireFeedPostDetail(header, feedDetailCurrentPost);
+  }
+}
+
 // 리뷰용 닉네임/사진만 서버에 저장 (다른 프로필 필드는 안 건드림)
 function saveReviewProfileToServer(){
   if(!authToken) return;
@@ -14193,6 +14224,7 @@ function saveReviewProfileToServer(){
       persistSession();
     }
     renderFeedReviewProfileCard();
+    refreshMyAuthorInFeed();
   }).catch(err => {
     showToast(err.message);
   });
