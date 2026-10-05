@@ -8412,7 +8412,7 @@
           <button class="add-friend-btn" id="createFeedPostBtn" title="추천 올리기" style="margin-left:auto;">+</button>
         </div>
         <div class="feed-search-sort-row">
-          <input type="text" class="search-input" id="feedSearchInput" placeholder="장소명, 동네 이름으로 검색" />
+          <input type="text" class="search-input" id="feedSearchInput" placeholder="장소명, 주소로 검색" />
           <div class="sort-trigger-wrap">
             <button type="button" class="sort-trigger-btn" id="feedSortTriggerBtn" data-sort="recent">최신순 ▾</button>
             <div class="sort-dropdown-menu" id="feedSortDropdown"></div>
@@ -8493,10 +8493,10 @@
           <div class="feed-place-map" id="feedPlaceMapWrap" style="display:none;">
             <div id="feedPlaceMap" style="width:100%;height:140px;border-radius:10px;overflow:hidden;"></div>
           </div>
-          <div class="feed-place-create-info" id="feedPlaceCreateInfo" style="display:none;"></div>
           <div class="mp-input-group" style="margin-bottom:0;">
-            <input class="search-input" id="feedLocationInput" placeholder="동네/역 이름 (장소 검색하면 자동으로 채워져요)" maxlength="30" />
+            <input class="search-input" id="feedLocationInput" placeholder="주소 (장소를 검색해서 고르면 자동으로 채워져요)" maxlength="80" />
           </div>
+          <div class="feed-place-create-info" id="feedPlaceCreateInfo" style="display:none;margin-top:10px;margin-bottom:0;"></div>
         </div>
 
         <div class="feed-create-section">
@@ -12047,7 +12047,7 @@ function renderFeedPosts(){
 
   const q = feedSearchQuery.trim().toLowerCase();
   let posts = FEED_POSTS[activeFeedCategory].filter(p =>
-    !q || (p.title || '').toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q)
+    !q || [p.title, p.location, p.address].some(v => (v || '').toLowerCase().includes(q))
   );
 
   // 위치(현위치/지정 위치)가 설정돼 있으면, "주변 핫플 보기"와 똑같은 반경(도보 20분, 약 1.6km) 안의 장소만 보여줌.
@@ -13015,6 +13015,8 @@ async function loadFeedPostsFromServer(){
         likeCount: p.likeCount || 0,
         commentCount: p.commentCount || 0,
         likedByMe: !!p.likedByMe,
+        savedByMe: !!p.savedByMe,
+        category: p.category,
         createdAt: p.createdAt,
       });
     });
@@ -13366,17 +13368,17 @@ function showFeedPlaceMap(lat, lon){
 }
 
 // 검색해서 고른 장소의 실제 주소/전화번호를 폼에 미리보기로 보여줌 (등록될 때 그대로 같이 저장됨)
+// 주소는 바로 아래 주소 칸에 채워지므로 여기엔 전화번호만 보여줌 (예전엔 같은 주소가 두 번 보였음)
 function renderFeedPlaceCreateInfo(picked){
   const box = document.getElementById('feedPlaceCreateInfo');
-  if(!picked || (!picked.address && !picked.phone)){
+  if(!picked || !picked.phone){
     box.style.display = 'none';
     box.innerHTML = '';
     return;
   }
   box.style.display = 'flex';
   box.innerHTML = `
-    ${picked.address ? `<div>${ICO.pin} <b>주소</b> ${escapeHtml(picked.address)}</div>` : ''}
-    ${picked.phone ? `<div>${ICO.phone} <b>전화</b> ${escapeHtml(picked.phone)}</div>` : ''}
+    <div>${ICO.phone} <b>전화</b> ${escapeHtml(picked.phone)}</div>
   `;
 }
 
@@ -13420,11 +13422,8 @@ document.getElementById('feedPlaceInput').addEventListener('input', () => {
             resultsBox.style.display = 'none';
             showFeedPlaceMap(feedPlacePicked.lat, feedPlacePicked.lon);
             renderFeedPlaceCreateInfo(feedPlacePicked);
-            // 위치(동네/역 이름) 칸이 비어있으면, 검색된 주소로 자동으로 채워줌 (직접 입력해뒀으면 안 건드림)
-            const locationInput = document.getElementById('feedLocationInput');
-            if(!locationInput.value.trim()){
-              locationInput.value = r.road_address_name || r.address_name || '';
-            }
+            // 주소 칸은 고른 장소의 주소로 항상 채움 (다른 장소로 다시 고르면 그 주소로 바뀜)
+            document.getElementById('feedLocationInput').value = r.road_address_name || r.address_name || '';
           });
         });
       });
@@ -20324,16 +20323,36 @@ function scheduleChatCacheSave(roomId){
 const AUTO_REPLIES = ['오 좋아요!', '넵 확인했어요', '그때 봐요 :)', '조금만 기다려주세요'];
 
 // ---------- 예약 확정 시 장소 저장/핫플 추천 (⭐ 저장 목록) ----------
-const SAVED_PLACES = { food: [], cafe: [], experience: [] };
+// 저장 여부는 서버에 남음(게시물의 savedByMe) - 예전엔 앱 메모리에만 있어서 앱을 껐다 켜면 사라졌음.
+// category 인자는 예전 호출부와 모양을 맞추려고 남겨둔 것 (이제 게시물 자체로 판단)
+function savedPostsOf(category){
+  return (FEED_POSTS[category] || []).filter(p => p.savedByMe);
+}
 function isPlaceSaved(category, post){
-  return (SAVED_PLACES[category] || []).includes(post);
+  return !!(post && post.savedByMe);
+}
+// 같은 게시물이 목록/장소 모아보기 등에 따로 들고 있는 복사본까지 같이 맞춤
+function setPostSavedEverywhere(postId, saved, extra){
+  Object.values(FEED_POSTS).forEach(list => (list || []).forEach(p => { if(p.id === postId) p.savedByMe = saved; }));
+  feedTagCurrentPosts.forEach(p => { if(p.id === postId) p.savedByMe = saved; });
+  if(extra) extra.savedByMe = saved;
 }
 function toggleSavedPlace(category, post){
-  if(!SAVED_PLACES[category]) SAVED_PLACES[category] = [];
-  const list = SAVED_PLACES[category];
-  const idx = list.indexOf(post);
-  if(idx >= 0) list.splice(idx, 1);
-  else list.push(post);
+  if(!post || !post.id) return;
+  const next = !post.savedByMe;
+  setPostSavedEverywhere(post.id, next, post); // 화면은 바로 바뀌게 먼저 반영하고, 서버 저장이 실패하면 되돌림
+  apiRequest(`/feed/${post.id}/save`, { method: 'POST' })
+    .then(data => {
+      if(data && typeof data.saved === 'boolean' && data.saved !== next){
+        setPostSavedEverywhere(post.id, data.saved, post);
+        renderSavedPlacesGroups();
+      }
+    })
+    .catch(err => {
+      setPostSavedEverywhere(post.id, !next, post);
+      renderSavedPlacesGroups();
+      showToast(err.message || '저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+    });
 }
 
 // 예약이 확정되고 장소가 정해져 있으면, 그 채팅방에 "주변 핫플 보기" 알림 메시지를 추가함
@@ -20783,14 +20802,14 @@ function renderSavedPlacesGroups(){
     { key: 'experience', label: `${ICO.sparkle} 액티비티` },
   ];
 
-  const hasAny = categories.some(c => (SAVED_PLACES[c.key] || []).length > 0);
+  const hasAny = categories.some(c => savedPostsOf(c.key).length > 0);
   if(!hasAny){
     container.innerHTML = `<div class="search-empty">아직 저장한 장소가 없어요. ${ICO.starOutline} 버튼을 눌러 나중에 가볼 곳으로 저장해보세요.</div>`;
     return;
   }
 
   categories.forEach(({ key, label }) => {
-    const list = SAVED_PLACES[key] || [];
+    const list = savedPostsOf(key);
     if(list.length === 0) return;
 
     const groupTitle = document.createElement('div');
@@ -22917,7 +22936,7 @@ function openFeedMapView(){
   // renderFeedPosts()와 똑같은 필터(카테고리 + 검색어 + 위치 반경)를 그대로 적용해서, 지금 목록에 보이는 장소만 지도에 찍음
   const q = feedSearchQuery.trim().toLowerCase();
   let posts = FEED_POSTS[activeFeedCategory].filter(p =>
-    !q || (p.title || '').toLowerCase().includes(q) || (p.location || '').toLowerCase().includes(q)
+    !q || [p.title, p.location, p.address].some(v => (v || '').toLowerCase().includes(q))
   );
   const hasRefLocation = communityRefLocation && typeof communityRefLocation.lat === 'number' && typeof communityRefLocation.lon === 'number';
   if(hasRefLocation){
