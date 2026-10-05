@@ -5983,6 +5983,14 @@
     cursor:pointer;
   }
   .weekday-pick-btn.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  /* 일정 이름 칠 때 예전에 쓴 일정 이름 추천 - 누르면 그 일정의 시간/색/공개 설정으로 채움 */
+  .event-title-suggest{ margin-top:6px; border:1px solid var(--line); border-radius:10px; background:var(--surface); overflow:hidden; }
+  .event-title-suggest:empty{ display:none; }
+  .event-title-suggest button{ display:flex; align-items:center; gap:8px; width:100%; padding:10px 12px; border:0; border-top:1px solid var(--line); background:none; color:var(--text); font-size:13.5px; text-align:left; cursor:pointer; }
+  .event-title-suggest button:first-child{ border-top:0; }
+  .event-title-suggest .dot{ flex:0 0 10px; width:10px; height:10px; border-radius:50%; }
+  .event-title-suggest .nm{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+  .event-title-suggest .tm{ flex:0 0 auto; color:var(--text-dim); font-size:12px; }
   .visibility-picker{
     display:flex;
     gap:6px;
@@ -7452,7 +7460,8 @@
       <div id="busyFieldsGroup">
         <div class="mp-input-group" id="eventFormTitleGroup">
           <label>일정 이름</label>
-          <input type="text" id="eventFormTitle" class="search-input" maxlength="30" placeholder="예) 클라이언트 미팅" />
+          <input type="text" id="eventFormTitle" class="search-input" maxlength="30" placeholder="예) 클라이언트 미팅" autocomplete="off" />
+          <div class="event-title-suggest" id="eventTitleSuggest"></div>
         </div>
         <div class="event-form-time-row" id="eventFormDateRangeRow">
           <div class="mp-input-group">
@@ -16803,6 +16812,129 @@ document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(btn => {
     refreshDateDisplay('eventFormUntil');
   });
 });
+
+// ---------- 일정 이름 추천: 예전에 쓴 일정 이름을 치면 목록에 뜨고, 누르면 그 일정과 같은 시간/색/공개 설정으로 채움 ----------
+// 날짜와 반복 설정은 지금 고른 그대로 둠. 같은 이름이 여러 개면 가장 최근 날짜의 일정을 기준으로 함
+const HANGUL_CHOSUNG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+const HANGUL_JONG_TO_CHO = { 1:'ㄱ', 2:'ㄲ', 4:'ㄴ', 7:'ㄷ', 8:'ㄹ', 16:'ㅁ', 17:'ㅂ', 19:'ㅅ', 20:'ㅆ', 21:'ㅇ', 22:'ㅈ', 23:'ㅊ', 24:'ㅋ', 25:'ㅌ', 26:'ㅍ', 27:'ㅎ' };
+function hangulParts(ch){
+  const c = ch.charCodeAt(0) - 0xAC00;
+  if(c < 0 || c > 11171) return null;
+  return { cho: Math.floor(c / 588), jung: Math.floor((c % 588) / 28), jong: c % 28 };
+}
+// 이름 t의 i번째 글자부터 q가 맞는지 - 초성만 친 글자(ㅇㄱ), 아직 받침까지만 친 마지막 글자(연기 치는 중의 "여", 수업 치는 중의 "숭")도 맞는 걸로 봄
+function titleMatchesAt(t, q, i){
+  for(let k = 0; k < q.length; k++){
+    const qc = q[k], tc = t[i + k];
+    if(tc === undefined) return false;
+    if(qc === tc) continue;
+    const last = k === q.length - 1;
+    const tp = hangulParts(tc);
+    if(HANGUL_CHOSUNG.includes(qc)){ if(tp && HANGUL_CHOSUNG[tp.cho] === qc) continue; return false; }
+    const qp = hangulParts(qc);
+    if(!last || !qp || !tp || qp.cho !== tp.cho || qp.jung !== tp.jung) return false;
+    if(qp.jong === 0) continue;
+    // "숭"처럼 받침으로 붙은 자음이 사실은 다음 글자의 초성일 수 있음
+    const next = hangulParts(t[i + k + 1] || '');
+    if(tp.jong === 0 && next && HANGUL_CHOSUNG[next.cho] === HANGUL_JONG_TO_CHO[qp.jong]) continue;
+    return false;
+  }
+  return true;
+}
+function titleMatchRank(title, query){
+  const t = title.toLowerCase(), q = query.toLowerCase();
+  if(titleMatchesAt(t, q, 0)) return 0;
+  for(let i = 1; i <= t.length - q.length; i++) if(titleMatchesAt(t, q, i)) return 1;
+  return -1;
+}
+// 이 일정의 시작 분과 길이(분) - 여러 조각으로 나뉘어 저장된 일정은 하나로 합쳐서 셈
+function eventTimeSpanOf(ev){
+  if(ev.dateRange) return { startMin: ev.startMin, duration: daysBetween(ev.dateRange.start, ev.dateRange.end) * 1440 + ev.endMin - ev.startMin };
+  if(ev.linkGroupId && ev.dateKey){
+    const group = SCHEDULE_EVENTS.filter(e => e.linkGroupId === ev.linkGroupId && e.dateKey)
+      .sort((a, b) => dateKeyNum(parseDateInputValue(a.dateKey)) - dateKeyNum(parseDateInputValue(b.dateKey)));
+    if(group.length > 1){
+      const first = group[0], last = group[group.length - 1];
+      return { startMin: first.startMin, duration: daysBetween(parseDateInputValue(first.dateKey), parseDateInputValue(last.dateKey)) * 1440 + last.endMin - first.startMin };
+    }
+  }
+  const duration = ev.endMin - ev.startMin;
+  return { startMin: ev.startMin, duration: duration > 0 ? duration : duration + 1440 };
+}
+function eventRecencyKey(ev){
+  return ev.dateKey || ev.recurringAnchorDateKey || (ev.dateRange ? toDateInputValue(ev.dateRange.start) : '') || '';
+}
+function eventTitleSuggestions(query){
+  const q = query.trim();
+  if(!q) return [];
+  const byTitle = new Map();
+  SCHEDULE_EVENTS.forEach(ev => {
+    if(!ev.title || ev.type === 'available' || ev.isPendingHold || ev.isReservationLinked) return;
+    if(ev.title.includes('님과 약속')) return; // 약속 링크로 잡힌 약속은 이름이 자동으로 붙은 거라 뺌
+    if(ev.title === q) return; // 이미 다 친 이름은 안 띄움
+    const rank = titleMatchRank(ev.title, q);
+    if(rank < 0) return;
+    const prev = byTitle.get(ev.title);
+    if(!prev || eventRecencyKey(ev) > eventRecencyKey(prev.ev)) byTitle.set(ev.title, { ev, rank });
+  });
+  return [...byTitle.values()]
+    .sort((a, b) => a.rank - b.rank || (eventRecencyKey(b.ev) > eventRecencyKey(a.ev) ? 1 : -1))
+    .slice(0, 5)
+    .map(x => x.ev);
+}
+let eventTitleSuggestList = [];
+function renderEventTitleSuggest(){
+  const box = document.getElementById('eventTitleSuggest');
+  const input = document.getElementById('eventFormTitle');
+  // 새 일정을 추가할 때만 (수정 중엔 이름만 고치려는 거라 시간까지 바꾸면 안 됨)
+  eventTitleSuggestList = (!editingEventId && formEventType !== 'available' && document.activeElement === input)
+    ? eventTitleSuggestions(input.value) : [];
+  box.innerHTML = eventTitleSuggestList.map((ev, i) => {
+    const span = eventTimeSpanOf(ev);
+    const time = `${minutesToLabel(span.startMin)}~${minutesToLabel((span.startMin + span.duration) % 1440)}`;
+    return `<button type="button" data-suggest-idx="${i}"><span class="dot" style="background:${escapeHtml(colorForEvent(ev))}"></span><span class="nm">${escapeHtml(ev.title)}</span><span class="tm">${time}</span></button>`;
+  }).join('');
+}
+function applyEventTitleSuggestion(ev){
+  const span = eventTimeSpanOf(ev);
+  document.getElementById('eventFormTitle').value = ev.title;
+  const startDateKey = document.getElementById('eventFormStartDate').value || toDateInputValue(scheduleFocusDate);
+  const end = splitAbsoluteEndMin(startDateKey, span.startMin + span.duration);
+  document.getElementById('eventFormStart').value = minutesToLabel(span.startMin);
+  document.getElementById('eventFormEnd').value = minutesToLabel(end.timeOfDayMin);
+  document.getElementById('eventFormEndDate').value = end.dateKey;
+  formColor = ev.color || null;
+  renderEventColorPicker();
+  formVisibility = {
+    groupIds: Array.isArray(ev.visibility && ev.visibility.groupIds) ? [...ev.visibility.groupIds] : [],
+    private: !!(ev.visibility && ev.visibility.private),
+  };
+  renderVisibilityPicker();
+  formAllowBooking = !blocksBooking(ev);
+  renderEventAvailFor();
+  ['eventFormEndDate'].forEach(refreshDateDisplay);
+  ['eventFormStart', 'eventFormEnd'].forEach(refreshTimeDisplay);
+  document.getElementById('eventTitleSuggest').innerHTML = '';
+  eventTitleSuggestList = [];
+  showToast(`'${ev.title}' 일정과 같은 시간·색으로 채웠어요. 바꿔도 돼요.`);
+}
+(function setupEventTitleSuggest(){
+  const input = document.getElementById('eventFormTitle');
+  const box = document.getElementById('eventTitleSuggest');
+  input.addEventListener('input', renderEventTitleSuggest);
+  input.addEventListener('focus', renderEventTitleSuggest);
+  // 목록을 누르는 사이에 입력칸이 먼저 포커스를 잃어 목록이 사라지지 않게, 누르는 순간의 기본 동작을 막음
+  box.addEventListener('pointerdown', (e) => e.preventDefault());
+  box.addEventListener('mousedown', (e) => e.preventDefault());
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-suggest-idx]');
+    if(!btn) return;
+    const ev = eventTitleSuggestList[Number(btn.dataset.suggestIdx)];
+    if(ev) applyEventTitleSuggestion(ev);
+    input.blur();
+  });
+  input.addEventListener('blur', () => setTimeout(() => { if(document.activeElement !== input) box.innerHTML = ''; }, 150));
+})();
 
 document.querySelectorAll('.weekday-pick-btn').forEach(btn => {
   btn.addEventListener('click', () => {
