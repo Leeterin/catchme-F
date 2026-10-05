@@ -6460,7 +6460,10 @@
     display:flex;
     justify-content:space-around;
     align-items:center;
-    padding:13px 6px calc(13px + env(safe-area-inset-bottom));
+    /* 아래 여백을 "13px + 홈 표시줄 영역"으로 더하면 아이폰에서 바가 너무 높이 떠 보여서, 홈 표시줄 영역 안에 겹치게 줄임 */
+    padding:9px 6px max(10px, calc(env(safe-area-inset-bottom) - 10px));
+    /* 늘어나는 탭 카드(flex:1)가 없는 화면(홈 등)에선 남는 높이를 이 위쪽 여백이 가져가 바를 화면 맨 아래로 내림 */
+    margin-top:auto;
     border-top:1px solid var(--glass-border);
     background:var(--glass-bg-strong);
     backdrop-filter:blur(18px) saturate(160%);
@@ -6469,9 +6472,9 @@
     position:sticky;
     bottom:0;
   }
-  /* 하단 바 바로 앞 빈칸 - 내용이 짧은 화면(홈 등)에선 남는 높이를 채워 바를 화면 맨 아래로 내리고,
-     내용이 길면 예전 margin-top처럼 14px만 띄움 (예전엔 홈에서 바가 화면 중간에 떠 있었음) */
-  .bottom-nav-spacer{ flex:1 0 14px; }
+  /* 하단 바 바로 앞 14px 간격 (늘어나지 않음 - 예전엔 flex:1이라 탭 카드와 남는 높이를 반씩 나눠서
+     채팅/친구 탭 카드가 중간에서 잘린 것처럼 보였음) */
+  .bottom-nav-spacer{ flex:0 0 14px; }
   .nav-item{
     display:flex;
     flex-direction:column;
