@@ -27707,13 +27707,36 @@ quickAvailRowsEl.addEventListener('pointerdown', (e) => {
   if(handle || bar){
     const [, idx, edge] = (handle ? handle.dataset.qaHandle : bar.dataset.qaBar + '|m').split('|');
     const ranges = quickCloneRanges(quickAvailPattern[row.dows[0]]);
-    quickDrag = { row, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, startMin: quickMinAt(track, e.clientX), el: bar || handle.closest('[data-qa-bar]'), x: e.clientX, y: e.clientY, moved: false };
+    quickDrag = { row, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, startMin: quickMinAt(track, e.clientX), el: bar || handle.closest('[data-qa-bar]'), x: e.clientX, y: e.clientY, moved: false, offset: 0, stuck: null, stuckX: 0, passed: new Set() };
     try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
     e.preventDefault();
     return;
   }
   quickDrag = { tap: true, row, track, x: e.clientX, y: e.clientY };
 });
+// 내 일정(회색)에 막대 끝이 닿으면 "드드득" 진동과 함께 거기서 멈춤 - 그대로 더 밀면 넘어가서 다시 따라 움직임
+const QUICK_DETENT_PX = 28; // 멈춘 뒤 이만큼 더 밀어야 넘어감
+function hapticRattle(){
+  try {
+    const hp = getHapticsPlugin();
+    if(hp){ [0, 45, 90, 135].forEach(t => setTimeout(() => { Promise.resolve(hp.impact({ style: 'MEDIUM' })).catch(() => {}); }, t)); return; }
+    if(navigator.vibrate) navigator.vibrate([15, 30, 15, 30, 15, 30, 25]);
+  } catch(e) {}
+}
+// 막대 끝이 p에서 c로 갈 때 처음 들어가게 되는 내 일정과 그 경계 - 이미 밀고 넘어간 일정은 빼고
+function quickDetentHit(dr, p, c){
+  if(c === p) return null;
+  const right = c > p;
+  let hit = null;
+  (quickAvailBusy[dr.row.dows[0]] || []).forEach(b => {
+    if(b.soft || dr.passed.has(b)) return;
+    if(p > b.s && p < b.e) return; // 이미 일정 안에 있던 끝은 안 막음
+    const edge = right ? b.s : b.e;
+    if(right ? !(p <= b.s && c > b.s) : !(p >= b.e && c < b.e)) return;
+    if(!hit || (right ? edge < hit.at : edge > hit.at)) hit = { b, at: edge };
+  });
+  return hit;
+}
 quickAvailRowsEl.addEventListener('pointermove', (e) => {
   const dr = quickDrag;
   if(!dr || dr.tap) return;
@@ -27723,14 +27746,42 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
   const prevEnd = dr.idx > 0 ? dr.ranges[dr.idx - 1].e : quickAvailAxis.s;
   const nextStart = dr.idx < dr.ranges.length - 1 ? dr.ranges[dr.idx + 1].s : quickAvailAxis.e;
   const snap = m => Math.round(m / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP;
-  const m = quickMinAt(dr.track, e.clientX);
-  if(dr.edge === 's') r.s = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, snap(m)));
-  else if(dr.edge === 'e') r.e = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, snap(m)));
+  // 넘어간 뒤엔 손가락보다 뒤처져 있던 만큼을 조금씩 줄여서 다시 손가락 밑으로 따라오게 함
+  if(!dr.stuck && dr.offset) dr.offset = Math.abs(dr.offset) < 2 ? 0 : dr.offset * 0.75;
+  const m = quickMinAt(dr.track, e.clientX) - dr.offset;
+  // 가려는 값(s, e)을 먼저 구하고, 내 일정에 걸리면 경계에서 멈춤
+  let ns = r.s, ne = r.e;
+  if(dr.edge === 's') ns = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, snap(m)));
+  else if(dr.edge === 'e') ne = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, snap(m)));
   else {
     const len = dr.orig.e - dr.orig.s;
-    r.s = Math.max(prevEnd, Math.min(nextStart - len, snap(dr.orig.s + m - dr.startMin)));
-    r.e = r.s + len;
+    ns = Math.max(prevEnd, Math.min(nextStart - len, snap(dr.orig.s + m - dr.startMin)));
+    ne = ns + len;
   }
+  const hits = [];
+  if(dr.edge !== 'e'){ const h = quickDetentHit(dr, r.s, ns); if(h) hits.push({ ...h, shift: h.at - r.s }); }
+  if(dr.edge !== 's'){ const h = quickDetentHit(dr, r.e, ne); if(h) hits.push({ ...h, shift: h.at - r.e }); }
+  const hit = hits.sort((a, b) => Math.abs(a.shift) - Math.abs(b.shift))[0];
+  if(hit){
+    if(dr.stuck !== hit.b){
+      dr.stuck = hit.b;
+      dr.stuckX = e.clientX;
+      hapticRattle();
+    } else if(Math.abs(e.clientX - dr.stuckX) > QUICK_DETENT_PX){
+      // 계속 밀었으면 넘어감 - 멈춰 있던 만큼은 빼서 막대가 경계에서부터 이어서 움직이게
+      dr.passed.add(hit.b);
+      dr.offset += quickMinAt(dr.track, e.clientX) - quickMinAt(dr.track, dr.stuckX);
+      dr.stuck = null;
+    }
+    // 걸린 쪽 끝을 경계에 맞춤 (통째로 옮길 땐 둘 다 같은 만큼만)
+    if(dr.edge === 's') ns = r.s + hit.shift;
+    else if(dr.edge === 'e') ne = r.e + hit.shift;
+    else { ns = r.s + hit.shift; ne = r.e + hit.shift; }
+  } else {
+    dr.stuck = null;
+  }
+  r.s = ns;
+  r.e = ne;
   // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
   dr.el.style.cssText = quickBarStyle(r);
   const label = document.querySelector(`[data-qa-times="${dr.row.key}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
