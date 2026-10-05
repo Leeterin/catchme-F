@@ -3456,6 +3456,8 @@
   }
   .meet-badge-chip svg{ flex-shrink:0; }
   .reviewer-level-badge{ cursor:pointer; }
+  .feed-author-view-toggle-row{ display:flex; justify-content:flex-end; margin:10px 0; }
+  .feed-tag-grid-place{ font-size:11px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .feed-author-view-header{
     display:flex;
     align-items:center;
@@ -8463,6 +8465,16 @@
           <button class="edit-icon-btn" id="feedAuthorViewEditBtn" type="button" style="display:none;">&#9998;</button>
         </div>
         <div class="profile-meet-next" id="feedAuthorViewNext" style="display:none;"></div>
+        <div class="feed-author-view-toggle-row">
+          <div class="feed-tag-view-toggle" id="feedAuthorViewToggle">
+            <button type="button" class="feed-tag-view-btn active" data-view="grid" title="그리드로 보기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+            </button>
+            <button type="button" class="feed-tag-view-btn" data-view="list" title="세로로 보기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
         <div id="feedAuthorListContainer"></div>
       </div>
 
@@ -11969,19 +11981,16 @@ function renderFeedAuthorViewContent(author){
     .flatMap(cat => FEED_POSTS[cat] || [])
     .filter(p => p.author && p.author.id === author.id)
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  const container = document.getElementById('feedAuthorListContainer');
-  container.innerHTML = '';
-  if(posts.length === 0){
-    const empty = document.createElement('div');
-    empty.className = 'search-empty';
-    empty.textContent = '아직 작성한 리뷰가 없어요.';
-    container.appendChild(empty);
-  } else {
-    posts.forEach(post => renderFeedPostCard(post, container));
-  }
+  // 장소 모아보기와 같은 그리드/리스트 모양으로 (예전엔 큰 피드 카드가 길게 이어졌음)
+  renderFeedPostCollection(document.getElementById('feedAuthorListContainer'), posts, {
+    emptyText: '아직 작성한 리뷰가 없어요.',
+    showPlace: true,
+  });
 }
+let feedAuthorViewCurrent = null; // 지금 작성자 리뷰 화면에 떠 있는 사람 (보기 방식 전환 시 다시 그리려고)
 function openFeedAuthorView(author){
   if(!author || !author.id) return;
+  feedAuthorViewCurrent = author;
   renderFeedAuthorViewContent(author);
 
   // 다른 사람이든 나 자신이든, 이 화면을 보는 동안에는 위쪽 "내 리뷰 프로필" 카드를 가려서
@@ -12748,14 +12757,20 @@ let feedTagCurrentPosts = []; // 지금 장소 모아보기 화면에 떠있는 
 
 // feedTagViewMode에 따라 grid/list 중 골라서 렌더링
 function renderFeedTagList(){
-  const posts = feedTagCurrentPosts;
-  const container = document.getElementById('feedTagListContainer');
+  renderFeedPostCollection(document.getElementById('feedTagListContainer'), feedTagCurrentPosts, {
+    emptyText: '아직 이 장소에 대한 다른 글이 없어요.',
+  });
+}
+// 게시물 여러 개를 그리드(대표사진 3열) / 리스트(사진+한줄평) 중 feedTagViewMode로 골라서 그림 -
+// 장소 모아보기와 작성자 리뷰 모아보기(내 리뷰 포함)가 같이 씀.
+// showPlace: 작성자 화면처럼 글쓴이가 다 같은 경우, 글쓴이 대신 장소 이름을 보여줌
+function renderFeedPostCollection(container, posts, { emptyText, showPlace } = {}){
   container.innerHTML = '';
   if(posts.length === 0){
     container.className = '';
     const empty = document.createElement('div');
     empty.className = 'search-empty';
-    empty.textContent = '아직 이 장소에 대한 다른 글이 없어요.';
+    empty.textContent = emptyText || '아직 글이 없어요.';
     container.appendChild(empty);
     return;
   }
@@ -12768,7 +12783,9 @@ function renderFeedTagList(){
       row.innerHTML = `
         <div class="feed-tag-list-thumb">${cover ? `<img loading="lazy" src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
         <div class="feed-tag-list-body">
-          <div class="feed-tag-list-author">${escapeHtml(feedAuthorDisplayName(post.author))}${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}</div>
+          ${showPlace
+            ? `<div class="feed-tag-list-author">${ICO.pin} ${escapeHtml(post.title || '')}</div>`
+            : `<div class="feed-tag-list-author">${escapeHtml(feedAuthorDisplayName(post.author))}${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}</div>`}
           ${typeof post.avgRating === 'number' ? `<div class="feed-tag-list-rating">${renderStarsHtml(post.avgRating)} ${post.avgRating.toFixed(1)}${post.ratingCount > 1 ? ` (${post.ratingCount})` : ''}</div>` : ''}
           <div class="feed-tag-list-note">${escapeHtml(post.note || '')}</div>
         </div>
@@ -12808,10 +12825,11 @@ function renderFeedTagList(){
       cell.appendChild(photo);
 
       // 사진이 있는 글만 아래에 별점/한줄평을 따로 표시 (사진 없는 글은 위 박스 안에 이미 다 보여줬으니 중복 안 함)
-      if(cover && (typeof post.rating === 'number' || post.note)){
+      if(cover && (typeof post.rating === 'number' || post.note || (showPlace && post.title))){
         const info = document.createElement('div');
         info.className = 'feed-tag-grid-info';
         info.innerHTML = `
+          ${showPlace && post.title ? `<div class="feed-tag-grid-place">${escapeHtml(post.title)}</div>` : ''}
           ${typeof post.rating === 'number' ? `<div class="feed-tag-grid-rating">${renderStarsHtml(post.rating)} ${post.rating.toFixed(1)}</div>` : ''}
           ${post.note ? `<div class="feed-tag-grid-note">${escapeHtml(post.note)}</div>` : ''}
         `;
@@ -12859,13 +12877,15 @@ function closeFeedPlaceTagView(){
   document.getElementById('feedListView').classList.add('active');
 }
 document.getElementById('feedTagBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceTagView));
-document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn').forEach(btn => {
+// 장소 모아보기/작성자 리뷰 화면의 그리드·리스트 전환 - 보기 방식은 두 화면이 같이 씀
+document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn, #feedAuthorViewToggle .feed-tag-view-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     const mode = btn.dataset.view;
     if(mode === feedTagViewMode) return;
     feedTagViewMode = mode;
-    document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
-    renderFeedTagList();
+    document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn, #feedAuthorViewToggle .feed-tag-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+    if(document.getElementById('feedTagView').classList.contains('active')) renderFeedTagList();
+    if(document.getElementById('feedAuthorView').classList.contains('active') && feedAuthorViewCurrent) renderFeedAuthorViewContent(feedAuthorViewCurrent);
   });
 });
 
