@@ -5886,8 +5886,8 @@
   .event-type-btn.active{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .event-type-btn.active[data-type="available"]{ border-color:#38BDF8; color:#38BDF8; background:rgba(56,189,248,0.12); }
   /* 예약 가능 시간을 누구에게 열지 (모두 / 친구만 / 일만) - 색은 캘린더 블록 색과 같음 */
-  .avail-for-row{ display:flex; gap:6px; }
-  .avail-for-btn{ flex:1; padding:9px 0; border-radius:9px; border:1.5px solid var(--line); background:var(--surface); color:var(--text-dim); font-size:12.5px; font-weight:600; cursor:pointer; }
+  .avail-for-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .avail-for-btn{ flex:1 0 auto; padding:9px 10px; border-radius:9px; border:1.5px solid var(--line); background:var(--surface); color:var(--text-dim); font-size:12.5px; font-weight:600; cursor:pointer; }
   .avail-for-btn.active{ border-color:var(--af-color); color:var(--af-color); background:color-mix(in srgb, var(--af-color) 12%, transparent); }
   .avail-for-hint{ margin-top:6px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
   .quick-avail-for{ margin:0 0 12px; }
@@ -6135,6 +6135,11 @@
   .week-cell.occupied.already-available{
     background:rgba(56,189,248,0.25);
     border-color:#38BDF8;
+  }
+  /* 이미 예약 가능으로 열린 칸 - 새로 열 때는 골라서 대상을 더할 수 있음 (점선으로 구분) */
+  .week-cell.mergeable-available:not(.selected){
+    background:rgba(56,189,248,0.18);
+    border:1px dashed #38BDF8;
   }
   .week-cell.selected{
     background:var(--accent);
@@ -7442,7 +7447,7 @@
       <div id="availableGridGroup" style="display:none;">
         <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
         <div class="mp-input-group">
-          <label>누구에게 열까요? <span style="font-weight:400;color:var(--text-dim);">(둘 다 켤 수 있어요)</span></label>
+          <label>누구에게 열까요? <span style="font-weight:400;color:var(--text-dim);">(여러 개 고를 수 있어요)</span></label>
           <div class="avail-for-row" id="eventAvailForRow"></div>
           <div class="avail-for-hint" id="eventAvailForHint"></div>
         </div>
@@ -7535,6 +7540,15 @@
         </div>
       </div>
       <div id="friendGroupsListContainer"></div>
+      <!-- 업무용 링크도 "누구에게 열까요?"에서 그룹처럼 고르니까, 이모티콘도 여기서 같이 정함 -->
+      <div class="mp-input-group" style="margin-top:18px;">
+        <label>업무용 링크 이모티콘 <span style="font-weight:400;color:var(--text-dim);">(업무용 링크에 연 시간에 붙어요)</span></label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" class="search-input" id="workEmojiInput" placeholder="💼" maxlength="16" style="width:52px;flex-shrink:0;text-align:center;padding-left:0;padding-right:0;" />
+          <span style="flex:1;font-size:13px;color:var(--text-dim);">업무용 링크</span>
+          <button type="button" class="search-add-btn" id="saveWorkEmojiBtn" style="flex-shrink:0;">저장</button>
+        </div>
+      </div>
     </div>
 
     <!-- 그룹 상세 (이름 변경 / 멤버 선택 / 삭제) -->
@@ -7542,8 +7556,9 @@
       <button class="profile-back" id="groupDetailBackBtn">&#8249; 뒤로</button>
       <div class="friend-calendar-title" id="groupDetailTitle" style="margin-bottom:10px;">그룹</div>
       <div class="mp-input-group">
-        <label>그룹 이름</label>
+        <label>이모티콘 · 그룹 이름 <span style="font-weight:400;color:var(--text-dim);">(이모티콘은 캘린더의 예약 가능 시간에 붙어요)</span></label>
         <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" class="search-input" id="groupEmojiInput" placeholder="👥" maxlength="16" style="width:52px;flex-shrink:0;text-align:center;padding-left:0;padding-right:0;" />
           <input type="text" class="search-input" id="renameGroupInput" placeholder="그룹 이름" maxlength="20" style="flex:1;" />
           <button type="button" class="search-add-btn" id="renameGroupBtn" style="flex-shrink:0;">저장</button>
         </div>
@@ -10445,6 +10460,7 @@ const settingsState = {
   chat_preview: true,
   dark_mode: (() => { try { return localStorage.getItem('catchme_dark_mode') === '1'; } catch(_){ return false; } })(), // 서버 설정 오기 전엔 폰에 기억해둔 값
   default_schedule_view: 'month', // 첫 화면/시간표 탭 진입 시 기본으로 보여줄 화면: day/week/month
+  work_emoji: '💼', // 업무용 링크에 연 예약 가능 시간에 붙는 이모티콘
 };
 
 // 프론트 키(snake_case) <-> 서버 키(camelCase) 매핑
@@ -10460,6 +10476,7 @@ const SETTINGS_KEY_MAP = {
   chat_preview: 'chatPreview',
   dark_mode: 'darkMode',
   default_schedule_view: 'defaultScheduleView',
+  work_emoji: 'workEmoji',
 };
 
 // 로그인 직후 서버에 저장된 설정을 불러와서 반영
@@ -10472,6 +10489,8 @@ async function loadSettingsFromServer(){
       if(data.settings[serverKey] !== undefined) settingsState[localKey] = data.settings[serverKey];
     });
     applyDarkMode();
+    resyncAllScheduleEvents(); // 업무용 링크 이모티콘이 예약 가능 이름에 붙어서 다시 맞춤
+    refreshActiveScheduleView();
   } catch(err){
     console.error('[settings] load failed:', err);
   }
@@ -15535,6 +15554,7 @@ document.getElementById('ecmDone').addEventListener('click', closeEventColorMixe
 function renderVisibilityPicker(){
   document.getElementById('visibilityPicker').innerHTML = visibilityButtonsHtml(formVisibility, 'visibility-pick-btn');
   renderVisibilityHint();
+  renderEventAvailFor(); // 예약 가능 칩도 공개 범위(그룹)를 같이 보여줘서 맞춰 다시 그림
 }
 // 고른 공개설정이 친구에게 실제로 어떻게 보이는지 한 줄로 알려줌 (버튼 이름만으로는 제목까지 보이는지 알 수 없어서)
 // 일반 일정: 공개 범위 밖 친구에게도 그 시간은 '일정 있음'으로 보임(서버 원칙). 예약 가능 시간: 공개 범위 안 친구만 예약 가능
@@ -15769,17 +15789,18 @@ function defaultUntilDateValue(){
 }
 
 function renderEventAvailFor(){
-  document.getElementById('eventAvailForRow').innerHTML = availForButtonsHtml(formAvailableFor);
+  document.getElementById('eventAvailForRow').innerHTML = availAudienceChipsHtml(formAvailableFor, formVisibility);
   document.getElementById('eventAvailForHint').textContent = AVAILABLE_FOR_META[formAvailableFor].hint;
-  // 친구에게 안 열면(업무용 링크만) 친구 공개 설정은 의미가 없어서 숨김
-  document.getElementById('visibilityPickerGroup').style.display = (formEventType === 'available' && formAvailableFor === 'work') ? 'none' : '';
+  // 예약 가능 시간은 "누구에게 열까요?" 칩에서 친구 그룹까지 고르므로 아래 공개 설정은 숨김
+  document.getElementById('visibilityPickerGroup').style.display = formEventType === 'available' ? 'none' : '';
 }
 document.getElementById('eventAvailForRow').addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-avail-toggle]');
+  const btn = e.target.closest('[data-aud-chip]');
   if(!btn) return;
-  const next = nextAvailFor(formAvailableFor, btn.dataset.availToggle);
+  const next = nextAvailAudience(formAvailableFor, formVisibility, btn);
   if(!next) return;
-  formAvailableFor = next;
+  formAvailableFor = next.availableFor;
+  formVisibility = next.visibility;
   renderEventAvailFor();
 });
 
@@ -16343,12 +16364,15 @@ function renderAvailSelectGrid(){
         const evEndH = Math.max(evStartH + 1, Math.ceil(disp.endMin / 60));
         return h >= evStartH && h < evEndH;
       });
-      const occupied = !!blockingEv; // texts는 실제 시각(0~23시) 기준으로 인덱싱되므로, 그리드 행번호(rowIdx)가 아니라 실제 시각(h)으로 찾아야 함
-      const alreadyAvailable = !!blockingEv && blockingEv.type === 'available'; // 이미 예약 가능으로 등록된 칸은 따로 구분해서 한눈에 보이게 함
+      // 새로 여는 중이면 이미 예약 가능으로 열린 칸도 고를 수 있음 - 저장할 때 그 시간에 고른 대상을 더해서 합침
+      const mergeableCell = !editingEventId && formEventType === 'available' && isMergeableAvail(blockingEv);
+      const occupied = !!blockingEv && !mergeableCell; // texts는 실제 시각(0~23시) 기준으로 인덱싱되므로, 그리드 행번호(rowIdx)가 아니라 실제 시각(h)으로 찾아야 함
+      const alreadyAvailable = !!blockingEv && blockingEv.type === 'available' && !mergeableCell; // 이미 예약 가능으로 등록된 칸은 따로 구분해서 한눈에 보이게 함
       const cellKey = `${key}::${rowIdx}`;
 
       const cell = document.createElement('div');
       cell.className = 'week-cell'
+        + (mergeableCell ? ' mergeable-available' : '')
         + (occupied ? ' occupied' : '')
         + (alreadyAvailable ? ' already-available' : '')
         + (availSelectedCells.has(cellKey) ? ' selected' : '');
@@ -16616,9 +16640,12 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
       // 그대로 두거나 살짝만 바꿔도 "자기 자신"이랑 겹친다고 막혀버림)
       const editingExcludeIds = editingEventId ? new Set([editingEventId, ...editingLinkedPieceIds]) : null;
       const dateObj = parseDateInputValue(block.dateKey);
-      const conflict = getEventsForDate(dateObj).find(ev => (!editingExcludeIds || !editingExcludeIds.has(ev.id)) && block.startMin < ev.endMin && block.endMin > ev.startMin);
+      // 이미 열린 예약 가능 조각(반복 아님)과 겹치는 건 막지 않고 저장할 때 합침
+      const conflict = getEventsForDate(dateObj).find(ev => (!editingExcludeIds || !editingExcludeIds.has(ev.id)) && !isMergeableAvail(ev) && block.startMin < ev.endMin && block.endMin > ev.startMin);
       if(conflict){
-        showToast(`${availFineTuneDateLabel(block.dateKey)} ${minutesToLabel(conflict.startMin)}-${minutesToLabel(conflict.endMin)}에 "${conflict.title}" 일정이 이미 있어서 그 시간엔 예약 가능으로 만들 수 없어요.`);
+        showToast(conflict.type === 'available'
+          ? `${availFineTuneDateLabel(block.dateKey)} ${minutesToLabel(conflict.startMin)}-${minutesToLabel(conflict.endMin)}은 반복으로 열어둔 예약 가능 시간이라 겹쳐서 열 수 없어요. 그 반복 일정을 수정해서 대상을 바꿔 주세요.`
+          : `${availFineTuneDateLabel(block.dateKey)} ${minutesToLabel(conflict.startMin)}-${minutesToLabel(conflict.endMin)}에 "${conflict.title}" 일정이 이미 있어서 그 시간엔 예약 가능으로 만들 수 없어요.`);
         return;
       }
     }
@@ -16639,21 +16666,10 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
       });
     }
 
-    let createdCount = 0;
+    let createdCount = 0, mergedCount = 0;
+    const formAud = { availableFor: formAvailableFor, visibility: { ...formVisibility } };
     availFineTuneBlocks.forEach(block => {
-      const ev = {
-        id: 'ev' + (scheduleEventIdCounter++),
-        title: availableTitleFor(formAvailableFor, formVisibility),
-        startMin: block.startMin,
-        endMin: block.endMin,
-        visibility: { ...formVisibility },
-        type: 'available',
-        availableFor: formAvailableFor,
-        recurring: null,
-        dateKey: block.dateKey,
-      };
-      SCHEDULE_EVENTS.push(ev);
-      syncEventCreateToServer(ev);
+      mergedCount += openAvailableRangeMerging(block.dateKey, block.startMin, block.endMin, formAud);
       createdCount++;
     });
 
@@ -16665,7 +16681,8 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     editingLinkedPieceIds = [];
     dismissView(closeEventForm);
     refreshActiveScheduleView();
-    showToast(wasEditing ? `예약 가능한 시간을 수정했어요.` : `예약 가능한 시간 ${createdCount}개를 등록했어요.`);
+    showToast((wasEditing ? `예약 가능한 시간을 수정했어요.` : `예약 가능한 시간 ${createdCount}개를 등록했어요.`)
+      + (mergedCount ? ' 이미 열려 있던 시간과 겹치는 부분은 하나로 합쳤어요.' : ''));
     return;
   }
 
@@ -17293,7 +17310,7 @@ function getScheduleTextOrderIndex(text){
 // 일정마다 등장 순서에 따라 같은 색 계열에서 점점 어두워지는 단색을 배정
 function colorForScheduleText(text){
   if(text === '예약 가능') return '#38BDF8'; // 예약 가능 시간은 테마와 상관없이 항상 하늘색으로 고정
-  if(text === availableTitleFor('work')) return AVAILABLE_WORK_COLOR;
+  if(text && text.endsWith(' 업무용 예약 가능')) return AVAILABLE_WORK_COLOR;
   if(text && text.startsWith('예약 가능 · ')) return AVAILABLE_EVENT_COLOR;
   if(scheduleColorOverrides[text]) return scheduleColorOverrides[text];
   const idx = getScheduleTextOrderIndex(text);
@@ -17307,44 +17324,164 @@ function colorForScheduleText(text){
 const AVAILABLE_EVENT_COLOR = '#38BDF8';
 const APPOINTMENT_EVENT_COLOR = '#F43F5E';
 
-// 예약 가능 시간을 누구에게 열지 - "친구에게 열기"와 "업무용 링크에 열기"를 따로 켜고 끔 (서버 저장값은 그대로 all/friends/work)
-//   all = 친구 + 업무용 링크 / friends = 친구만(업무용 링크엔 안 보임) / work = 업무용 링크만(친구에겐 빈 시간처럼 보임)
-// 친구 중 누구에게 열지는 공개 범위(전체/그룹/나만 보기)가 따로 정함
-// 색은 친구 쪽 기준(하늘색), 업무용 링크에도 열린 시간은 💼 표시 + 왼쪽 보라 줄로 구분 (친구 화면엔 이름이 안 나가서 내 캘린더에서만 보임)
+// 예약 가능 시간을 누구에게 열지 - "모든 친구 / 내 그룹들 / 업무용 링크" 칩을 여러 개 고름
+// 서버 저장값은 그대로: availableFor(all = 친구 + 업무용 링크 / friends = 친구만 / work = 업무용 링크만) + visibility.groupIds(친구 중 어느 그룹)
+// 색은 친구 쪽 기준(하늘색), 업무용 링크에도 열린 시간은 업무용 이모티콘 + 왼쪽 보라 줄로 구분 (친구 화면엔 이름이 안 나가서 내 캘린더에서만 보임)
 const AVAILABLE_WORK_COLOR = '#818CF8';
+const DEFAULT_GROUP_EMOJI = '👥';
+const DEFAULT_WORK_EMOJI = '💼';
 const AVAILABLE_FOR_META = {
-  all:     { label: '친구 + 💼업무용', short: '💼가능', color: AVAILABLE_EVENT_COLOR, hint: '친구와 업무용 링크를 받은 사람 모두 이 시간에 신청할 수 있어요.' },
-  friends: { label: '친구만',          short: '가능',   color: AVAILABLE_EVENT_COLOR, hint: '친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
-  work:    { label: '💼업무용만',      short: '💼업무', color: AVAILABLE_WORK_COLOR,  hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
+  all:     { color: AVAILABLE_EVENT_COLOR, hint: '고른 친구와 업무용 링크를 받은 사람이 이 시간에 신청할 수 있어요.' },
+  friends: { color: AVAILABLE_EVENT_COLOR, hint: '고른 친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
+  work:    { color: AVAILABLE_WORK_COLOR,  hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
 };
 function availableForOf(ev){ return (ev && AVAILABLE_FOR_META[ev.availableFor]) ? ev.availableFor : 'all'; }
-// 내 캘린더에 보이는 이름 - 예) "예약 가능 · 👥동아리 · 💼업무", 업무용만이면 "💼 업무용 예약 가능"
+function groupEmojiOf(g){ return (g && g.emoji) || DEFAULT_GROUP_EMOJI; }
+function workEmoji(){ return settingsState.work_emoji || DEFAULT_WORK_EMOJI; }
+// 이모티콘 입력칸 값 확인 - 비우면 ''(기본값), 이모티콘 하나면 그 값, 그 밖엔 null
+function parseEmojiInput(raw){
+  const v = String(raw || '').trim();
+  if(!v) return '';
+  const count = typeof Intl !== 'undefined' && Intl.Segmenter ? [...new Intl.Segmenter('ko', { granularity: 'grapheme' }).segment(v)].length : Array.from(v).length;
+  return (count === 1 && v.length <= 16) ? v : null;
+}
+// 친구 쪽으로 열린 그룹들 (모든 친구면 빈 배열, 친구에게 안 열렸으면 null) - "나만 보기"는 예약 가능에선 친구에게 안 열린 것과 같음
+// (그룹 목록을 아직 못 불러왔어도 합치기가 "모든 친구"로 넓어지지 않게 저장된 id를 그대로 씀 - 화면 표시용만 shownGroups로 거름)
+function availFriendGroupIds(f, vis){
+  if(f === 'work' || (vis && vis.private)) return null;
+  return (vis && vis.groupIds) ? [...vis.groupIds] : [];
+}
+function shownGroups(groupIds){ return (groupIds || []).map(id => MY_GROUPS.find(g => g.id === id)).filter(Boolean); }
+// 내 캘린더에 보이는 이름 - 예) "예약 가능 · 🎸동아리 · 💼업무", 업무용만이면 "💼 업무용 예약 가능"
 function availableTitleFor(f, vis){
-  if(f === 'work') return '💼 업무용 예약 가능';
+  if(f === 'work') return `${workEmoji()} 업무용 예약 가능`;
   const parts = ['예약 가능'];
+  const groupIds = availFriendGroupIds(f, vis);
   if(vis && vis.private) parts.push('🔒나만 보기');
-  else if(vis && vis.groupIds && vis.groupIds.length){
-    const names = vis.groupIds.map(id => (MY_GROUPS.find(g => g.id === id) || {}).name).filter(Boolean);
-    if(names.length) parts.push('👥' + names.join(','));
-  }
-  if(f !== 'friends') parts.push('💼업무');
+  else shownGroups(groupIds).forEach(g => parts.push(groupEmojiOf(g) + g.name));
+  if(f !== 'friends') parts.push(`${workEmoji()}업무`);
   return parts.join(' · ');
+}
+// 한 달 칸처럼 좁은 곳에 쓰는 짧은 이름 - 모든 친구면 "가능", 그룹이면 그룹 이모티콘들, 업무용 링크도 열렸으면 업무용 이모티콘
+function availableShortFor(f, vis){
+  if(f === 'work') return `${workEmoji()}업무`;
+  const groupIds = availFriendGroupIds(f, vis);
+  const work = f === 'all' ? workEmoji() : '';
+  if(shownGroups(groupIds).length) return shownGroups(groupIds).map(groupEmojiOf).join('') + work;
+  return work + '가능';
 }
 // 친구 + 업무용 링크에 함께 열린 시간은 띠 왼쪽에 보라 줄
 function availWorkStripeStyle(ev){
   return (ev && ev.type === 'available' && availableForOf(ev) === 'all' && !ev.color) ? `box-shadow:inset 3px 0 0 ${AVAILABLE_WORK_COLOR};` : '';
 }
-function availForButtonsHtml(current){
-  const friendsOn = current !== 'work', workOn = current !== 'friends';
-  return `<button type="button" class="avail-for-btn${friendsOn ? ' active' : ''}" data-avail-toggle="friends" style="--af-color:${AVAILABLE_EVENT_COLOR}">👥 친구에게 열기</button>`
-    + `<button type="button" class="avail-for-btn${workOn ? ' active' : ''}" data-avail-toggle="work" style="--af-color:${AVAILABLE_WORK_COLOR}">💼 업무용 링크에 열기</button>`;
+// "누구에게 열까요?" 칩 - 모든 친구 / 내 그룹들 / 업무용 링크 (여러 개 고를 수 있음)
+function availAudienceChipsHtml(f, vis){
+  const groupIds = availFriendGroupIds(f, vis);
+  const workOn = f !== 'friends';
+  const chip = (on, attrs, color, text) => `<button type="button" class="avail-for-btn${on ? ' active' : ''}" ${attrs} style="--af-color:${color}">${text}</button>`;
+  return chip(!!groupIds && groupIds.length === 0, 'data-aud-chip="all"', AVAILABLE_EVENT_COLOR, `${DEFAULT_GROUP_EMOJI} 모든 친구`)
+    + MY_GROUPS.map(g => chip(!!groupIds && groupIds.includes(g.id), `data-aud-chip="group" data-group-id="${g.id}"`, AVAILABLE_EVENT_COLOR, `${escapeHtml(groupEmojiOf(g))} ${escapeHtml(g.name)}`)).join('')
+    + chip(workOn, 'data-aud-chip="work"', AVAILABLE_WORK_COLOR, `${escapeHtml(workEmoji())} 업무용 링크`);
 }
-// 친구/업무용 버튼 하나를 눌렀을 때 다음 값 - 둘 다 끄면 아무도 신청을 못 하니 막음(null)
-function nextAvailFor(current, toggled){
-  let friendsOn = current !== 'work', workOn = current !== 'friends';
-  if(toggled === 'friends') friendsOn = !friendsOn; else workOn = !workOn;
-  if(!friendsOn && !workOn){ showToast('친구나 업무용 링크 중 하나는 열어야 해요.'); return null; }
-  return friendsOn && workOn ? 'all' : (friendsOn ? 'friends' : 'work');
+// 칩 하나를 눌렀을 때 다음 상태 { availableFor, visibility } - 아무 데도 안 열리게 되면 막음(null)
+function nextAvailAudience(f, vis, chipEl){
+  let groupIds = availFriendGroupIds(f, vis);
+  let friendsOn = !!groupIds;
+  let workOn = f !== 'friends';
+  groupIds = groupIds ? [...groupIds] : [];
+  const kind = chipEl.dataset.audChip;
+  if(kind === 'all'){
+    if(friendsOn && groupIds.length === 0) friendsOn = false; else { friendsOn = true; groupIds = []; }
+  } else if(kind === 'group'){
+    const gid = chipEl.dataset.groupId;
+    if(!friendsOn || groupIds.length === 0){ friendsOn = true; groupIds = [gid]; } // 모든 친구에서 그룹을 누르면 그 그룹만
+    else if(groupIds.includes(gid)){ groupIds = groupIds.filter(id => id !== gid); if(!groupIds.length) friendsOn = false; }
+    else groupIds.push(gid);
+  } else {
+    workOn = !workOn;
+  }
+  if(!friendsOn && !workOn){ showToast('적어도 한 곳에는 열어야 해요.'); return null; }
+  return {
+    availableFor: friendsOn && workOn ? 'all' : (friendsOn ? 'friends' : 'work'),
+    visibility: { groupIds: friendsOn ? groupIds : [], private: false },
+  };
+}
+function availAudienceLabel(f, vis){
+  const groupIds = availFriendGroupIds(f, vis);
+  const parts = [];
+  if(groupIds) parts.push(shownGroups(groupIds).length ? shownGroups(groupIds).map(g => groupEmojiOf(g) + g.name).join(', ') : '모든 친구');
+  if(f !== 'friends') parts.push(`${workEmoji()}업무용 링크`);
+  return parts.join(' + ');
+}
+
+// ---------- 겹치는 예약 가능 시간은 막지 않고 하나로 합침 ----------
+// 예) 1~3시 업무용이 있는데 2~4시를 동아리에 열면 -> 1~2 업무용 / 2~3 동아리+업무용 / 3~4 동아리
+// (누가 예약하면 그 시간은 어차피 모두에게 닫혀야 해서, 띠를 두 개 겹쳐 두지 않고 한 띠에 연 대상만 늘림)
+function availAudienceOf(ev){ return { availableFor: availableForOf(ev), visibility: ev.visibility || { groupIds: [], private: false } }; }
+function mergeAvailAudience(a, b){
+  const ga = availFriendGroupIds(a.availableFor, a.visibility), gb = availFriendGroupIds(b.availableFor, b.visibility);
+  const friendsOn = !!ga || !!gb;
+  const workOn = a.availableFor !== 'friends' || b.availableFor !== 'friends';
+  let visibility;
+  if(ga && gb) visibility = { groupIds: (ga.length === 0 || gb.length === 0) ? [] : [...new Set([...ga, ...gb])], private: false };
+  else if(ga) visibility = { ...a.visibility };
+  else if(gb) visibility = { ...b.visibility };
+  else visibility = { groupIds: [], private: false };
+  if(!friendsOn && !workOn) return a;
+  return { availableFor: friendsOn && workOn ? 'all' : (friendsOn ? 'friends' : 'work'), visibility };
+}
+function sameAvailAudience(a, b){
+  const key = x => [x.availableFor, !!(x.visibility && x.visibility.private), [...((x.visibility && x.visibility.groupIds) || [])].sort().join(',')].join('|');
+  return key(a) === key(b);
+}
+// 이 일정과 겹쳐도 합칠 수 있는 예약 가능 조각인지 (반복/기간으로 연 시간은 잘라 합칠 수 없어서 제외)
+function isMergeableAvail(ev){
+  return !!ev && ev.type === 'available' && !!ev.dateKey && !ev.recurring && !ev.dateRange && !ev.isPendingHold && !ev.isReservationLinked;
+}
+// dateKey의 startMin~endMin을 aud로 엶 - 겹치는 예약 가능 조각은 겹친 부분만 대상을 합침. 합친 조각 수를 돌려줌
+function openAvailableRangeMerging(dateKey, startMin, endMin, aud){
+  const overlaps = SCHEDULE_EVENTS
+    .filter(ev => isMergeableAvail(ev) && ev.dateKey === dateKey && ev.startMin < endMin && ev.endMin > startMin)
+    .sort((a, b) => a.startMin - b.startMin);
+  const pieces = [];
+  let cursor = startMin;
+  overlaps.forEach(ev => {
+    const evAud = availAudienceOf(ev);
+    if(ev.startMin < startMin) pieces.push({ s: ev.startMin, e: startMin, aud: evAud, color: ev.color });
+    if(ev.startMin > cursor) pieces.push({ s: cursor, e: ev.startMin, aud });
+    const ovS = Math.max(ev.startMin, startMin), ovE = Math.min(ev.endMin, endMin);
+    pieces.push({ s: ovS, e: ovE, aud: mergeAvailAudience(evAud, aud), color: ev.color });
+    if(ev.endMin > endMin) pieces.push({ s: endMin, e: ev.endMin, aud: evAud, color: ev.color });
+    cursor = Math.max(cursor, ovE);
+    const idx = SCHEDULE_EVENTS.indexOf(ev);
+    if(idx >= 0) SCHEDULE_EVENTS.splice(idx, 1);
+    if(ev.serverId) syncEventDeleteToServer(ev);
+  });
+  if(cursor < endMin) pieces.push({ s: cursor, e: endMin, aud });
+  // 바로 붙어 있고 대상도 같은 조각은 하나로
+  const merged = [];
+  pieces.sort((a, b) => a.s - b.s).forEach(p => {
+    const last = merged[merged.length - 1];
+    if(last && last.e === p.s && sameAvailAudience(last.aud, p.aud) && (last.color || null) === (p.color || null)) last.e = p.e;
+    else merged.push({ ...p });
+  });
+  merged.forEach(p => {
+    const ev = {
+      id: 'ev' + (scheduleEventIdCounter++),
+      title: availableTitleFor(p.aud.availableFor, p.aud.visibility),
+      startMin: p.s,
+      endMin: p.e,
+      visibility: { ...p.aud.visibility },
+      type: 'available',
+      availableFor: p.aud.availableFor,
+      recurring: null,
+      dateKey,
+      color: p.color || null,
+    };
+    SCHEDULE_EVENTS.push(ev);
+    syncEventCreateToServer(ev);
+  });
+  return overlaps.length;
 }
 
 // 일정 객체 기준 색 - 이 일정에 직접 고른 색이 있으면 그걸 쓰고, 없으면 종류별 기본색 / 일정 이름 기준 테마 색
@@ -17787,8 +17924,8 @@ function renderMonthSchedView(){
     const labelsHtml = shownEvents.map(ev => {
       const bg = ev.isPendingHold ? '#F59E0B' : colorForEvent(ev);
       // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 짧게 보여줌
-      // (업무용 링크에도 열린 시간인지 알 수 있게 "가능"/"💼가능"/"💼업무")
-      const label = ev.type === 'available' ? AVAILABLE_FOR_META[availableForOf(ev)].short : ev.title;
+      // (누구에게 열린 시간인지 알 수 있게 "가능"/"💼가능"/그룹 이모티콘들/"💼업무")
+      const label = ev.type === 'available' ? availableShortFor(availableForOf(ev), ev.visibility) : ev.title;
       return `<div class="month-event-label" style="background:${bg};${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
     const moreHtml = events.length > shownEvents.length
@@ -18030,10 +18167,13 @@ async function loadFriendsFromServer(){
     MY_GROUPS = groupsData.groups.map(g => ({
       id: g.id,
       name: g.name,
+      emoji: g.emoji || null,
       createdAt: g.createdAt,
       memberIds: Array.isArray(g.memberIds) ? g.memberIds : [],
     }));
     renderScheduleGroupFilterRow();
+    resyncAllScheduleEvents(); // 예약 가능 이름에 그룹 이름/이모티콘이 붙어서 그룹을 받아온 뒤 다시 맞춤
+    refreshActiveScheduleView();
     INCOMING_FRIEND_REQUESTS = requestsData.incoming.map(r => ({
       requestId: r.requestId,
       id: r.from.id,
@@ -18438,8 +18578,18 @@ function openFriendGroupsView(){
   document.getElementById('friendsListView').classList.remove('active');
   document.getElementById('friendProfileView').classList.remove('active');
   document.getElementById('friendGroupsView').classList.add('active');
+  document.getElementById('workEmojiInput').value = settingsState.work_emoji && settingsState.work_emoji !== DEFAULT_WORK_EMOJI ? settingsState.work_emoji : '';
   pushViewState(closeFriendGroupsView);
 }
+document.getElementById('saveWorkEmojiBtn').addEventListener('click', () => {
+  const emoji = parseEmojiInput(document.getElementById('workEmojiInput').value);
+  if(emoji === null){ showToast('이모티콘은 하나만 넣어주세요.'); return; }
+  settingsState.work_emoji = emoji || DEFAULT_WORK_EMOJI;
+  saveSettingToServer('work_emoji');
+  resyncAllScheduleEvents();
+  refreshActiveScheduleView();
+  showToast(`업무용 링크 이모티콘을 ${settingsState.work_emoji}(으)로 정했어요.`);
+});
 function closeFriendGroupsView(){
   document.getElementById('friendGroupsView').classList.remove('active');
   document.getElementById('friendsListView').classList.add('active');
@@ -18458,7 +18608,7 @@ function renderFriendGroupsList(){
     const row = document.createElement('div');
     row.className = 'group-list-row';
     row.innerHTML = `
-      <div class="group-list-avatar">${escapeHtml(group.name[0] || '?')}</div>
+      <div class="group-list-avatar">${escapeHtml(group.emoji || group.name[0] || '?')}</div>
       <div class="group-list-text"><b>${escapeHtml(group.name)}</b><span>멤버 ${group.memberIds.length}명</span></div>
     `;
     row.addEventListener('click', () => openFriendGroupDetail(group.id));
@@ -18473,7 +18623,7 @@ document.getElementById('createGroupBtn').addEventListener('click', async () => 
   if(!authToken) return;
   try {
     const data = await apiRequest('/friends/groups', { method: 'POST', body: JSON.stringify({ name }) });
-    MY_GROUPS.push({ id: data.group.id, name: data.group.name, createdAt: data.group.createdAt, memberIds: data.group.memberIds || [] });
+    MY_GROUPS.push({ id: data.group.id, name: data.group.name, emoji: data.group.emoji || null, createdAt: data.group.createdAt, memberIds: data.group.memberIds || [] });
     renderScheduleGroupFilterRow();
     input.value = '';
     renderFriendGroupsList();
@@ -18490,6 +18640,7 @@ function openFriendGroupDetail(groupId){
   editingGroupId = groupId;
   document.getElementById('groupDetailTitle').textContent = group.name;
   document.getElementById('renameGroupInput').value = group.name;
+  document.getElementById('groupEmojiInput').value = group.emoji || '';
   renderGroupMemberCheckList(group);
 
   document.getElementById('friendGroupsView').classList.remove('active');
@@ -18554,16 +18705,23 @@ document.getElementById('renameGroupBtn').addEventListener('click', async () => 
   if(!group || !authToken) return;
   const name = document.getElementById('renameGroupInput').value.trim();
   if(!name){ showToast('그룹 이름을 입력해주세요.'); return; }
-  const previous = group.name;
+  const emoji = parseEmojiInput(document.getElementById('groupEmojiInput').value);
+  if(emoji === null){ showToast('이모티콘은 하나만 넣어주세요.'); return; }
+  const previous = group.name, previousEmoji = group.emoji;
   group.name = name; // 먼저 화면에 반영
+  group.emoji = emoji || null;
   document.getElementById('groupDetailTitle').textContent = name;
   try {
-    await apiRequest(`/friends/groups/${group.id}`, { method: 'PATCH', body: JSON.stringify({ name }) });
-    showToast('그룹 이름을 바꿨어요.');
+    await apiRequest(`/friends/groups/${group.id}`, { method: 'PATCH', body: JSON.stringify({ name, emoji }) });
+    resyncAllScheduleEvents(); // 캘린더의 예약 가능 이름에 붙은 그룹 이름/이모티콘도 바로 바뀌게
+    refreshActiveScheduleView();
+    showToast('그룹을 저장했어요.');
   } catch(err){
     group.name = previous; // 실패하면 되돌림
+    group.emoji = previousEmoji;
     document.getElementById('groupDetailTitle').textContent = previous;
     document.getElementById('renameGroupInput').value = previous;
+    document.getElementById('groupEmojiInput').value = previousEmoji || '';
     showToast(err.message);
   }
 });
@@ -26653,11 +26811,12 @@ function closeQuickAvailKeys(removedKeys){
 function quickPresetKeys(p){ return p.dows.flatMap(dow => p.bands.map(b => quickAvailKey(dow, b))); }
 
 let quickAvailFor = 'all'; // 빠르게 열기로 새로 여는 시간을 누구에게 열지
+let quickAvailVisibility = { groupIds: [], private: false }; // 친구 중 어느 그룹에 열지 (빈 배열 = 모든 친구)
 function renderQuickAvailFor(){
-  document.getElementById('quickAvailForRow').innerHTML = availForButtonsHtml(quickAvailFor);
+  document.getElementById('quickAvailForRow').innerHTML = availAudienceChipsHtml(quickAvailFor, quickAvailVisibility);
   document.getElementById('quickAvailForHint').textContent = AVAILABLE_FOR_META[quickAvailFor].hint;
   const open = document.getElementById('quickAvailForBody').style.display !== 'none';
-  document.getElementById('quickAvailForToggle').innerHTML = `누구에게 열지: <b>${AVAILABLE_FOR_META[quickAvailFor].label}</b> <span>${open ? '접기' : '바꾸기 ›'}</span>`;
+  document.getElementById('quickAvailForToggle').innerHTML = `누구에게 열지: <b>${escapeHtml(availAudienceLabel(quickAvailFor, quickAvailVisibility))}</b> <span>${open ? '접기' : '바꾸기 ›'}</span>`;
 }
 document.getElementById('quickAvailForToggle').addEventListener('click', () => {
   const body = document.getElementById('quickAvailForBody');
@@ -26665,17 +26824,20 @@ document.getElementById('quickAvailForToggle').addEventListener('click', () => {
   renderQuickAvailFor();
 });
 document.getElementById('quickAvailForRow').addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-avail-toggle]');
+  const btn = e.target.closest('[data-aud-chip]');
   if(!btn) return;
-  const next = nextAvailFor(quickAvailFor, btn.dataset.availToggle);
+  const next = nextAvailAudience(quickAvailFor, quickAvailVisibility, btn);
   if(!next) return;
-  quickAvailFor = next;
+  quickAvailFor = next.availableFor;
+  quickAvailVisibility = next.visibility;
   renderQuickAvailFor();
 });
 function openQuickAvail(){
   quickAvailCells.clear();
-  // 친구만/업무용만을 골라둔 채로 다시 열면 펼쳐서 보여줌 (둘 다 열기면 접어둠)
-  document.getElementById('quickAvailForBody').style.display = quickAvailFor === 'all' ? 'none' : '';
+  // 지운 그룹은 빼고, 기본(모든 친구 + 업무용 링크)이 아닌 걸 골라둔 채로 다시 열면 펼쳐서 보여줌
+  quickAvailVisibility = { groupIds: (quickAvailVisibility.groupIds || []).filter(id => MY_GROUPS.some(g => g.id === id)), private: false };
+  const quickIsDefault = quickAvailFor === 'all' && !quickAvailVisibility.groupIds.length;
+  document.getElementById('quickAvailForBody').style.display = quickIsDefault ? 'none' : '';
   renderQuickAvailFor();
   // 지금 열려 있는 칸을 켜진 채로 보여줌 - 여기서 끄면 닫히고, 켜면 열림
   quickAvailInitial = quickAvailCurrentPattern();
@@ -27298,7 +27460,10 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
     return;
   }
   // 2) 켜진 칸은 기존처럼 열기 (이미 열려 있는 시간은 빼고 새로 필요한 부분만 생김)
-  const visibility = defaultVisibilityForNewEvent();
+  //    이번에 새로 켠 칸이 이미 열린 예약 가능 시간과 겹치면, 그 부분은 고른 대상을 더해서 합침
+  const visibility = { ...quickAvailVisibility };
+  const quickAud = { availableFor: quickAvailFor, visibility };
+  let mergedCount = 0;
   const now = new Date();
   const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30; // 오늘은 지금 이후 30분 단위부터
   const created = [];
@@ -27315,8 +27480,26 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
       if(last && last.e === b.s) last.e = b.e; else ranges.push({ s: b.s, e: b.e });
     });
     // 이미 있는 일정(바쁨/예약 가능/예약중 다 포함)과 겹치는 부분은 뺌 - 기존 등록 화면처럼 겹치는 예약 가능은 안 만듦
-    const cuts = getEventsForDate(d).map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
+    const dayEvents = getEventsForDate(d);
+    const cuts = dayEvents.map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
     if(i === 0) cuts.push({ s: 0, e: nowMin });
+    // 새로 켠 칸 중 이미 열린 예약 가능 조각과 겹치는 부분 -> 그 조각에 대상을 더함 (바쁨 일정/반복 예약 가능과 겹치는 곳은 건드리지 않음)
+    const addedBands = picked.filter(b => !quickAvailInitial.has(quickAvailKey(d.getDay(), b.id)));
+    if(addedBands.length){
+      const nonMergeCuts = dayEvents.filter(ev => !isMergeableAvail(ev)).map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
+      if(i === 0) nonMergeCuts.push({ s: 0, e: nowMin });
+      const addedRanges = subtractMinuteRanges(addedBands.map(b => ({ s: b.s, e: b.e })), nonMergeCuts);
+      dayEvents.filter(isMergeableAvail).forEach(ev => {
+        addedRanges.forEach(r => {
+          const s = Math.max(r.s, ev.startMin), e = Math.min(r.e, ev.endMin);
+          if(e - s < 30) return;
+          const before = availAudienceOf(ev);
+          if(sameAvailAudience(mergeAvailAudience(before, quickAud), before)) return; // 이미 그 대상에게 열려 있음
+          mergedCount += openAvailableRangeMerging(dateKeyOf(d), s, e, quickAud);
+          openedDays.add(dateKeyOf(d));
+        });
+      });
+    }
     subtractMinuteRanges(ranges, cuts).filter(r => r.e - r.s >= 30).forEach(r => {
       const dateKey = dateKeyOf(d);
       created.push({
@@ -27336,12 +27519,12 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
   const closedMsg = (closed && closed.closedDays.size ? `${closed.closedDays.size}일의 시간을 닫았어요.` : '')
     + (closed && closed.skippedRecurring.size ? ' 반복으로 열어둔 시간은 캘린더에서 직접 지워 주세요.' : '');
   if(!created.length){
-    if(closed){
+    if(closed || mergedCount){
       resyncAllScheduleEvents();
       dismissView(closeQuickAvail);
       refreshActiveScheduleView();
       refreshHomeDashIfVisible();
-      showToast(closedMsg || '바뀐 시간이 없어요.');
+      showToast(mergedCount ? `이미 열려 있던 시간에 ${availAudienceLabel(quickAvailFor, quickAvailVisibility)}도 더했어요.${closedMsg ? ' ' + closedMsg : ''}` : (closedMsg || '바뀐 시간이 없어요.'));
       return;
     }
     showToast('고른 시간엔 이미 다른 일정이 있어서 새로 열 시간이 없어요.');
@@ -27354,7 +27537,7 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
   refreshHomeDashIfVisible();
   // 열린 날 수(4주 기준)를 그대로 말하면 다른 곳의 "앞으로 2주 중 N일"과 숫자가 달라 헷갈림 -
   // 여기선 "얼마 동안 열렸는지"만 말하고, 지금 열린 정도는 상태 문구(앞으로 2주 중 N일)로 통일
-  showToast(`예약 가능 시간을 앞으로 ${QUICK_AVAIL_WEEKS}주 동안 열었어요.${closedMsg ? ' ' + closedMsg : ''}`);
+  showToast(`예약 가능 시간을 앞으로 ${QUICK_AVAIL_WEEKS}주 동안 열었어요.${mergedCount ? ' 이미 열려 있던 시간과 겹치는 부분은 하나로 합쳤어요.' : ''}${closedMsg ? ' ' + closedMsg : ''}`);
   // 한꺼번에 수십 개를 쏘지 않게 하나씩 순서대로 저장 (실패하면 syncEventCreateToServer가 알려줌)
   for(const ev of created){
     try { await syncEventCreateToServer(ev); } catch(e){}
