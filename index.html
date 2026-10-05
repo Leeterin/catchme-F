@@ -7482,6 +7482,12 @@
           <div><div class="stt-label">이 시간에도 예약 받기</div><div class="stt-sub">켜면 이 일정과 겹쳐도 예약 가능 시간을 열 수 있고, 친구가 예약할 수 있어요. 친구에겐 이 일정이 보이지 않아요.</div></div>
           <div class="toggle" id="allowBookingToggle"><div class="knob"></div></div>
         </div>
+        <!-- 처음 켤 때 한 번만: 새 일정에서도 기본으로 켜둘지 물어봄 -->
+        <div id="allowBookingAlwaysPrompt" style="display:none;align-items:center;gap:8px;margin-top:6px;padding:9px 12px;border-radius:10px;background:var(--surface-2);font-size:12px;color:var(--text-dim);">
+          <span style="flex:1;">다음에도 항상 켜둘까요?</span>
+          <button type="button" id="allowBookingAlwaysYes" style="border:none;background:none;color:var(--accent);font-weight:600;font-size:12px;font-family:'Inter',sans-serif;cursor:pointer;padding:2px 4px;">항상 켜기</button>
+          <button type="button" id="allowBookingAlwaysNo" style="border:none;background:none;color:var(--text-dim);font-size:12px;font-family:'Inter',sans-serif;cursor:pointer;padding:2px 4px;">이번만</button>
+        </div>
       </div>
       </div>
       <div class="event-form-footer">
@@ -10844,6 +10850,10 @@ function openSettingsDetail(id){
         <div><div class="stt-label">흔들어서 오류 신고하기</div><div class="stt-sub">폰을 5번 흔들면 오류 신고 창이 열려요</div></div>
         <div class="toggle${isShakeReportEnabled() ? ' on' : ''}" id="shakeReportToggle"><div class="knob"></div></div>
       </div>
+      <div class="settings-toggle-row">
+        <div><div class="stt-label">새 일정에 "이 시간에도 예약 받기" 항상 켜기</div><div class="stt-sub">일정을 추가할 때 처음부터 켜진 상태로 시작해요</div></div>
+        <div class="toggle${isAllowBookingAlways() ? ' on' : ''}" id="allowBookingAlwaysToggle"><div class="knob"></div></div>
+      </div>
       <div class="settings-simple-row"><span>오류 신고하기</span><button class="settings-action-btn" id="appmanageBugReportBtn">신고 &#8250;</button></div>
       <div class="settings-simple-row"><span>현재 버전</span><span class="value">1.0.0</span></div>
       <div class="settings-simple-row"><span>캐시 삭제</span><button class="settings-action-btn" id="clearCacheBtn">삭제</button></div>
@@ -10868,6 +10878,12 @@ function openSettingsDetail(id){
       e.currentTarget.classList.toggle('on', next);
       if(next) requestShakePermissionIfNeeded();
       showToast(next ? '이제 폰을 5번 흔들면 오류 신고 창이 열려요.' : '흔들어서 오류 신고하기를 껐어요.');
+    });
+    document.getElementById('allowBookingAlwaysToggle').addEventListener('click', (e) => {
+      const next = !isAllowBookingAlways();
+      setAllowBookingAlways(next);
+      e.currentTarget.classList.toggle('on', next);
+      showToast(next ? '새 일정에서 "이 시간에도 예약 받기"가 켜진 상태로 시작해요.' : '새 일정은 다시 꺼진 상태로 시작해요.');
     });
     document.querySelector('#settingsDetailBody .settings-simple-row:nth-last-child(2) .settings-action-btn').addEventListener('click', () => openLegalPage('terms'));
     document.querySelector('#settingsDetailBody .settings-simple-row:last-child .settings-action-btn').addEventListener('click', () => openLegalPage('privacy'));
@@ -15811,7 +15827,33 @@ function renderEventAvailFor(){
 document.getElementById('allowBookingToggle').addEventListener('click', () => {
   formAllowBooking = !formAllowBooking;
   renderEventAvailFor();
+  // 처음 켤 때만 "항상 켜둘까요?" 물어봄 (이미 항상 켜짐이거나 한 번 답했으면 안 물어봄)
+  const ask = formAllowBooking && !isAllowBookingAlways() && !wasAllowBookingAsked();
+  document.getElementById('allowBookingAlwaysPrompt').style.display = ask ? 'flex' : 'none';
 });
+document.getElementById('allowBookingAlwaysYes').addEventListener('click', () => {
+  setAllowBookingAlways(true);
+  document.getElementById('allowBookingAlwaysPrompt').style.display = 'none';
+  showToast('이제 새 일정에서도 "이 시간에도 예약 받기"가 켜져 있어요. 설정 > 앱 관리에서 끌 수 있어요.');
+});
+document.getElementById('allowBookingAlwaysNo').addEventListener('click', () => {
+  try { localStorage.setItem('catchme_allow_booking_asked', '1'); } catch(_){}
+  document.getElementById('allowBookingAlwaysPrompt').style.display = 'none';
+});
+
+// "이 시간에도 예약 받기" 항상 켜짐 - 이 기기에만 저장 (기본은 꺼짐)
+function isAllowBookingAlways(){
+  try { return localStorage.getItem('catchme_allow_booking_always') === 'on'; } catch(_){ return false; }
+}
+function setAllowBookingAlways(on){
+  try {
+    localStorage.setItem('catchme_allow_booking_always', on ? 'on' : 'off');
+    localStorage.setItem('catchme_allow_booking_asked', '1');
+  } catch(_){}
+}
+function wasAllowBookingAsked(){
+  try { return localStorage.getItem('catchme_allow_booking_asked') === '1'; } catch(_){ return false; }
+}
 document.getElementById('eventAvailForRow').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-aud-chip]');
   if(!btn) return;
@@ -15879,7 +15921,10 @@ function openEventForm(existingEvent){
   pushViewState(closeEventForm);
 
   formAvailableFor = existingEvent ? availableForOf(existingEvent) : 'all';
-  formAllowBooking = !!existingEvent && !blocksBooking(existingEvent) && existingEvent.type !== 'available';
+  formAllowBooking = existingEvent
+    ? !blocksBooking(existingEvent) && existingEvent.type !== 'available'
+    : isAllowBookingAlways();
+  document.getElementById('allowBookingAlwaysPrompt').style.display = 'none';
   if(existingEvent){
     setEventTypeUI(existingEvent.type || 'busy');
     document.getElementById('eventFormTitle').value = existingEvent.title;
