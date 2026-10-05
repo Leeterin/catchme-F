@@ -9795,8 +9795,31 @@ const ICO = {
   mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 6l10 7 10-7"/></svg>',
   navigation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>',
 };
-document.getElementById('todayDate').textContent =
-  `${TODAY.getMonth()+1}월 ${TODAY.getDate()}일 ${WEEKDAY_KO[TODAY.getDay()]}요일`;
+function renderTodayHeader(){
+  document.getElementById('todayDate').textContent =
+    `${TODAY.getMonth()+1}월 ${TODAY.getDate()}일 ${WEEKDAY_KO[TODAY.getDay()]}요일`;
+}
+renderTodayHeader();
+
+// TODAY는 앱을 연 순간 한 번만 정해져서, 앱을 켜 둔 채(백그라운드 포함) 자정을 넘기면 어제 날짜로 남았음
+// (홈 '오늘' 표시, 예약 가능 시간 요일 시작, 다가오는 약속의 오늘/내일 등이 하루씩 어긋남).
+// 날짜가 바뀌었으면 TODAY를 오늘로 맞추고, 어제를 보고 있던 캘린더는 오늘로 옮긴 뒤 화면을 다시 그림
+function refreshTodayIfDateChanged(){
+  const now = new Date();
+  const oldKey = dateKeyOf(TODAY);
+  if(dateKeyOf(now) === oldKey) return false;
+  TODAY.setTime(now.getTime());
+  if(dateKeyOf(scheduleFocusDate) === oldKey) scheduleFocusDate = new Date(TODAY);
+  if(dateKeyOf(monthSelectedDate) === oldKey) monthSelectedDate = new Date(TODAY);
+  renderTodayHeader();
+  refreshHomeDashIfVisible();
+  refreshActiveScheduleView();
+  return true;
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') refreshTodayIfDateChanged();
+});
+setInterval(refreshTodayIfDateChanged, 60 * 1000); // 앱을 켜 둔 채 자정을 넘기는 경우
 
 // ============================================================
 // 캘린더 렌더링 (월 이동 가능한 실제 달력 로직)
