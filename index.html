@@ -8026,8 +8026,7 @@
     </div>
   </div>
 
-  <!-- 예약 가능 시간 빠르게 열기 - 월~일 시간 막대를 맞춰서 앞으로 4주치 예약 가능 시간을 한 번에 만듦.
-       세밀하게 고르고 싶으면 아래 링크로 기존 일정 추가(칸 드래그) 화면으로 넘어감 -->
+  <!-- 예약 가능 시간 빠르게 열기 - 월~일 시간 막대를 맞춰서 앞으로 4주치 예약 가능 시간을 한 번에 만듦 -->
   <div class="mini-confirm-overlay" id="quickAvailOverlay">
     <div class="mini-confirm-card quick-avail-card">
       <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
@@ -8044,7 +8043,6 @@
       <div class="quick-avail-rows" id="quickAvailRows"></div>
       <p class="quick-avail-hint">막대 끝을 끌거나 시간 글자를 눌러 5분 단위로 맞출 수 있어요. 빈 곳을 누르면 시간을 더 넣어요.<br/>회색은 내 일정이라 그 시간은 빼고 열고, 점선은 겹쳐도 예약 받는 일정이에요. 눌러보면 무슨 일정인지 보여요.</p>
       <button type="button" class="profile-chat-btn" id="quickAvailSubmitBtn">열어두기</button>
-      <button type="button" class="plan-back-btn" id="quickAvailDetailBtn">시간을 직접 세밀하게 고를래요 &rsaquo;</button>
       <button type="button" class="plan-back-btn quick-avail-close-all" id="quickAvailCloseAllBtn" style="display:none;">앞으로 열어둔 시간 모두 닫기</button>
     </div>
   </div>
@@ -26982,15 +26980,6 @@ async function friendAvailableDayCount(friend, startDate, endDate){
 function openMyAvailabilityForm(){
   openQuickAvail();
 }
-// 기존 일정 추가 화면(칸 드래그 + 분 단위 조정)을 "예약 가능 시간" 유형으로 바로 엶
-function openDetailedAvailabilityForm(){
-  scheduleFocusDate = new Date(TODAY);
-  switchTopTab('schedule');
-  switchScheduleView('day');
-  openEventForm();
-  setEventTypeUI('available');
-  showToast('친구가 약속을 걸 수 있는 시간을 골라 주세요.');
-}
 
 // ---------- 예약 가능 시간 빠르게 열기 ----------
 // 칸 드래그 + 분 단위 조정은 처음 쓰는 사람한텐 너무 무거워서, 요일마다 "몇 시부터 몇 시까지"를 막대로만 정해서
@@ -28128,10 +28117,6 @@ function endQuickDrag(e){
 quickAvailRowsEl.addEventListener('pointerup', endQuickDrag);
 quickAvailRowsEl.addEventListener('pointercancel', endQuickDrag);
 document.getElementById('quickAvailCloseBtn').addEventListener('click', () => goBackOrClose(closeQuickAvail));
-document.getElementById('quickAvailDetailBtn').addEventListener('click', () => {
-  dismissView(closeQuickAvail);
-  openDetailedAvailabilityForm();
-});
 
 // [s, e) 구간들에서 빼낼 구간들을 뺀 나머지
 function subtractMinuteRanges(ranges, cuts){
