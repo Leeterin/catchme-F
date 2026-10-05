@@ -13259,8 +13259,7 @@ function doOpenFeedCreate(){
   renderFeedPlaceCreateInfo(null);
   renderFeedRatingPicker();
   renderFeedPhotoRow();
-  document.getElementById('feedListView').classList.remove('active');
-  document.getElementById('feedCreateView').classList.add('active');
+  showFeedCreateView();
   pushViewState(closeFeedCreate);
 }
 // 내가 쓴 게시물을 수정할 때 - 목록 카드에서 바로 열림 (제목/위치는 검색으로 다시 바꿀 수 있게 그대로 열어둠, 카테고리는 고정)
@@ -13288,14 +13287,41 @@ function openFeedReviewEdit(post){
   }
   renderFeedRatingPicker();
   renderFeedPhotoRow();
-  document.getElementById('feedListView').classList.remove('active');
-  document.getElementById('feedCreateView').classList.add('active');
+  showFeedCreateView();
   pushViewState(closeFeedCreate);
+}
+// 글쓰기/수정 폼은 지금 보고 있던 화면(목록·상세·장소 모아보기·작성자 리뷰)을 완전히 가리고 별도 화면으로 열림.
+// 닫으면 원래 보던 화면으로 돌아감 (예전엔 목록만 숨겨서 상세에서 수정을 누르면 상세 밑에 폼이 붙어서 떴음)
+let feedCreateReturnViewId = 'feedListView';
+function showFeedCreateView(){
+  const feedViews = document.querySelectorAll('#communityView-feed > .feed-list-view');
+  const current = [...feedViews].find(v => v.classList.contains('active'));
+  feedCreateReturnViewId = current ? current.id : 'feedListView';
+  feedViews.forEach(v => v.classList.remove('active'));
+  const view = document.getElementById('feedCreateView');
+  view.classList.add('active');
+  // 폼 맨 위(뒤로 버튼/제목)부터 보이게
+  window.scrollTo(0, 0);
+  for(let el = view.parentElement; el; el = el.parentElement){ if(el.scrollTop) el.scrollTop = 0; }
 }
 function closeFeedCreate(){
   document.getElementById('feedCreateView').classList.remove('active');
   setFeedPlaceFieldsLocked(false);
-  document.getElementById('feedListView').classList.add('active');
+  const back = document.getElementById(feedCreateReturnViewId) || document.getElementById('feedListView');
+  back.classList.add('active');
+  feedCreateReturnViewId = 'feedListView';
+}
+// 수정 저장 후, 돌아갈 화면(상세·장소 모아보기·작성자 리뷰)에 떠 있는 내용도 새 내용으로 다시 그림
+function refreshFeedViewsAfterEdit(post){
+  if(feedCreateReturnViewId === 'feedPlaceDetailView'){
+    const header = document.getElementById('feedPlaceDetailHeader');
+    header.innerHTML = feedPostDetailHtml(post);
+    wireFeedPostDetail(header, post);
+  } else if(feedCreateReturnViewId === 'feedTagView'){
+    renderFeedTagList();
+  } else if(feedCreateReturnViewId === 'feedAuthorView' && currentUser){
+    renderFeedAuthorViewContent(currentUser);
+  }
 }
 
 function showFeedPlaceMap(lat, lon){
@@ -13425,9 +13451,13 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
         method: 'PATCH',
         body: JSON.stringify({ title, note, location, rating: feedSelectedRating, photos: feedSelectedPhotos, lat: feedLat, lon: feedLon, address: feedAddress, phone: feedPhone }),
       });
-      const existing = FEED_POSTS[activeFeedCategory].find(p => p.id === editingFeedPostId);
-      if(existing) Object.assign(existing, data.post);
+      let updated = null;
+      Object.values(FEED_POSTS).forEach(list => (list || []).forEach(p => {
+        if(p.id === editingFeedPostId){ Object.assign(p, data.post); updated = updated || p; }
+      }));
+      feedTagCurrentPosts.forEach(p => { if(p.id === editingFeedPostId){ Object.assign(p, data.post); updated = updated || p; } });
       renderFeedPosts();
+      refreshFeedViewsAfterEdit(updated || data.post);
       dismissView(closeFeedCreate);
       showToast('수정했어요.');
       return;
