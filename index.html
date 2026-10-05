@@ -17303,9 +17303,9 @@ const APPOINTMENT_EVENT_COLOR = '#F43F5E';
 // 예약 가능 시간을 누구에게 열지 - 모두(앱 친구 + 업무용 링크) / 친구만 / 업무용(업무용 링크로만)
 // 캘린더에서 한눈에 구분되게 용도마다 색과 이름이 다름 (친구 화면엔 이름이 안 나가서 내 캘린더에서만 보임)
 const AVAILABLE_FOR_META = {
-  all:     { label: '모두',   title: '예약 가능',         color: AVAILABLE_EVENT_COLOR, hint: '친구도, 업무용 링크를 받은 사람도 이 시간에 신청할 수 있어요.' },
-  friends: { label: '친구만', title: '👥 친구만 예약 가능', color: '#34D399', hint: '앱 친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
-  work:    { label: '업무용', title: '💼 업무용 예약 가능', color: '#818CF8', hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
+  all:     { label: '모두',   title: '예약 가능',         short: '가능',   color: AVAILABLE_EVENT_COLOR, hint: '친구도, 업무용 링크를 받은 사람도 이 시간에 신청할 수 있어요.' },
+  friends: { label: '친구만', title: '👥 친구만 예약 가능', short: '친구만', color: '#34D399', hint: '앱 친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
+  work:    { label: '업무용', title: '💼 업무용 예약 가능', short: '업무용', color: '#818CF8', hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
 };
 function availableForOf(ev){ return (ev && AVAILABLE_FOR_META[ev.availableFor]) ? ev.availableFor : 'all'; }
 function availableTitleFor(f){ return (AVAILABLE_FOR_META[f] || AVAILABLE_FOR_META.all).title; }
@@ -17753,8 +17753,9 @@ function renderMonthSchedView(){
     // 같은 일정은 위의 레인 배정 덕분에 그 주 안에서 같은 줄에 나와서, 칸이 나뉘어도 이어지는 게 보임
     const labelsHtml = shownEvents.map(ev => {
       const bg = ev.isPendingHold ? '#F59E0B' : colorForEvent(ev);
-      // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 "가능"으로 짧게 보여줌 (색으로 구분됨)
-      const label = ev.type === 'available' ? '가능' : ev.title;
+      // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 짧게 보여줌
+      // (모두 "가능"으로만 보이면 업무용/친구만으로 연 시간인지 몰라서 용도별로 "가능"/"친구만"/"업무용")
+      const label = ev.type === 'available' ? AVAILABLE_FOR_META[availableForOf(ev)].short : ev.title;
       return `<div class="month-event-label" style="background:${bg}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
     const moreHtml = events.length > shownEvents.length
