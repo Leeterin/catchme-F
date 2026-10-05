@@ -1282,6 +1282,7 @@
     cursor:pointer;
     flex-shrink:0;
   }
+  .feed-photo-add-btn svg{ width:24px; height:24px; }
   .feed-photo-thumb{
     position:relative;
     width:64px;height:64px;
@@ -8129,12 +8130,12 @@
       <div style="font-size:11.5px;color:var(--text-dim);margin-bottom:14px;">실명으로 리뷰 달기 부담스러우면, 소식 탭에서만 대신 보여줄 닉네임/사진을 만들 수 있어요. 비워두면 실명/기존 프로필 사진으로 올라가요.</div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
         <div class="profile-avatar-lg" id="reviewProfileSetupAvatarPreview" style="width:52px;height:52px;font-size:18px;margin:0;flex-shrink:0;"></div>
-        <button class="pin-action-btn" id="reviewProfileSetupPhotoChangeBtn" type="button">사진 선택</button>
+        <button class="feed-post-btn" id="reviewProfileSetupPhotoChangeBtn" type="button" style="flex:0 0 auto;padding:8px 14px;">사진 선택</button>
         <input type="file" id="reviewProfileSetupPhotoInput" accept="image/*" style="display:none;" />
       </div>
       <div class="mp-input-group" style="margin-bottom:0;"><label>리뷰용 닉네임</label><input class="search-input" id="reviewProfileSetupNicknameInput" maxlength="20" placeholder="예: 동네 미식가 (비우면 실명 사용)" /></div>
       <div class="mini-confirm-actions">
-        <button type="button" id="reviewProfileSetupSaveBtn" class="mini-confirm-btn danger">만들고 계속하기</button>
+        <button type="button" id="reviewProfileSetupSaveBtn" class="mini-confirm-btn primary">만들고 계속하기</button>
         <button type="button" id="reviewProfileSetupSkipBtn" class="mini-confirm-btn">나중에</button>
       </div>
     </div>
@@ -8404,7 +8405,7 @@
           <button class="meetup-chip" data-cat="experience">체험</button>
           <button type="button" class="feed-map-view-btn" id="feedMapViewBtn" title="지도 전체보기">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
-            지도 전체보기
+            지도
           </button>
           <button class="add-friend-btn" id="createFeedPostBtn" title="추천 올리기" style="margin-left:auto;">+</button>
         </div>
@@ -12267,8 +12268,7 @@ function wireFeedPostDetail(container, post){
     if(deleteBtn) deleteBtn.addEventListener('click', async () => {
       container.querySelector('.feed-detail-kebab-menu').classList.remove('open');
       try {
-        await deleteFeedPostItem(post);
-        dismissView(closeFeedPostDetail);
+        if(await deleteFeedPostItem(post)) dismissView(closeFeedPostDetail);
       } catch(err){
         showToast(err.message);
       }
@@ -12284,10 +12284,6 @@ function wireFeedPostDetail(container, post){
   kebabBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     kebabMenu.classList.toggle('open');
-  });
-  document.addEventListener('click', () => {
-    if(!document.body.contains(kebabMenu)) return; // 이미 다른 게시물 상세보기로 교체돼서 사라진 메뉴면 무시
-    kebabMenu.classList.remove('open');
   });
 
   // 저장(나중에 가볼 곳) 토글
@@ -12710,24 +12706,33 @@ document.getElementById('feedShareOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'feedShareOverlay') closeFeedShareFriendPicker();
 });
 
-let feedDetailReturnTo = 'list'; // 상세보기를 닫았을 때 어디로 돌아갈지 ('list' 또는 장소 모아보기 그리드 'tag')
-function openFeedPostDetail(post, returnTo){
-  feedDetailReturnTo = returnTo || 'list';
+// 상세보기를 닫았을 때 돌아갈 화면 - 열 때 보고 있던 화면(목록·장소 모아보기·작성자 리뷰)을 그대로 기억함
+// (예전엔 목록/모아보기만 숨겨서, 작성자 리뷰 화면에서 글을 누르면 그 목록 밑에 상세가 붙어서 떴음)
+let feedDetailReturnViewId = 'feedListView';
+// 상세보기의 ⋮ 메뉴 바깥을 누르면 닫힘 (상세를 열 때마다 리스너를 새로 붙이지 않도록 한 번만 등록)
+document.addEventListener('click', () => {
+  document.querySelectorAll('.feed-detail-kebab-menu.open').forEach(m => m.classList.remove('open'));
+});
+function openFeedPostDetail(post){
   const header = document.getElementById('feedPlaceDetailHeader');
   header.innerHTML = feedPostDetailHtml(post);
   wireFeedPostDetail(header, post);
-  document.getElementById('feedListView').classList.remove('active');
-  document.getElementById('feedTagView').classList.remove('active');
-  document.getElementById('feedPlaceDetailView').classList.add('active');
+  const feedViews = document.querySelectorAll('#communityView-feed > .feed-list-view');
+  const current = [...feedViews].find(v => v.classList.contains('active') && v.id !== 'feedPlaceDetailView');
+  feedDetailReturnViewId = current ? current.id : 'feedListView';
+  feedViews.forEach(v => v.classList.remove('active'));
+  const view = document.getElementById('feedPlaceDetailView');
+  view.classList.add('active');
+  scrollFeedViewToTop(view);
   pushViewState(closeFeedPostDetail);
 }
 function closeFeedPostDetail(){
   document.getElementById('feedPlaceDetailView').classList.remove('active');
-  if(feedDetailReturnTo === 'tag'){
-    document.getElementById('feedTagView').classList.add('active');
-  } else {
-    document.getElementById('feedListView').classList.add('active');
-  }
+  (document.getElementById(feedDetailReturnViewId) || document.getElementById('feedListView')).classList.add('active');
+}
+function scrollFeedViewToTop(view){
+  window.scrollTo(0, 0);
+  for(let el = view.parentElement; el; el = el.parentElement){ if(el.scrollTop) el.scrollTop = 0; }
 }
 document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPostDetail));
 
@@ -12762,7 +12767,7 @@ function renderFeedTagList(){
           <div class="feed-tag-list-note">${escapeHtml(post.note || '')}</div>
         </div>
       `;
-      row.addEventListener('click', () => openFeedPostDetail(post, 'tag'));
+      row.addEventListener('click', () => openFeedPostDetail(post));
       container.appendChild(row);
     });
   } else {
@@ -12807,7 +12812,7 @@ function renderFeedTagList(){
         cell.appendChild(info);
       }
 
-      cell.addEventListener('click', () => openFeedPostDetail(post, 'tag'));
+      cell.addEventListener('click', () => openFeedPostDetail(post));
       container.appendChild(cell);
     });
   }
@@ -12858,12 +12863,24 @@ document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn').forEach(btn =
   });
 });
 
-// 게시물 삭제 공통 처리
+// 게시물 삭제 공통 처리 - 한 번 더 물어보고, 지운 글은 목록·장소 모아보기·작성자 리뷰 화면에서도 같이 빠짐.
+// 취소하면 false를 돌려줌
 async function deleteFeedPostItem(post){
+  const ok = await appConfirm({ title: '게시물을 삭제할까요?', html: '삭제하면 댓글도 함께 사라지고 되돌릴 수 없어요.', yesText: '삭제', noText: '취소' });
+  if(!ok) return false;
   await apiRequest(`/feed/${post.id}`, { method: 'DELETE' });
-  FEED_POSTS[activeFeedCategory] = FEED_POSTS[activeFeedCategory].filter(p => p.id !== post.id);
+  Object.keys(FEED_POSTS).forEach(cat => { FEED_POSTS[cat] = (FEED_POSTS[cat] || []).filter(p => p.id !== post.id); });
   renderFeedPosts();
+  if(feedTagCurrentPosts.some(p => p.id === post.id)){
+    feedTagCurrentPosts = feedTagCurrentPosts.filter(p => p.id !== post.id);
+    renderFeedTagList();
+    const sub = document.getElementById('feedTagSub');
+    if(sub) sub.textContent = `이 장소에 올라온 글 ${feedTagCurrentPosts.length}개`;
+  }
+  const authorView = document.getElementById('feedAuthorView');
+  if(currentUser && (authorView.classList.contains('active') || feedDetailReturnViewId === 'feedAuthorView')) renderFeedAuthorViewContent(currentUser);
   showToast('삭제했어요.');
+  return true;
 }
 
 // 게시물 카드의 동작(좋아요·댓글·수정·삭제·신고) 연결
@@ -13230,8 +13247,12 @@ document.querySelectorAll('#feedCreateCategoryRow .feed-create-category-chip').f
 
 // 리뷰(소식 게시물)를 쓰기 전에, 리뷰용 프로필(닉네임/사진)을 한 번도 설정한 적 없는 사용자면
 // 먼저 만들 기회를 주고, 이미 있으면(또는 건너뛰면) 바로 진행함.
+// "나중에"를 한 번 누르면 이 기기에서는 다시 묻지 않음 (리뷰 프로필 카드의 ✎로 언제든 만들 수 있음)
+function reviewProfileSkipKey(){ return 'catchme_reviewProfileSkipped_' + (currentUser ? currentUser.id : ''); }
 function ensureReviewProfileThenRun(callback){
-  if(myProfileData.reviewNickname || myProfileData.reviewAvatarUrl){
+  let skipped = false;
+  try { skipped = localStorage.getItem(reviewProfileSkipKey()) === '1'; } catch(_){}
+  if(myProfileData.reviewNickname || myProfileData.reviewAvatarUrl || skipped){
     callback();
     return;
   }
@@ -13300,9 +13321,7 @@ function showFeedCreateView(){
   feedViews.forEach(v => v.classList.remove('active'));
   const view = document.getElementById('feedCreateView');
   view.classList.add('active');
-  // 폼 맨 위(뒤로 버튼/제목)부터 보이게
-  window.scrollTo(0, 0);
-  for(let el = view.parentElement; el; el = el.parentElement){ if(el.scrollTop) el.scrollTop = 0; }
+  scrollFeedViewToTop(view); // 폼 맨 위(뒤로 버튼/제목)부터 보이게
 }
 function closeFeedCreate(){
   document.getElementById('feedCreateView').classList.remove('active');
@@ -14144,6 +14163,7 @@ document.getElementById('reviewProfileSetupSaveBtn').addEventListener('click', (
   if(callback) callback();
 });
 document.getElementById('reviewProfileSetupSkipBtn').addEventListener('click', () => {
+  try { localStorage.setItem(reviewProfileSkipKey(), '1'); } catch(_){}
   const callback = reviewProfileSetupPendingCallback;
   closeReviewProfileSetupOverlay();
   if(callback) callback();
