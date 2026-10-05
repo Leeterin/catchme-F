@@ -5232,6 +5232,8 @@
   .qa-track{ position:relative; height:28px; margin:0 8px; border-radius:8px; background:var(--surface-2); cursor:pointer; touch-action:pan-y; }
   .qa-grid{ position:absolute; top:0; bottom:0; width:1px; background:var(--line); }
   .qa-bar{ position:absolute; top:0; bottom:0; border-radius:8px; background:var(--accent); cursor:grab; touch-action:none; }
+  .qa-bar.clip-s{ border-top-left-radius:0; border-bottom-left-radius:0; }
+  .qa-bar.clip-e{ border-top-right-radius:0; border-bottom-right-radius:0; }
   .qa-handle{ position:absolute; top:-4px; bottom:-4px; width:24px; cursor:ew-resize; touch-action:none; }
   .qa-handle.s{ left:-12px; }
   .qa-handle.e{ right:-12px; }
@@ -27514,7 +27516,18 @@ function closeQuickAvail(){
   document.getElementById('quickAvailOverlay').classList.remove('show');
 }
 function quickPct(min){ return (min - quickAvailAxis.s) / (quickAvailAxis.e - quickAvailAxis.s) * 100; }
-function quickBarStyle(r){ return `left:${quickPct(r.s)}%;width:${quickPct(r.e) - quickPct(r.s)}%`; }
+// 보이는 범위 밖으로 나간 부분은 잘라서 그림 (전부 밖이면 숨김 - 시간 글자를 눌러 고칠 수 있음)
+function quickBarStyle(r){
+  const s = Math.max(r.s, quickAvailAxis.s), e = Math.min(r.e, quickAvailAxis.e);
+  if(e <= s) return 'display:none';
+  return `left:${quickPct(s)}%;width:${quickPct(e) - quickPct(s)}%`;
+}
+function quickBarHtml(row, r, i){
+  const cs = r.s < quickAvailAxis.s, ce = r.e > quickAvailAxis.e;
+  return `<div class="qa-bar${cs ? ' clip-s' : ''}${ce ? ' clip-e' : ''}" data-qa-bar="${row.key}|${i}" style="${quickBarStyle(r)}">`
+    + (cs ? '' : `<span class="qa-handle s" data-qa-handle="${row.key}|${i}|s"></span>`)
+    + (ce ? '' : `<span class="qa-handle e" data-qa-handle="${row.key}|${i}|e"></span>`) + '</div>';
+}
 function quickHoursText(min){
   const h = Math.floor(min / 60), m = min % 60;
   return h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`;
@@ -27563,15 +27576,16 @@ function quickAxisRangeHtml(){
   const a = quickAvailAxis;
   const hourSel = (f, v, from, to) => `<select data-qa-range-f="${f}">${Array.from({ length: to - from + 1 }, (_, k) => from + k).map(h => `<option value="${h}"${h * 60 === v ? ' selected' : ''}>${h}시</option>`).join('')}</select>`;
   const pref = quickAvailAxisPref;
-  const widened = pref && (a.s < pref.s || a.e > pref.e);
+  const outside = QUICK_AVAIL_DOWS.some(dow => (quickAvailPattern[dow] || []).some(r => r.s < a.s || r.e > a.e));
   return `<div class="qa-range">
     <button type="button" class="qa-range-toggle" data-qa-range-open>보이는 시간 <b>${a.s / 60}시–${a.e / 60}시</b> <span>${quickAvailRangeOpen ? '접기' : '바꾸기 ›'}</span></button>
     ${quickAvailRangeOpen ? `<div class="qa-edit qa-range-edit">${hourSel('s', a.s, 0, 23)} – ${hourSel('e', a.e, 1, 24)}${pref ? '<button type="button" data-qa-range-auto>내 일정에 맞추기</button>' : ''}</div>
-    ${widened ? '<div class="qa-range-note">열어둔 시간이 있어서 그 시간까지 보여줘요</div>' : ''}` : ''}
+    ` : ''}${outside ? '<div class="qa-range-note">보이는 시간 밖에도 정해둔 시간이 있어요. 시간 글자를 눌러 고칠 수 있어요.</div>' : ''}
   </div>`;
 }
 function renderQuickAvail(){
-  quickAvailAxis = quickAxisCover(quickAvailAxisPref || quickAvailAxis);
+  // 자동일 땐 정해둔 시간이 다 보이게 넓히고, 직접 고른 범위는 그대로 둠 (밖으로 나간 막대는 잘려 보임)
+  quickAvailAxis = quickAvailAxisPref ? { ...quickAvailAxisPref } : quickAxisCover(quickAvailAxis);
   // 3시간마다 눈금, 넓게 볼 땐 글자는 6시간마다
   const ticks = [];
   for(let h = Math.ceil(quickAvailAxis.s / 180) * 3; h * 60 <= quickAvailAxis.e; h += 3) ticks.push(h);
@@ -27595,7 +27609,7 @@ function renderQuickAvail(){
         ${on ? `<button type="button" class="qa-add" data-qa-add="${row.key}" aria-label="${row.label} 시간 더 넣기">+</button>` : ''}
       </div>
       ${editing >= 0 ? quickAvailEditHtml(dow, editing) : ''}
-      <div class="qa-track" data-qa-track="${row.key}">${grid}${ranges.map((r, i) => `<div class="qa-bar" data-qa-bar="${row.key}|${i}" style="${quickBarStyle(r)}"><span class="qa-handle s" data-qa-handle="${row.key}|${i}|s"></span><span class="qa-handle e" data-qa-handle="${row.key}|${i}|e"></span></div>`).join('')}${busy}</div>
+      <div class="qa-track" data-qa-track="${row.key}">${grid}${ranges.map((r, i) => quickBarHtml(row, r, i)).join('')}${busy}</div>
       ${quickAvailInfo && quickAvailInfo.dow === dow ? quickAvailInfoHtml(dow, quickAvailInfo.min) : ''}
     </div>`;
   }).join('');
@@ -27775,7 +27789,8 @@ quickAvailRowsEl.addEventListener('pointerdown', (e) => {
   const handle = e.target.closest('[data-qa-handle]');
   const bar = e.target.closest('[data-qa-bar]');
   if(handle || bar){
-    const [, idx, edge] = (handle ? handle.dataset.qaHandle : bar.dataset.qaBar + '|m').split('|');
+    let [, idx, edge] = (handle ? handle.dataset.qaHandle : bar.dataset.qaBar + '|m').split('|');
+    if(edge === 'm' && /clip-/.test(bar.className)) edge = 'x'; // 잘려 보이는 막대는 통째로 옮기지 않음 (톡 누르면 시간 고르기)
     const ranges = quickCloneRanges(quickAvailPattern[row.dows[0]]);
     quickDrag = { row, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, startMin: quickMinAt(track, e.clientX), el: bar || handle.closest('[data-qa-bar]'), x: e.clientX, y: e.clientY, moved: false, offset: 0, stuck: null, stuckX: 0, passed: new Set() };
     try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
@@ -27809,7 +27824,7 @@ function quickDetentHit(dr, p, c){
 }
 quickAvailRowsEl.addEventListener('pointermove', (e) => {
   const dr = quickDrag;
-  if(!dr || dr.tap) return;
+  if(!dr || dr.tap || dr.edge === 'x') return;
   if(!dr.moved && Math.abs(e.clientX - dr.x) < 6) return; // 톡 누른 건 끌기로 안 봄
   dr.moved = true;
   const r = dr.ranges[dr.idx];
