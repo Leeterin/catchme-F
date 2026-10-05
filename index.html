@@ -3881,6 +3881,30 @@
     pointer-events:none;
   }
   .msg-swipe-reply-icon.ready{ opacity:1; transform:scale(1); color:var(--accent); }
+  /* 어느 화면에서나 왼쪽에서 오른쪽으로 밀면 뒤로가기 - 미는 동안 왼쪽 끝에서 화살표가 따라 나옴 */
+  .swipe-back-hint{
+    position:fixed;
+    left:0;
+    top:50%;
+    width:40px;
+    height:40px;
+    margin-top:-20px;
+    border-radius:50%;
+    background:var(--surface);
+    color:var(--text-dim);
+    box-shadow:0 2px 10px rgba(0,0,0,0.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:24px;
+    font-weight:700;
+    line-height:1;
+    transform:translateX(-48px);
+    opacity:0;
+    pointer-events:none;
+    z-index:100000;
+  }
+  .swipe-back-hint.ready{ color:var(--accent); }
   /* 컴퓨터(마우스)에서는 밀 수가 없어서, 메시지에 마우스를 올리면 옆에 답장 버튼이 나타남 */
   .msg-hover-reply-btn{
     align-self:center;
@@ -8912,6 +8936,87 @@ function goBackOrClose(closeFn){
     closeFn();
   }
 }
+
+// ---------- 어느 화면에서나 왼쪽에서 오른쪽으로 밀면 뒤로가기 ----------
+// 화면 안 뒤로가기 버튼과 똑같이 history.back()으로 닫아서, 언제나 그 화면을 열기 전 화면으로 돌아감
+// (쌓인 화면이 없는 첫 화면/탭에서는 아무것도 안 함. 채팅방은 setupChatRoomSwipeBack이 따로 처리)
+(function setupSwipeBack(){
+  const hint = document.createElement('div');
+  hint.className = 'swipe-back-hint';
+  hint.innerHTML = '&#8249;';
+  document.body.appendChild(hint);
+  let startX = 0, startY = 0, startT = 0, dx = 0;
+  let tracking = false, dragging = false;
+
+  // 가로로 넘기는 줄, 막대 끌기(touch-action:none), 지도처럼 손가락을 스스로 쓰는 곳은 그쪽 우선
+  function ownsHorizontalTouch(el){
+    let node = el;
+    while(node && node !== document.body){
+      const style = window.getComputedStyle(node);
+      if((style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth) return true;
+      if(style.touchAction === 'none') return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+  function setHint(x, ready){
+    const p = Math.min(1, x / 90);
+    hint.style.transform = `translateX(${-48 + p * 64}px)`;
+    hint.style.opacity = String(p);
+    hint.classList.toggle('ready', ready);
+  }
+  function hideHint(){
+    hint.style.transition = 'transform .18s ease, opacity .18s ease';
+    hint.style.transform = '';
+    hint.style.opacity = '';
+    hint.classList.remove('ready');
+  }
+
+  document.addEventListener('touchstart', (e) => {
+    tracking = false;
+    if(e.touches.length !== 1 || viewCloseStack.length === 0) return;
+    const target = e.target;
+    if(!target.closest) return;
+    if(target.closest('#chatRoomView, input, textarea, select, [contenteditable="true"], #feedPlaceMap, #placeViewerMap, #locationPickerMap, #hotplaceMapFrame, #placeDetailMapCanvas, #feedMapOverlayCanvas, #meetupMapOverlayCanvas')) return;
+    if(ownsHorizontalTouch(target)) return;
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY; startT = Date.now(); dx = 0;
+    tracking = true; dragging = false;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if(!tracking) return;
+    // 다른 곳에서 끌기(칸 칠하기, 사진 순서 바꾸기, 지도 등)로 쓰는 중이면 뒤로가기로 보지 않음
+    if(e.defaultPrevented || availTouchDrag.active || feedPhotoDrag){ tracking = false; if(dragging) hideHint(); dragging = false; return; }
+    const t = e.touches[0];
+    const mx = t.clientX - startX, my = t.clientY - startY;
+    if(!dragging){
+      if(Math.abs(mx) < 12 && Math.abs(my) < 12) return;
+      // 오른쪽으로, 위아래보다 확실히 가로로 움직일 때만 (위아래 스크롤은 그대로)
+      if(!(mx > 0 && mx > Math.abs(my) * 1.5)){ tracking = false; return; }
+      dragging = true;
+      hint.style.transition = 'none';
+    }
+    dx = Math.max(0, mx);
+    setHint(dx, dx > 80);
+  }, { passive: true });
+
+  function onEnd(){
+    if(!tracking) return;
+    tracking = false;
+    if(!dragging) return;
+    dragging = false;
+    const speed = dx / Math.max(1, Date.now() - startT); // px/ms
+    const shouldGoBack = dx > 80 || (dx > 40 && speed > 0.5);
+    hideHint();
+    if(shouldGoBack && viewCloseStack.length > 0){
+      if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      history.back();
+    }
+  }
+  document.addEventListener('touchend', onEnd);
+  document.addEventListener('touchcancel', () => { tracking = false; if(dragging) hideHint(); dragging = false; });
+})();
 
 function showToast(message, duration = 2400){
   const el = document.getElementById('globalToast');
@@ -16685,6 +16790,15 @@ document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(btn => {
     applyRepeatModeDateUI();
     if(formRepeatMode === 'weekly' && !document.getElementById('eventFormUntil').value){
       document.getElementById('eventFormUntil').value = defaultUntilDateValue();
+    }
+    // 요일을 아직 안 골랐으면 고른 날짜의 요일을 미리 눌러둠 (목요일에서 추가하면 "목"이 켜져 있음)
+    if(formRepeatMode === 'weekly' && formSelectedWeekdays.size === 0){
+      const sd = document.getElementById('eventFormStartDate').value;
+      const dow = (sd ? new Date(`${sd}T00:00:00`) : scheduleFocusDate).getDay();
+      if(!isNaN(dow)){
+        formSelectedWeekdays.add(dow);
+        document.querySelectorAll('.weekday-pick-btn').forEach(b => b.classList.toggle('on', formSelectedWeekdays.has(parseInt(b.dataset.dow, 10))));
+      }
     }
     refreshDateDisplay('eventFormUntil');
   });
@@ -29131,7 +29245,7 @@ function openInviteCreate(fromList, opts = {}){
     calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
     calDates: new Set(),
     calError: '',
-    audience: 'friends', // 친구용(모두 + 친구만 시간) / 업무용(모두 + 업무용 시간)
+    audience: 'friends', // 친구용(모두 + 친구만 시간) / 'group:<id>'(모든 친구 + 그 그룹에 연 시간) / 업무용(모두 + 업무용 시간)
     place: opts.place || null, // 추천 게시물에서 "약속 장소로 선택"하고 들어오면 장소가 붙어있음
   };
   inviteState.fromList = !!fromList;
@@ -29144,7 +29258,7 @@ function openInviteCreate(fromList, opts = {}){
 async function loadInviteCalendarDays(){
   const d = inviteState.draft;
   try {
-    const data = await apiRequest(`/invites/availability?audience=${d.audience}`);
+    const data = await apiRequest(`/invites/availability?audience=${encodeURIComponent(d.audience)}`);
     if(inviteState.draft !== d) return;
     d.calDays = data.days || [];
     d.calDates = new Set(d.calDays.slice(0, 14).map(x => x.date));
@@ -29380,18 +29494,23 @@ function renderInviteCreateHtml(){
       <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
     </div>`;
   const placeHtml = d.place ? `<div class="inv-section"><label class="inv-label">약속 장소</label>${invitePlaceHtml(d.place, true)}</div>` : '';
-  // 친구만/업무용만으로 열어둔 시간이 하나도 없으면 친구용/업무용 링크 내용이 똑같아서 고르는 칸 자체를 안 보여줌
-  const hasSplitAvail = SCHEDULE_EVENTS.some(e => e.type === 'available' && availableForOf(e) !== 'all');
+  // 친구만/업무용만/그룹에만 열어둔 시간이 하나도 없고 그룹도 없으면 링크 내용이 다 똑같아서 고르는 칸 자체를 안 보여줌
+  const hasSplitAvail = MY_GROUPS.length > 0 || SCHEDULE_EVENTS.some(e => e.type === 'available' && availableForOf(e) !== 'all');
+  const audGroup = d.audience.startsWith('group:') ? MY_GROUPS.find(g => `group:${g.id}` === d.audience) : null;
+  const audChip = (aud, color, text) => `<button type="button" class="avail-for-btn${d.audience === aud ? ' active' : ''}" data-act="aud" data-aud="${escapeHtml(aud)}" style="--af-color:${color}">${text}</button>`;
   const audienceHtml = !hasSplitAvail ? '' : `
     <div class="inv-section">
       <label class="inv-label">누구에게 보낼 링크인가요?</label>
-      <div class="inv-src-tabs" style="margin-bottom:6px;">
-        <button type="button" data-act="aud" data-aud="friends" class="${d.audience === 'friends' ? 'on' : ''}">👥 친구용</button>
-        <button type="button" data-act="aud" data-aud="work" class="${d.audience === 'work' ? 'on' : ''}">💼 업무용</button>
+      <div class="avail-for-row" style="margin-bottom:6px;">
+        ${audChip('friends', AVAILABLE_EVENT_COLOR, `${DEFAULT_GROUP_EMOJI} 친구용`)}
+        ${MY_GROUPS.map(g => audChip(`group:${g.id}`, AVAILABLE_EVENT_COLOR, `${escapeHtml(groupEmojiOf(g))} ${escapeHtml(g.name)}`)).join('')}
+        ${audChip('work', AVAILABLE_WORK_COLOR, `${escapeHtml(workEmoji())} 업무용`)}
       </div>
       <div class="avail-for-hint">${d.audience === 'work'
         ? '업무용 링크에 열어둔 시간이 담겨요. 친구에게만 연 시간은 안 보여요.'
-        : '친구에게 열어둔 시간이 담겨요. 업무용 링크에만 연 시간은 안 보여요.'}</div>
+        : audGroup
+          ? `${escapeHtml(audGroup.name)} 그룹이나 모든 친구에게 열어둔 시간이 담겨요. 다른 그룹에만 연 시간은 안 보여요.`
+          : '친구에게 열어둔 시간이 담겨요. 업무용 링크에만 연 시간은 안 보여요.'}</div>
     </div>`;
   if(d.source === 'calendar') return placeHtml + tabs + audienceHtml + titleHtml + renderInviteCalendarPickHtml(d);
   return placeHtml + tabs + titleHtml + `
