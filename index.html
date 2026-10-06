@@ -8798,6 +8798,9 @@ function fitMonthLabelsByChars(container){
 // 화면을 열 때마다 pushViewState(그 화면을 닫는 함수)를 호출해서 히스토리에 쌓아두면,
 // 사용자가 뒤로가기를 눌렀을 때 앱을 나가는 대신 그 화면이 닫힘
 const viewCloseStack = [];
+// 브라우저가 뒤로가기 때 스크롤을 멋대로 되돌리지 않게 함 - 화면을 열면서 맨 위로 올린 뒤에 pushState를 해서,
+// 뒤로가면 브라우저가 "맨 위(0)"로 되돌려버려 보던 위치를 잃었음. 스크롤 복원은 각 화면의 닫기 함수가 직접 함
+if('scrollRestoration' in history) history.scrollRestoration = 'manual';
 // 히스토리를 조용히 되감는 중(unwindViewStack)이면 그 popstate는 닫기 함수를 실행하지 않고 넘김.
 // 되감기는 비동기라, 그 사이에 새로 여는 화면의 pushState는 되감기가 끝난 뒤에 쌓아야 순서가 안 꼬임
 let historyUnwinding = 0;
@@ -13015,6 +13018,7 @@ function restoreFeedViewScroll(viewId){
   const apply = () => snap.forEach(s => { if(s.el) s.el.scrollTop = s.top; else window.scrollTo(0, s.top); });
   apply();
   requestAnimationFrame(apply); // 화면이 다시 그려진 뒤 높이가 늦게 잡히는 경우 대비해 한 번 더
+  setTimeout(apply, 80);        // 뒤로가기(popstate) 직후 다른 처리가 스크롤을 건드려도 마지막에 한 번 더 맞춤
 }
 document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPostDetail));
 
