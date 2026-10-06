@@ -4689,7 +4689,7 @@
   /* "내 캘린더" 제목이 탭 제목과 겹쳐서 두 번 보였음 - 하루 보기에선 날짜를 제목처럼 크게 */
   .day-header-title{ display:none; }
   .day-header-sub{ margin-top:0; }
-  .day-header-sub #dayViewLabel{ font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:700; color:var(--text); }
+  .day-header-sub #dayViewLabel{ font-family:'Space Grotesk',sans-serif; font-size:17px; font-weight:700; color:var(--text); word-break:keep-all; }
   /* 마이크 아이콘만으로는 뭔지 몰라서 "음성" 글자를 같이 */
   .day-header-actions button.voice-add-btn{ width:auto; padding:0 8px; gap:3px; font-size:11.5px; font-weight:600; }
   #voiceAddBtn.listening{
@@ -6323,6 +6323,8 @@
     overflow:hidden;
     cursor:pointer;
     line-height:1.25;
+    word-break:keep-all;
+    overflow-wrap:anywhere;
   }
   .week-cal-block.show-actions{ z-index:3; }
   /* 아직 상대 응답을 기다리는 "예약중..." 시간대 - 확정된 일정과 확실히 다르게 줄무늬로 표시 */
@@ -15279,8 +15281,10 @@ function nextVisibilityOnClick(vis, clickedVis, clickedGroupId){
 
 // ---------- 하루 보기 ----------
 function renderDayView(){
+  // 올해면 연도는 빼서 짧게 - 오른쪽 버튼들(이전/다음/음성/+)과 한 줄에 있어서 "화요 / 일"처럼 글자 중간에서 줄이 바뀌었음
+  const dayYear = scheduleFocusDate.getFullYear() === TODAY.getFullYear() ? '' : `${scheduleFocusDate.getFullYear()}년 `;
   document.getElementById('dayViewLabel').textContent =
-    `${scheduleFocusDate.getFullYear()}년 ${scheduleFocusDate.getMonth()+1}월 ${scheduleFocusDate.getDate()}일 ${WEEKDAY_KO[scheduleFocusDate.getDay()]}요일`;
+    `${dayYear}${scheduleFocusDate.getMonth()+1}월 ${scheduleFocusDate.getDate()}일 ${WEEKDAY_KO[scheduleFocusDate.getDay()]}요일`;
   renderDayTodayIndicator();
 
   const events = filterEventsByScheduleGroup(getEventsForDate(scheduleFocusDate));
@@ -17259,6 +17263,10 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     const dayEvents = getEventsForDate(date);
     const found = dayEvents.find(ev => {
       if(ev.id === editingEventId || editingLinkedPieceIds.includes(ev.id)) return false;
+      // "이 시간에도 예약 받기"를 켠 일정과 예약 가능 시간은 겹쳐도 서로 막지 않으니 물어보지 않음
+      // (켠 일정을 열어둔 시간 위에 넣을 때 / 열어둔 시간을 켠 일정 위에 열 때 둘 다)
+      if(formEventType !== 'available' && formAllowBooking && ev.type === 'available') return false;
+      if(formEventType === 'available' && ev.type !== 'available' && !blocksBooking(ev)) return false;
       const disp = getEventDisplayRangeForDate(ev, date);
       return disp.startMin < winEnd && disp.endMin > winStart;
     });
@@ -18186,7 +18194,11 @@ function renderWeekView(){
         block.title = `${d.getMonth()+1}/${d.getDate()} ${minutesToLabel(blockRange.startMin)}-${minutesToLabel(blockRange.endMin)} - ${text}`;
 
         const label = document.createElement('span');
-        label.textContent = text;
+        // 일주일 칸은 좁아서 "예약 가능 · 💼업무" 같은 긴 이름이 "예약 가 / 능 · 💼 / 업무"처럼 끊겼음 -
+        // 예약 가능 시간은 한달 보기와 같은 짧은 이름으로 (전체 이름은 위 title에 그대로)
+        label.textContent = (matchedEv && matchedEv.type === 'available' && !isPending && !isLinked)
+          ? availableShortFor(availableForOf(matchedEv), matchedEv.visibility)
+          : text;
         block.appendChild(label);
 
         if(matchedEv && !isPending && !isLinked){
