@@ -29686,23 +29686,17 @@ async function renderPlanStartMethods(friendId){
     status: !known ? '' : (mine === 0 && theirs === 0 ? '두 사람 다 아직 안 열었어요'
       : mine === 0 ? '내 예약 가능 시간이 아직 없어요'
       : theirs === 0 ? `${name}님이 아직 안 열었어요` : '둘 다 열어둔 시간이 있어요'),
-    disabled: known && (mine === 0 || theirs === 0),
+    // 안 열린 상태여도 누를 수 있게 둠 - 들어가면 왜 없는지와 '내 시간 열기' 등 다음 할 일을 안내함
   };
   const link = { ...PLAN_LINK_OPTION };
-  // 지금 쓸 수 있는 방법만 보여줌 - 예전엔 안 되는 방법(회색)과 링크/내 시간 열기까지 4개가 한꺼번에 나와 헷갈렸음
+  // '둘 다 되는 시간 찾기'는 항상 보여줌 (한쪽이라도 안 열었을 때 숨겼더니 매칭 기능이 사라진 것처럼 보였음)
   let options, note = '';
   if(known && theirs > 0 && mine > 0){ match.recommended = true; options = [match, reserve]; }
-  else if(known && theirs > 0){
-    // 친구가 열어둔 시간에 예약하는 것 하나뿐이면 고르게 하지 않고 바로 예약 화면으로
-    dismissView(closePlanStart);
-    calendarOpenedFromChat = planStartChatRoomId;
-    openFriendCalendar(friendId, 'reserve');
-    return;
-  }
+  else if(known && theirs > 0){ reserve.recommended = true; options = [reserve, match]; }
   else if(known){
     note = `<div class="plan-empty">${name}님이 아직 예약 가능 시간을 안 열었어요.<br/>링크로 되는 시간을 물어보면 ${name}님이 골라줘요.</div>`;
     link.recommended = true;
-    options = [link];
+    options = [link, match];
   }
   else options = [reserve, match, link];
 
