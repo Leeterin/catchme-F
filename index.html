@@ -3483,7 +3483,7 @@
     gap:10px;
     margin-bottom:10px;
   }
-  /* 이달의 맛집왕 배너 - 소식 목록 맨 위에 표시 */
+  /* 이달의 리뷰왕 배너 - 소식 목록 맨 위에 표시 */
   .feed-monthly-king-banner{
     display:flex;
     align-items:center;
@@ -11881,7 +11881,7 @@ function sortFeedPosts(category){
   });
 }
 
-// ---------- 소식 탭 활동 뱃지: 첫 리뷰어 / 친구 N명+ 다녀간 곳 / 이달의 맛집왕 ----------
+// ---------- 소식 탭 활동 뱃지: 첫 리뷰어 / 친구 N명+ 다녀간 곳 / 이달의 리뷰왕 ----------
 // 리뷰를 남기고 싶어지게 만드는 가벼운 동기부여 장치들. 전부 이미 불러와 있는 FEED_POSTS/FRIENDS로만 계산함(추가 API 호출 없음).
 const FEED_BADGE_ICON = {
   medal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><circle cx="12" cy="8" r="6"/><path d="M8.5 13.5L7 22l5-3 5 3-1.5-8.5"/></svg>',
@@ -11922,7 +11922,7 @@ function renderFriendVisitBadgeHtml(title){
   return `<span class="meet-badge-chip" style="color:#22B07D;border-color:#22B07D;" title="친구 ${count}명이 다녀간 곳이에요">${FEED_BADGE_ICON.users}친구 ${count}명+ 다녀간 곳</span>`;
 }
 
-const MONTHLY_KING_MIN_COUNT = 2; // 이 정도는 올려야 "이달의 맛집왕" 타이틀을 붙여줌
+const MONTHLY_KING_MIN_COUNT = 2; // 이 정도는 올려야 "이달의 리뷰왕" 타이틀을 붙여줌
 // 이번 달(달력 기준)에 후기를 가장 많이 남긴 사람 - 렌더 한 번당 한 번만 계산해서 재사용(renderFeedPosts에서 매번 초기화)
 let _monthlyTopReviewerCache;
 function getMonthlyTopReviewer(){
@@ -11948,11 +11948,11 @@ function getMonthlyTopReviewer(){
 function renderMonthlyKingBadgeHtml(authorId){
   const top = getMonthlyTopReviewer();
   if(!top || !authorId || top.author.id !== authorId) return '';
-  return `<span class="meet-badge-chip" style="color:#F5A623;border-color:#F5A623;" title="이번 달 후기 ${top.count}개 · 이달의 맛집왕">${FEED_BADGE_ICON.crown}이달의 맛집왕</span>`;
+  return `<span class="meet-badge-chip" style="color:#F5A623;border-color:#F5A623;" title="이번 달 후기 ${top.count}개 · 이달의 리뷰왕">${FEED_BADGE_ICON.crown}이달의 리뷰왕</span>`;
 }
 
 // ---------- 작성자 등급 뱃지: 지금까지 쓴 리뷰 누적 개수 기준, 항상 작성자 이름 옆에 표시됨 ----------
-// 위의 첫 리뷰어/친구N+/이달의 맛집왕은 "이 장소" 또는 "이번 달" 한정 뱃지라 리뷰를 더 써도
+// 위의 첫 리뷰어/친구N+/이달의 리뷰왕은 "이 장소" 또는 "이번 달" 한정 뱃지라 리뷰를 더 써도
 // 사라지거나 그대로인 게 제각각이었음. 이 등급 뱃지는 그 사람이 지금까지 쓴 리뷰 총 개수만 보고
 // 매겨져서, 리뷰를 쓰면 쓸수록 등급이 오르기만 하지 절대 내려가거나 사라지지 않음.
 // ---------- 레벨(Lv) 시스템 - 리뷰 등급·약속 등급 공통 ----------
@@ -12037,7 +12037,7 @@ const REVIEWER_LEVEL_TIERS = [
   { min: 50, key: 'master',  label: '리뷰 마스터', color: '#8B5CF6', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M2 8l4 10h12l4-10-6 4-4-7-4 7z"/><path d="M6 21h12"/></svg>' },
   { min: 21, key: 'legend',  label: '리뷰 레전드', color: '#F5A623', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M7 5H4a3 3 0 0 0 3 4"/><path d="M17 5h3a3 3 0 0 1-3 4"/></svg>' },
   { min: 11, key: 'expert',  label: '리뷰 고수', color: '#F472B6', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 2l2.9 6.3 6.9.6-5.2 4.6 1.6 6.8L12 16.9 5.8 20.3l1.6-6.8-5.2-4.6 6.9-.6z"/></svg>' },
-  { min: 6,  key: 'foodie',  label: '맛잘알', color: '#22B07D', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M4 2v7a2.5 2.5 0 0 0 5 0V2"/><path d="M6.5 2v20"/><path d="M18 2c-1.8 0-3 2.5-3 6s1.2 5 3 5 3-1.5 3-5-1.2-6-3-6z"/><path d="M18 13v9"/></svg>' },
+  { min: 6,  key: 'explorer', label: '리뷰 탐험가', color: '#22B07D', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>' },
   { min: 3,  key: 'regular', label: '리뷰 단골', color: '#38BDF8', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M3 9l1.5-5h15L21 9"/><path d="M4.5 9a2.3 2.3 0 0 0 4.5 0 2.3 2.3 0 0 0 4.5 0 2.3 2.3 0 0 0 4.5 0"/><path d="M5 9.5V21h14V9.5"/></svg>' },
   { min: 1,  key: 'sprout',  label: '리뷰 새싹', color: '#9CA3AF', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M12 22V13"/><path d="M12 13C7 13 4 10 4 5c6 0 8 3 8 8z"/><path d="M12 13c0-5 2-8 8-8 0 5-2 8-8 8z"/></svg>' },
 ];
@@ -12178,7 +12178,7 @@ function renderFeedPosts(){
   updateFeedReviewProfileMineCount();
   const container = document.getElementById('feedListContainer');
   container.innerHTML = '';
-  _monthlyTopReviewerCache = undefined; // 게시물 목록이 새로 그려질 때마다 이달의 맛집왕도 다시 계산
+  _monthlyTopReviewerCache = undefined; // 게시물 목록이 새로 그려질 때마다 이달의 리뷰왕도 다시 계산
 
   const q = feedSearchQuery.trim().toLowerCase();
   if(feedShowSaved){
@@ -12222,7 +12222,7 @@ function renderFeedPosts(){
   if(monthlyKing){
     const banner = document.createElement('div');
     banner.className = 'feed-monthly-king-banner';
-    banner.innerHTML = `${FEED_BADGE_ICON.crown}<b>이달의 맛집왕</b> ${escapeHtml(feedAuthorDisplayName(monthlyKing.author))}님 · 이번 달 후기 ${monthlyKing.count}개`;
+    banner.innerHTML = `${FEED_BADGE_ICON.crown}<b>이달의 리뷰왕</b> ${escapeHtml(feedAuthorDisplayName(monthlyKing.author))}님 · 이번 달 후기 ${monthlyKing.count}개`;
     container.appendChild(banner);
   }
 
@@ -12308,7 +12308,7 @@ function feedPostCardHtml(post){
       ${feedAuthorAvatarHtml(post.author)}
       <div class="feed-ig-author-name">${escapeHtml(feedAuthorDisplayName(post.author))}</div>
       ${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}
-      <!-- 목록에선 배지를 하나만 - 이름 옆에 배지가 3개씩 붙어 장소보다 배지가 먼저 보였음 (첫 리뷰어/맛집왕은 글 상세에서) -->
+      <!-- 목록에선 배지를 하나만 - 이름 옆에 배지가 3개씩 붙어 장소보다 배지가 먼저 보였음 (첫 리뷰어/리뷰왕은 글 상세에서) -->
     </div>
     <div class="feed-ig-tag-row">
       <button type="button" class="feed-ig-place-tag">${ICO.pin} ${escapeHtml(post.title || '')}</button>
