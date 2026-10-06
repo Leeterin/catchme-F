@@ -12441,7 +12441,7 @@ function feedPostDetailHtml(post){
   return `
     ${photos.length > 0 ? `
       <div class="feed-detail-photos">
-        ${photos.map(p => `<img loading="lazy" src="${p}" />`).join('')}
+        ${photos.map((p, i) => `<img${i > 0 ? ' loading="lazy"' : ''} decoding="async" src="${p}" />`).join('')}
       </div>
     ` : ''}
     <div class="feed-detail-body">
@@ -12989,12 +12989,37 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.feed-detail-kebab-menu.open').forEach(m => m.classList.remove('open'));
 });
 let feedDetailCurrentPost = null;
+let feedDetailOpenToken = 0;
 function openFeedPostDetail(post){
   feedDetailCurrentPost = post;
   const header = document.getElementById('feedPlaceDetailHeader');
   header.innerHTML = feedPostDetailHtml(post);
   wireFeedPostDetail(header, post);
+  // 사진이 그려질 준비가 된 뒤에 화면을 바꿈 - 바로 바꾸면 빈 칸이 잠깐 보였다가 사진이 떠서 깜빡거렸음
+  // (목록에서 이미 받아둔 사진이라 보통 금방 끝나고, 오래 걸려도 0.3초 넘게 기다리진 않음)
+  const token = ++feedDetailOpenToken;
+  const firstImg = header.querySelector('.feed-detail-photos img');
+  let shown = false;
+  const show = () => {
+    if(shown || token !== feedDetailOpenToken) return;
+    shown = true;
+    showFeedPostDetailView();
+  };
+  if(firstImg && !firstImg.complete && firstImg.decode){
+    firstImg.decode().then(show, show);
+    setTimeout(show, 300);
+  } else if(firstImg && firstImg.decode){
+    firstImg.decode().then(show, show);
+    setTimeout(show, 120);
+  } else {
+    show();
+  }
+}
+function showFeedPostDetailView(){
   rememberActiveFeedViewScroll();
+  // 리뷰 상세를 보는 동안엔 위쪽 "내 리뷰 프로필" 카드를 가림
+  const reviewProfileCard = document.getElementById('feedReviewProfileCard');
+  if(reviewProfileCard) reviewProfileCard.style.display = 'none';
   const feedViews = document.querySelectorAll('#communityView-feed > .feed-list-view');
   const current = [...feedViews].find(v => v.classList.contains('active') && v.id !== 'feedPlaceDetailView');
   feedDetailReturnViewId = current ? current.id : 'feedListView';
@@ -13008,6 +13033,8 @@ function closeFeedPostDetail(){
   document.getElementById('feedPlaceDetailView').classList.remove('active');
   const back = document.getElementById(feedDetailReturnViewId) || document.getElementById('feedListView');
   back.classList.add('active');
+  // 목록으로 돌아갈 때만 "내 리뷰 프로필" 카드를 다시 보여줌 (작성자 화면으로 돌아가면 계속 가려둠)
+  if(back.id === 'feedListView') updateFeedReviewProfileMineCount();
   restoreFeedViewScroll(back.id);
 }
 function scrollFeedViewToTop(view){
@@ -13402,7 +13429,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
           view.style.display = '';
           if(!didSwap){ dropView(); return; }
           if(!underWasActive && underView) underView.classList.remove('active');
-          if(id === 'feedAuthorView'){
+          if(id === 'feedAuthorView' || id === 'feedPlaceDetailView'){
             const card = document.getElementById('feedReviewProfileCard');
             if(card) card.style.display = 'none';
           }
