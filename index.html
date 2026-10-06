@@ -1441,7 +1441,9 @@
     flex-shrink:0;
     scroll-snap-align:start;
   }
-  .feed-detail-photos{ scroll-snap-type:x mandatory; }
+  /* scroll-padding: 맞춰 멈추는 기준을 안쪽 여백(18px)에 맞춤 - 없으면 사진 크기가 바뀔 때 브라우저가
+     첫 사진을 화면 끝에 맞추려고 18px 옆으로 밀어버렸음 */
+  .feed-detail-photos{ scroll-snap-type:x mandatory; scroll-padding:0 18px; }
   .feed-detail-photos.single img{ margin:0 auto; }
   /* 리뷰 상세를 보는 동안엔 위쪽 "장소 추천" 제목/위치 설정을 가림 */
   #panel-community.feed-detail-open .community-header{ display:none; }
@@ -13058,11 +13060,14 @@ function layoutFeedDetailPhotos(container){
     H = Math.max(W * 0.55, Math.min(W / widest, maxH));
     row.dataset.lockedH = String(H);
   }
+  // 크기를 바꿔도 보던 위치는 그대로 (사진이 늦게 와서 다시 맞출 때 옆으로 튀지 않게)
+  const scrollLeft = row.scrollLeft;
   imgs.forEach((img, i) => {
     const r = ratios[i] || 3 / 4;
     img.style.height = Math.round(H) + 'px';
     img.style.width = Math.round(imgs.length === 1 ? Math.min(W, H * r) : H * r) + 'px';
   });
+  if(row.scrollLeft !== scrollLeft) row.scrollLeft = scrollLeft;
 }
 function showFeedPostDetailView(){
   rememberActiveFeedViewScroll();
