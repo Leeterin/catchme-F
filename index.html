@@ -194,6 +194,17 @@
   .home-avail-day.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .home-avail-day.today{ border:2px solid var(--accent); color:var(--accent); font-weight:800; }
   .home-avail-day.today.on{ border-color:var(--text); color:#fff; }
+  /* 홈: 이번 주 시간 맞는 친구 */
+  .home-match-row{ display:flex; align-items:flex-start; gap:10px; padding:10px 2px; border-top:1px solid var(--line); }
+  .home-match-row:first-child{ border-top:none; }
+  .home-match-avatar{ width:34px; height:34px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700; overflow:hidden; }
+  .home-match-avatar img{ width:100%; height:100%; object-fit:cover; }
+  .home-match-body{ flex:1; min-width:0; }
+  .home-match-name{ font-size:14px; font-weight:700; color:var(--text); margin:1px 0 6px; }
+  .home-match-slots{ display:flex; flex-wrap:wrap; gap:5px; }
+  .home-match-slot{ padding:5px 9px; border-radius:999px; border:1px solid var(--accent); background:var(--accent-soft, transparent); color:var(--accent); font-size:12px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; white-space:nowrap; }
+  .home-match-more{ padding:5px 4px; border:none; background:none; color:var(--text-dim); font-size:12px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
+  .home-match-empty-btn{ margin-top:8px; padding:8px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); color:var(--text); font-size:12.5px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
   .home-avail-status{ font-size:12.5px; color:var(--text-dim); line-height:1.45; }
   .home-avail-status.warn{ color:#e5484d; font-weight:600; }
   .home-avail-actions{ display:flex; gap:6px; margin-top:10px; }
@@ -7262,6 +7273,11 @@
       <div class="home-card-title"><span>다가오는 약속</span><button type="button" class="home-card-link" id="homePastApptBtn">지난 약속</button></div>
       <div id="homeUpcomingList"></div>
     </div>
+    <!-- 이번 주 시간 맞는 친구 - 앞으로 7일 동안 나와 친구가 둘 다 '예약 가능'으로 열어둔 시간이 겹치는 친구 (빈 시간 추측 없음) -->
+    <div class="home-card" id="homeMatchCard">
+      <div class="home-card-title"><span>이번 주 시간 맞는 친구</span></div>
+      <div id="homeMatchList"><div class="home-empty">불러오는 중...</div></div>
+    </div>
     <!-- 내 예약 가능 시간 - 친구가 나에게 약속을 걸 수 있는 시간이 얼마나 열려 있는지 (홈에 큰 달력 대신) -->
     <div class="home-card">
       <div class="home-card-title"><span>내 예약 가능 시간</span></div>
@@ -10132,6 +10148,7 @@ function showTab(tabKey){
     homeDash.style.display = 'flex';
     renderHomeDash();
     loadHomePending();
+    loadHomeFriendMatches();
   } else {
     panels[tabKey].classList.add('active');
     document.querySelector(`.nav-item[data-tab="${tabKey}"]`).classList.add('active');
@@ -10256,6 +10273,125 @@ document.getElementById('homePastApptBtn').addEventListener('click', () => {
 // 홈을 열 때마다 새로 받아옴 - 채팅방에서 수락/투표하고 돌아오면 바로 빠지게
 let homePendingItems = [];
 let homePendingSeq = 0;
+// ---------- 홈: 이번 주 시간 맞는 친구 ----------
+// 서버(/events/match-friends)가 친구마다 "나와 그 친구가 둘 다 예약 가능으로 열어둔 시간"을 계산해서 줌.
+// 홈을 열 때나 일정·채팅이 바뀔 때 받되, 너무 자주 부르지 않게 10초 안에는 이전 결과를 다시 씀
+const HOME_MATCH_DAYS = 7;
+const HOME_MATCH_FRIENDS_MAX = 4; // 처음엔 4명까지, "더 보기"로 전부
+const HOME_MATCH_SLOTS_MAX = 3;   // 친구 한 명당 시간 칩 3개까지
+let homeMatchData = null;  // { friends: [...], myAvailability } | null(아직 안 받음)
+let homeMatchLoadedAt = 0;
+let homeMatchSeq = 0;
+let homeMatchExpanded = false;
+async function loadHomeFriendMatches(force){
+  if(!authToken) return;
+  if(!force && homeMatchData && Date.now() - homeMatchLoadedAt < 10000) return;
+  const seq = ++homeMatchSeq;
+  const start = new Date(TODAY);
+  const end = new Date(TODAY);
+  end.setDate(end.getDate() + HOME_MATCH_DAYS - 1);
+  try {
+    const data = await apiRequest(`/events/match-friends?start=${toDateInputValue(start)}&end=${toDateInputValue(end)}&minHours=1`);
+    if(seq !== homeMatchSeq) return;
+    homeMatchData = { friends: Array.isArray(data.friends) ? data.friends : [], myAvailability: data.myAvailability !== false, hasFriends: data.hasFriends !== false };
+    homeMatchLoadedAt = Date.now();
+  } catch(e){
+    if(seq !== homeMatchSeq) return;
+    homeMatchData = { error: true, friends: [] };
+  }
+  renderHomeFriendMatches();
+}
+// 친구 한 명의 겹치는 시간을 칩 목록으로 - 오늘 이미 지난 시간은 빼고, 오늘 진행 중이면 지금 이후만
+function homeMatchSlotsOf(entry){
+  const todayKey = toDateInputValue(TODAY);
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const slots = [];
+  (entry.days || []).forEach(day => {
+    (day.ranges || []).forEach(r => {
+      let startMin = r.startMin, endMin = r.endMin;
+      if(day.date === todayKey){
+        if(endMin - 60 < nowMin) return; // 남은 시간이 1시간도 안 되면 뺌
+        startMin = Math.max(startMin, Math.ceil(nowMin / 5) * 5);
+      }
+      slots.push({ date: day.date, startMin, endMin });
+    });
+  });
+  return slots;
+}
+function homeMatchSlotLabel(slot){
+  const d = parseDateInputValue(slot.date);
+  const hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  const todayKey = toDateInputValue(TODAY);
+  const tmr = new Date(TODAY); tmr.setDate(tmr.getDate() + 1);
+  const dayLabel = slot.date === todayKey ? '오늘' : slot.date === toDateInputValue(tmr) ? '내일' : `${WEEKDAY_KO[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`;
+  return `${dayLabel} ${hm(slot.startMin)}~${hm(slot.endMin === 1440 ? 1440 : slot.endMin)}`;
+}
+// 시간 칩을 누르면 그 친구와 약속 잡기 화면을 그 날짜로 열어줌 (실제 요청은 거기서 시간 골라서 보냄)
+function openHomeMatchSlot(friendId, dateKey){
+  openFriendCalendar(friendId, 'reserve');
+  if(!dateKey || dateKey === toDateInputValue(TODAY)) return;
+  friendDayFocusDate = parseDateInputValue(dateKey);
+  friendWeekFocusDate = getWeekStart(friendDayFocusDate);
+  renderFriendCalDateNav();
+  renderFriendToday();
+  renderFriendWeek();
+  loadFriendScheduleForFocusWindow();
+}
+function renderHomeFriendMatches(){
+  const listEl = document.getElementById('homeMatchList');
+  if(!listEl) return;
+  const emptyWith = (text, btnText, onClick) => {
+    listEl.innerHTML = `<div class="home-empty">${text}</div>${btnText ? `<button type="button" class="home-match-empty-btn">${btnText}</button>` : ''}`;
+    if(btnText) listEl.querySelector('.home-match-empty-btn').addEventListener('click', onClick);
+  };
+  if(!authToken) return emptyWith('로그인하면 시간 맞는 친구를 보여줘요.');
+  if(!homeMatchData) return emptyWith('불러오는 중...');
+  if(homeMatchData.error) return emptyWith('시간 맞는 친구를 불러오지 못했어요.', '다시 시도', () => loadHomeFriendMatches(true));
+  if(!homeMatchData.hasFriends){
+    return emptyWith('친구를 추가하면 서로 시간이 맞는 날을 여기서 알려줘요.', '친구 찾기', () => switchTopTab('friends'));
+  }
+  // 친구 목록(이름/사진)이 아직 안 불러와졌으면 잠깐 기다림 - 불러오면 renderFriendsList가 홈을 다시 그림
+  if(!FRIENDS.length && homeMatchData.friends.length) return emptyWith('불러오는 중...');
+  if(!homeMatchData.myAvailability){
+    return emptyWith('내 예약 가능 시간을 열면, 같은 시간에 열어둔 친구를 보여줘요.', '내 시간 열기', () => document.getElementById('homeAvailQuickBtn').click());
+  }
+  const rows = homeMatchData.friends
+    .map(entry => ({ entry, friend: FRIENDS.find(f => f.id === entry.userId), slots: homeMatchSlotsOf(entry) }))
+    .filter(x => x.friend && x.slots.length);
+  if(!rows.length){
+    return emptyWith('이번 주엔 친구와 겹치게 열어둔 시간이 없어요. 친구 캘린더에서 친구가 열어둔 시간을 볼 수 있어요.');
+  }
+  const shown = homeMatchExpanded ? rows : rows.slice(0, HOME_MATCH_FRIENDS_MAX);
+  listEl.innerHTML = shown.map((x, i) => {
+    const f = x.friend;
+    const avatar = f.avatar
+      ? `<span class="home-match-avatar"><img src="${f.avatar}" alt="" /></span>`
+      : `<span class="home-match-avatar" style="background:${f.color}">${escapeHtml((f.name || '?')[0])}</span>`;
+    const chips = x.slots.slice(0, HOME_MATCH_SLOTS_MAX).map(sl =>
+      `<button type="button" class="home-match-slot" data-row="${i}" data-date="${sl.date}">${escapeHtml(homeMatchSlotLabel(sl))}</button>`).join('');
+    const more = x.slots.length > HOME_MATCH_SLOTS_MAX ? `<button type="button" class="home-match-more" data-row="${i}">+${x.slots.length - HOME_MATCH_SLOTS_MAX}</button>` : '';
+    return `
+      <div class="home-match-row">
+        ${avatar}
+        <div class="home-match-body">
+          <div class="home-match-name">${escapeHtml(f.name || '')}</div>
+          <div class="home-match-slots">${chips}${more}</div>
+        </div>
+      </div>`;
+  }).join('') + (rows.length > shown.length
+    ? `<button type="button" class="home-match-more" id="homeMatchExpandBtn" style="width:100%;padding-top:8px;">친구 ${rows.length - shown.length}명 더 보기</button>`
+    : '');
+  listEl.querySelectorAll('.home-match-slot, .home-match-more[data-row]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const x = shown[parseInt(btn.dataset.row, 10)];
+      if(x) openHomeMatchSlot(x.friend.id, btn.dataset.date || x.slots[0].date);
+    });
+  });
+  const expandBtn = document.getElementById('homeMatchExpandBtn');
+  if(expandBtn) expandBtn.addEventListener('click', () => { homeMatchExpanded = true; renderHomeFriendMatches(); });
+}
+
 async function loadHomePending(){
   if(!authToken) return;
   const seq = ++homePendingSeq;
@@ -10329,6 +10465,7 @@ function renderHomeDash(){
   if(!listEl) return;
   renderHomePending();
   renderHomeAvailCard();
+  renderHomeFriendMatches();
   const items = homeUpcomingAppointments();
   if(!items.length){
     listEl.innerHTML = `<div class="home-empty">아직 잡힌 약속이 없어요. 위의 <b>약속 잡기</b>로 시작해 보세요.</div>`;
@@ -10407,7 +10544,7 @@ function refreshHomeDashIfVisible(){
       renderHomeDash();
       // 새 메시지(예약 요청 등)가 와서 채팅 목록이 바뀌었을 수 있으니 "답할 차례"도 잠깐 모았다가 한 번만 다시 받아옴
       clearTimeout(refreshHomeDashIfVisible.pendingTimer);
-      refreshHomeDashIfVisible.pendingTimer = setTimeout(loadHomePending, 2500);
+      refreshHomeDashIfVisible.pendingTimer = setTimeout(() => { loadHomePending(); loadHomeFriendMatches(); }, 2500);
     }
   } catch(e){} // 앱 시작 직후(변수들이 아직 준비 전)에 불려도 조용히 넘어감
 }
