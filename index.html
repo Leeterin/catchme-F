@@ -1445,6 +1445,10 @@
      첫 사진을 화면 끝에 맞추려고 18px 옆으로 밀어버렸음 */
   .feed-detail-photos{ scroll-snap-type:x mandatory; scroll-padding:0 18px; }
   .feed-detail-photos.single img{ margin:0 auto; }
+  /* 크기를 아직 모르는 사진(과 그 뒤 사진들)은 크기가 정해질 때까지 자리만 잡고 숨겨둠 - 짐작한 크기로 먼저 보였다가
+     진짜 크기로 바뀌면서 사진이 옆으로 밀려 보였음 */
+  .feed-detail-photos img{ transition:opacity .15s; }
+  .feed-detail-photos img.size-pending{ opacity:0; transition:none; }
   /* 리뷰 상세를 보는 동안엔 위쪽 "장소 추천" 제목/위치 설정을 가림 */
   #panel-community.feed-detail-open .community-header{ display:none; }
   .feed-detail-title-row{
@@ -13068,6 +13072,15 @@ function layoutFeedDetailPhotos(container){
     img.style.width = Math.round(imgs.length === 1 ? Math.min(W, H * r) : H * r) + 'px';
   });
   if(row.scrollLeft !== scrollLeft) row.scrollLeft = scrollLeft;
+  // 앞에서부터 크기를 다 아는 사진까지만 보여줌 (그 앞 사진 크기가 안 바뀌니 더 이상 안 밀림)
+  // 사진이 너무 안 오면 0.8초 뒤엔 그냥 다 보여줌
+  const firstUnknown = ratios.findIndex(r => !(r > 0));
+  const revealAll = row.dataset.revealAll === '1';
+  imgs.forEach((img, i) => img.classList.toggle('size-pending', !revealAll && firstUnknown !== -1 && i >= firstUnknown));
+  if(firstUnknown !== -1 && !revealAll && !row.dataset.revealTimer){
+    row.dataset.revealTimer = '1';
+    setTimeout(() => { row.dataset.revealAll = '1'; imgs.forEach(img => img.classList.remove('size-pending')); }, 800);
+  }
 }
 function showFeedPostDetailView(){
   rememberActiveFeedViewScroll();
