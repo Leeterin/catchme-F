@@ -19842,10 +19842,13 @@ function renderFriendMonthView(){
       }
       if(hasBookable) markupExtra = `<div class="month-event-label" style="background:var(--accent);color:#fff;">가능</div>`; // 칸이 좁아 "예약 가능"은 잘림
     } else {
-      const busyCount = dayInfo.busy.filter(Boolean).length;
-      const titledHours = dayInfo.titles.filter(Boolean);
-      const labels = titledHours.slice(0, 2).map(t => `<div class="month-event-label" style="background:${colorForScheduleText(t)}">${escapeHtml(truncateForMonthLabel(t))}</div>`).join('');
-      const untitledBusy = busyCount - titledHours.length;
+      // 서버는 한 시간 칸마다 바쁨/제목을 줌 - 그대로 세면 2시간짜리 일정 하나가 라벨 두 개("회의","회의")로,
+      // 제목 없는 3시간 일정이 "바쁨 3개"로 보였음. 이어진 같은 일정은 아래 패널처럼 한 덩어리로 묶어서 셈
+      // (예약 가능 시간과 겹친 바쁨 일정도 예전처럼 세도록 bookable은 빈 배열로 넘김)
+      const busyBlocks = groupFriendScheduleBlocks(monthData.hours, [], dayInfo.busy, dayInfo.titles);
+      const titledBlocks = busyBlocks.filter(b => b.title);
+      const labels = titledBlocks.slice(0, 2).map(b => `<div class="month-event-label" style="background:${colorForScheduleText(b.title)}">${escapeHtml(truncateForMonthLabel(b.title))}</div>`).join('');
+      const untitledBusy = busyBlocks.length - titledBlocks.length;
       const moreHtml = untitledBusy > 0 ? `<div class="month-event-more">바쁨 ${untitledBusy}개</div>` : '';
       markupExtra = labels + moreHtml;
     }
