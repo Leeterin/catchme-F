@@ -2228,6 +2228,9 @@
   .feed-list-view.active{ display:block; }
   /* 밀어서 뒤로가기 하는 동안 오른쪽으로 밀려난 화면 때문에 가로 스크롤이 생기지 않게 (clip은 sticky를 안 깨뜨림) */
   #communityView-feed{ overflow-x:clip; }
+  /* 밀어서 뒤로가기 중인 화면 - 채팅방처럼 그림자를 주고, 밑에 깔린 화면과 겹쳐 보이도록 배경을 채움 */
+  .feed-list-view.feed-swiping{ background:var(--surface); box-shadow:-8px 0 24px rgba(0,0,0,.18); will-change:transform; }
+  body.feed-swipe-active .bottom-nav{ z-index:6; }
   .feed-create-view{ display:none; }
   .feed-create-view.active{ display:block; }
 
@@ -13134,7 +13137,8 @@ function closeFeedPlaceTagView(){
 document.getElementById('feedTagBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceTagView));
 
 // ---------- 리뷰 상세·장소 모아보기·작성자 리뷰: 왼쪽에서 오른쪽으로 밀어서 뒤로가기 ----------
-// 손가락을 따라 화면이 오른쪽으로 밀리고, 충분히 밀거나 빠르게 튕기면 뒤로가기(뒤로 버튼과 같음), 아니면 제자리로 돌아옴
+// 채팅방 나가기처럼, 손가락을 따라 화면이 오른쪽으로 밀리고 그 뒤에 돌아갈 화면(목록 등)이 보던 위치 그대로 미리 깔림.
+// 충분히 밀거나 빠르게 튕기면 뒤로가기(뒤로 버튼과 같음), 아니면 제자리로 돌아옴
 (function setupFeedSwipeBack(){
   const targets = [
     ['feedPlaceDetailView', closeFeedPostDetail],
@@ -13146,9 +13150,10 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
     if(!view) return;
     let startX = 0, startY = 0, startT = 0, dx = 0;
     let tracking = false, dragging = false;
+    let startScrollY = 0, underView = null, underWasActive = false;
 
     // 오른쪽으로 밀었을 때 그쪽이 먼저 움직여야 하는 가로 스크롤(사진 넘기기 등)인지 - 이미 왼쪽 끝(첫 사진)이면
-    // 더 넘길 게 없으니 뒤로가기로 받음. (세로 스크롤 영역은 overflowX도 auto로 잡혀서, 예전엔 그 위에서 밀면 안 먹었음)
+    // 더 넘길 게 없으니 뒤로가기로 받음. (세로 스크롤 영역은 overflowX도 auto로 잡혀서 scrollLeft로 판단)
     function isInsideHorizontalScroll(el){
       for(let node = el; node && node !== view; node = node.parentElement){
         const style = window.getComputedStyle(node);
@@ -13156,25 +13161,42 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       }
       return false;
     }
-    function setOffset(x){
-      view.style.transform = x ? `translateX(${x}px)` : '';
-      view.style.opacity = x ? String(Math.max(0.4, 1 - x / (view.offsetWidth || window.innerWidth))) : '';
-    }
-    function clearSwipeStyles(){
-      view.style.transition = '';
-      view.style.transform = '';
-      view.style.opacity = '';
-    }
+    function setOffset(x){ view.style.transform = x ? `translateX(${x}px)` : ''; }
     function afterTransition(fn){
       let done = false;
       const finish = () => { if(done) return; done = true; view.removeEventListener('transitionend', finish); fn(); };
       view.addEventListener('transitionend', finish);
       setTimeout(finish, 320);
     }
+    // 밀기 시작: 지금 화면을 보이는 자리 그대로 화면에 고정(fixed)해서 띄우고, 그 밑에 돌아갈 화면을 펼쳐 보던 위치로 스크롤
+    function liftView(){
+      startScrollY = window.scrollY;
+      const rect = view.getBoundingClientRect();
+      Object.assign(view.style, {
+        position: 'fixed', top: rect.top + 'px', left: rect.left + 'px', width: rect.width + 'px',
+        zIndex: '5', transition: 'none',
+      });
+      view.classList.add('feed-swiping');
+      document.body.classList.add('feed-swipe-active');
+      const underId = id === 'feedPlaceDetailView' ? feedDetailReturnViewId : 'feedListView';
+      underView = document.getElementById(underId) || document.getElementById('feedListView');
+      underWasActive = underView.classList.contains('active');
+      underView.classList.add('active');
+      if(underView.id === 'feedListView'){
+        const card = document.getElementById('feedReviewProfileCard');
+        if(card) card.style.display = '';
+      }
+      restoreFeedViewScroll(underView.id);
+    }
+    function dropView(){
+      view.classList.remove('feed-swiping');
+      document.body.classList.remove('feed-swipe-active');
+      ['position', 'top', 'left', 'width', 'zIndex', 'transition', 'transform'].forEach(k => { view.style[k] = ''; });
+    }
 
     view.addEventListener('touchstart', (e) => {
       tracking = false;
-      if(e.touches.length !== 1 || !view.classList.contains('active')) return;
+      if(e.touches.length !== 1 || !view.classList.contains('active') || view.classList.contains('feed-swiping')) return;
       if(e.target.closest('input, textarea, select, .feed-detail-kebab-menu')) return;
       if(isInsideHorizontalScroll(e.target)) return; // 사진 넘기기 등 가로 스크롤은 그쪽 우선
       const t = e.touches[0];
@@ -13187,11 +13209,15 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       const t = e.touches[0];
       const mx = t.clientX - startX, my = t.clientY - startY;
       if(!dragging){
-        if(Math.abs(mx) < 10 && Math.abs(my) < 10) return;
-        // 오른쪽으로, 위아래보다 확실히 가로로 움직일 때만 뒤로가기 제스처로 봄 (위아래 스크롤은 그대로)
-        if(!(mx > 0 && mx > Math.abs(my) * 1.5)){ tracking = false; return; }
+        // iOS는 첫 touchmove를 안 막으면 그 순간 세로 스크롤로 확정해버려서 이후로는 막을 수 없음(그래서 두세 번 해야 됐음).
+        // 그래서 아주 조금 움직였을 때부터 오른쪽 방향이 더 크면 바로 막아서 스크롤이 시작되지 않게 함
+        if(Math.abs(mx) < 8 && Math.abs(my) < 8){
+          if(mx > 0 && mx > Math.abs(my)) e.preventDefault();
+          return;
+        }
+        if(!(mx > 0 && mx > Math.abs(my) * 1.2)){ tracking = false; return; }
         dragging = true;
-        view.style.transition = 'none';
+        liftView();
       }
       e.preventDefault();
       dx = Math.max(0, mx);
@@ -13206,21 +13232,31 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       const width = view.offsetWidth || window.innerWidth;
       const speed = dx / Math.max(1, Date.now() - startT); // px/ms
       const shouldClose = dx > width * 0.33 || (dx > 40 && speed > 0.5);
-      view.style.transition = 'transform .22s cubic-bezier(.2,.8,.3,1), opacity .22s ease';
+      view.style.transition = 'transform .24s cubic-bezier(.2,.8,.3,1)';
       if(shouldClose){
-        setOffset(width + 20);
+        setOffset(window.innerWidth + 20);
         afterTransition(() => {
           goBackOrClose(closeFn);
-          // history.back()으로 닫히는 건 한 박자 늦게 일어나서, 실제로 닫힌 뒤에 위치를 되돌림
+          // history.back()으로 닫히는 건 한 박자 늦게 일어나서, 실제로 닫힌 뒤에 고정을 풀어야 제자리로 번쩍 안 돌아옴
           const until = Date.now() + 600;
           (function waitClosed(){
             if(view.classList.contains('active') && Date.now() < until) return requestAnimationFrame(waitClosed);
-            clearSwipeStyles();
+            dropView();
           })();
         });
       } else {
         setOffset(0);
-        afterTransition(clearSwipeStyles);
+        afterTransition(() => {
+          // 취소: 밑에 깔았던 화면을 다시 숨기고, 원래 보던 위치로
+          if(!underWasActive && underView) underView.classList.remove('active');
+          if(id === 'feedAuthorView'){
+            const card = document.getElementById('feedReviewProfileCard');
+            if(card) card.style.display = 'none';
+          }
+          dropView();
+          window.scrollTo(0, startScrollY);
+          requestAnimationFrame(() => window.scrollTo(0, startScrollY));
+        });
       }
     }
     view.addEventListener('touchend', onEnd);
