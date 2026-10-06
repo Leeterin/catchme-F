@@ -13165,6 +13165,8 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
     function cloneVisible(node, scrolled){
       if(node.nodeType !== 1) return node.cloneNode(true);
       if(!node.getClientRects().length || node.classList.contains('bottom-nav')) return null;
+      // 사진은 복사하면 새로 그리느라 잠깐 비어 보여서(깜빡임), 이미 그려진 원래 사진을 캔버스에 바로 옮겨 그림
+      if(node.tagName === 'IMG') return snapshotImg(node) || node.cloneNode(false);
       const c = node.cloneNode(false);
       if(node.scrollTop || node.scrollLeft) scrolled.push([c, node.scrollTop, node.scrollLeft]);
       for(const child of node.childNodes){
@@ -13172,6 +13174,32 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
         if(cc) c.appendChild(cc);
       }
       return c;
+    }
+    function snapshotImg(img){
+      try{
+        if(!img.complete || !img.naturalWidth) return null;
+        const r = img.getBoundingClientRect();
+        const cs = getComputedStyle(img);
+        // 화면에 보이는 크기의 2~3배까지만 (원본이 아주 크면 메모리만 먹음), 비율은 그대로 둬서 object-fit이 똑같이 맞음
+        const dpr = window.devicePixelRatio || 1;
+        const scale = Math.min(1, Math.max(r.width, 1) * dpr * 1.5 / img.naturalWidth, Math.max(r.height, 1) * dpr * 1.5 / img.naturalHeight);
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.naturalWidth * scale));
+        cv.height = Math.max(1, Math.round(img.naturalHeight * scale));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        cv.className = img.className;
+        cv.style.cssText = img.style.cssText;
+        Object.assign(cv.style, {
+          display: cs.display === 'inline' ? 'inline-block' : cs.display,
+          width: r.width + 'px', height: r.height + 'px',
+          objectFit: cs.objectFit, objectPosition: cs.objectPosition,
+          borderRadius: cs.borderRadius, verticalAlign: cs.verticalAlign,
+          position: cs.position, top: cs.top, left: cs.left, right: cs.right, bottom: cs.bottom,
+          opacity: cs.opacity, transform: cs.transform === 'none' ? '' : cs.transform,
+          margin: cs.margin, flexShrink: '0', maxWidth: 'none', maxHeight: 'none', boxSizing: 'border-box',
+        });
+        return cv;
+      }catch(_){ return null; }
     }
     // iOS 채팅방 나가기처럼: 위쪽 바까지 포함해 지금 보이는 화면 전체가 한 장으로 손가락 따라 밀리고,
     // 밑에는 돌아갈 화면이 어둡게 깔려 있다가 밀수록 밝아짐. 회색 배경 위로는 안 삐져나가게 원래 칸 안에서 자름
@@ -13225,16 +13253,10 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       scrolled.forEach(([c, t, l]) => { c.scrollTop = t; c.scrollLeft = l; });
       view.classList.add('feed-swiping');
       document.body.classList.add('feed-swipe-active');
-      // 복사본 사진이 다 그려지기 전에 실제 화면을 바꾸면 한 번 번쩍임 -> 사진 준비(최대 150ms) 후 다음 프레임에 바꿈.
-      // 그동안은 복사본 밑에 원래 화면이 그대로 있어서 똑같이 보임
+      // 복사본이 한 번 화면에 그려진 다음 프레임에 실제 화면을 바꿈 (그 전엔 복사본 밑에 원래 화면이 그대로 있어서 똑같이 보임)
       swapped = false;
       const token = ++swapToken;
-      const imgs = Array.from(copy.querySelectorAll('img'));
-      imgs.forEach(img => { img.loading = 'eager'; img.decoding = 'sync'; });
-      Promise.race([
-        Promise.all(imgs.map(img => img.decode ? img.decode().catch(() => {}) : null)),
-        new Promise(r => setTimeout(r, 150)),
-      ]).then(() => requestAnimationFrame(() => { if(token === swapToken) swapUnder(); }));
+      requestAnimationFrame(() => requestAnimationFrame(() => { if(token === swapToken) swapUnder(); }));
     }
     let swapped = false, swapToken = 0;
     function swapUnder(){
