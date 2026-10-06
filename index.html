@@ -2229,7 +2229,7 @@
   /* 밀어서 뒤로가기 하는 동안 오른쪽으로 밀려난 화면 때문에 가로 스크롤이 생기지 않게 (clip은 sticky를 안 깨뜨림) */
   #communityView-feed{ overflow-x:clip; }
   /* 밀어서 뒤로가기 중인 화면 - 채팅방처럼 그림자를 주고, 밑에 깔린 화면과 겹쳐 보이도록 배경을 채움 */
-  .feed-list-view.feed-swiping{ background:var(--surface); box-shadow:-8px 0 24px rgba(0,0,0,.18); will-change:transform; }
+  .feed-list-view.feed-swiping{ background:var(--surface); will-change:transform, clip-path; }
   body.feed-swipe-active .bottom-nav{ z-index:6; }
   .feed-create-view{ display:none; }
   .feed-create-view.active{ display:block; }
@@ -13151,6 +13151,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
     let startX = 0, startY = 0, startT = 0, dx = 0;
     let tracking = false, dragging = false;
     let startScrollY = 0, underView = null, underWasActive = false;
+    let lastX = 0, lastT = 0, velocity = 0;
 
     // 오른쪽으로 밀었을 때 그쪽이 먼저 움직여야 하는 가로 스크롤(사진 넘기기 등)인지 - 이미 왼쪽 끝(첫 사진)이면
     // 더 넘길 게 없으니 뒤로가기로 받음. (세로 스크롤 영역은 overflowX도 auto로 잡혀서 scrollLeft로 판단)
@@ -13161,21 +13162,53 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       }
       return false;
     }
-    function setOffset(x){ view.style.transform = x ? `translateX(${x}px)` : ''; }
-    function afterTransition(fn){
+    let colWidth = 0, dim = null, rafId = 0, pendingX = 0;
+    // iOS 채팅방 나가기처럼: 위 화면은 손가락 따라 밀리고, 밑 화면은 왼쪽에서 살짝 따라 들어오며 어둡던 게 밝아짐.
+    // 밀린 화면이 회색 배경 위로 삐져나가지 않게 원래 칸(420px) 안에서 잘라 보여줌
+    function setOffset(x){
+      const p = colWidth ? Math.min(1, x / colWidth) : 0;
+      // 0으로 돌아갈 때도 값을 비우지 않아야 되돌아가는 애니메이션이 끊기지 않음(정리는 dropView에서)
+      view.style.transform = `translate3d(${x}px,0,0)`;
+      view.style.clipPath = `inset(0 ${x}px 0 -40px)`;
+      view.style.boxShadow = `-6px 0 24px rgba(0,0,0,${(0.22 * (1 - p)).toFixed(3)})`;
+      if(underView) underView.style.transform = `translate3d(${(-0.28 * colWidth * (1 - p)).toFixed(1)}px,0,0)`;
+      if(dim) dim.style.opacity = String((0.14 * (1 - p)).toFixed(3));
+    }
+    function scheduleOffset(x){
+      pendingX = x;
+      if(rafId) return;
+      rafId = requestAnimationFrame(() => { rafId = 0; setOffset(pendingX); });
+    }
+    function setTransition(v){
+      view.style.transition = v;
+      if(underView) underView.style.transition = v;
+      if(dim) dim.style.transition = v ? v.replace(/transform/g, 'opacity') : '';
+    }
+    function afterTransition(ms, fn){
       let done = false;
-      const finish = () => { if(done) return; done = true; view.removeEventListener('transitionend', finish); fn(); };
+      const finish = (e) => {
+        if(e && e.target !== view) return;
+        if(done) return; done = true; view.removeEventListener('transitionend', finish); fn();
+      };
       view.addEventListener('transitionend', finish);
-      setTimeout(finish, 320);
+      setTimeout(finish, ms + 80);
     }
     // 밀기 시작: 지금 화면을 보이는 자리 그대로 화면에 고정(fixed)해서 띄우고, 그 밑에 돌아갈 화면을 펼쳐 보던 위치로 스크롤
     function liftView(){
       startScrollY = window.scrollY;
       const rect = view.getBoundingClientRect();
+      colWidth = rect.width;
       Object.assign(view.style, {
         position: 'fixed', top: rect.top + 'px', left: rect.left + 'px', width: rect.width + 'px',
+        minHeight: Math.max(0, window.innerHeight - rect.top) + 'px', // 내용이 짧아도 화면 아래까지 덮음
         zIndex: '5', transition: 'none',
       });
+      dim = document.createElement('div');
+      Object.assign(dim.style, {
+        position: 'fixed', top: Math.max(0, rect.top) + 'px', bottom: '0', left: rect.left + 'px', width: rect.width + 'px',
+        background: '#000', opacity: '0.14', zIndex: '4', pointerEvents: 'none',
+      });
+      document.body.appendChild(dim);
       view.classList.add('feed-swiping');
       document.body.classList.add('feed-swipe-active');
       const underId = id === 'feedPlaceDetailView' ? feedDetailReturnViewId : 'feedListView';
@@ -13186,12 +13219,16 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
         const card = document.getElementById('feedReviewProfileCard');
         if(card) card.style.display = '';
       }
+      underView.style.transition = 'none';
       restoreFeedViewScroll(underView.id);
     }
     function dropView(){
+      if(rafId){ cancelAnimationFrame(rafId); rafId = 0; }
       view.classList.remove('feed-swiping');
       document.body.classList.remove('feed-swipe-active');
-      ['position', 'top', 'left', 'width', 'zIndex', 'transition', 'transform'].forEach(k => { view.style[k] = ''; });
+      ['position', 'top', 'left', 'width', 'minHeight', 'zIndex', 'transition', 'transform', 'clipPath', 'boxShadow'].forEach(k => { view.style[k] = ''; });
+      if(underView){ underView.style.transform = ''; underView.style.transition = ''; }
+      if(dim){ dim.remove(); dim = null; }
     }
 
     // 화면 안 흰 영역뿐 아니라 양옆 회색 배경(body)에서 밀어도 되도록 document에서 받음
@@ -13209,6 +13246,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       if(isInsideHorizontalScroll(e.target)) return; // 사진 넘기기 등 가로 스크롤은 그쪽 우선
       const t = e.touches[0];
       startX = t.clientX; startY = t.clientY; startT = Date.now(); dx = 0;
+      lastX = 0; lastT = startT; velocity = 0;
       tracking = true; dragging = false;
     }, { passive: true });
 
@@ -13229,7 +13267,10 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       }
       e.preventDefault();
       dx = Math.max(0, mx);
-      setOffset(dx);
+      const now = Date.now();
+      if(now - lastT > 0){ velocity = (dx - lastX) / (now - lastT) * 0.6 + velocity * 0.4; } // 손 떼기 직전 속도
+      lastX = dx; lastT = now;
+      scheduleOffset(dx);
     }, { passive: false });
 
     function onEnd(){
@@ -13237,13 +13278,21 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       tracking = false;
       if(!dragging) return;
       dragging = false;
-      const width = view.offsetWidth || window.innerWidth;
-      const speed = dx / Math.max(1, Date.now() - startT); // px/ms
-      const shouldClose = dx > width * 0.33 || (dx > 40 && speed > 0.5);
-      view.style.transition = 'transform .24s cubic-bezier(.2,.8,.3,1)';
+      if(rafId){ cancelAnimationFrame(rafId); rafId = 0; }
+      setOffset(dx);
+      const width = colWidth || view.offsetWidth || window.innerWidth;
+      if(Date.now() - lastT > 80) velocity = 0; // 멈췄다가 뗀 경우
+      // 반 가까이 밀었거나, 오른쪽으로 휙 튕겼으면 닫힘 (왼쪽으로 되돌리며 떼면 취소)
+      const shouldClose = velocity > 0.35 ? true : velocity < -0.2 ? false : dx > width * 0.4;
+      const remain = shouldClose ? width - dx : dx;
+      const v = Math.max(Math.abs(velocity), 0.9); // px/ms
+      const ms = Math.round(Math.min(380, Math.max(180, remain / v * 1.6)));
+      // 강제 리플로우로 지금 위치를 확정한 뒤 애니메이션 시작
+      void view.offsetWidth;
+      setTransition(`transform ${ms}ms cubic-bezier(.22,.61,.36,1), clip-path ${ms}ms cubic-bezier(.22,.61,.36,1), box-shadow ${ms}ms linear`);
       if(shouldClose){
-        setOffset(window.innerWidth + 20);
-        afterTransition(() => {
+        setOffset(width);
+        afterTransition(ms, () => {
           goBackOrClose(closeFn);
           // history.back()으로 닫히는 건 한 박자 늦게 일어나서, 실제로 닫힌 뒤에 고정을 풀어야 제자리로 번쩍 안 돌아옴
           const until = Date.now() + 600;
@@ -13254,7 +13303,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
         });
       } else {
         setOffset(0);
-        afterTransition(() => {
+        afterTransition(ms, () => {
           // 취소: 밑에 깔았던 화면을 다시 숨기고, 원래 보던 위치로
           if(!underWasActive && underView) underView.classList.remove('active');
           if(id === 'feedAuthorView'){
