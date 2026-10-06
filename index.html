@@ -4407,7 +4407,6 @@
   #panel-schedule.home-clean-mode > .desc,
   #panel-schedule.home-clean-mode #scheduleSegment,
   #panel-schedule.home-clean-mode .week-color-settings-row,
-  #panel-schedule.home-clean-mode .week-color-panel,
   #panel-schedule.home-clean-mode #quickAvailEntryBtn{
     display:none !important;
   }
@@ -4509,7 +4508,7 @@
 
   .week-color-settings-row{
     display:flex;
-    justify-content:space-between;
+    justify-content:flex-end; /* 색상 설정 버튼을 없애서 일정 추가만 오른쪽에 */
     align-items:center;
     margin-bottom:8px;
   }
@@ -4542,99 +4541,6 @@
   }
   .week-color-settings-row button:hover{ color:var(--accent); border-color:var(--accent); }
 
-  .week-color-panel{
-    background:var(--surface-2);
-    border-radius:12px;
-    padding:12px;
-    margin-bottom:12px;
-  }
-  .week-color-panel-title{
-    font-family:'Space Grotesk',sans-serif;
-    font-weight:700;
-    font-size:12px;
-    color:var(--text-dim);
-    margin-bottom:8px;
-  }
-  .theme-swatch-row{
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-  }
-  .theme-swatch-option{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    padding:7px 9px;
-    border-radius:9px;
-    border:1.5px solid var(--line);
-    background:var(--surface);
-    cursor:pointer;
-  }
-  .theme-swatch-option.active{ border-color:var(--accent); }
-  .theme-swatch-dots{ display:flex; gap:3px; flex-shrink:0; }
-  .theme-swatch-dots span{
-    width:12px; height:12px;
-    border-radius:50%;
-    display:inline-block;
-  }
-  .theme-swatch-option .theme-name{
-    font-size:12px;
-    color:var(--text);
-    font-weight:600;
-  }
-  .custom-color-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    padding:7px 2px;
-    border-bottom:1px solid var(--line);
-  }
-  .custom-color-row:last-child{ border-bottom:none; }
-  .custom-color-row span{ font-size:12px; color:var(--text); }
-  .custom-color-row input[type="color"]{
-    width:32px;
-    height:26px;
-    border:none;
-    border-radius:7px;
-    background:none;
-    cursor:pointer;
-    padding:0;
-  }
-  .custom-color-empty{
-    font-size:11.5px;
-    color:var(--text-dim);
-    padding:4px 2px;
-  }
-
-  /* ---------------- 색상 되돌리기 버튼 ---------------- */
-  .color-reset-all-btn{
-    display:flex;
-    align-items:center;
-    gap:4px;
-    border:none;
-    background:none;
-    color:var(--text-dim);
-    font-size:11px;
-    font-weight:600;
-    font-family:'Inter',sans-serif;
-    cursor:pointer;
-    padding:2px 0;
-  }
-  .color-reset-all-btn:hover{ color:var(--accent); }
-  .color-reset-all-btn svg{ width:11px;height:11px; }
-  .color-reset-row-btn{
-    width:24px;height:24px;
-    border-radius:7px;
-    border:1px solid var(--line);
-    background:var(--surface);
-    color:var(--text-dim);
-    cursor:pointer;
-    display:flex;align-items:center;justify-content:center;
-    flex-shrink:0;
-  }
-  .color-reset-row-btn:hover{ color:var(--accent); border-color:var(--accent); }
-  .color-reset-row-btn svg{ width:12px;height:12px; }
 
   /* ---------------- 하루 시간표: 헤더 ---------------- */
   .day-header-row{
@@ -6024,66 +5930,6 @@
     flex-shrink:0;
   }
   .event-color-swatch.on{ border-color:var(--surface); box-shadow:0 0 0 2px var(--text); }
-  .event-color-auto{
-    height:28px;
-    padding:0 11px;
-    border-radius:999px;
-    border:1.5px solid var(--line);
-    background:var(--surface);
-    color:var(--text-dim);
-    font-size:12px;
-    font-weight:600;
-    cursor:pointer;
-  }
-  .event-color-auto.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
-  .event-color-custom{
-    position:relative;
-    overflow:hidden;
-    background:conic-gradient(#EF4444, #F59E0B, #22C55E, #38BDF8, #8B5CF6, #EC4899, #EF4444);
-  }
-  .event-color-mixer{
-    margin-top:10px;
-    padding:12px;
-    border-radius:14px;
-    background:var(--surface-2);
-    animation:ecmOpen .18s ease both;
-  }
-  @keyframes ecmOpen{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
-  .ecm-sv{
-    position:relative;
-    height:140px;
-    border-radius:10px;
-    touch-action:none;
-    cursor:crosshair;
-    background:linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, rgba(255,255,255,0));
-    background-color:hsl(200,100%,50%);
-  }
-  .ecm-hue{
-    position:relative;
-    height:16px;
-    margin-top:12px;
-    border-radius:999px;
-    touch-action:none;
-    cursor:pointer;
-    background:linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
-  }
-  .ecm-sv-thumb, .ecm-hue-thumb{
-    position:absolute;
-    width:20px; height:20px;
-    margin:-10px 0 0 -10px;
-    border-radius:50%;
-    border:3px solid #fff;
-    box-shadow:0 0 0 1px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.25);
-    pointer-events:none;
-  }
-  .ecm-hue-thumb{ top:50%; }
-  .ecm-footer{ display:flex; align-items:center; gap:8px; margin-top:12px; }
-  .ecm-preview{ width:24px; height:24px; border-radius:50%; box-shadow:0 0 0 1px var(--line); }
-  .ecm-hex{ font-family:'Roboto Mono',monospace; font-size:12px; color:var(--text-dim); flex:1; }
-  .ecm-done{
-    border:none; border-radius:999px; padding:6px 14px;
-    background:var(--accent); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
-  }
 
   .group-chip-picker{
     display:flex;
@@ -7413,17 +7259,7 @@
         <button id="weekNext">&#8250;</button>
       </div>
       <div class="week-color-settings-row">
-        <button id="weekColorSettingsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><path d="M12 2a10 10 0 1 0 10 10c0-1.5-1-2.5-2.5-2.5H17a2.5 2.5 0 0 1 0-5h.5C19 4.5 16 2 12 2z"/><circle cx="7.5" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="11" cy="7" r="1.2" fill="currentColor" stroke="none"/><circle cx="15" cy="8.5" r="1.2" fill="currentColor" stroke="none"/></svg> 색상 설정</button>
         <button id="weekAddEventBtn" class="schedule-add-btn wide" title="일정 추가">+ 일정 추가</button>
-      </div>
-      <div class="week-color-panel" id="weekColorPanel" style="display:none;">
-        <div class="week-color-panel-title">테마 선택</div>
-        <div class="theme-swatch-row" id="themeSwatchRow"></div>
-        <div class="week-color-panel-title" style="margin-top:12px;display:flex;align-items:center;justify-content:space-between;">
-          <span>일정별 색상 직접 지정</span>
-          <button class="color-reset-all-btn" id="colorResetAllBtn" title="모두 기본 톤으로 되돌리기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg>전체 되돌리기</button>
-        </div>
-        <div id="customColorList"></div>
       </div>
       <div class="week-grid-wrap" id="weekGridWrap"><div class="week-grid" id="weekGrid"></div></div>
     </div>
@@ -7511,18 +7347,8 @@
           <button type="button" class="date-picker-btn" data-target="eventFormUntil">-</button>
         </div>
         <div class="mp-input-group">
-          <label>색상 <span style="font-weight:400;color:var(--text-dim);">(이 일정에만 적용돼요)</span></label>
+          <label>색상</label>
           <div class="event-color-picker" id="eventColorPicker"></div>
-          <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 -->
-          <div class="event-color-mixer" id="eventColorMixer" style="display:none;">
-            <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
-            <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
-            <div class="ecm-footer">
-              <span class="ecm-preview" id="ecmPreview"></span>
-              <span class="ecm-hex" id="ecmHex">#38BDF8</span>
-              <button type="button" class="ecm-done" id="ecmDone">완료</button>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -15748,135 +15574,24 @@ let editingLinkedPieceIds = []; // 예전 방식(linkGroupId)으로 여러 날�
                                  // 지금 연 조각 말고 나머지 조각들의 id - 저장 시 하나로 합치면서 이 조각들은 정리함
 const formSelectedWeekdays = new Set();
 let formVisibility = { groupIds: [], private: false };
-let formColor = null; // 이 일정 하나에만 쓸 색("#RRGGBB") - null이면 테마 자동 색
+let formColor = null; // 이 일정 하나에만 쓸 색("#RRGGBB") - null이면 자동 색(예전에 색 없이 만든 일정)
+const NEW_EVENT_DEFAULT_COLOR = '#8B5CF6'; // 새 일정은 보라(일반 일정 기본색)가 골라진 채로 열림
 
-// 일정 폼에서 고를 수 있는 기본 색 팔레트 (그 외 색은 맨 끝 무지개 버튼으로 직접 고름)
+// 일정 폼에서 고를 수 있는 색 팔레트
 const EVENT_COLOR_PALETTE = ['#EF4444', '#F97316', '#F59E0B', '#22C55E', '#14B8A6', '#38BDF8', '#2563EB', '#8B5CF6', '#EC4899', '#64748B'];
 
 // 일정 폼의 색상 선택 UI를 formColor 상태에 맞게 다시 그림
+// 색은 팔레트에서 바로 고르기만 함 ("자동"/직접 조제는 뺐음 - 깔끔하게)
 function renderEventColorPicker(){
-  const isCustom = !!formColor && !EVENT_COLOR_PALETTE.includes(formColor);
-  document.getElementById('eventColorPicker').innerHTML = `
-    <button type="button" class="event-color-auto${formColor ? '' : ' on'}" data-color="">자동</button>
-    ${EVENT_COLOR_PALETTE.map(c => `<button type="button" class="event-color-swatch${formColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('')}
-    <button type="button" class="event-color-swatch event-color-custom${isCustom ? ' on' : ''}" id="eventColorCustomBtn" title="나만의 색 조제"${isCustom ? ` style="background:${formColor}"` : ''}></button>
-  `;
-  closeEventColorMixer(); // 폼을 새로 열거나 기본 색을 고르면 조제 패널은 닫힘
+  document.getElementById('eventColorPicker').innerHTML =
+    EVENT_COLOR_PALETTE.map(c => `<button type="button" class="event-color-swatch${formColor === c ? ' on' : ''}" data-color="${c}" style="background:${c}" title="${c}"></button>`).join('');
 }
 document.getElementById('eventColorPicker').addEventListener('click', (e) => {
-  if(e.target.closest('#eventColorCustomBtn')){
-    const mixer = document.getElementById('eventColorMixer');
-    if(mixer.style.display === 'none') openEventColorMixer();
-    else closeEventColorMixer();
-    return;
-  }
   const btn = e.target.closest('button[data-color]');
   if(!btn) return;
   formColor = btn.dataset.color || null;
   renderEventColorPicker();
 });
-
-// ---------- 나만의 색 조제 (채도/밝기 판 + 색상 바) ----------
-// 폰 기본 색상 선택창(input type=color)은 색이 바뀔 때마다 버튼을 다시 그리면서 창이 갑자기 닫히고 버벅여서,
-// 앱 안에서 직접 그리는 패널로 바꿈. 드래그하는 동안에는 필요한 부분(썸네일 위치/미리보기 색)만 바꿔서 끊김 없게 함
-const eventColorMixerState = { h: 200, s: 0.75, v: 0.97 };
-
-function hsvToHex(h, s, v){
-  const f = n => {
-    const k = (n + h / 60) % 6;
-    return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
-  };
-  return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
-}
-function hexToHsv(hex){
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-  if(!m) return null;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  let h = 0;
-  if(d){
-    if(max === r) h = ((g - b) / d) % 6;
-    else if(max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h *= 60;
-    if(h < 0) h += 360;
-  }
-  return { h, s: max ? d / max : 0, v: max };
-}
-
-function openEventColorMixer(){
-  const start = hexToHsv(formColor && !EVENT_COLOR_PALETTE.includes(formColor) ? formColor : '#38BDF8');
-  Object.assign(eventColorMixerState, start);
-  document.getElementById('eventColorMixer').style.display = '';
-  applyEventColorMixer(true);
-}
-function closeEventColorMixer(){
-  const mixer = document.getElementById('eventColorMixer');
-  if(mixer) mixer.style.display = 'none';
-}
-
-// 패널 표시(썸네일 위치/미리보기) 갱신 + 고른 색을 이 일정 색으로 바로 반영 (버튼 줄 전체를 다시 그리지 않음)
-function applyEventColorMixer(){
-  const { h, s, v } = eventColorMixerState;
-  const hex = hsvToHex(h, s, v);
-  document.getElementById('ecmSv').style.backgroundColor = `hsl(${h},100%,50%)`;
-  const svThumb = document.getElementById('ecmSvThumb');
-  svThumb.style.left = (s * 100) + '%';
-  svThumb.style.top = ((1 - v) * 100) + '%';
-  svThumb.style.background = hex;
-  const hueThumb = document.getElementById('ecmHueThumb');
-  hueThumb.style.left = (h / 360 * 100) + '%';
-  hueThumb.style.background = `hsl(${h},100%,50%)`;
-  document.getElementById('ecmPreview').style.background = hex;
-  document.getElementById('ecmHex').textContent = hex;
-
-  formColor = hex;
-  const picker = document.getElementById('eventColorPicker');
-  picker.querySelectorAll('.on').forEach(el => el.classList.remove('on'));
-  const customBtn = document.getElementById('eventColorCustomBtn');
-  if(customBtn){
-    customBtn.classList.add('on');
-    customBtn.style.background = hex;
-  }
-}
-
-// 손가락/마우스로 누른 채 움직이는 동안 계속 따라오게 (pointer capture로 영역 밖으로 나가도 유지)
-function bindEventColorMixerDrag(el, onPoint){
-  let dragging = false;
-  let rafId = 0;
-  let lastEvent = null;
-  const handle = (e) => {
-    lastEvent = e;
-    if(rafId) return;
-    rafId = requestAnimationFrame(() => {
-      rafId = 0;
-      const rect = el.getBoundingClientRect();
-      const x = Math.min(1, Math.max(0, (lastEvent.clientX - rect.left) / rect.width));
-      const y = Math.min(1, Math.max(0, (lastEvent.clientY - rect.top) / rect.height));
-      onPoint(x, y);
-      applyEventColorMixer();
-    });
-  };
-  el.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    try { el.setPointerCapture(e.pointerId); } catch(err) {}
-    e.preventDefault();
-    handle(e);
-  });
-  el.addEventListener('pointermove', (e) => { if(dragging) handle(e); });
-  const end = () => { dragging = false; };
-  el.addEventListener('pointerup', end);
-  el.addEventListener('pointercancel', end);
-}
-bindEventColorMixerDrag(document.getElementById('ecmSv'), (x, y) => {
-  eventColorMixerState.s = x;
-  eventColorMixerState.v = 1 - y;
-});
-bindEventColorMixerDrag(document.getElementById('ecmHue'), (x) => {
-  eventColorMixerState.h = Math.min(359.9, x * 360);
-});
-document.getElementById('ecmDone').addEventListener('click', closeEventColorMixer);
 
 // 일정 폼의 공개설정 UI(전체공개/나만보기/그룹들 버튼)를 formVisibility 상태에 맞게 다시 그림
 function renderVisibilityPicker(){
@@ -16337,7 +16052,7 @@ function openEventForm(existingEvent){
     formVisibility = defaultVisibilityForNewEvent();
     renderVisibilityPicker();
 
-    formColor = null;
+    formColor = NEW_EVENT_DEFAULT_COLOR;
     renderEventColorPicker();
   }
 
@@ -17337,7 +17052,8 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           dateRange: null,
           dateKey: formRepeatMode === 'weekly' ? recurringStartKey : baseDateKey,
           type: formEventType,
-          color: formColor,
+          // 예약 가능 시간은 색 팔레트가 안 보이니, 새 일정 기본색(보라)이 따라가지 않게 함
+          color: formEventType === 'available' && !editingEventId ? null : formColor,
           blocksBooking: formEventType === 'available' || !formAllowBooking,
         });
         showToast('일정이 추가됐어요.');
@@ -17787,7 +17503,6 @@ const COLOR_THEMES = [
   { name: '어스톤', baseColor: '#B45309' },
 ];
 let activeThemeIndex = 0;
-const scheduleColorOverrides = {}; // { 일정텍스트: '#hex' }
 const scheduleTextOrder = []; // 처음 등장한 순서를 기억 (먼저 나온 일정일수록 밝고, 나중일수록 어둡게)
 
 // hex 색상을 밝게(+)/어둡게(-) 보정
@@ -17816,7 +17531,6 @@ function colorForScheduleText(text){
   if(text === '예약 가능') return '#38BDF8'; // 예약 가능 시간은 테마와 상관없이 항상 하늘색으로 고정
   if(text && text.endsWith(' 업무용 예약 가능')) return AVAILABLE_WORK_COLOR;
   if(text && text.startsWith('예약 가능 · ')) return AVAILABLE_EVENT_COLOR;
-  if(scheduleColorOverrides[text]) return scheduleColorOverrides[text];
   const idx = getScheduleTextOrderIndex(text);
   const steps = 6; // 6단계로 밝기를 순환 (그 이후엔 다시 밝은 단계부터 반복)
   const stepIdx = idx % steps;
@@ -18273,86 +17987,6 @@ function renderWeekView(){
 document.addEventListener('click', (e) => {
   if(e.target.closest('.week-cal-block')) return;
   document.querySelectorAll('.week-cal-block.show-actions').forEach(b => b.classList.remove('show-actions'));
-});
-
-// ---------- 색상 설정 패널 ----------
-function getAllScheduleTexts(){
-  const set = new Set();
-  Object.values(scheduleText).forEach(arr => {
-    arr.forEach(t => { if(t && t.trim()) set.add(t); });
-  });
-  return Array.from(set);
-}
-
-function renderColorPanel(){
-  const themeRow = document.getElementById('themeSwatchRow');
-  themeRow.innerHTML = COLOR_THEMES.map((theme, idx) => `
-    <div class="theme-swatch-option${idx === activeThemeIndex ? ' active' : ''}" data-idx="${idx}">
-      <div class="theme-swatch-dots">${[32, 19, 6, -7, -20].map(p => `<span style="background:${shadeHexColor(theme.baseColor, p)}"></span>`).join('')}</div>
-      <span class="theme-name">${theme.name}</span>
-    </div>
-  `).join('');
-
-  const listEl = document.getElementById('customColorList');
-  const texts = getAllScheduleTexts();
-  if(texts.length === 0){
-    listEl.innerHTML = `<div class="custom-color-empty">아직 등록된 일정이 없어요.</div>`;
-    return;
-  }
-  listEl.innerHTML = texts.map(t => {
-    const current = colorForScheduleText(t);
-    const pickerValue = current.startsWith('#') ? current : '#0284C7';
-    const isOverridden = !!scheduleColorOverrides[t];
-    const resetBtnHtml = isOverridden
-      ? `<button class="color-reset-row-btn" data-reset-text="${t}" title="기본 톤으로 되돌리기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg></button>`
-      : '';
-    return `
-    <div class="custom-color-row">
-      <span>${t}</span>
-      <div style="display:flex;align-items:center;gap:6px;">
-        ${resetBtnHtml}
-        <input type="color" value="${pickerValue}" data-text="${t}" />
-      </div>
-    </div>
-  `;
-  }).join('');
-}
-
-// 테마/커스텀 색상 클릭은 위임 방식으로 한 번만 바인딩 (패널이 다시 그려져도 리스너가 유지됨)
-document.getElementById('themeSwatchRow').addEventListener('click', (e) => {
-  const opt = e.target.closest('.theme-swatch-option');
-  if(!opt) return;
-  activeThemeIndex = parseInt(opt.dataset.idx, 10);
-  renderColorPanel();
-  renderWeekView();
-});
-document.getElementById('customColorList').addEventListener('input', (e) => {
-  if(e.target.tagName !== 'INPUT' || e.target.type !== 'color') return;
-  scheduleColorOverrides[e.target.dataset.text] = e.target.value;
-  renderWeekView();
-});
-// 스포이드 등으로 색을 직접 바꾼 뒤에도, 한 개씩 기본 톤(테마 자동 배정 색)으로 되돌리기
-document.getElementById('customColorList').addEventListener('click', (e) => {
-  const resetBtn = e.target.closest('.color-reset-row-btn');
-  if(!resetBtn) return;
-  delete scheduleColorOverrides[resetBtn.dataset.resetText];
-  renderColorPanel();
-  renderWeekView();
-  showToast('기본 톤으로 되돌렸어요.');
-});
-// 직접 지정한 색상을 전부 한 번에 기본 톤으로 되돌리기
-document.getElementById('colorResetAllBtn').addEventListener('click', () => {
-  Object.keys(scheduleColorOverrides).forEach(k => delete scheduleColorOverrides[k]);
-  renderColorPanel();
-  renderWeekView();
-  showToast('모든 색상을 기본 톤으로 되돌렸어요.');
-});
-
-document.getElementById('weekColorSettingsBtn').addEventListener('click', () => {
-  const panel = document.getElementById('weekColorPanel');
-  const willOpen = panel.style.display === 'none';
-  panel.style.display = willOpen ? 'block' : 'none';
-  if(willOpen) renderColorPanel();
 });
 
 // ---------- 한달 보기 (일정으로 채워진 시간 비율 히트맵) ----------
