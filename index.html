@@ -12414,6 +12414,7 @@ function renderFeedPostCard(post, container){
   container.appendChild(card);
   wireFeedPostCard(card, post);
   // 좋아요/댓글/수정/삭제/신고 버튼이 아닌, 카드의 나머지 부분을 누르면 상세보기로 들어감
+  card.addEventListener('pointerdown', () => prefetchFeedPostPhotos(post), { passive: true });
   card.addEventListener('click', (e) => {
     if(e.target.closest('button, a, input')) return;
     openFeedPostDetail(post);
@@ -13007,6 +13008,16 @@ function openFeedPostDetail(post){
   showFeedPostDetailView();
   relayoutFeedDetailPhotosWhenLoaded(header);
 }
+// 카드를 누르는 순간(손가락이 닿을 때) 그 글의 사진들을 미리 받아서 비율을 알아둠 -
+// 상세가 열릴 때 두 번째 이후 사진도 처음부터 제 크기로 뜨게
+function prefetchFeedPostPhotos(post){
+  (post && post.photos || []).forEach(src => {
+    if(feedPhotoRatioCache.has(src)) return;
+    const im = new Image();
+    im.onload = () => { if(im.naturalWidth && im.naturalHeight) feedPhotoRatioCache.set(src, im.naturalWidth / im.naturalHeight); };
+    im.src = src;
+  });
+}
 // 화면에 뜬 사진의 가로/세로 비율을 기억해둠 - 상세를 열 때 사진을 다시 기다리지 않고 바로 크기를 정하려고
 const feedPhotoRatioCache = new Map();
 document.addEventListener('load', (e) => {
@@ -13037,10 +13048,15 @@ function layoutFeedDetailPhotos(container){
   let H;
   if(imgs.length === 1){
     H = known.length ? Math.min(W / known[0], maxH) : W * 0.75;
+  } else if(row.dataset.lockedH){
+    // 사진이 여러 장이면 처음 정한 높이를 끝까지 유지 - 늦게 도착한 사진 때문에 높이가 바뀌면
+    // 이미 보이던 사진 크기가 달라지고 두 번째 사진이 옆으로 밀려 보였음 (늦게 온 사진은 자기 너비만 맞춤)
+    H = parseFloat(row.dataset.lockedH);
   } else {
     const widest = known.length ? Math.max(...known) : 4 / 3;
     // 파노라마처럼 아주 긴 사진이 있어도 너무 납작해지지 않게 최소 높이를 둠 (그 사진만 옆으로 넘쳐서 밀어서 봄)
     H = Math.max(W * 0.55, Math.min(W / widest, maxH));
+    row.dataset.lockedH = String(H);
   }
   imgs.forEach((img, i) => {
     const r = ratios[i] || 3 / 4;
@@ -13135,6 +13151,7 @@ function renderFeedPostCollection(container, posts, { emptyText, showPlace } = {
           <div class="feed-tag-list-note">${escapeHtml(post.note || '')}</div>
         </div>
       `;
+      row.addEventListener('pointerdown', () => prefetchFeedPostPhotos(post), { passive: true });
       row.addEventListener('click', () => openFeedPostDetail(post));
       container.appendChild(row);
     });
@@ -13181,6 +13198,7 @@ function renderFeedPostCollection(container, posts, { emptyText, showPlace } = {
         cell.appendChild(info);
       }
 
+      cell.addEventListener('pointerdown', () => prefetchFeedPostPhotos(post), { passive: true });
       cell.addEventListener('click', () => openFeedPostDetail(post));
       container.appendChild(cell);
     });
