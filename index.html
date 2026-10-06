@@ -3456,6 +3456,11 @@
   }
   .meet-badge-chip svg{ flex-shrink:0; }
   .reviewer-level-badge{ cursor:pointer; }
+  .feed-saved-header{ display:flex; align-items:center; justify-content:space-between; margin:2px 0 10px; }
+  .feed-saved-title{ font-size:13px; color:var(--text-dim); }
+  .feed-saved-title b{ color:var(--text); }
+  #feedSegment .meetup-chip{ padding:7px 11px; }
+  #feedSegment .feed-map-view-btn{ padding:9px 10px; }
   .feed-author-view-toggle-row{ display:flex; justify-content:flex-end; margin:10px 0; }
   .feed-tag-grid-place{ font-size:11px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .feed-author-view-header{
@@ -8488,6 +8493,7 @@
           <button class="meetup-chip active" data-cat="food">음식점</button>
           <button class="meetup-chip" data-cat="cafe">카페</button>
           <button class="meetup-chip" data-cat="experience">체험</button>
+          <button class="meetup-chip" data-saved="1">저장</button>
           <button type="button" class="feed-map-view-btn" id="feedMapViewBtn" title="지도 전체보기">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
             지도
@@ -11840,6 +11846,7 @@ const FEED_POSTS = {
 let activeFeedCategory = 'food';
 
 let feedSortMode = 'recent'; // 'recent' | 'popular' | 'rating'
+let feedShowSaved = false; // 카테고리 칩 줄의 '저장'을 골랐을 때 - 카테고리 상관없이 내가 ⭐ 저장한 글만 모아서 보여줌
 let feedSearchQuery = '';
 
 function sortFeedPosts(category){
@@ -12150,6 +12157,10 @@ function renderFeedPosts(){
   _monthlyTopReviewerCache = undefined; // 게시물 목록이 새로 그려질 때마다 이달의 맛집왕도 다시 계산
 
   const q = feedSearchQuery.trim().toLowerCase();
+  if(feedShowSaved){
+    renderFeedSavedView(container, q);
+    return;
+  }
   let posts = FEED_POSTS[activeFeedCategory].filter(p =>
     !q || [p.title, p.location, p.address].some(v => (v || '').toLowerCase().includes(q))
   );
@@ -12194,6 +12205,53 @@ function renderFeedPosts(){
   posts.forEach(post => renderFeedPostCard(post, container));
 }
 renderFeedPosts();
+
+// 내가 ⭐ 저장한 글 - 음식점/카페/체험 전부에서 모으고, 검색어·정렬은 목록과 똑같이 적용.
+// 일부러 먼 곳도 저장해두니까 위치 반경 필터는 적용하지 않음
+function getFeedSavedPosts(q){
+  return ['food', 'cafe', 'experience']
+    .flatMap(cat => FEED_POSTS[cat] || [])
+    .filter(p => p.savedByMe)
+    .filter(p => !q || [p.title, p.location, p.address].some(v => (v || '').toLowerCase().includes(q)))
+    .sort((a, b) => {
+      if(feedSortMode === 'popular') return (b.likeCount || 0) - (a.likeCount || 0);
+      if(feedSortMode === 'rating') return (b.rating || 0) - (a.rating || 0);
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+}
+// '저장' 칩을 골랐을 때의 목록 - 장소 모아보기/내 리뷰와 같은 그리드·리스트 보기
+function renderFeedSavedView(container, q){
+  const posts = getFeedSavedPosts(q);
+  const header = document.createElement('div');
+  header.className = 'feed-saved-header';
+  header.innerHTML = `
+    <div class="feed-saved-title">저장한 곳 <b>${posts.length}</b></div>
+    <div class="feed-tag-view-toggle">
+      <button type="button" class="feed-tag-view-btn${feedTagViewMode === 'grid' ? ' active' : ''}" data-view="grid" title="그리드로 보기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      </button>
+      <button type="button" class="feed-tag-view-btn${feedTagViewMode === 'list' ? ' active' : ''}" data-view="list" title="세로로 보기">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+    </div>
+  `;
+  header.querySelectorAll('.feed-tag-view-btn').forEach(btn => btn.addEventListener('click', () => {
+    if(btn.dataset.view === feedTagViewMode) return;
+    feedTagViewMode = btn.dataset.view;
+    // 장소 모아보기/작성자 화면의 전환 버튼도 같은 보기 방식으로 맞춤
+    document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn, #feedAuthorViewToggle .feed-tag-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === feedTagViewMode));
+    renderFeedPosts();
+  }));
+  container.appendChild(header);
+  const body = document.createElement('div');
+  container.appendChild(body);
+  renderFeedPostCollection(body, posts, {
+    emptyText: q
+      ? `"${feedSearchQuery}"에 대한 저장한 곳이 없어요.`
+      : '아직 저장한 곳이 없어요. 글을 열고 ☆을 눌러 가보고 싶은 곳을 저장해보세요.',
+    showPlace: true,
+  });
+}
 
 // 게시물 작성자 아바타 - 리뷰용 사진을 따로 설정해뒀으면 그걸, 아니면 실명 프로필 사진을,
 // 그것도 없으면 다른 곳과 동일하게 이름(리뷰 닉네임 우선) 첫 글자 이니셜을 색상 원으로 보여줌 (목록 카드/상세보기 공용)
@@ -13147,7 +13205,8 @@ async function loadFeedPostsFromServer(){
 document.querySelectorAll('#feedSegment .meetup-chip').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#feedSegment .meetup-chip').forEach(b => b.classList.toggle('active', b === btn));
-    activeFeedCategory = btn.dataset.cat;
+    feedShowSaved = !!btn.dataset.saved;
+    if(!feedShowSaved) activeFeedCategory = btn.dataset.cat; // 저장을 보는 동안엔 마지막 카테고리를 그대로 둠(+로 글 쓸 때 기본값)
     renderFeedPosts();
   });
 });
@@ -20832,6 +20891,7 @@ function toggleSavedPlace(category, post){
   if(!post || !post.id) return;
   const next = !post.savedByMe;
   setPostSavedEverywhere(post.id, next, post); // 화면은 바로 바뀌게 먼저 반영하고, 서버 저장이 실패하면 되돌림
+  if(feedShowSaved) renderFeedPosts();
   apiRequest(`/feed/${post.id}/save`, { method: 'POST' })
     .then(data => {
       if(data && typeof data.saved === 'boolean' && data.saved !== next){
@@ -20841,6 +20901,7 @@ function toggleSavedPlace(category, post){
     })
     .catch(err => {
       setPostSavedEverywhere(post.id, !next, post);
+      if(feedShowSaved) renderFeedPosts();
       renderSavedPlacesGroups();
       showToast(err.message || '저장하지 못했어요. 잠시 후 다시 시도해주세요.');
     });
@@ -23426,11 +23487,13 @@ let feedMapOverlays = []; // 마커/라벨 - 다시 열 때마다 지우고 새�
 function openFeedMapView(){
   // renderFeedPosts()와 똑같은 필터(카테고리 + 검색어 + 위치 반경)를 그대로 적용해서, 지금 목록에 보이는 장소만 지도에 찍음
   const q = feedSearchQuery.trim().toLowerCase();
-  let posts = FEED_POSTS[activeFeedCategory].filter(p =>
-    !q || [p.title, p.location, p.address].some(v => (v || '').toLowerCase().includes(q))
-  );
+  let posts = feedShowSaved
+    ? getFeedSavedPosts(q) // '저장'을 보고 있으면 저장한 곳만 (반경 필터 없이)
+    : FEED_POSTS[activeFeedCategory].filter(p =>
+      !q || [p.title, p.location, p.address].some(v => (v || '').toLowerCase().includes(q))
+    );
   const hasRefLocation = communityRefLocation && typeof communityRefLocation.lat === 'number' && typeof communityRefLocation.lon === 'number';
-  if(hasRefLocation){
+  if(hasRefLocation && !feedShowSaved){
     posts = posts.filter(p => typeof p.lat === 'number' && typeof p.lon === 'number' &&
       distanceKmClient(communityRefLocation.lat, communityRefLocation.lon, p.lat, p.lon) <= FEED_NEARBY_RADIUS_KM);
   }
@@ -23446,7 +23509,7 @@ function openFeedMapView(){
   });
   const places = [...groups.values()];
 
-  const categoryLabel = { food: '음식점', cafe: '카페', experience: '체험' }[activeFeedCategory] || '';
+  const categoryLabel = feedShowSaved ? '저장한 곳' : ({ food: '음식점', cafe: '카페', experience: '체험' }[activeFeedCategory] || '');
   document.getElementById('feedMapOverlayTitle').textContent = `${categoryLabel} 지도${places.length ? ` · ${places.length}곳` : ''}`;
 
   document.getElementById('feedMapOverlay').classList.add('show');
