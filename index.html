@@ -5914,41 +5914,28 @@
   .visibility-pick-btn.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .visibility-hint{ margin-top:7px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
   .visibility-pick-btn.private.on{ border-color:var(--cta); color:var(--cta); background:rgba(255,107,74,0.1); }
-  /* 일정 폼 - 이 일정 하나에만 쓸 색 고르기 (자동 / 기본 팔레트 / 직접 고르기) */
+  /* 일정 폼 - 이 일정 색 고르기: [자동 | 직접 선택] 두 칸 (직접 선택 칸에 지금 고른 색 점 + 색 코드) */
   .event-color-picker{
     display:flex;
-    flex-wrap:wrap;
-    align-items:center;
-    gap:8px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:var(--surface-2);
+    padding:3px;
+    gap:3px;
   }
-  .event-color-swatch{
-    width:28px;
-    height:28px;
-    border-radius:50%;
-    border:2px solid transparent;
-    box-shadow:0 0 0 1px var(--line);
-    padding:0;
-    cursor:pointer;
-    flex-shrink:0;
-  }
-  .event-color-swatch.on{ border-color:var(--surface); box-shadow:0 0 0 2px var(--text); }
-  .event-color-auto{
-    height:28px;
-    padding:0 11px;
-    border-radius:999px;
-    border:1.5px solid var(--line);
-    background:var(--surface);
+  .ecs-btn{
+    flex:1;
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    height:36px;
+    border:none; border-radius:9px;
+    background:transparent;
     color:var(--text-dim);
-    font-size:12px;
-    font-weight:600;
+    font-size:13px; font-weight:600; font-family:'Inter',sans-serif;
     cursor:pointer;
   }
-  .event-color-auto.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
-  .event-color-custom{
-    position:relative;
-    overflow:hidden;
-    background:conic-gradient(#EF4444, #F59E0B, #22C55E, #38BDF8, #8B5CF6, #EC4899, #EF4444);
-  }
+  .ecs-btn.on{ background:var(--surface); color:var(--text); font-weight:700; box-shadow:0 1px 4px rgba(23,24,29,0.10); }
+  .ecs-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; box-shadow:0 0 0 1px rgba(0,0,0,0.12); }
+  .ecs-hex{ font-family:'Roboto Mono',monospace; font-size:12px; letter-spacing:0.2px; }
   .event-color-mixer{
     margin-top:10px;
     padding:12px;
@@ -5985,9 +5972,6 @@
     pointer-events:none;
   }
   .ecm-hue-thumb{ top:50%; }
-  .ecm-footer{ display:flex; align-items:center; gap:8px; margin-top:12px; }
-  .ecm-preview{ width:24px; height:24px; border-radius:50%; box-shadow:0 0 0 1px var(--line); }
-  .ecm-hex{ font-family:'Roboto Mono',monospace; font-size:12px; color:var(--text-dim); flex:1; }
 
   .group-chip-picker{
     display:flex;
@@ -7411,10 +7395,6 @@
           <div class="event-color-mixer" id="eventColorMixer">
             <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
             <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
-            <div class="ecm-footer">
-              <span class="ecm-preview" id="ecmPreview"></span>
-              <span class="ecm-hex" id="ecmHex">#38BDF8</span>
-            </div>
           </div>
         </div>
       </div>
@@ -15787,8 +15767,11 @@ let formColor = null; // 이 일정 하나에만 쓸 색("#RRGGBB") - null이면
 function renderEventColorPicker(){
   const isCustom = !!formColor;
   document.getElementById('eventColorPicker').innerHTML = `
-    <button type="button" class="event-color-auto${formColor ? '' : ' on'}" data-color="">자동</button>
-    <button type="button" class="event-color-swatch event-color-custom${isCustom ? ' on' : ''}" id="eventColorCustomBtn" title="원하는 색 고르기"${isCustom ? ` style="background:${formColor}"` : ''}></button>
+    <button type="button" class="ecs-btn${isCustom ? '' : ' on'}" data-color="">자동</button>
+    <button type="button" class="ecs-btn${isCustom ? ' on' : ''}" id="eventColorCustomBtn" title="아래 판에서 원하는 색 고르기">
+      <span class="ecs-dot" id="eventColorCustomDot"${isCustom ? ` style="background:${formColor}"` : ''}></span>
+      <span class="${isCustom ? 'ecs-hex' : ''}" id="eventColorCustomLabel">${isCustom ? formColor.toUpperCase() : '직접 선택'}</span>
+    </button>
   `;
   showEventColorMixer(); // 판은 항상 펼쳐 둠 - 지금 고른 색 위치로만 맞추고, 자동이면 자동 그대로 둠
 }
@@ -15833,8 +15816,9 @@ function hexToHsv(hex){
 }
 
 // 판 위치를 지금 고른 색에 맞춤 (자동이면 일반 일정 기본색 보라 위치) - 표시만 하고 색을 고른 걸로 치지는 않음
+let eventColorLastPicked = null; // '자동'을 눌렀다가 다시 '직접 선택'을 누르면 방금 고른 색으로 돌아오게
 function showEventColorMixer(){
-  Object.assign(eventColorMixerState, hexToHsv(formColor || '#8B5CF6'));
+  Object.assign(eventColorMixerState, hexToHsv(formColor || eventColorLastPicked || '#8B5CF6'));
   applyEventColorMixer(false);
 }
 
@@ -15850,17 +15834,22 @@ function applyEventColorMixer(pick = true){
   const hueThumb = document.getElementById('ecmHueThumb');
   hueThumb.style.left = (h / 360 * 100) + '%';
   hueThumb.style.background = `hsl(${h},100%,50%)`;
-  document.getElementById('ecmPreview').style.background = hex;
-  document.getElementById('ecmHex').textContent = hex;
+  // '직접 선택' 칸의 점은 판에 보이는 색을 따라감 (자동일 때도 어떤 색이 골라질지 미리 보임)
+  const customDot = document.getElementById('eventColorCustomDot');
+  if(customDot) customDot.style.background = hex;
 
   if(!pick) return;
   formColor = hex;
+  eventColorLastPicked = hex;
   const picker = document.getElementById('eventColorPicker');
   picker.querySelectorAll('.on').forEach(el => el.classList.remove('on'));
   const customBtn = document.getElementById('eventColorCustomBtn');
   if(customBtn){
     customBtn.classList.add('on');
-    customBtn.style.background = hex;
+    document.getElementById('eventColorCustomDot').style.background = hex;
+    const label = document.getElementById('eventColorCustomLabel');
+    label.textContent = hex.toUpperCase();
+    label.className = 'ecs-hex';
   }
 }
 
@@ -16231,6 +16220,7 @@ function setEventTypeUI(type){
 // 신규 추가: openEventForm() / 수정: openEventForm(기존이벤트객체)
 function openEventForm(existingEvent){
   editingEventId = existingEvent ? existingEvent.id : null;
+  eventColorLastPicked = null;
   editingLinkedPieceIds = [];
   absorbedAvailIds = [];
   document.getElementById('dayEventList').style.display = 'none';
