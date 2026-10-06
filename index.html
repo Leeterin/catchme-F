@@ -5986,10 +5986,6 @@
   .ecm-footer{ display:flex; align-items:center; gap:8px; margin-top:12px; }
   .ecm-preview{ width:24px; height:24px; border-radius:50%; box-shadow:0 0 0 1px var(--line); }
   .ecm-hex{ font-family:'Roboto Mono',monospace; font-size:12px; color:var(--text-dim); flex:1; }
-  .ecm-done{
-    border:none; border-radius:999px; padding:6px 14px;
-    background:var(--accent); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
-  }
 
   .group-chip-picker{
     display:flex;
@@ -7409,14 +7405,13 @@
         <div class="mp-input-group">
           <label>색상</label>
           <div class="event-color-picker" id="eventColorPicker"></div>
-          <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 -->
-          <div class="event-color-mixer" id="eventColorMixer" style="display:none;">
+          <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 (항상 펼쳐져 있음) -->
+          <div class="event-color-mixer" id="eventColorMixer">
             <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
             <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
             <div class="ecm-footer">
               <span class="ecm-preview" id="ecmPreview"></span>
               <span class="ecm-hex" id="ecmHex">#38BDF8</span>
-              <button type="button" class="ecm-done" id="ecmDone">완료</button>
             </div>
           </div>
         </div>
@@ -15666,13 +15661,11 @@ function renderEventColorPicker(){
     <button type="button" class="event-color-auto${formColor ? '' : ' on'}" data-color="">자동</button>
     <button type="button" class="event-color-swatch event-color-custom${isCustom ? ' on' : ''}" id="eventColorCustomBtn" title="원하는 색 고르기"${isCustom ? ` style="background:${formColor}"` : ''}></button>
   `;
-  closeEventColorMixer(); // 폼을 새로 열거나 기본 색을 고르면 조제 패널은 닫힘
+  showEventColorMixer(); // 판은 항상 펼쳐 둠 - 지금 고른 색 위치로만 맞추고, 자동이면 자동 그대로 둠
 }
 document.getElementById('eventColorPicker').addEventListener('click', (e) => {
   if(e.target.closest('#eventColorCustomBtn')){
-    const mixer = document.getElementById('eventColorMixer');
-    if(mixer.style.display === 'none') openEventColorMixer();
-    else closeEventColorMixer();
+    applyEventColorMixer(true); // 판에 보이는 색을 이 일정 색으로
     return;
   }
   const btn = e.target.closest('button[data-color]');
@@ -15710,19 +15703,14 @@ function hexToHsv(hex){
   return { h, s: max ? d / max : 0, v: max };
 }
 
-function openEventColorMixer(){
-  const start = hexToHsv(formColor || '#8B5CF6'); // 지금 고른 색에서 시작, 자동이면 일반 일정 기본색(보라)에서
-  Object.assign(eventColorMixerState, start);
-  document.getElementById('eventColorMixer').style.display = '';
-  applyEventColorMixer(true);
-}
-function closeEventColorMixer(){
-  const mixer = document.getElementById('eventColorMixer');
-  if(mixer) mixer.style.display = 'none';
+// 판 위치를 지금 고른 색에 맞춤 (자동이면 일반 일정 기본색 보라 위치) - 표시만 하고 색을 고른 걸로 치지는 않음
+function showEventColorMixer(){
+  Object.assign(eventColorMixerState, hexToHsv(formColor || '#8B5CF6'));
+  applyEventColorMixer(false);
 }
 
-// 패널 표시(썸네일 위치/미리보기) 갱신 + 고른 색을 이 일정 색으로 바로 반영 (버튼 줄 전체를 다시 그리지 않음)
-function applyEventColorMixer(){
+// 패널 표시(썸네일 위치/미리보기) 갱신 - pick이면 그 색을 이 일정 색으로 바로 반영 (버튼 줄 전체를 다시 그리지 않음)
+function applyEventColorMixer(pick = true){
   const { h, s, v } = eventColorMixerState;
   const hex = hsvToHex(h, s, v);
   document.getElementById('ecmSv').style.backgroundColor = `hsl(${h},100%,50%)`;
@@ -15736,6 +15724,7 @@ function applyEventColorMixer(){
   document.getElementById('ecmPreview').style.background = hex;
   document.getElementById('ecmHex').textContent = hex;
 
+  if(!pick) return;
   formColor = hex;
   const picker = document.getElementById('eventColorPicker');
   picker.querySelectorAll('.on').forEach(el => el.classList.remove('on'));
@@ -15781,7 +15770,6 @@ bindEventColorMixerDrag(document.getElementById('ecmSv'), (x, y) => {
 bindEventColorMixerDrag(document.getElementById('ecmHue'), (x) => {
   eventColorMixerState.h = Math.min(359.9, x * 360);
 });
-document.getElementById('ecmDone').addEventListener('click', closeEventColorMixer);
 
 // 일정 폼의 공개설정 UI(전체공개/나만보기/그룹들 버튼)를 formVisibility 상태에 맞게 다시 그림
 function renderVisibilityPicker(){
