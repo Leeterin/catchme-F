@@ -8081,10 +8081,22 @@
   <!-- 일정 삭제 확인 팝업: 반복 일정이면 "전체 삭제"와 "이 날짜만 삭제" 중에 고를 수 있음 -->
   <div class="mini-confirm-overlay" id="deleteConfirmOverlay">
     <div class="mini-confirm-card">
-      <div class="mini-confirm-title">일정을 삭제할까요?</div>
+      <div class="mini-confirm-title" id="deleteConfirmTitle">일정을 삭제할까요?</div>
       <div class="mini-confirm-actions">
+        <button type="button" id="recurringDeleteThisBtn" class="mini-confirm-btn danger">이 일정만 삭제</button>
         <button type="button" id="recurringDeleteAllBtn" class="mini-confirm-btn danger">반복 일정 전체 삭제</button>
-        <button type="button" id="recurringDeleteThisBtn" class="mini-confirm-btn">이 날짜만 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 반복 일정 수정 확인: 보통은 그날 하나만 바꾸고 싶어서 "이 일정만"이 먼저 -->
+  <div class="mini-confirm-overlay" id="recurringEditChoiceOverlay">
+    <div class="mini-confirm-card">
+      <div class="mini-confirm-title" id="recurringEditChoiceTitle">반복되는 일정이에요. 어떻게 수정할까요?</div>
+      <div class="mini-confirm-actions" style="flex-direction:column;">
+        <button type="button" id="recurringEditThisBtn" class="mini-confirm-btn primary">이 일정만 수정</button>
+        <button type="button" id="recurringEditAllBtn" class="mini-confirm-btn">반복 일정 전체 수정</button>
+        <button type="button" id="recurringEditCancelBtn" class="mini-confirm-btn">취소</button>
       </div>
     </div>
   </div>
@@ -16091,6 +16103,30 @@ document.getElementById('scheduleOverlapConfirmYesBtn').addEventListener('click'
   if(action) action();
 });
 
+// 반복 일정 수정 - 저장을 누르면 "이 일정만 / 반복 일정 전체"를 고르게 함 (onChoose('this' | 'all'))
+let recurringEditChoiceAction = null;
+function openRecurringEditChoice(onChoose){
+  recurringEditChoiceAction = onChoose;
+  document.getElementById('recurringEditChoiceTitle').textContent =
+    `반복되는 일정이에요. ${scheduleFocusDate.getMonth() + 1}월 ${scheduleFocusDate.getDate()}일 일정만 수정할까요?`;
+  document.getElementById('recurringEditChoiceOverlay').classList.add('show');
+}
+function closeRecurringEditChoice(){
+  recurringEditChoiceAction = null;
+  document.getElementById('recurringEditChoiceOverlay').classList.remove('show');
+}
+['recurringEditThisBtn', 'recurringEditAllBtn'].forEach(id => {
+  document.getElementById(id).addEventListener('click', () => {
+    const action = recurringEditChoiceAction;
+    closeRecurringEditChoice();
+    if(action) action(id === 'recurringEditThisBtn' ? 'this' : 'all');
+  });
+});
+document.getElementById('recurringEditCancelBtn').addEventListener('click', closeRecurringEditChoice);
+document.getElementById('recurringEditChoiceOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'recurringEditChoiceOverlay') closeRecurringEditChoice();
+});
+
 function openDeleteConfirmOverlay(){
   if(!editingEventId) return;
   const ev = SCHEDULE_EVENTS.find(e => e.id === editingEventId);
@@ -16098,6 +16134,9 @@ function openDeleteConfirmOverlay(){
   // 반복 일정이 아니면 "이 날짜만 삭제"는 의미가 없으니 숨기고, 전체삭제 버튼 문구도 단순하게
   document.getElementById('recurringDeleteThisBtn').style.display = ev.recurring ? 'block' : 'none';
   document.getElementById('recurringDeleteAllBtn').textContent = ev.recurring ? '반복 일정 전체 삭제' : '삭제';
+  document.getElementById('deleteConfirmTitle').textContent = ev.recurring
+    ? `반복되는 일정이에요. ${scheduleFocusDate.getMonth() + 1}월 ${scheduleFocusDate.getDate()}일 일정만 삭제할까요?`
+    : '일정을 삭제할까요?';
   document.getElementById('deleteConfirmOverlay').classList.add('show');
 }
 function closeDeleteConfirmOverlay(){
@@ -17000,9 +17039,39 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
 
   // 겹침 확인 팝업에서 "그래도 추가"를 눌렀을 때(또는 애초에 안 겹쳐서 바로) 실제로 일정을 만들거나 수정함
   // (title/startMin/endMin/until/baseDateKey를 그대로 참조해야 해서, 위에서 바로 호출하지 않고 이 시점에 정의해둔 함수를 씀)
-  function proceedEventFormSubmit(){
+  function proceedEventFormSubmit(scope){
+    // 반복 일정을 반복 그대로 수정하는 거면, 먼저 "이 일정만 / 전체" 중 고르게 함 (반복을 끄는 수정은 전체에 적용)
+    if(editingEventId && !scope){
+      const target = SCHEDULE_EVENTS.find(e => e.id === editingEventId);
+      if(target && target.type !== 'available' && target.recurring && (target.recurring.weekdays || []).length && formRepeatMode === 'weekly'){
+        openRecurringEditChoice(proceedEventFormSubmit);
+        return;
+      }
+    }
     try {
-      if(editingEventId){
+      if(editingEventId && scope === 'this'){
+        // 이 일정만: 반복에서 그날을 빼고(이 날만 삭제와 같음), 그날 하나짜리 일정을 바뀐 내용으로 새로 만듦
+        const ev = SCHEDULE_EVENTS.find(e => e.id === editingEventId);
+        const occKey = dateKeyOf(scheduleFocusDate);
+        if(ev){
+          if(!ev.recurring.exceptions) ev.recurring.exceptions = [];
+          if(!ev.recurring.exceptions.includes(occKey)) ev.recurring.exceptions.push(occKey);
+          resyncAllScheduleEvents();
+          if(ev.serverId) syncEventUpdateToServer(ev);
+          createScheduleEvent({
+            title, startMin, endMin,
+            visibility: { ...formVisibility },
+            recurringWeekdays: null,
+            until: null,
+            dateRange: null,
+            dateKey: occKey,
+            type: formEventType,
+            color: formColor,
+            blocksBooking: formEventType === 'available' || !formAllowBooking,
+          });
+        }
+        showToast(`${scheduleFocusDate.getMonth() + 1}월 ${scheduleFocusDate.getDate()}일 일정만 수정했어요.`);
+      } else if(editingEventId){
         const ev = SCHEDULE_EVENTS.find(e => e.id === editingEventId);
         if(ev){
           // 반복으로 새로 바뀌는 거면 기준 날짜가 필요함 - 원래 있던 기준 날짜(이미 반복이었으면)나 원래 dateKey/기간 시작일을 그대로 씀, 그것도 없으면 지금 보고 있는 날짜로
