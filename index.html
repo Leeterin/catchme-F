@@ -13147,10 +13147,12 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
     let startX = 0, startY = 0, startT = 0, dx = 0;
     let tracking = false, dragging = false;
 
+    // 오른쪽으로 밀었을 때 그쪽이 먼저 움직여야 하는 가로 스크롤(사진 넘기기 등)인지 - 이미 왼쪽 끝(첫 사진)이면
+    // 더 넘길 게 없으니 뒤로가기로 받음. (세로 스크롤 영역은 overflowX도 auto로 잡혀서, 예전엔 그 위에서 밀면 안 먹었음)
     function isInsideHorizontalScroll(el){
       for(let node = el; node && node !== view; node = node.parentElement){
         const style = window.getComputedStyle(node);
-        if((style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth) return true;
+        if((style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 1 && node.scrollLeft > 0) return true;
       }
       return false;
     }
