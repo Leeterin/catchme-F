@@ -11959,17 +11959,7 @@ function getFeedPostsForPlace(title){
   return ['food', 'cafe', 'experience'].flatMap(cat => FEED_POSTS[cat] || []).filter(p => (p.title || '').trim() === name);
 }
 
-// 이 글이 그 장소에 대한 가장 첫 리뷰인지(같은 장소 글들 중 작성일이 가장 이름)
-function isFirstReviewerPost(post){
-  const posts = getFeedPostsForPlace(post.title);
-  if(posts.length === 0) return false;
-  const earliest = posts.reduce((a, b) => new Date(a.createdAt) < new Date(b.createdAt) ? a : b);
-  return earliest.id === post.id;
-}
-function renderFirstReviewerBadgeHtml(post){
-  if(!isFirstReviewerPost(post)) return '';
-  return `<span class="meet-badge-chip" style="color:#38BDF8;border-color:#38BDF8;" title="이 장소에 처음으로 리뷰를 남겼어요">${FEED_BADGE_ICON.medal}첫 리뷰어</span>`;
-}
+// "첫 리뷰어" 뱃지는 뺐음 - 리뷰가 하나뿐인 장소가 대부분이라 거의 모든 글 작성자 옆에 계속 떴음
 
 const FRIEND_VISIT_BADGE_MIN = 3; // 친구 몇 명 이상 다녀갔을 때 뱃지를 보여줄지
 // 이 장소에 글을 남긴 "친구"(FRIENDS 목록에 있는 사람) 수 - 중복 제거
@@ -12376,7 +12366,7 @@ function feedPostCardHtml(post){
       ${feedAuthorAvatarHtml(post.author)}
       <div class="feed-ig-author-name">${escapeHtml(feedAuthorDisplayName(post.author))}</div>
       ${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}
-      <!-- 목록에선 배지를 하나만 - 이름 옆에 배지가 3개씩 붙어 장소보다 배지가 먼저 보였음 (첫 리뷰어/리뷰왕은 글 상세에서) -->
+      <!-- 목록에선 배지를 하나만 - 이름 옆에 배지가 3개씩 붙어 장소보다 배지가 먼저 보였음 (리뷰왕은 글 상세에서) -->
     </div>
     <div class="feed-ig-tag-row">
       <button type="button" class="feed-ig-place-tag">${ICO.pin} ${escapeHtml(post.title || '')}</button>
@@ -12463,7 +12453,6 @@ function feedPostDetailHtml(post){
         ${feedAuthorAvatarHtml(post.author)}
         <div class="feed-ig-author-name">${escapeHtml(feedAuthorDisplayName(post.author))}</div>
         ${post.author ? renderReviewerLevelBadgeHtml(post.author.id) : ''}
-        ${renderFirstReviewerBadgeHtml(post)}
         ${post.author ? renderMonthlyKingBadgeHtml(post.author.id) : ''}
       </div>
       <div class="feed-detail-title-row">
