@@ -13221,16 +13221,33 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       Object.assign(copy.style, { position: 'absolute', top: rect.top + 'px', left: '0', width: rect.width + 'px', margin: '0' });
       copy.setAttribute('aria-hidden', 'true');
       sheet.appendChild(copy);
-      dim = document.createElement('div');
-      Object.assign(dim.style, {
-        position: 'fixed', top: '0', bottom: '0', left: rect.left + 'px', width: rect.width + 'px',
-        background: '#000', opacity: '0.14', zIndex: '4', pointerEvents: 'none',
-      });
-      document.body.appendChild(dim);
       document.body.appendChild(sheet);
       scrolled.forEach(([c, t, l]) => { c.scrollTop = t; c.scrollLeft = l; });
       view.classList.add('feed-swiping');
       document.body.classList.add('feed-swipe-active');
+      // 복사본 사진이 다 그려지기 전에 실제 화면을 바꾸면 한 번 번쩍임 -> 사진 준비(최대 150ms) 후 다음 프레임에 바꿈.
+      // 그동안은 복사본 밑에 원래 화면이 그대로 있어서 똑같이 보임
+      swapped = false;
+      const token = ++swapToken;
+      const imgs = Array.from(copy.querySelectorAll('img'));
+      imgs.forEach(img => { img.loading = 'eager'; img.decoding = 'sync'; });
+      Promise.race([
+        Promise.all(imgs.map(img => img.decode ? img.decode().catch(() => {}) : null)),
+        new Promise(r => setTimeout(r, 150)),
+      ]).then(() => requestAnimationFrame(() => { if(token === swapToken) swapUnder(); }));
+    }
+    let swapped = false, swapToken = 0;
+    function swapUnder(){
+      if(swapped || !sheet) return;
+      swapped = true;
+      const rect = sheet.getBoundingClientRect();
+      dim = document.createElement('div');
+      Object.assign(dim.style, {
+        position: 'fixed', top: '0', bottom: '0', left: sheet.style.left, width: rect.width + 'px',
+        background: '#000', opacity: '0', zIndex: '4', pointerEvents: 'none', transition: 'opacity 120ms linear',
+      });
+      document.body.insertBefore(dim, sheet);
+      setOffset(pendingX);
       view.style.display = 'none';
       const underId = id === 'feedPlaceDetailView' ? feedDetailReturnViewId : 'feedListView';
       underView = document.getElementById(underId) || document.getElementById('feedListView');
@@ -13244,6 +13261,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
     }
     function dropView(){
       if(rafId){ cancelAnimationFrame(rafId); rafId = 0; }
+      swapToken++; swapped = false;
       view.classList.remove('feed-swiping');
       document.body.classList.remove('feed-swipe-active');
       view.style.display = '';
@@ -13308,6 +13326,9 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       const v = Math.max(Math.abs(velocity), 0.9); // px/ms
       const ms = Math.round(Math.min(380, Math.max(180, remain / v * 1.6)));
       // 강제 리플로우로 지금 위치를 확정한 뒤 애니메이션 시작
+      // 닫힐 땐 밑 화면이 바로 필요하니 지금 바꾸고, 취소면 아직 안 바꿨을 경우 바꾸지 않음
+      if(shouldClose) swapUnder(); else swapToken++;
+      const didSwap = swapped;
       if(sheet) void sheet.offsetWidth;
       setTransition(`transform ${ms}ms cubic-bezier(.22,.61,.36,1), clip-path ${ms}ms cubic-bezier(.22,.61,.36,1), box-shadow ${ms}ms linear`);
       if(shouldClose){
@@ -13326,6 +13347,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
         afterTransition(ms, () => {
           // 취소: 밑에 깔았던 화면을 다시 숨기고, 원래 보던 위치로 (복사본을 걷기 전에 실제 화면을 먼저 되돌려 놓음)
           view.style.display = '';
+          if(!didSwap){ dropView(); return; }
           if(!underWasActive && underView) underView.classList.remove('active');
           if(id === 'feedAuthorView'){
             const card = document.getElementById('feedReviewProfileCard');
