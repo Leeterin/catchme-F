@@ -12448,7 +12448,7 @@ function feedPostDetailHtml(post){
   return `
     ${photos.length > 0 ? `
       <div class="feed-detail-photos">
-        ${photos.map(p => `<img decoding="async" src="${p}" />`).join('')}
+        ${photos.map(p => `<img decoding="sync" src="${p}" />`).join('')}
       </div>
     ` : ''}
     <div class="feed-detail-body">
@@ -12997,33 +12997,24 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.feed-detail-kebab-menu.open').forEach(m => m.classList.remove('open'));
 });
 let feedDetailCurrentPost = null;
-let feedDetailOpenToken = 0;
 function openFeedPostDetail(post){
   feedDetailCurrentPost = post;
   const header = document.getElementById('feedPlaceDetailHeader');
   header.innerHTML = feedPostDetailHtml(post);
   wireFeedPostDetail(header, post);
-  // 사진이 그려질 준비가 된 뒤에 화면을 바꿈 - 바로 바꾸면 빈 칸이 잠깐 보였다가 사진이 떠서 깜빡거렸음
-  // (목록에서 이미 받아둔 사진이라 보통 금방 끝나고, 오래 걸려도 0.3초 넘게 기다리진 않음)
-  // 사진 비율을 알아야 크기를 정할 수 있어서, 사진들이 다 준비될 때까지 기다림
-  const token = ++feedDetailOpenToken;
-  const imgs = [...header.querySelectorAll('.feed-detail-photos img')];
-  let shown = false;
-  const show = () => {
-    if(shown || token !== feedDetailOpenToken) return;
-    shown = true;
-    showFeedPostDetailView();
-    layoutFeedDetailPhotos(header);
-  };
-  // 늦게 온 사진은 도착하는 대로 비율을 다시 맞춤
-  imgs.forEach(img => img.addEventListener('load', () => { if(shown && token === feedDetailOpenToken) layoutFeedDetailPhotos(header); }));
-  if(imgs.length && imgs[0].decode){
-    Promise.all(imgs.map(img => img.decode().catch(() => {}))).then(show);
-    setTimeout(show, imgs.every(img => img.complete) ? 120 : 300);
-  } else {
-    show();
-  }
+  // 기다리지 않고 바로 화면을 바꿈 - 사진 크기는 목록에서 이미 본 사진의 비율(feedPhotoRatioCache)로 바로 정하고,
+  // 처음 보는 사진만 도착하는 대로 다시 맞춤 (예전엔 사진 준비를 기다리느라 최대 0.3초 늦게 열렸음)
+  showFeedPostDetailView();
+  relayoutFeedDetailPhotosWhenLoaded(header);
 }
+// 화면에 뜬 사진의 가로/세로 비율을 기억해둠 - 상세를 열 때 사진을 다시 기다리지 않고 바로 크기를 정하려고
+const feedPhotoRatioCache = new Map();
+document.addEventListener('load', (e) => {
+  const img = e.target;
+  if(img && img.tagName === 'IMG' && img.naturalWidth && img.naturalHeight){
+    feedPhotoRatioCache.set(img.getAttribute('src'), img.naturalWidth / img.naturalHeight);
+  }
+}, true);
 // 상세 내용을 다시 그렸을 때(수정 후 등) 사진 크기를 지금 한 번, 사진이 도착할 때마다 다시 맞춤
 function relayoutFeedDetailPhotosWhenLoaded(container){
   container.querySelectorAll('.feed-detail-photos img').forEach(img => img.addEventListener('load', () => layoutFeedDetailPhotos(container)));
@@ -13039,7 +13030,7 @@ function layoutFeedDetailPhotos(container){
   const cs = getComputedStyle(row);
   const W = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   if(W <= 0) return;
-  const ratios = imgs.map(img => (img.naturalWidth && img.naturalHeight) ? img.naturalWidth / img.naturalHeight : 0);
+  const ratios = imgs.map(img => (img.naturalWidth && img.naturalHeight) ? img.naturalWidth / img.naturalHeight : (feedPhotoRatioCache.get(img.getAttribute('src')) || 0));
   const known = ratios.filter(r => r > 0);
   const maxH = W * 1.25;
   row.classList.toggle('single', imgs.length === 1);
