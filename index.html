@@ -1429,16 +1429,22 @@
     scrollbar-width:none;
   }
   .feed-detail-photos::-webkit-scrollbar{ display:none; }
+  /* 사진 원래 비율 그대로 - 크기는 layoutFeedDetailPhotos가 사진들 비율을 보고 정해줌
+     (가로/세로 사진이 섞여도 높이를 맞춰서 나란히 보이게) */
   .feed-detail-photos img{
-    width:100%;
-    max-width:384px;
+    width:auto;
+    max-width:none;
     height:260px;
     object-fit:cover;
+    background:var(--surface-2);
     border-radius:14px;
     flex-shrink:0;
     scroll-snap-align:start;
   }
   .feed-detail-photos{ scroll-snap-type:x mandatory; }
+  .feed-detail-photos.single img{ margin:0 auto; }
+  /* 리뷰 상세를 보는 동안엔 위쪽 "장소 추천" 제목/위치 설정을 가림 */
+  #panel-community.feed-detail-open .community-header{ display:none; }
   .feed-detail-title-row{
     display:flex;
     align-items:flex-start;
@@ -12177,6 +12183,7 @@ function openFeedAuthorView(author){
 
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('panel-community').classList.remove('feed-detail-open');
   document.getElementById('feedTagView').classList.remove('active');
   const authorView = document.getElementById('feedAuthorView');
   authorView.classList.add('active');
@@ -12441,7 +12448,7 @@ function feedPostDetailHtml(post){
   return `
     ${photos.length > 0 ? `
       <div class="feed-detail-photos">
-        ${photos.map((p, i) => `<img${i > 0 ? ' loading="lazy"' : ''} decoding="async" src="${p}" />`).join('')}
+        ${photos.map(p => `<img decoding="async" src="${p}" />`).join('')}
       </div>
     ` : ''}
     <div class="feed-detail-body">
@@ -12682,6 +12689,7 @@ function meetPlaceInChatRoom(roomId, place, act){
   if(!CHAT_ROOMS[roomId]) return;
   const go = () => {
     document.getElementById('feedPlaceDetailView').classList.remove('active');
+    document.getElementById('panel-community').classList.remove('feed-detail-open');
     document.getElementById('feedListView').classList.add('active');
     showTab('chat');
     openChatRoom(roomId);
@@ -12997,29 +13005,64 @@ function openFeedPostDetail(post){
   wireFeedPostDetail(header, post);
   // 사진이 그려질 준비가 된 뒤에 화면을 바꿈 - 바로 바꾸면 빈 칸이 잠깐 보였다가 사진이 떠서 깜빡거렸음
   // (목록에서 이미 받아둔 사진이라 보통 금방 끝나고, 오래 걸려도 0.3초 넘게 기다리진 않음)
+  // 사진 비율을 알아야 크기를 정할 수 있어서, 사진들이 다 준비될 때까지 기다림
   const token = ++feedDetailOpenToken;
-  const firstImg = header.querySelector('.feed-detail-photos img');
+  const imgs = [...header.querySelectorAll('.feed-detail-photos img')];
   let shown = false;
   const show = () => {
     if(shown || token !== feedDetailOpenToken) return;
     shown = true;
     showFeedPostDetailView();
+    layoutFeedDetailPhotos(header);
   };
-  if(firstImg && !firstImg.complete && firstImg.decode){
-    firstImg.decode().then(show, show);
-    setTimeout(show, 300);
-  } else if(firstImg && firstImg.decode){
-    firstImg.decode().then(show, show);
-    setTimeout(show, 120);
+  // 늦게 온 사진은 도착하는 대로 비율을 다시 맞춤
+  imgs.forEach(img => img.addEventListener('load', () => { if(shown && token === feedDetailOpenToken) layoutFeedDetailPhotos(header); }));
+  if(imgs.length && imgs[0].decode){
+    Promise.all(imgs.map(img => img.decode().catch(() => {}))).then(show);
+    setTimeout(show, imgs.every(img => img.complete) ? 120 : 300);
   } else {
     show();
   }
+}
+// 상세 내용을 다시 그렸을 때(수정 후 등) 사진 크기를 지금 한 번, 사진이 도착할 때마다 다시 맞춤
+function relayoutFeedDetailPhotosWhenLoaded(container){
+  container.querySelectorAll('.feed-detail-photos img').forEach(img => img.addEventListener('load', () => layoutFeedDetailPhotos(container)));
+  layoutFeedDetailPhotos(container);
+}
+// 상세 사진 크기 - 모든 사진을 같은 높이로 맞추고 너비는 각자 원래 비율대로.
+// 높이는 가장 가로로 긴 사진이 화면 너비에 딱 맞게 정해서, 가로 사진은 꽉 차고 세로 사진은 옆으로 나란히 이어짐.
+// 사진이 하나면 원래 비율 그대로 화면 너비에 맞춤 (너무 길쭉한 세로 사진만 높이를 제한)
+function layoutFeedDetailPhotos(container){
+  const row = container.querySelector('.feed-detail-photos');
+  if(!row) return;
+  const imgs = [...row.querySelectorAll('img')];
+  const cs = getComputedStyle(row);
+  const W = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if(W <= 0) return;
+  const ratios = imgs.map(img => (img.naturalWidth && img.naturalHeight) ? img.naturalWidth / img.naturalHeight : 0);
+  const known = ratios.filter(r => r > 0);
+  const maxH = W * 1.25;
+  row.classList.toggle('single', imgs.length === 1);
+  let H;
+  if(imgs.length === 1){
+    H = known.length ? Math.min(W / known[0], maxH) : W * 0.75;
+  } else {
+    const widest = known.length ? Math.max(...known) : 4 / 3;
+    // 파노라마처럼 아주 긴 사진이 있어도 너무 납작해지지 않게 최소 높이를 둠 (그 사진만 옆으로 넘쳐서 밀어서 봄)
+    H = Math.max(W * 0.55, Math.min(W / widest, maxH));
+  }
+  imgs.forEach((img, i) => {
+    const r = ratios[i] || 3 / 4;
+    img.style.height = Math.round(H) + 'px';
+    img.style.width = Math.round(imgs.length === 1 ? Math.min(W, H * r) : H * r) + 'px';
+  });
 }
 function showFeedPostDetailView(){
   rememberActiveFeedViewScroll();
   // 리뷰 상세를 보는 동안엔 위쪽 "내 리뷰 프로필" 카드를 가림
   const reviewProfileCard = document.getElementById('feedReviewProfileCard');
   if(reviewProfileCard) reviewProfileCard.style.display = 'none';
+  document.getElementById('panel-community').classList.add('feed-detail-open');
   const feedViews = document.querySelectorAll('#communityView-feed > .feed-list-view');
   const current = [...feedViews].find(v => v.classList.contains('active') && v.id !== 'feedPlaceDetailView');
   feedDetailReturnViewId = current ? current.id : 'feedListView';
@@ -13031,6 +13074,7 @@ function showFeedPostDetailView(){
 }
 function closeFeedPostDetail(){
   document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('panel-community').classList.remove('feed-detail-open');
   const back = document.getElementById(feedDetailReturnViewId) || document.getElementById('feedListView');
   back.classList.add('active');
   // 목록으로 돌아갈 때만 "내 리뷰 프로필" 카드를 다시 보여줌 (작성자 화면으로 돌아가면 계속 가려둠)
@@ -13180,6 +13224,7 @@ function openFeedPlaceTagView(placeName){
   rememberActiveFeedViewScroll();
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedPlaceDetailView').classList.remove('active');
+  document.getElementById('panel-community').classList.remove('feed-detail-open');
   const tagView = document.getElementById('feedTagView');
   tagView.classList.add('active');
   scrollFeedViewToTop(tagView);
@@ -13333,6 +13378,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       underView = document.getElementById(underId) || document.getElementById('feedListView');
       underWasActive = underView.classList.contains('active');
       underView.classList.add('active');
+      if(id === 'feedPlaceDetailView') document.getElementById('panel-community').classList.remove('feed-detail-open');
       if(underView.id === 'feedListView'){
         const card = document.getElementById('feedReviewProfileCard');
         if(card) card.style.display = '';
@@ -13429,6 +13475,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
           view.style.display = '';
           if(!didSwap){ dropView(); return; }
           if(!underWasActive && underView) underView.classList.remove('active');
+          if(id === 'feedPlaceDetailView') document.getElementById('panel-community').classList.add('feed-detail-open');
           if(id === 'feedAuthorView' || id === 'feedPlaceDetailView'){
             const card = document.getElementById('feedReviewProfileCard');
             if(card) card.style.display = 'none';
@@ -13935,6 +13982,7 @@ function refreshFeedViewsAfterEdit(post){
     const header = document.getElementById('feedPlaceDetailHeader');
     header.innerHTML = feedPostDetailHtml(post);
     wireFeedPostDetail(header, post);
+    relayoutFeedDetailPhotosWhenLoaded(header);
   } else if(feedCreateReturnViewId === 'feedTagView'){
     renderFeedTagList();
   } else if(feedCreateReturnViewId === 'feedAuthorView' && currentUser){
@@ -14800,6 +14848,7 @@ function refreshMyAuthorInFeed(){
     const header = document.getElementById('feedPlaceDetailHeader');
     header.innerHTML = feedPostDetailHtml(feedDetailCurrentPost);
     wireFeedPostDetail(header, feedDetailCurrentPost);
+    relayoutFeedDetailPhotosWhenLoaded(header);
   }
 }
 
