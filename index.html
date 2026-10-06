@@ -2226,6 +2226,8 @@
 
   .feed-list-view{ display:none; }
   .feed-list-view.active{ display:block; }
+  /* 밀어서 뒤로가기 하는 동안 오른쪽으로 밀려난 화면 때문에 가로 스크롤이 생기지 않게 (clip은 sticky를 안 깨뜨림) */
+  #communityView-feed{ overflow-x:clip; }
   .feed-create-view{ display:none; }
   .feed-create-view.active{ display:block; }
 
@@ -12186,12 +12188,15 @@ function openFeedAuthorView(author){
   // 다른 사람이든 나 자신이든, 이 화면을 보는 동안에는 위쪽 "내 리뷰 프로필" 카드를 가려서
   // (특히 다른 사람을 보고 있을 때) 내 프로필 카드가 같이 떠서 헷갈리는 일이 없게 함.
   const reviewProfileCard = document.getElementById('feedReviewProfileCard');
+  rememberActiveFeedViewScroll();
   if(reviewProfileCard) reviewProfileCard.style.display = 'none';
 
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedPlaceDetailView').classList.remove('active');
   document.getElementById('feedTagView').classList.remove('active');
-  document.getElementById('feedAuthorView').classList.add('active');
+  const authorView = document.getElementById('feedAuthorView');
+  authorView.classList.add('active');
+  scrollFeedViewToTop(authorView);
   pushViewState(closeFeedAuthorView);
 }
 function closeFeedAuthorView(){
@@ -12199,6 +12204,7 @@ function closeFeedAuthorView(){
   document.getElementById('feedListView').classList.add('active');
   const reviewProfileCard = document.getElementById('feedReviewProfileCard');
   if(reviewProfileCard) reviewProfileCard.style.display = '';
+  restoreFeedViewScroll('feedListView');
 }
 document.getElementById('feedAuthorBackBtn').addEventListener('click', () => goBackOrClose(closeFeedAuthorView));
 // 리뷰용 프로필 수정 팝업 - 작성자 화면의 수정 버튼과 추천 탭 맨 위 "내 리뷰 프로필" 카드가 같이 씀
@@ -12973,6 +12979,7 @@ function openFeedPostDetail(post){
   const header = document.getElementById('feedPlaceDetailHeader');
   header.innerHTML = feedPostDetailHtml(post);
   wireFeedPostDetail(header, post);
+  rememberActiveFeedViewScroll();
   const feedViews = document.querySelectorAll('#communityView-feed > .feed-list-view');
   const current = [...feedViews].find(v => v.classList.contains('active') && v.id !== 'feedPlaceDetailView');
   feedDetailReturnViewId = current ? current.id : 'feedListView';
@@ -12984,11 +12991,30 @@ function openFeedPostDetail(post){
 }
 function closeFeedPostDetail(){
   document.getElementById('feedPlaceDetailView').classList.remove('active');
-  (document.getElementById(feedDetailReturnViewId) || document.getElementById('feedListView')).classList.add('active');
+  const back = document.getElementById(feedDetailReturnViewId) || document.getElementById('feedListView');
+  back.classList.add('active');
+  restoreFeedViewScroll(back.id);
 }
 function scrollFeedViewToTop(view){
   window.scrollTo(0, 0);
   for(let el = view.parentElement; el; el = el.parentElement){ if(el.scrollTop) el.scrollTop = 0; }
+}
+// 리뷰 화면끼리 오갈 때 스크롤 위치 기억 - 다른 화면을 열기 직전에 지금 보던 화면의 위치를 저장해두고,
+// 뒤로 돌아오면 그 위치로 되돌림 (예전엔 상세에서 뒤로가면 목록 맨 위로 가버렸음)
+const feedViewScrollMemo = {};
+function rememberActiveFeedViewScroll(){
+  const cur = [...document.querySelectorAll('#communityView-feed > .feed-list-view')].find(v => v.classList.contains('active'));
+  if(!cur) return;
+  const snap = [{ el: null, top: window.scrollY }];
+  for(let el = cur.parentElement; el; el = el.parentElement){ if(el.scrollTop) snap.push({ el, top: el.scrollTop }); }
+  feedViewScrollMemo[cur.id] = snap;
+}
+function restoreFeedViewScroll(viewId){
+  const snap = feedViewScrollMemo[viewId];
+  if(!snap) return;
+  const apply = () => snap.forEach(s => { if(s.el) s.el.scrollTop = s.top; else window.scrollTo(0, s.top); });
+  apply();
+  requestAnimationFrame(apply); // 화면이 다시 그려진 뒤 높이가 늦게 잡히는 경우 대비해 한 번 더
 }
 document.getElementById('feedPlaceDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPostDetail));
 
@@ -13108,16 +13134,113 @@ function openFeedPlaceTagView(placeName){
   feedTagCurrentPosts = posts;
   renderFeedTagList();
 
+  rememberActiveFeedViewScroll();
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedPlaceDetailView').classList.remove('active');
-  document.getElementById('feedTagView').classList.add('active');
+  const tagView = document.getElementById('feedTagView');
+  tagView.classList.add('active');
+  scrollFeedViewToTop(tagView);
   pushViewState(closeFeedPlaceTagView);
 }
 function closeFeedPlaceTagView(){
   document.getElementById('feedTagView').classList.remove('active');
   document.getElementById('feedListView').classList.add('active');
+  restoreFeedViewScroll('feedListView');
 }
 document.getElementById('feedTagBackBtn').addEventListener('click', () => goBackOrClose(closeFeedPlaceTagView));
+
+// ---------- 리뷰 상세·장소 모아보기·작성자 리뷰: 왼쪽에서 오른쪽으로 밀어서 뒤로가기 ----------
+// 손가락을 따라 화면이 오른쪽으로 밀리고, 충분히 밀거나 빠르게 튕기면 뒤로가기(뒤로 버튼과 같음), 아니면 제자리로 돌아옴
+(function setupFeedSwipeBack(){
+  const targets = [
+    ['feedPlaceDetailView', closeFeedPostDetail],
+    ['feedTagView', closeFeedPlaceTagView],
+    ['feedAuthorView', closeFeedAuthorView],
+  ];
+  targets.forEach(([id, closeFn]) => {
+    const view = document.getElementById(id);
+    if(!view) return;
+    let startX = 0, startY = 0, startT = 0, dx = 0;
+    let tracking = false, dragging = false;
+
+    function isInsideHorizontalScroll(el){
+      for(let node = el; node && node !== view; node = node.parentElement){
+        const style = window.getComputedStyle(node);
+        if((style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth) return true;
+      }
+      return false;
+    }
+    function setOffset(x){
+      view.style.transform = x ? `translateX(${x}px)` : '';
+      view.style.opacity = x ? String(Math.max(0.4, 1 - x / (view.offsetWidth || window.innerWidth))) : '';
+    }
+    function clearSwipeStyles(){
+      view.style.transition = '';
+      view.style.transform = '';
+      view.style.opacity = '';
+    }
+    function afterTransition(fn){
+      let done = false;
+      const finish = () => { if(done) return; done = true; view.removeEventListener('transitionend', finish); fn(); };
+      view.addEventListener('transitionend', finish);
+      setTimeout(finish, 320);
+    }
+
+    view.addEventListener('touchstart', (e) => {
+      tracking = false;
+      if(e.touches.length !== 1 || !view.classList.contains('active')) return;
+      if(e.target.closest('input, textarea, select, .feed-detail-kebab-menu')) return;
+      if(isInsideHorizontalScroll(e.target)) return; // 사진 넘기기 등 가로 스크롤은 그쪽 우선
+      const t = e.touches[0];
+      startX = t.clientX; startY = t.clientY; startT = Date.now(); dx = 0;
+      tracking = true; dragging = false;
+    }, { passive: true });
+
+    view.addEventListener('touchmove', (e) => {
+      if(!tracking) return;
+      const t = e.touches[0];
+      const mx = t.clientX - startX, my = t.clientY - startY;
+      if(!dragging){
+        if(Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+        // 오른쪽으로, 위아래보다 확실히 가로로 움직일 때만 뒤로가기 제스처로 봄 (위아래 스크롤은 그대로)
+        if(!(mx > 0 && mx > Math.abs(my) * 1.5)){ tracking = false; return; }
+        dragging = true;
+        view.style.transition = 'none';
+      }
+      e.preventDefault();
+      dx = Math.max(0, mx);
+      setOffset(dx);
+    }, { passive: false });
+
+    function onEnd(){
+      if(!tracking) return;
+      tracking = false;
+      if(!dragging) return;
+      dragging = false;
+      const width = view.offsetWidth || window.innerWidth;
+      const speed = dx / Math.max(1, Date.now() - startT); // px/ms
+      const shouldClose = dx > width * 0.33 || (dx > 40 && speed > 0.5);
+      view.style.transition = 'transform .22s cubic-bezier(.2,.8,.3,1), opacity .22s ease';
+      if(shouldClose){
+        setOffset(width + 20);
+        afterTransition(() => {
+          goBackOrClose(closeFn);
+          // history.back()으로 닫히는 건 한 박자 늦게 일어나서, 실제로 닫힌 뒤에 위치를 되돌림
+          const until = Date.now() + 600;
+          (function waitClosed(){
+            if(view.classList.contains('active') && Date.now() < until) return requestAnimationFrame(waitClosed);
+            clearSwipeStyles();
+          })();
+        });
+      } else {
+        setOffset(0);
+        afterTransition(clearSwipeStyles);
+      }
+    }
+    view.addEventListener('touchend', onEnd);
+    view.addEventListener('touchcancel', onEnd);
+  });
+})();
 // 장소 모아보기/작성자 리뷰 화면의 그리드·리스트 전환 - 보기 방식은 두 화면이 같이 씀
 document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn, #feedAuthorViewToggle .feed-tag-view-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -13585,6 +13708,7 @@ function openFeedReviewEdit(post){
 // 닫으면 원래 보던 화면으로 돌아감 (예전엔 목록만 숨겨서 상세에서 수정을 누르면 상세 밑에 폼이 붙어서 떴음)
 let feedCreateReturnViewId = 'feedListView';
 function showFeedCreateView(){
+  rememberActiveFeedViewScroll();
   const feedViews = document.querySelectorAll('#communityView-feed > .feed-list-view');
   const current = [...feedViews].find(v => v.classList.contains('active'));
   feedCreateReturnViewId = current ? current.id : 'feedListView';
@@ -13598,6 +13722,7 @@ function closeFeedCreate(){
   setFeedPlaceFieldsLocked(false);
   const back = document.getElementById(feedCreateReturnViewId) || document.getElementById('feedListView');
   back.classList.add('active');
+  restoreFeedViewScroll(back.id);
   feedCreateReturnViewId = 'feedListView';
 }
 // 수정 저장 후, 돌아갈 화면(상세·장소 모아보기·작성자 리뷰)에 떠 있는 내용도 새 내용으로 다시 그림
