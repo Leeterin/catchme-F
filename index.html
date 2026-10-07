@@ -17473,6 +17473,7 @@ function formAvailMinAt(track, clientX){
       let [, idx, edge] = (handle ? handle.dataset.faHandle : bar.dataset.faBar + '|m').split('|');
       if(edge === 'm' && /clip-/.test(bar.className)) edge = 'x'; // 잘려 보이는 막대는 통째로 옮기지 않음 (톡 누르면 시간 고르기)
       const ranges = quickCloneRanges(formAvailRanges[dk]);
+      hapticSelectionStart();
       formAvailDrag = { dk, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, bounds: formAvailBounds(dk, ranges, Number(idx), formAvailAxis.s, formAvailAxis.e), startMin: formAvailMinAt(track, e.clientX), el: bar || handle.closest('[data-fa-bar]'), x: e.clientX, y: e.clientY, moved: false };
       try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
       e.preventDefault();
@@ -17487,15 +17488,17 @@ function formAvailMinAt(track, clientX){
     dr.moved = true;
     const r = dr.ranges[dr.idx];
     const { lo: prevEnd, hi: nextStart } = dr.bounds;
-    const snap = m => Math.round(m / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP;
     const m = formAvailMinAt(dr.track, e.clientX);
-    if(dr.edge === 's') r.s = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, snap(m)));
-    else if(dr.edge === 'e') r.e = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, snap(m)));
+    const ps = r.s, pe = r.e;
+    if(dr.edge === 's') r.s = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, quickStickySnap(r.s, m)));
+    else if(dr.edge === 'e') r.e = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, quickStickySnap(r.e, m)));
     else {
       const len = dr.orig.e - dr.orig.s;
-      r.s = Math.max(prevEnd, Math.min(nextStart - len, snap(dr.orig.s + m - dr.startMin)));
+      r.s = Math.max(prevEnd, Math.min(nextStart - len, quickStickySnap(r.s, dr.orig.s + m - dr.startMin)));
       r.e = r.s + len;
     }
+    if(r.s === ps && r.e === pe) return;
+    hapticTick(); // 5분 칸 넘어갈 때마다 톡
     // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
     dr.el.style.cssText = formAvailBarStyle(r);
     const label = document.querySelector(`[data-fa-times="${dr.dk}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
@@ -17505,6 +17508,7 @@ function formAvailMinAt(track, clientX){
     const dr = formAvailDrag;
     formAvailDrag = null;
     if(!dr) return;
+    if(!dr.tap) hapticSelectionEnd();
     const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
     if(isTap){
       const min = formAvailMinAt(dr.track, e.clientX);
@@ -20759,6 +20763,11 @@ function hapticSelectionStart(){
 }
 function hapticSelectionEnd(){
   try { const hp = getHapticsPlugin(); if(hp) Promise.resolve(hp.selectionEnd()).catch(() => {}); } catch(e) {}
+}
+// 5분 칸에 딱 걸려 있게 - 다음 칸 가까이(4분)까지 밀어야 넘어가서 경계에서 왔다 갔다 떨리지 않음
+function quickStickySnap(cur, m){
+  if(Math.abs(m - cur) < QUICK_AVAIL_STEP * 0.8) return cur;
+  return Math.round(m / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP;
 }
 function hapticTick(){
   try {
@@ -28894,6 +28903,7 @@ quickAvailRowsEl.addEventListener('pointerdown', (e) => {
     let [, idx, edge] = (handle ? handle.dataset.qaHandle : bar.dataset.qaBar + '|m').split('|');
     if(edge === 'm' && /clip-/.test(bar.className)) edge = 'x'; // 잘려 보이는 막대는 통째로 옮기지 않음 (톡 누르면 시간 고르기)
     const ranges = quickCloneRanges(quickAvailPattern[row.dows[0]]);
+    hapticSelectionStart();
     quickDrag = { row, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, startMin: quickMinAt(track, e.clientX), el: bar || handle.closest('[data-qa-bar]'), x: e.clientX, y: e.clientY, moved: false, offset: 0, stuck: null, stuckX: 0, passed: new Set() };
     try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
     e.preventDefault();
@@ -28932,17 +28942,16 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
   const r = dr.ranges[dr.idx];
   const prevEnd = dr.idx > 0 ? dr.ranges[dr.idx - 1].e : quickAvailAxis.s;
   const nextStart = dr.idx < dr.ranges.length - 1 ? dr.ranges[dr.idx + 1].s : quickAvailAxis.e;
-  const snap = m => Math.round(m / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP;
   // 넘어간 뒤엔 손가락보다 뒤처져 있던 만큼을 조금씩 줄여서 다시 손가락 밑으로 따라오게 함
   if(!dr.stuck && dr.offset) dr.offset = Math.abs(dr.offset) < 2 ? 0 : dr.offset * 0.75;
   const m = quickMinAt(dr.track, e.clientX) - dr.offset;
   // 가려는 값(s, e)을 먼저 구하고, 내 일정에 걸리면 경계에서 멈춤
   let ns = r.s, ne = r.e;
-  if(dr.edge === 's') ns = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, snap(m)));
-  else if(dr.edge === 'e') ne = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, snap(m)));
+  if(dr.edge === 's') ns = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, quickStickySnap(r.s, m)));
+  else if(dr.edge === 'e') ne = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, quickStickySnap(r.e, m)));
   else {
     const len = dr.orig.e - dr.orig.s;
-    ns = Math.max(prevEnd, Math.min(nextStart - len, snap(dr.orig.s + m - dr.startMin)));
+    ns = Math.max(prevEnd, Math.min(nextStart - len, quickStickySnap(r.s, dr.orig.s + m - dr.startMin)));
     ne = ns + len;
   }
   const hits = [];
@@ -28954,6 +28963,7 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
       dr.stuck = hit.b;
       dr.stuckX = e.clientX;
       hapticRattle();
+      dr.rattled = true;
     } else if(Math.abs(e.clientX - dr.stuckX) > QUICK_DETENT_PX){
       // 계속 밀었으면 넘어감 - 멈춰 있던 만큼은 빼서 막대가 경계에서부터 이어서 움직이게
       dr.passed.add(hit.b);
@@ -28967,8 +28977,12 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
   } else {
     dr.stuck = null;
   }
+  const changed = r.s !== ns || r.e !== ne;
   r.s = ns;
   r.e = ne;
+  if(!changed) return;
+  if(dr.rattled) dr.rattled = false; // 일정에 걸린 순간은 드드득 진동만
+  else hapticTick(); // 5분 칸 넘어갈 때마다 톡
   // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
   dr.el.style.cssText = quickBarStyle(r);
   const label = document.querySelector(`[data-qa-times="${dr.row.key}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
@@ -28978,6 +28992,7 @@ function endQuickDrag(e){
   const dr = quickDrag;
   quickDrag = null;
   if(!dr) return;
+  if(!dr.tap) hapticSelectionEnd();
   const dow = dr.row.dows[0];
   const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
   if(isTap){
