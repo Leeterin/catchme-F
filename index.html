@@ -7510,22 +7510,14 @@
           <div class="avail-for-hint" id="eventAvailForHint"></div>
         </div>
         <div class="mp-input-group">
-          <label>예약 가능 시간 선택 <span style="font-weight:400;color:var(--text-dim);">(탭하면 한 칸, 꾹 누른 채 밀면 여러 칸)</span></label>
+          <label>예약 가능 시간 <span style="font-weight:400;color:var(--text-dim);">(막대 끝을 끌거나 시간 글자를 눌러 5분 단위로 맞춰요)</span></label>
           <div class="schedule-nav" style="margin-bottom:8px;">
             <button id="availWeekPrev" type="button">&#8249;</button>
             <div class="schedule-nav-label" id="availWeekLabel">-</div>
             <button id="availWeekNext" type="button">&#8250;</button>
           </div>
-          <button type="button" class="avail-early-toggle" id="availEarlyToggle">새벽 시간 보기 (0~8시)</button>
-          <div class="week-grid-wrap avail-grid-wrap"><div class="week-grid" id="availSelectGrid"></div></div>
-        </div>
-      </div>
-
-      <!-- 여러 칸 선택 후 "분단위로 세부조정" 단계: 고른 시간대별로 정확한 시작/종료 시간을 정할 수 있음 -->
-      <div id="availFineTuneGroup" style="display:none;">
-        <div class="mp-input-group">
-          <label>분 단위로 세부 조정 <span style="font-weight:400;color:var(--text-dim);">(선택한 시간대별로 정확한 시작·종료 시간을 정할 수 있어요)</span></label>
-          <div id="availFineTuneList"></div>
+          <div id="formAvailRows"></div>
+          <p class="quick-avail-hint">빈 곳을 누르면 시간을 더 넣어요. 회색은 내 일정이라 그 시간은 빼고 열어요.</p>
         </div>
       </div>
 
@@ -7550,7 +7542,6 @@
       </div>
       <div class="event-form-footer">
         <button class="profile-chat-btn" id="eventFormSubmitBtn">추가하기</button>
-        <button type="button" id="availFineTuneBackBtn" style="display:none;width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">&larr; 다시 칸으로 선택하기</button>
         <div id="recurringDeleteGroup" style="display:none;margin-top:10px;text-align:center;">
           <button type="button" id="recurringDeleteTriggerBtn" style="border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;padding:6px 0;text-decoration:underline;">일정 삭제</button>
         </div>
@@ -16415,212 +16406,20 @@ function renderVisibilityHint(){
   }
 }
 
-// 예약 가능 시간 - 주간 그리드 다중 선택 상태
-let availGridWeekStart = null;
-const availSelectedCells = new Set(); // "dateKey::hourIndex"
-const AVAIL_EARLY_END = 9; // 0~8시(새벽)는 기본으로 접어둠
-let availShowEarly = false;
-// 모바일: 꾹 누르면(0.35초) 드래그 선택 모드 - 그 뒤로 미는 동안은 스크롤 대신 지나가는 칸을 칠함
-const availTouchDrag = { timer: null, active: false, used: false, value: true, x: 0, y: 0 };
-let availDragging = false;
-let availPaintValue = false;
-
-// 예약 가능 시간 - 그리드에서 고른 걸 분 단위로 세부 조정하는 단계
-let availFineTuneMode = false;
+// 예약 가능 시간 - 날짜마다 막대로 정하는 상태 (빠르게 열기와 같은 막대)
+let availGridWeekStart = null; // 지금 보는 주의 첫날
+let formAvailRanges = {}; // dateKey -> [{ s, e }] 시간순 - 주를 넘겨도 다른 주에 정한 시간은 그대로 남음
+let formAvailStash = {}; // 줄을 껐다 다시 켤 때 되돌릴 시간
+let formAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dk, idx }
+let formAvailAxis = { s: 0, e: 24 * 60 }; // 막대가 보여주는 시간 범위
+let formAvailDrag = null;
+// 저장할 때 등록할 블록들
 let availFineTuneBlocks = []; // [{ dateKey, startMin, endMin }]
-// 기존 "예약 가능" 일정을 수정하려고 열었을 때, 원래 가지고 있던 정확한 분 단위 시작/종료 시간들
-// (그리드는 "시" 단위로만 칸을 선택하므로, 세부조정 화면을 처음 열 때 이 값이 있으면 반올림하지 않고 그대로 살려씀)
-let editingOriginalAvailBlocks = []; // [{ dateKey, startMin, endMin }]
-
-// 선택된 칸들("dateKey::hourIndex")을 날짜별로 모아서, 같은 날 연속된 시간은 하나의 블록으로 합침
-function computeAvailBlocksFromSelection(){
-  const byDate = {};
-  availSelectedCells.forEach(cellKey => {
-    const [dKey, idxStr] = cellKey.split('::');
-    if(!byDate[dKey]) byDate[dKey] = [];
-    byDate[dKey].push(parseInt(idxStr, 10));
-  });
-  const blocks = [];
-  Object.entries(byDate).forEach(([dKey, idxList]) => {
-    idxList.sort((a, b) => a - b);
-    let i = 0;
-    while(i < idxList.length){
-      let j = i;
-      while(j + 1 < idxList.length && idxList[j+1] === idxList[j] + 1) j++;
-      const startH = HOURS[idxList[i]];
-      const endH = HOURS[idxList[j]] + 1;
-      blocks.push({ dateKey: dKey, startMin: startH * 60, endMin: endH * 60 });
-      i = j + 1;
-    }
-  });
-  blocks.sort((a, b) => (a.dateKey < b.dateKey ? -1 : a.dateKey > b.dateKey ? 1 : a.startMin - b.startMin));
-  return blocks;
-}
-
-// 이 블록이 속한 날짜에서, 원래 위치를 포함해 다른 일정과 안 겹치게 조정할 수 있는 최대 범위(분 단위)를 계산.
-// 양옆에 다른 일정(바쁨/예약가능/등)이 있으면 그 경계까지만 늘릴 수 있게 제한함
-function computeFreeRangeForBlock(dateKey, aroundStartMin, aroundEndMin){
-  let minStart = 0, maxEnd = 24 * 60;
-  SCHEDULE_EVENTS.forEach(ev => {
-    if(ev.dateKey !== dateKey || !blocksBooking(ev)) return;
-    if(ev.endMin <= aroundStartMin && ev.endMin > minStart) minStart = ev.endMin;
-    if(ev.startMin >= aroundEndMin && ev.startMin < maxEnd) maxEnd = ev.startMin;
-  });
-  return { minStart, maxEnd };
-}
+let editingOriginalAvailBlocks = []; // 수정하려고 열었을 때 원래 있던 블록들
 
 function availFineTuneDateLabel(dateKey){
   const d = parseDateInputValue(dateKey);
   return `${d.getMonth()+1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]})`;
-}
-
-// 그리드에서 고른 시간대들을 "다음" 단계로 넘겨서, 한 화면에서 날짜별로 분 단위 시작/종료 시간을 조정할 수 있게 함
-function openAvailFineTune(){
-  availFineTuneBlocks = computeAvailBlocksFromSelection();
-  if(availFineTuneBlocks.length === 0){
-    showToast('예약 가능으로 표시할 시간을 하나 이상 선택해주세요.');
-    return;
-  }
-  // 수정 중이던 원래 블록이 지금 선택된 그리드 칸(시 단위)과 같은 시간대를 가리키면,
-  // 그리드 때문에 반올림된 "시" 단위 값 대신 원래 쓰던 정확한 분 단위 시작/종료 시간을 그대로 되살림
-  availFineTuneBlocks.forEach(block => {
-    const orig = editingOriginalAvailBlocks.find(o => {
-      if(o.dateKey !== block.dateKey) return false;
-      const startH = Math.floor(o.startMin / 60);
-      const endH = Math.max(startH + 1, Math.ceil(o.endMin / 60));
-      return startH === Math.floor(block.startMin / 60) && endH === Math.floor(block.endMin / 60);
-    });
-    if(orig){
-      block.startMin = orig.startMin;
-      block.endMin = orig.endMin;
-    }
-  });
-  // 각 블록마다 "다른 일정과 안 겹치게 조정 가능한 최대 범위"를 미리 계산해서 붙여둠 - 이 범위 밖은 아예 선택 못 하게 함
-  availFineTuneBlocks.forEach(block => {
-    const range = computeFreeRangeForBlock(block.dateKey, block.startMin, block.endMin);
-    block.minStart = range.minStart;
-    block.maxEnd = range.maxEnd;
-  });
-  availFineTuneMode = true;
-  document.getElementById('availableGridGroup').style.display = 'none';
-  document.getElementById('availFineTuneGroup').style.display = 'block';
-  document.getElementById('availFineTuneBackBtn').style.display = 'block';
-  document.getElementById('eventFormSubmitBtn').textContent = editingEventId ? '이대로 수정하기' : '이대로 등록하기';
-  renderAvailFineTuneList();
-  // 분 단위 조정도 한 단계로 쌓아서, 폰 뒤로가기를 누르면 일정 창 전체가 아니라 칸 선택 화면으로만 돌아가게 함
-  pushViewState(closeAvailFineTune);
-}
-
-function closeAvailFineTune(){
-  if(!availFineTuneMode) return;
-  availFineTuneMode = false;
-  document.getElementById('availFineTuneGroup').style.display = 'none';
-  document.getElementById('availableGridGroup').style.display = 'block';
-  document.getElementById('availFineTuneBackBtn').style.display = 'none';
-  document.getElementById('eventFormSubmitBtn').textContent = '다음: 분 단위로 조정하기';
-}
-
-// 주어진 범위(rangeMin~rangeMax, 분 단위) 안에서 고를 수 있는 "시" 옵션들만 계산 (그 시간대 안에 5분 단위로 유효한 값이 하나라도 있어야 포함)
-function buildHourOptionsInRange(rangeMin, rangeMax, includeMidnight24){
-  const hours = [];
-  for(let h = 0; h < 24; h++){
-    if(h * 60 <= rangeMax && h * 60 + 55 >= rangeMin) hours.push(h);
-  }
-  if(includeMidnight24 && 24 * 60 >= rangeMin && 24 * 60 <= rangeMax) hours.push(24);
-  return hours;
-}
-// 특정 "시"가 주어졌을 때, 그 시간 안에서 범위를 벗어나지 않는 "분"(5분 단위) 옵션들만 계산
-function buildMinuteOptionsInRange(hour, rangeMin, rangeMax){
-  const minutes = [];
-  for(let m = 0; m < 60; m += 5){
-    const total = hour * 60 + m;
-    if(total >= rangeMin && total <= rangeMax) minutes.push(m);
-  }
-  return minutes;
-}
-
-function renderAvailFineTuneList(){
-  const list = document.getElementById('availFineTuneList');
-  list.innerHTML = availFineTuneBlocks.map((block, idx) => {
-    const startH = Math.floor(block.startMin / 60) % 24;
-    const startM = block.startMin % 60;
-    const isEndOfDay = block.endMin >= 24 * 60;
-    const endH = isEndOfDay ? 24 : Math.floor(block.endMin / 60);
-    const endM = isEndOfDay ? 0 : block.endMin % 60;
-
-    // 시작 시간은 [minStart, maxEnd-5] 안에서만, 종료 시간은 [minStart+5, maxEnd] 안에서만 고를 수 있음
-    const startHours = buildHourOptionsInRange(block.minStart, block.maxEnd - 5, false);
-    const startMinutes = buildMinuteOptionsInRange(startH, block.minStart, block.maxEnd - 5);
-    const endHours = buildHourOptionsInRange(block.minStart + 5, block.maxEnd, true);
-    const endMinutes = isEndOfDay ? [] : buildMinuteOptionsInRange(endH, block.minStart + 5, block.maxEnd);
-
-    return `
-      <div class="avail-finetune-row">
-        <div class="avail-finetune-date">${availFineTuneDateLabel(block.dateKey)}</div>
-        <div class="avail-finetune-time-row">
-          <select class="search-input time-select finetune-start-hour" data-block-idx="${idx}">
-            ${startHours.map(h => `<option value="${h}" ${h === startH ? 'selected' : ''}>${String(h).padStart(2,'0')}시</option>`).join('')}
-          </select>
-          <select class="search-input time-select finetune-start-minute" data-block-idx="${idx}">
-            ${startMinutes.map(m => `<option value="${m}" ${m === startM ? 'selected' : ''}>${String(m).padStart(2,'0')}분</option>`).join('')}
-          </select>
-          <span class="avail-finetune-tilde">~</span>
-          <select class="search-input time-select finetune-end-hour" data-block-idx="${idx}">
-            ${endHours.map(h => `<option value="${h}" ${h === endH ? 'selected' : ''}>${h === 24 ? '24시(자정)' : String(h).padStart(2,'0') + '시'}</option>`).join('')}
-          </select>
-          <select class="search-input time-select finetune-end-minute" data-block-idx="${idx}" ${isEndOfDay ? 'disabled' : ''}>
-            ${endMinutes.map(m => `<option value="${m}" ${m === endM ? 'selected' : ''}>${String(m).padStart(2,'0')}분</option>`).join('')}
-          </select>
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  // 시(hour)를 바꾸면, 그 시에 맞는 분(minute) 옵션도 다시 계산해서 채워줌 (범위 밖 분은 애초에 안 보이게)
-  list.querySelectorAll('.finetune-start-hour').forEach(sel => {
-    sel.addEventListener('change', () => {
-      const idx = parseInt(sel.dataset.blockIdx, 10);
-      const block = availFineTuneBlocks[idx];
-      const hour = parseInt(sel.value, 10);
-      const minuteSel = list.querySelector(`.finetune-start-minute[data-block-idx="${idx}"]`);
-      const minutes = buildMinuteOptionsInRange(hour, block.minStart, block.maxEnd - 5);
-      minuteSel.innerHTML = minutes.map(m => `<option value="${m}">${String(m).padStart(2,'0')}분</option>`).join('');
-    });
-  });
-  // 종료 시간이 "24시(자정)"이면 분 선택은 의미 없으니 비활성화하고, 다른 시로 바꾸면 다시 그 시에 맞는 분 옵션을 채움
-  list.querySelectorAll('.finetune-end-hour').forEach(sel => {
-    sel.addEventListener('change', () => {
-      const idx = parseInt(sel.dataset.blockIdx, 10);
-      const block = availFineTuneBlocks[idx];
-      const hour = parseInt(sel.value, 10);
-      const minuteSel = list.querySelector(`.finetune-end-minute[data-block-idx="${idx}"]`);
-      if(hour === 24){
-        minuteSel.disabled = true;
-        minuteSel.innerHTML = '';
-      } else {
-        minuteSel.disabled = false;
-        const minutes = buildMinuteOptionsInRange(hour, block.minStart + 5, block.maxEnd);
-        minuteSel.innerHTML = minutes.map(m => `<option value="${m}">${String(m).padStart(2,'0')}분</option>`).join('');
-      }
-    });
-  });
-}
-document.getElementById('availFineTuneBackBtn').addEventListener('click', () => goBackOrClose(closeAvailFineTune));
-
-// 세부조정 화면의 select 값들을 읽어서 availFineTuneBlocks에 반영(분 단위 정밀 시간으로 갱신)
-function readAvailFineTuneBlocksFromInputs(){
-  const list = document.getElementById('availFineTuneList');
-  availFineTuneBlocks.forEach((block, idx) => {
-    const startH = parseInt(list.querySelector(`.finetune-start-hour[data-block-idx="${idx}"]`).value, 10);
-    const startM = parseInt(list.querySelector(`.finetune-start-minute[data-block-idx="${idx}"]`).value, 10);
-    const endH = parseInt(list.querySelector(`.finetune-end-hour[data-block-idx="${idx}"]`).value, 10);
-    const endMinuteSel = list.querySelector(`.finetune-end-minute[data-block-idx="${idx}"]`);
-    // 종료 시간이 24시(자정)면 분 선택지를 비워서 비활성화해두므로(옵션이 하나도 없음) select의 value가
-    // 빈 문자열이라 parseInt하면 NaN이 나와버림 - 자정은 항상 0분이므로 그 경우엔 0으로 취급함
-    const endM = (endH === 24 || endMinuteSel.disabled) ? 0 : parseInt(endMinuteSel.value, 10);
-    block.startMin = startH * 60 + startM;
-    block.endMin = endH * 60 + endM;
-  });
 }
 
 function defaultUntilDateValue(){
@@ -16904,21 +16703,15 @@ function setEventTypeUI(type){
     document.getElementById('eventFormMemoDate').value = document.getElementById('eventFormStartDate').value || toDateInputValue(scheduleFocusDate);
     refreshDateDisplay('eventFormMemoDate');
   }
-  // 다른 타입으로 바꾸거나 새로 열었으면 세부조정 상태는 항상 초기화
-  // 분 단위 조정 중에 일정 종류를 바꾸면 조정 화면이 닫히니, 그 뒤로가기 항목도 같이 지움
-  const fineTuneIdx = viewCloseStack.lastIndexOf(closeAvailFineTune);
-  if(fineTuneIdx >= 0) unwindViewStack(fineTuneIdx);
-  availFineTuneMode = false;
   availFineTuneBlocks = [];
-  document.getElementById('availFineTuneGroup').style.display = 'none';
-  document.getElementById('availFineTuneBackBtn').style.display = 'none';
-  document.getElementById('eventFormSubmitBtn').textContent = useGrid ? '다음: 분 단위로 조정하기'
+  document.getElementById('eventFormSubmitBtn').textContent = useGrid ? (editingEventId ? '수정하기' : '등록하기')
     : isMemo ? (editingMemoId ? '메모 수정하기' : '메모 추가하기')
     : (editingEventId ? '수정하기' : '추가하기');
   if(useGrid){
     syncAvailFirstTip();
     availGridWeekStart = getWeekStart(scheduleFocusDate);
-    renderAvailSelectGrid();
+    formAvailEdit = null;
+    renderFormAvailBars();
   }
 
   renderEventAvailFor();
@@ -17029,33 +16822,29 @@ function openEventForm(existingEvent){
     formColor = existingEvent.color || null;
     renderEventColorPicker();
 
-    // "예약 가능" 일정을 수정할 때는, 원래 만들 때 쓰던 그리드 선택 화면으로 다시 열어서
-    // 어떤 칸들이 선택되어 있었는지 그대로 보여줌 (setEventTypeUI가 그리드를 일단
-    // 오늘 기준 주간/빈 선택으로 초기화해두므로, 그 다음에 실제 값으로 덮어씀)
+    // "예약 가능" 일정을 수정할 때는 원래 시간을 막대로 그대로 보여줌 (setEventTypeUI가 오늘 기준 주로 열어두므로, 그 다음에 실제 값으로 덮어씀)
     if(existingEvent.type === 'available'){
       const pieces = existingEvent.linkGroupId
         ? SCHEDULE_EVENTS.filter(e => e.linkGroupId === existingEvent.linkGroupId)
         : [existingEvent];
-      availSelectedCells.clear();
+      formAvailRanges = {};
+      formAvailStash = {};
       pieces.forEach(piece => {
         if(!piece.dateKey) return;
-        const startH = Math.floor(piece.startMin / 60);
-        const endH = Math.max(startH + 1, Math.ceil(piece.endMin / 60));
-        for(let h = startH; h < endH && h < 24; h++){
-          availSelectedCells.add(`${piece.dateKey}::${HOURS.indexOf(h)}`);
-        }
+        formAvailRanges[piece.dateKey] = quickMergeRanges([...(formAvailRanges[piece.dateKey] || []), { s: piece.startMin, e: piece.endMin }]);
       });
       const firstPiece = pieces.find(p => p.dateKey) || existingEvent;
       if(firstPiece.dateKey) availGridWeekStart = getWeekStart(parseDateInputValue(firstPiece.dateKey));
       editingOriginalAvailBlocks = pieces.filter(p => p.dateKey).map(p => ({ dateKey: p.dateKey, startMin: p.startMin, endMin: p.endMin }));
-      renderAvailSelectGrid();
+      renderFormAvailBars();
     } else {
       editingOriginalAvailBlocks = [];
     }
   } else {
     editingOriginalAvailBlocks = [];
+    formAvailRanges = {};
+    formAvailStash = {};
     setEventTypeUI('busy');
-    availSelectedCells.clear();
     document.getElementById('eventFormTitle').value = '';
     document.getElementById('eventFormStartDate').value = toDateInputValue(scheduleFocusDate);
     document.getElementById('eventFormEndDate').value = toDateInputValue(scheduleFocusDate);
@@ -17468,253 +17257,257 @@ document.querySelectorAll('.time-picker-btn').forEach(btn => {
   btn.addEventListener('click', () => openTimePicker(btn.dataset.target));
 });
 
-// ---------- 예약 가능 시간: 주간 그리드에서 터치/드래그로 다중 선택 ----------
-function renderAvailSelectGrid(){
-  const weekEnd = new Date(availGridWeekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
+// ---------- 예약 가능 시간: 날짜마다 막대로 정함 (빠르게 열기와 같은 막대) ----------
+// 칸을 하나씩 누르던 표 대신, 그 주 7일을 한 줄씩 막대로 보여줌. 끝을 끌면 시작/끝, 가운데를 끌면 통째로 옮기고,
+// 시간 글자를 누르면 5분 단위로 고름. 빈 곳을 누르면 그 자리에 시간을 넣음
+function formAvailWeekDays(){
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(availGridWeekStart); d.setDate(d.getDate() + i); return d; });
+}
+// 그날 막대 위에 보여줄 다른 일정 - 회색(그 시간은 못 엶)/점선(겹쳐도 예약 받는 일정). 이미 열어둔 예약 가능 시간은 합쳐지니 아래 얇은 줄로만
+function formAvailBusyFor(d){
+  const ex = editingEventId ? new Set([editingEventId, ...editingLinkedPieceIds]) : null;
+  const busy = [], other = [];
+  getEventsForDate(d).forEach(ev => {
+    if(ex && ex.has(ev.id)) return;
+    const r = getEventDisplayRangeForDate(ev, d);
+    if(r.endMin <= r.startMin) return;
+    if(ev.type === 'available' && isMergeableAvail(ev)){ other.push({ s: r.startMin, e: r.endMin }); return; }
+    busy.push({ s: r.startMin, e: r.endMin, soft: !blocksBooking(ev), title: ev.type === 'available' ? '반복으로 열어둔 예약 가능 시간' : (ev.title || '일정') });
+  });
+  return { busy, other };
+}
+function formAvailPct(min){ return (min - formAvailAxis.s) / (formAvailAxis.e - formAvailAxis.s) * 100; }
+function formAvailBarStyle(r){
+  const s = Math.max(r.s, formAvailAxis.s), e = Math.min(r.e, formAvailAxis.e);
+  if(e <= s) return 'display:none';
+  return `left:${formAvailPct(s)}%;width:${formAvailPct(e) - formAvailPct(s)}%`;
+}
+function formAvailDefault(dk){
+  const dow = parseDateInputValue(dk).getDay();
+  return { ...QUICK_AVAIL_GROUPS.find(g => g.dows.includes(dow)).def };
+}
+function formAvailEditHtml(dk, idx){
+  const r = (formAvailRanges[dk] || [])[idx];
+  if(!r) return '';
+  const hourSel = (f, v, max) => `<select data-fa-edit-f="${f}">${Array.from({ length: max + 1 }, (_, h) => `<option value="${h}"${h === v ? ' selected' : ''}>${String(h).padStart(2, '0')}</option>`).join('')}</select>`;
+  const minSel = (f, v) => `<select data-fa-edit-f="${f}">${Array.from({ length: 60 / QUICK_AVAIL_STEP }, (_, k) => k * QUICK_AVAIL_STEP).map(m => `<option value="${m}"${m === v ? ' selected' : ''}>${String(m).padStart(2, '0')}</option>`).join('')}</select>`;
+  return `<div class="qa-edit" data-fa-edit="${dk}|${idx}">${hourSel('sh', Math.floor(r.s / 60), 23)}:${minSel('sm', r.s % 60)} – ${hourSel('eh', Math.floor(r.e / 60), 24)}:${minSel('em', r.e % 60)}<button type="button" data-fa-edit-done>완료</button></div>`;
+}
+function renderFormAvailBars(){
+  const days = formAvailWeekDays();
   document.getElementById('availWeekLabel').textContent =
-    `${availGridWeekStart.getMonth()+1}월 ${availGridWeekStart.getDate()}일 - ${weekEnd.getMonth()+1}월 ${weekEnd.getDate()}일`;
-
-  const days = [];
-  for(let i = 0; i < 7; i++){
-    const d = new Date(availGridWeekStart);
-    d.setDate(d.getDate() + i);
-    days.push(d);
-  }
-
-  // 기존 "예약 가능" 일정을 수정하는 중이면, 지금 수정 중인 일정 자신은 "이미 다른 일정이 있어서 선택 불가"
-  // 판정에서 제외함 - 안 그러면 원래 선택돼 있던 칸들을 다시 눌러서 꺼버릴(칸별로 예약 취소) 수가 없음
-  const editingExcludeIds = editingEventId ? new Set([editingEventId, ...editingLinkedPieceIds]) : null;
-  const dayEventsCache = {};
-  days.forEach(d => { dayEventsCache[dateKeyOf(d)] = getEventsForDate(d); });
-
-  const grid = document.getElementById('availSelectGrid');
-  grid.className = 'week-grid avail-select-grid';
-  grid.innerHTML = '';
-  grid.appendChild(Object.assign(document.createElement('div'), { className: 'week-head-cell' })); // 모서리 빈 칸도 헤더줄과 같이 고정되게 같은 클래스를 줌
-
-  days.forEach(d => {
-    const head = document.createElement('div');
-    head.className = 'week-head-cell';
-    head.innerHTML = `${WEEKDAY_KO[d.getDay()]}<br>${d.getDate()}`;
-    grid.appendChild(head);
-  });
-
-  // 새벽 칸을 이미 골라뒀으면(수정 중 등) 접지 않고 보여줌
-  const earlyPicked = [...availSelectedCells].some(k => HOURS[Number(k.split('::')[1])] < AVAIL_EARLY_END);
-  const showEarly = availShowEarly || earlyPicked;
-  const earlyBtn = document.getElementById('availEarlyToggle');
-  earlyBtn.textContent = showEarly ? '새벽 시간 접기 (0~8시)' : '새벽 시간 보기 (0~8시)';
-  earlyBtn.hidden = earlyPicked;
-
-  HOURS.forEach((h, rowIdx) => {
-    if(!showEarly && h < AVAIL_EARLY_END) return; // rowIdx는 원래 순서 그대로 둬서 칸 키가 바뀌지 않게 함
-    const label = document.createElement('div');
-    label.className = 'week-hour-label';
-    label.textContent = `${h}시`;
-    grid.appendChild(label);
-
-    days.forEach(d => {
-      const key = dateKeyOf(d);
-      const texts = getScheduleText(key);
-      // 이 시각을 실제로 차지하는 "다른"(지금 수정 중인 자기 자신 제외) 일정이 있는지 직접 찾음 -
-      // texts만 보면 자기 자신이 차지한 칸도 그냥 "occupied"로 보여서, 수정 중엔 그 칸을 다시 못 누르게 돼버림
-      const blockingEv = (dayEventsCache[key] || []).find(ev => {
-        if(editingExcludeIds && editingExcludeIds.has(ev.id)) return false;
-        if(formEventType === 'available' && !blocksBooking(ev)) return false; // "이 시간에도 예약 받기" 켠 일정 위엔 열 수 있음
-        const disp = getEventDisplayRangeForDate(ev, d);
-        const evStartH = Math.floor(disp.startMin / 60);
-        const evEndH = Math.max(evStartH + 1, Math.ceil(disp.endMin / 60));
-        return h >= evStartH && h < evEndH;
-      });
-      // 새로 여는 중이면 이미 예약 가능으로 열린 칸도 고를 수 있음 - 저장할 때 그 시간에 고른 대상을 더해서 합침
-      const mergeableCell = !editingEventId && formEventType === 'available' && isMergeableAvail(blockingEv);
-      const occupied = !!blockingEv && !mergeableCell; // texts는 실제 시각(0~23시) 기준으로 인덱싱되므로, 그리드 행번호(rowIdx)가 아니라 실제 시각(h)으로 찾아야 함
-      const alreadyAvailable = !!blockingEv && blockingEv.type === 'available' && !mergeableCell; // 이미 예약 가능으로 등록된 칸은 따로 구분해서 한눈에 보이게 함
-      const cellKey = `${key}::${rowIdx}`;
-
-      const cell = document.createElement('div');
-      cell.className = 'week-cell'
-        + (mergeableCell ? ' mergeable-available' : '')
-        + (occupied ? ' occupied' : '')
-        + (alreadyAvailable ? ' already-available' : '')
-        + (availSelectedCells.has(cellKey) ? ' selected' : '');
-      cell.dataset.cellKey = cellKey;
-
-      if(!occupied){
-        cell.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          availDragging = true;
-          availPaintValue = !availSelectedCells.has(cellKey);
-          paintAvailCell(cell, cellKey, availPaintValue);
-        });
-        cell.addEventListener('mouseenter', () => {
-          if(availDragging) paintAvailCell(cell, cellKey, availPaintValue);
-        });
-        // 모바일: 예전엔 터치가 닿는 순간 바로 드래그선택 모드로 들어가서(preventDefault도 걸려서)
-        // 스크롤하려고 셀 위를 스쳐도 그 칸이 켜져버렸음. 그래서 터치는 드래그선택을 포기하고,
-        // "거의 움직이지 않고 뗐을 때"(=탭)만 그 칸 하나를 토글하도록 바꿈 - 스크롤은 그냥 자연스럽게 되게 둠.
-        let touchStartX = 0, touchStartY = 0, touchMoved = false;
-        cell.addEventListener('touchstart', (e) => {
-          const t = e.touches[0];
-          touchStartX = t.clientX;
-          touchStartY = t.clientY;
-          touchMoved = false;
-        }, { passive: true });
-        cell.addEventListener('touchmove', (e) => {
-          const t = e.touches[0];
-          if(Math.abs(t.clientX - touchStartX) > 10 || Math.abs(t.clientY - touchStartY) > 10){
-            touchMoved = true;
-          }
-        }, { passive: true });
-        cell.addEventListener('touchend', (e) => {
-          if(availTouchDrag.used){ e.preventDefault(); return; } // 꾹 눌러 드래그 선택한 경우는 탭 토글 안 함
-          if(!touchMoved){
-            e.preventDefault(); // 탭으로 처리할 때만 막아서, 뒤따라오는 합성 mousedown/click으로 두 번 토글되는 걸 방지
-            paintAvailCell(cell, cellKey, !availSelectedCells.has(cellKey));
-          }
-        }, { passive: false });
-      } else {
-        // 이미 다른 일정 있어서 선택 못 하는 칸: PC에서는 마우스 올리면 무슨 일정인지 말풍선으로 보여주고 떼면 사라짐,
-        // 모바일에서는 탭하면 토스트 알림으로 알려줌.
-        // "예약 가능" 일정을 수정하는 중에 다른 예약 가능 칸을 두 번 누르면, 그 일정도 이번 수정에 합쳐서 같이 고칠 수 있게 함
-        const canAbsorb = alreadyAvailable && !!editingEventId && formEventType === 'available' && !blockingEv.recurring;
-        const occupiedTitle = canAbsorb
-          ? '두 번 누르면 이 시간도 같이 수정할 수 있어요'
-          : alreadyAvailable ? '이미 예약 가능으로 등록돼 있어요' : ((blockingEv && blockingEv.title) || (texts[h] && texts[h].trim()) || '일정이 있어요');
-        cell.addEventListener('mouseenter', (e) => showCellHoverTooltip(occupiedTitle, e.clientX, e.clientY));
-        cell.addEventListener('mousemove', (e) => positionCellHoverTooltip(e.clientX, e.clientY));
-        cell.addEventListener('mouseleave', hideCellHoverTooltip);
-        cell.addEventListener('click', () => {
-          const now = Date.now();
-          if(canAbsorb && availLastOccupiedTap.key === cellKey && now - availLastOccupiedTap.at < 450){
-            availLastOccupiedTap = { key: null, at: 0 };
-            hideCellHoverTooltip();
-            absorbAvailEventIntoEdit(blockingEv);
-            return;
-          }
-          availLastOccupiedTap = { key: cellKey, at: now };
-          showToast(occupiedTitle);
-        });
-      }
-
-      grid.appendChild(cell);
-    });
-  });
-}
-
-// 수정 중인 "예약 가능" 일정에 다른 예약 가능 일정(ev)을 합침 - 그 칸들이 선택(파란색) 상태가 되고,
-// 저장하면 원래 일정과 함께 지워진 뒤 지금 선택된 칸들로 다시 만들어짐 (그래서 칸을 꺼서 일부만 취소할 수도 있음)
-let availLastOccupiedTap = { key: null, at: 0 };
-function absorbAvailEventIntoEdit(ev){
-  const pieces = ev.linkGroupId ? SCHEDULE_EVENTS.filter(e => e.linkGroupId === ev.linkGroupId) : [ev];
-  pieces.forEach(piece => {
-    if(piece.id === editingEventId || editingLinkedPieceIds.includes(piece.id)) return;
-    editingLinkedPieceIds.push(piece.id);
-    absorbedAvailIds.push(piece.id);
-    if(!piece.dateKey) return;
-    editingOriginalAvailBlocks.push({ dateKey: piece.dateKey, startMin: piece.startMin, endMin: piece.endMin });
-    const startH = Math.floor(piece.startMin / 60);
-    const endH = Math.max(startH + 1, Math.ceil(piece.endMin / 60));
-    for(let h = startH; h < endH && h < 24; h++){
-      availSelectedCells.add(`${piece.dateKey}::${HOURS.indexOf(h)}`);
+    `${days[0].getMonth()+1}월 ${days[0].getDate()}일 - ${days[6].getMonth()+1}월 ${days[6].getDate()}일`;
+  const todayKey = dateKeyOf(TODAY);
+  const info = days.map(d => ({ d, dk: dateKeyOf(d), ...formAvailBusyFor(d) }));
+  // 내 일정·정해둔 시간이 있는 범위에 앞뒤 1시간 여유 (최소 12시간). 아무것도 없으면 0~24시 전부
+  const all = info.flatMap(x => [...x.busy, ...x.other, ...(formAvailRanges[x.dk] || [])]);
+  if(!all.length) formAvailAxis = { s: 0, e: 24 * 60 };
+  else {
+    let s = Math.max(0, Math.floor((Math.min(...all.map(r => r.s)) - 60) / 60) * 60);
+    let e = Math.min(24 * 60, Math.ceil((Math.max(...all.map(r => r.e)) + 60) / 60) * 60);
+    while(e - s < 12 * 60){
+      if(s > 0) s -= 60;
+      if(e < 24 * 60 && e - s < 12 * 60) e += 60;
     }
-  });
-  renderAvailSelectGrid();
-  showToast('이 시간도 같이 수정할 수 있어요. 필요 없는 칸은 눌러서 꺼주세요.');
+    formAvailAxis = { s, e };
+  }
+  const ticks = [];
+  for(let h = Math.ceil(formAvailAxis.s / 180) * 3; h * 60 <= formAvailAxis.e; h += 3) ticks.push(h);
+  const grid = ticks.filter(h => h * 60 > formAvailAxis.s && h * 60 < formAvailAxis.e).map(h => `<i class="qa-grid" style="left:${formAvailPct(h * 60)}%"></i>`).join('');
+  const labelTicks = formAvailAxis.e - formAvailAxis.s > 18 * 60 ? ticks.filter(h => h % 6 === 0) : ticks;
+  let html = info.map(({ d, dk, busy, other }) => {
+    const past = dk < todayKey;
+    const ranges = formAvailRanges[dk] || [];
+    const on = ranges.length > 0;
+    const dow = d.getDay();
+    const label = `${d.getMonth() + 1}/${d.getDate()} ${WEEKDAY_KO[dow]}`;
+    if(past){
+      return `<div class="qa-row off"><div class="qa-row-top"><span class="qa-day" style="color:var(--text-dim);cursor:default;">${label}</span><div class="qa-times"><span class="qa-time off">지난 날</span></div></div></div>`;
+    }
+    const editing = formAvailEdit && formAvailEdit.dk === dk && ranges[formAvailEdit.idx] ? formAvailEdit.idx : -1;
+    const times = on
+      ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-fa-edit-open="${dk}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span>${ranges.length > 1 ? `<button type="button" class="qa-del" data-fa-del="${dk}|${i}" aria-label="이 시간 빼기">&times;</button>` : ''}</span>`).join('')
+      : '<span class="qa-time off">안 열어요</span>';
+    const busyHtml = busy.filter(b => b.e > formAvailAxis.s && b.s < formAvailAxis.e)
+      .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${formAvailBarStyle(b)}"></i>`).join('');
+    const otherHtml = quickMergeRanges(other).map(r => `<i class="qa-other" style="${formAvailBarStyle(r)}"></i>`).join('');
+    const bars = ranges.map((r, i) => {
+      const cs = r.s < formAvailAxis.s, ce = r.e > formAvailAxis.e;
+      return `<div class="qa-bar${cs ? ' clip-s' : ''}${ce ? ' clip-e' : ''}" data-fa-bar="${dk}|${i}" style="${formAvailBarStyle(r)}">`
+        + (cs ? '' : `<span class="qa-handle s" data-fa-handle="${dk}|${i}|s"></span>`)
+        + (ce ? '' : `<span class="qa-handle e" data-fa-handle="${dk}|${i}|e"></span>`) + '</div>';
+    }).join('');
+    return `<div class="qa-row${on ? '' : ' off'}">
+      <div class="qa-row-top">
+        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-fa-toggle="${dk}" aria-pressed="${on}"><i></i>${label}</button>
+        <div class="qa-times" data-fa-times="${dk}">${times}</div>
+        ${on ? `<button type="button" class="qa-add" data-fa-add="${dk}" aria-label="${label} 시간 더 넣기">+</button>` : ''}
+      </div>
+      ${editing >= 0 ? formAvailEditHtml(dk, editing) : ''}
+      <div class="qa-track" data-fa-track="${dk}">${grid}${otherHtml}${bars}${busyHtml}</div>
+    </div>`;
+  }).join('');
+  html += `<div class="qa-axis">${labelTicks.map(h => `<span style="left:${formAvailPct(h * 60)}%">${h}시</span>`).join('')}</div>`;
+  const anyBusy = info.some(x => x.busy.some(b => !b.soft)), anySoft = info.some(x => x.busy.some(b => b.soft)), anyOther = info.some(x => x.other.length);
+  if(anyBusy || anySoft || anyOther){
+    html += `<div class="qa-legend">${anyBusy ? '<span><i></i>내 일정</span>' : ''}${anySoft ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>이미 연 시간</span>' : ''}</div>`;
+  }
+  document.getElementById('formAvailRows').innerHTML = html;
 }
-
-function paintAvailCell(cellEl, cellKey, value){
-  if(value) availSelectedCells.add(cellKey);
-  else availSelectedCells.delete(cellKey);
-  cellEl.classList.toggle('selected', value);
+// 한 줄에 시간을 하나 더 넣음 - 누른 곳(centerMin)이 있으면 거기, 없으면 가장 넓은 빈 곳 가운데에 2시간
+function formAvailAddRange(dk, centerMin){
+  const ranges = formAvailRanges[dk] || [];
+  const gaps = subtractMinuteRanges([{ s: formAvailAxis.s, e: formAvailAxis.e }], ranges).filter(g => g.e - g.s >= 60);
+  const gap = centerMin != null ? gaps.find(g => g.s <= centerMin && g.e >= centerMin) : gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
+  if(!gap){
+    if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
+    return;
+  }
+  const len = Math.min(120, gap.e - gap.s);
+  const c = centerMin != null ? centerMin : (gap.s + gap.e) / 2;
+  let s = Math.round((c - len / 2) / 30) * 30;
+  s = Math.max(gap.s, Math.min(gap.e - len, s));
+  formAvailRanges[dk] = [...ranges, { s, e: s + len }].sort((a, b) => a.s - b.s);
+  renderFormAvailBars();
 }
-
-// PC에서 마우스를 일정 있는 칸에 올리면 무슨 일정인지 작은 말풍선으로 보여줌
-function showCellHoverTooltip(text, clientX, clientY){
-  const el = document.getElementById('cellHoverTooltip');
-  el.textContent = text;
-  el.classList.add('show');
-  positionCellHoverTooltip(clientX, clientY);
+document.getElementById('formAvailRows').addEventListener('click', (e) => {
+  const tg = e.target.closest('[data-fa-toggle]');
+  if(tg){
+    const dk = tg.dataset.faToggle;
+    const cur = formAvailRanges[dk] || [];
+    if(cur.length){ formAvailStash[dk] = quickCloneRanges(cur); delete formAvailRanges[dk]; }
+    else formAvailRanges[dk] = quickCloneRanges(formAvailStash[dk] || [formAvailDefault(dk)]);
+    if(formAvailEdit && formAvailEdit.dk === dk) formAvailEdit = null;
+    renderFormAvailBars();
+    return;
+  }
+  const add = e.target.closest('[data-fa-add]');
+  if(add){ formAvailAddRange(add.dataset.faAdd); return; }
+  const del = e.target.closest('[data-fa-del]');
+  if(del){
+    const [dk, idx] = del.dataset.faDel.split('|');
+    formAvailRanges[dk] = formAvailRanges[dk].filter((_, i) => i !== Number(idx));
+    formAvailEdit = null;
+    renderFormAvailBars();
+    return;
+  }
+  const open = e.target.closest('[data-fa-edit-open]');
+  if(open){
+    const [dk, idx] = open.dataset.faEditOpen.split('|');
+    const same = formAvailEdit && formAvailEdit.dk === dk && formAvailEdit.idx === Number(idx);
+    formAvailEdit = same ? null : { dk, idx: Number(idx) };
+    renderFormAvailBars();
+    return;
+  }
+  if(e.target.closest('[data-fa-edit-done]')){ formAvailEdit = null; renderFormAvailBars(); }
+});
+// 5분 단위 시간 고르기 - 바꾼 쪽을 기준으로 30분 이상, 앞뒤 시간과 안 겹치게 맞춤
+document.getElementById('formAvailRows').addEventListener('change', (e) => {
+  const f = e.target.dataset && e.target.dataset.faEditF;
+  if(!f) return;
+  const panel = e.target.closest('[data-fa-edit]');
+  const [dk, idxStr] = panel.dataset.faEdit.split('|');
+  const idx = Number(idxStr);
+  const val = k => Number(panel.querySelector(`[data-fa-edit-f="${k}"]`).value);
+  const ranges = quickCloneRanges(formAvailRanges[dk]);
+  const r = ranges[idx];
+  if(!r) return;
+  const prevEnd = idx > 0 ? ranges[idx - 1].e : 0;
+  const nextStart = idx < ranges.length - 1 ? ranges[idx + 1].s : 24 * 60;
+  let s = val('sh') * 60 + val('sm');
+  let en = Math.min(24 * 60, val('eh') * 60 + val('em'));
+  if(f === 'sh' || f === 'sm'){
+    s = Math.max(prevEnd, Math.min(nextStart - QUICK_AVAIL_MIN_LEN, s));
+    en = Math.min(nextStart, Math.max(en, s + QUICK_AVAIL_MIN_LEN));
+  } else {
+    en = Math.min(nextStart, Math.max(prevEnd + QUICK_AVAIL_MIN_LEN, en));
+    s = Math.max(prevEnd, Math.min(s, en - QUICK_AVAIL_MIN_LEN));
+  }
+  r.s = s;
+  r.e = en;
+  formAvailRanges[dk] = ranges;
+  renderFormAvailBars();
+});
+function formAvailMinAt(track, clientX){
+  const rect = track.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  return formAvailAxis.s + ratio * (formAvailAxis.e - formAvailAxis.s);
 }
-function positionCellHoverTooltip(clientX, clientY){
-  const el = document.getElementById('cellHoverTooltip');
-  if(!el.classList.contains('show')) return;
-  const margin = 14;
-  const rect = el.getBoundingClientRect();
-  let left = clientX + margin;
-  let top = clientY + margin;
-  if(left + rect.width > window.innerWidth - 8) left = clientX - rect.width - margin;
-  if(top + rect.height > window.innerHeight - 8) top = clientY - rect.height - margin;
-  el.style.left = Math.max(8, left) + 'px';
-  el.style.top = Math.max(8, top) + 'px';
-}
-function hideCellHoverTooltip(){
-  document.getElementById('cellHoverTooltip').classList.remove('show');
-}
-
-(function setupAvailTouchDrag(){
-  const grid = document.getElementById('availSelectGrid');
-  const cellAt = (x, y) => {
-    const el = document.elementFromPoint(x, y);
-    const cell = el && el.closest('#availSelectGrid .week-cell');
-    return cell && !cell.classList.contains('occupied') ? cell : null;
-  };
-  const stop = () => {
-    clearTimeout(availTouchDrag.timer);
-    availTouchDrag.timer = null;
-    availTouchDrag.active = false;
-    grid.classList.remove('touch-dragging');
-  };
-  grid.addEventListener('touchstart', (e) => {
-    stop();
-    availTouchDrag.used = false;
-    if(e.touches.length !== 1) return;
-    const t = e.touches[0];
-    const cell = cellAt(t.clientX, t.clientY);
-    if(!cell) return;
-    availTouchDrag.x = t.clientX;
-    availTouchDrag.y = t.clientY;
-    availTouchDrag.timer = setTimeout(() => {
-      availTouchDrag.timer = null;
-      availTouchDrag.active = true;
-      availTouchDrag.used = true;
-      availTouchDrag.value = !availSelectedCells.has(cell.dataset.cellKey);
-      paintAvailCell(cell, cell.dataset.cellKey, availTouchDrag.value);
-      grid.classList.add('touch-dragging');
-      try { if(navigator.vibrate) navigator.vibrate(15); } catch(err) {}
-    }, 350);
-  }, { passive: true });
-  grid.addEventListener('touchmove', (e) => {
-    const t = e.touches[0];
-    if(availTouchDrag.timer && (Math.abs(t.clientX - availTouchDrag.x) > 10 || Math.abs(t.clientY - availTouchDrag.y) > 10)){
-      clearTimeout(availTouchDrag.timer); // 꾹 누르기 전에 움직이면 그냥 스크롤
-      availTouchDrag.timer = null;
+(function setupFormAvailDrag(){
+  const rows = document.getElementById('formAvailRows');
+  rows.addEventListener('pointerdown', (e) => {
+    const track = e.target.closest('[data-fa-track]');
+    if(!track) return;
+    const dk = track.dataset.faTrack;
+    const handle = e.target.closest('[data-fa-handle]');
+    const bar = e.target.closest('[data-fa-bar]');
+    if(handle || bar){
+      let [, idx, edge] = (handle ? handle.dataset.faHandle : bar.dataset.faBar + '|m').split('|');
+      if(edge === 'm' && /clip-/.test(bar.className)) edge = 'x'; // 잘려 보이는 막대는 통째로 옮기지 않음 (톡 누르면 시간 고르기)
+      const ranges = quickCloneRanges(formAvailRanges[dk]);
+      formAvailDrag = { dk, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, startMin: formAvailMinAt(track, e.clientX), el: bar || handle.closest('[data-fa-bar]'), x: e.clientX, y: e.clientY, moved: false };
+      try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
+      e.preventDefault();
       return;
     }
-    if(!availTouchDrag.active) return;
-    e.preventDefault(); // 드래그 선택 중에는 화면이 안 움직이게
-    const cell = cellAt(t.clientX, t.clientY);
-    if(cell) paintAvailCell(cell, cell.dataset.cellKey, availTouchDrag.value);
-  }, { passive: false });
-  grid.addEventListener('touchend', stop);
-  grid.addEventListener('touchcancel', stop);
+    formAvailDrag = { tap: true, dk, track, x: e.clientX, y: e.clientY };
+  });
+  rows.addEventListener('pointermove', (e) => {
+    const dr = formAvailDrag;
+    if(!dr || dr.tap || dr.edge === 'x') return;
+    if(!dr.moved && Math.abs(e.clientX - dr.x) < 6) return; // 톡 누른 건 끌기로 안 봄
+    dr.moved = true;
+    const r = dr.ranges[dr.idx];
+    const prevEnd = dr.idx > 0 ? dr.ranges[dr.idx - 1].e : formAvailAxis.s;
+    const nextStart = dr.idx < dr.ranges.length - 1 ? dr.ranges[dr.idx + 1].s : formAvailAxis.e;
+    const snap = m => Math.round(m / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP;
+    const m = formAvailMinAt(dr.track, e.clientX);
+    if(dr.edge === 's') r.s = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, snap(m)));
+    else if(dr.edge === 'e') r.e = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, snap(m)));
+    else {
+      const len = dr.orig.e - dr.orig.s;
+      r.s = Math.max(prevEnd, Math.min(nextStart - len, snap(dr.orig.s + m - dr.startMin)));
+      r.e = r.s + len;
+    }
+    // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
+    dr.el.style.cssText = formAvailBarStyle(r);
+    const label = document.querySelector(`[data-fa-times="${dr.dk}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
+    if(label) label.textContent = `${minutesToLabel(r.s)}–${minutesToLabel(r.e)}`;
+  });
+  const end = (e) => {
+    const dr = formAvailDrag;
+    formAvailDrag = null;
+    if(!dr) return;
+    const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
+    if(isTap){
+      const min = formAvailMinAt(dr.track, e.clientX);
+      const hit = formAvailBusyFor(parseDateInputValue(dr.dk)).busy.find(b => b.s <= min && b.e > min);
+      if(hit){
+        showToast(`${hit.title} ${minutesToLabel(hit.s)}–${minutesToLabel(hit.e)} · ${hit.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : '이 시간은 빼고 열어요'}`);
+        return;
+      }
+      if(dr.tap){ formAvailAddRange(dr.dk, min); return; }
+      formAvailEdit = { dk: dr.dk, idx: dr.idx };
+      renderFormAvailBars();
+      return;
+    }
+    if(dr.tap) return;
+    if(dr.moved) formAvailRanges[dr.dk] = dr.ranges;
+    renderFormAvailBars();
+  };
+  rows.addEventListener('pointerup', end);
+  rows.addEventListener('pointercancel', end);
 })();
-
-document.getElementById('availEarlyToggle').addEventListener('click', () => {
-  availShowEarly = !availShowEarly;
-  renderAvailSelectGrid();
-});
-
-document.addEventListener('mouseup', () => { availDragging = false; }); // 마우스(PC)는 기존처럼 드래그로 여러 칸 선택 가능
 
 document.getElementById('availWeekPrev').addEventListener('click', () => {
   availGridWeekStart.setDate(availGridWeekStart.getDate() - 7);
-  renderAvailSelectGrid();
+  formAvailEdit = null;
+  renderFormAvailBars();
 });
 document.getElementById('availWeekNext').addEventListener('click', () => {
   availGridWeekStart.setDate(availGridWeekStart.getDate() + 7);
-  renderAvailSelectGrid();
+  formAvailEdit = null;
+  renderFormAvailBars();
 });
 
 document.getElementById('openEventFormBtn').addEventListener('click', () => openEventForm());
@@ -17725,17 +17518,8 @@ document.getElementById('monthAddEventBtn').addEventListener('click', () => {
 });
 document.getElementById('eventFormBackBtn').addEventListener('click', () => goBackOrClose(closeEventForm));
 
-// 새로 추가할 때 '예약 가능 시간'을 누르면 칸 그리드 대신 빠르게 열기의 요일별 막대 화면으로 보냄
-// (이미 있는 예약 가능 시간을 고칠 때는 그 날짜 하나를 다루니 지금 화면 그대로)
 document.querySelectorAll('.event-type-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if(btn.dataset.type === 'available' && !editingEventId){
-      dismissView(closeEventForm);
-      openQuickAvail();
-      return;
-    }
-    setEventTypeUI(btn.dataset.type);
-  });
+  btn.addEventListener('click', () => setEventTypeUI(btn.dataset.type));
 });
 
 document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(btn => {
@@ -17917,21 +17701,21 @@ document.getElementById('eventFormMemoDeleteBtn').addEventListener('click', () =
 });
 document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   if(formEventType === 'memo'){ submitMemoForm(); return; }
-  // 예약 가능 시간 + 신규 추가 모드일 때는 그리드에서 선택한 칸들로 등록
+  // 예약 가능 시간은 막대로 정한 날짜별 시간으로 등록 - 회색(막는 일정) 시간은 빼고, 30분보다 짧게 남은 조각은 안 만듦
   if(formEventType === 'available'){
-
-    // 아직 세부조정 화면으로 안 넘어갔으면, 먼저 그 화면으로 이동 (여기서는 등록하지 않음)
-    if(!availFineTuneMode){
-      if(availSelectedCells.size === 0){
-        showToast('예약 가능으로 표시할 시간을 하나 이상 선택해주세요.');
-        return;
-      }
-      openAvailFineTune();
+    const todayKey = dateKeyOf(TODAY);
+    availFineTuneBlocks = [];
+    Object.keys(formAvailRanges).sort().forEach(dk => {
+      if(dk < todayKey) return;
+      const hard = formAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft);
+      subtractMinuteRanges(quickMergeRanges(formAvailRanges[dk]), hard)
+        .filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN)
+        .forEach(r => availFineTuneBlocks.push({ dateKey: dk, startMin: r.s, endMin: r.e }));
+    });
+    if(!availFineTuneBlocks.length){
+      showToast('예약 가능으로 열 시간을 하나 이상 정해주세요.');
       return;
     }
-
-    // 세부조정 화면에서 "이대로 등록하기"를 누른 경우 - 분 단위로 조정된 시간으로 실제 등록
-    readAvailFineTuneBlocksFromInputs();
 
     // 등록하기 전에, 이미 있는 다른 일정(바쁨/예약가능 다 포함)이랑 겹치는 게 없는지 먼저 검사함.
     // 겹치면 하나도 등록하지 않고 멈춰서, "예약 가능"끼리 겹치거나 다른 일정을 덮어써버리는 걸 원천적으로 막음.
@@ -17989,8 +17773,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     });
 
     resyncAllScheduleEvents();
-    availSelectedCells.clear();
-    availFineTuneMode = false;
+    formAvailRanges = {};
     availFineTuneBlocks = [];
     editingEventId = null;
     editingLinkedPieceIds = [];
@@ -30353,7 +30136,8 @@ async function loadInviteCalendarDays(){
 function goRegisterAvailabilityFromInvite(){
   const open = () => {
     scheduleFocusDate = new Date();
-    openQuickAvail();
+    openEventForm();
+    setEventTypeUI('available');
   };
   if(viewCloseStack.length > 0){
     window.addEventListener('popstate', () => setTimeout(open, 0), { once: true });
