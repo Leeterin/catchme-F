@@ -4737,6 +4737,16 @@
   .day-event-delete:hover{ color:var(--cta); background:var(--surface); }
   .day-event-goto-chat-icon{ color:var(--accent); }
   .day-event-goto-chat-icon:hover{ background:var(--surface); }
+  /* 그날 메모 - 하루 보기 맨 위에 노란 쪽지처럼 */
+  .day-memo-card{
+    display:flex; align-items:flex-start; gap:8px;
+    background:#FEF3C7; border:1px solid #FCD34D; border-radius:13px;
+    padding:11px 14px; margin-bottom:10px; cursor:pointer;
+    font-size:13px; line-height:1.45; color:#78350F;
+  }
+  .day-memo-card .day-memo-text{ flex:1; min-width:0; white-space:pre-wrap; word-break:break-word; }
+  body.dark-mode .day-memo-card{ background:rgba(252,211,77,0.14); border-color:rgba(252,211,77,0.45); color:#FDE68A; }
+  .memo-textarea{ resize:none; min-height:84px; font-family:inherit; line-height:1.45; }
   .day-event-empty{
     font-size:12.5px;
     color:var(--text-dim);
@@ -6488,6 +6498,9 @@
     flex-shrink:0;
     width:80px;
   }
+  .month-memo-label{ background:#FDE68A; color:#78350F; }
+  .month-memo-row{ cursor:pointer; }
+  .month-memo-icon{ flex-shrink:0; font-size:12px; }
   .month-selected-text{
     font-size:12.5px;
     color:var(--text);
@@ -7378,6 +7391,7 @@
         <div class="repeat-toggle-row">
           <button class="event-type-btn active" data-type="busy" type="button">일반 일정</button>
           <button class="event-type-btn" data-type="available" type="button">예약 가능 시간</button>
+          <button class="event-type-btn" data-type="memo" type="button">메모</button>
         </div>
       </div>
       <div id="busyFieldsGroup">
@@ -7462,6 +7476,19 @@
         </div>
       </div>
 
+      <!-- 메모: 시간 없이 그날에 적어두는 글 - 하루/한달 보기에서 그날 맨 위에 보임 (나만 보고, 예약·매칭엔 안 잡힘) -->
+      <div id="memoFieldsGroup" style="display:none;">
+        <div class="mp-input-group">
+          <label>날짜</label>
+          <input type="hidden" id="eventFormMemoDate" />
+          <button type="button" class="date-picker-btn" data-target="eventFormMemoDate">-</button>
+        </div>
+        <div class="mp-input-group">
+          <label>메모 <span style="font-weight:400;color:var(--text-dim);">(그날 일정 맨 위에 보여요 · 나만 볼 수 있어요)</span></label>
+          <textarea id="eventFormMemoText" class="search-input memo-textarea" maxlength="200" rows="3" placeholder="예) 엄마 생신 선물 챙기기"></textarea>
+        </div>
+      </div>
+
       <div id="availableGridGroup" style="display:none;">
         <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
         <div class="mp-input-group">
@@ -7515,6 +7542,7 @@
           <button type="button" id="recurringDeleteTriggerBtn" style="border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;padding:6px 0;text-decoration:underline;">일정 삭제</button>
         </div>
         <button id="eventFormDeleteSingleBtn" style="display:none;width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">이 날짜만 삭제</button>
+        <button type="button" id="eventFormMemoDeleteBtn" style="display:none;width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">메모 삭제</button>
         <button id="eventFormDeleteBtn" style="display:none;width:100%;margin-top:4px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">일정 삭제</button>
       </div>
     </div>
@@ -15410,6 +15438,14 @@ function parseTimeLabelMinutes(label){
 // ============================================================
 let scheduleEventIdCounter = 1;
 const SCHEDULE_EVENTS = []; // { id, title, startMin, endMin, visibility:{groupIds:[],private}, recurring:null|{weekdays:[]}, dateKey }
+// 그날 메모 - 시간이 없는 글이라 SCHEDULE_EVENTS와 따로 둠 (매칭/겹침 확인/주간 표 계산에 안 섞이게). { id, serverId, dateKey, text }
+// 서버엔 eventType='memo' 일정으로 저장됨 (서버가 항상 나만보기 + 예약 안 막음으로 저장)
+const DAY_MEMOS = [];
+let dayMemoIdCounter = 1;
+function getMemosForDate(dateObj){
+  const key = dateKeyOf(dateObj);
+  return DAY_MEMOS.filter(m => m.dateKey === key);
+}
 
 function minutesToLabel(min){
   const h = Math.floor(min / 60);
@@ -15677,8 +15713,18 @@ function renderDayView(){
   const list = document.getElementById('dayEventList');
   list.innerHTML = '';
 
+  // 그날 메모는 항상 맨 위에
+  const memos = getMemosForDate(scheduleFocusDate);
+  memos.forEach(memo => {
+    const memoCard = document.createElement('div');
+    memoCard.className = 'day-memo-card';
+    memoCard.innerHTML = `<span>📝</span><span class="day-memo-text">${escapeHtml(memo.text)}</span>`;
+    memoCard.addEventListener('click', () => openMemoForm(memo));
+    list.appendChild(memoCard);
+  });
+
   if(events.length === 0){
-    list.innerHTML = `<div class="day-event-empty">이 날은 등록된 일정이 없어요.</div>`;
+    if(memos.length === 0) list.innerHTML = `<div class="day-event-empty">이 날은 등록된 일정이 없어요.</div>`;
     return;
   }
 
@@ -15891,6 +15937,49 @@ function syncEventDeleteToServer(ev){
   ev.serverId = null;
 }
 
+function memoServerBody(memo){
+  const start = dateKeyToDateAtMinutes(memo.dateKey, 0);
+  return { title: memo.text, startTime: start.toISOString(), endTime: new Date(start.getTime() + 60000).toISOString() };
+}
+function syncMemoCreateToServer(memo){
+  if(!authToken) return;
+  apiRequest('/events', {
+    method: 'POST',
+    body: JSON.stringify({ ...memoServerBody(memo), status: 'BUSY', eventType: 'memo', blocksBooking: false, visibility: { groupIds: [], private: true } }),
+  }).then(data => {
+    memo.serverId = data.event.id;
+    // 서버가 아직 메모를 모르는 옛 버전이면 일반 일정으로 저장돼버림 - 매칭에 끼지 않게 바로 지우고 알려줌
+    if(data.event.eventType !== 'memo'){
+      memo._deleteAfterCreate = true;
+      const i = DAY_MEMOS.indexOf(memo);
+      if(i >= 0) DAY_MEMOS.splice(i, 1);
+      refreshActiveScheduleView();
+      showToast('메모를 저장하지 못했어요. 잠시 후 다시 시도해주세요.');
+    }
+    if(memo._deleteAfterCreate) syncMemoDeleteToServer(memo);
+    else if(memo._updateAfterCreate){ memo._updateAfterCreate = false; syncMemoUpdateToServer(memo); }
+  }).catch(err => {
+    console.error('[memo] sync create failed:', err);
+    showToast(`메모를 서버에 저장하지 못했어요: ${err.message} (새로고침하면 사라질 수 있어요)`);
+  });
+}
+function syncMemoUpdateToServer(memo){
+  if(!authToken) return;
+  if(!memo.serverId){ memo._updateAfterCreate = true; return; }
+  apiRequest(`/events/${memo.serverId}`, { method: 'PATCH', body: JSON.stringify(memoServerBody(memo)) })
+    .catch(err => console.error('[memo] sync update failed:', err));
+}
+function syncMemoDeleteToServer(memo){
+  if(authToken && !memo.serverId){ memo._deleteAfterCreate = true; return; }
+  if(!authToken || !memo.serverId) return;
+  const id = memo.serverId;
+  recentlyDeletedServerIds.add(id);
+  apiRequest(`/events/${id}`, { method: 'DELETE' })
+    .catch(err => console.error('[memo] sync delete failed:', err))
+    .finally(() => { recentlyDeletedServerIds.delete(id); });
+  memo.serverId = null;
+}
+
 // 로그인 직후 서버에 저장된(하루짜리) 일정들을 불러와 SCHEDULE_EVENTS에 합침
 async function loadScheduleFromServer(){
   if(!authToken) return;
@@ -15913,8 +16002,23 @@ async function loadScheduleFromServer(){
       }
     }
 
+    // 메모도 같은 방식으로 - 서버에서 사라진 건 지움
+    for(let i = DAY_MEMOS.length - 1; i >= 0; i--){
+      const m = DAY_MEMOS[i];
+      if(!m.serverId || serverIds.has(m.serverId)) continue;
+      const mDate = parseDateInputValue(m.dateKey);
+      if(mDate >= start && mDate <= end) DAY_MEMOS.splice(i, 1);
+    }
+
     data.events.forEach(sev => {
       if(recentlyDeletedServerIds.has(sev.id)) return; // 방금 삭제 요청 보낸 걸 처리 중일 수 있으니, 다시 목록에 추가하지 않음
+      if(sev.eventType === 'memo'){
+        const memoFields = { dateKey: dateKeyOf(new Date(sev.startTime)), text: sev.title };
+        const existingMemo = DAY_MEMOS.find(m => m.serverId === sev.id);
+        if(existingMemo) Object.assign(existingMemo, memoFields);
+        else DAY_MEMOS.push({ id: 'memo' + (dayMemoIdCounter++), serverId: sev.id, ...memoFields });
+        return;
+      }
       const startD = new Date(sev.startTime);
       const endD = new Date(sev.endTime);
       const weekdays = Array.isArray(sev.recurringWeekdays) ? sev.recurringWeekdays : [];
@@ -16134,6 +16238,7 @@ let formEventType = 'busy';
 let formAllowBooking = false; // 바쁨 일정인데 "이 시간에도 예약 받기"를 켰는지 (서버 blocksBooking=false)
 let formAvailableFor = 'all'; // 예약 가능 시간을 누구에게 열지 (친구 + 업무용 / 친구만 / 업무용만)
 let editingEventId = null;
+let editingMemoId = null; // 수정 중인 메모 id (DAY_MEMOS)
 let absorbedAvailIds = []; // 예약 가능 수정 중 두 번 눌러서 이번 수정에 합친 다른 예약 가능 일정 id들
 let editingLinkedPieceIds = []; // 예전 방식(linkGroupId)으로 여러 날짜 조각으로 쪼개져 저장된 일정을 수정할 때,
                                  // 지금 연 조각 말고 나머지 조각들의 id - 저장 시 하나로 합치면서 이 조각들은 정리함
@@ -16510,8 +16615,8 @@ function renderEventAvailFor(){
   document.getElementById('eventAvailForRow').innerHTML = availAudienceChipsHtml(formAvailableFor, formVisibility);
   document.getElementById('eventAvailForHint').textContent = AVAILABLE_FOR_META[formAvailableFor].hint;
   // 예약 가능 시간은 "누구에게 열까요?" 칩에서 친구 그룹까지 고르므로 아래 공개 설정은 숨김
-  document.getElementById('visibilityPickerGroup').style.display = formEventType === 'available' ? 'none' : '';
-  document.getElementById('allowBookingGroup').style.display = formEventType === 'available' ? 'none' : '';
+  document.getElementById('visibilityPickerGroup').style.display = formEventType !== 'busy' ? 'none' : '';
+  document.getElementById('allowBookingGroup').style.display = formEventType !== 'busy' ? 'none' : '';
   renderTravelSection();
   document.getElementById('allowBookingToggle').classList.toggle('on', formAllowBooking);
 }
@@ -16772,8 +16877,15 @@ function setEventTypeUI(type){
   const titleInput = document.getElementById('eventFormTitle');
 
   const useGrid = (type === 'available');
-  document.getElementById('busyFieldsGroup').style.display = useGrid ? 'none' : 'block';
+  const isMemo = (type === 'memo');
+  document.getElementById('busyFieldsGroup').style.display = (useGrid || isMemo) ? 'none' : 'block';
   document.getElementById('availableGridGroup').style.display = useGrid ? 'block' : 'none';
+  document.getElementById('memoFieldsGroup').style.display = isMemo ? 'block' : 'none';
+  document.getElementById('eventFormMemoDeleteBtn').style.display = (isMemo && editingMemoId) ? 'block' : 'none';
+  if(isMemo && !document.getElementById('eventFormMemoDate').value){
+    document.getElementById('eventFormMemoDate').value = document.getElementById('eventFormStartDate').value || toDateInputValue(scheduleFocusDate);
+    refreshDateDisplay('eventFormMemoDate');
+  }
   // 다른 타입으로 바꾸거나 새로 열었으면 세부조정 상태는 항상 초기화
   // 분 단위 조정 중에 일정 종류를 바꾸면 조정 화면이 닫히니, 그 뒤로가기 항목도 같이 지움
   const fineTuneIdx = viewCloseStack.lastIndexOf(closeAvailFineTune);
@@ -16782,7 +16894,9 @@ function setEventTypeUI(type){
   availFineTuneBlocks = [];
   document.getElementById('availFineTuneGroup').style.display = 'none';
   document.getElementById('availFineTuneBackBtn').style.display = 'none';
-  document.getElementById('eventFormSubmitBtn').textContent = useGrid ? '다음: 분 단위로 조정하기' : (editingEventId ? '수정하기' : '추가하기');
+  document.getElementById('eventFormSubmitBtn').textContent = useGrid ? '다음: 분 단위로 조정하기'
+    : isMemo ? (editingMemoId ? '메모 수정하기' : '메모 추가하기')
+    : (editingEventId ? '수정하기' : '추가하기');
   if(useGrid){
     syncAvailFirstTip();
     availGridWeekStart = getWeekStart(scheduleFocusDate);
@@ -16804,6 +16918,11 @@ function setEventTypeUI(type){
 // 신규 추가: openEventForm() / 수정: openEventForm(기존이벤트객체)
 function openEventForm(existingEvent){
   editingEventId = existingEvent ? existingEvent.id : null;
+  editingMemoId = null;
+  document.getElementById('eventFormMemoDate').value = toDateInputValue(scheduleFocusDate);
+  document.getElementById('eventFormMemoText').value = '';
+  // 일정을 수정할 땐 메모로 바꿀 수 없게 메모 버튼을 숨김 (메모 수정 땐 openMemoForm이 반대로 숨김)
+  document.querySelectorAll('.event-type-btn').forEach(b => { b.style.display = (existingEvent && b.dataset.type === 'memo') ? 'none' : ''; });
   eventColorLastPicked = null;
   formTravel = existingEvent && existingEvent.travel ? JSON.parse(JSON.stringify(existingEvent.travel)) : null;
   document.getElementById('travelDestResults').style.display = 'none';
@@ -16941,13 +17060,47 @@ function openEventForm(existingEvent){
     renderEventColorPicker();
   }
 
-  ['eventFormStartDate', 'eventFormEndDate', 'eventFormUntil'].forEach(refreshDateDisplay);
+  ['eventFormStartDate', 'eventFormEndDate', 'eventFormUntil', 'eventFormMemoDate'].forEach(refreshDateDisplay);
   ['eventFormStart', 'eventFormEnd'].forEach(refreshTimeDisplay);
+}
+// 메모 수정 - 같은 일정 폼을 메모 유형으로 열고, 다른 유형 버튼은 숨김
+function openMemoForm(memo){
+  openEventForm();
+  editingMemoId = memo.id;
+  document.getElementById('eventFormHeaderTitle').textContent = '메모 수정';
+  document.querySelectorAll('.event-type-btn').forEach(b => { b.style.display = b.dataset.type === 'memo' ? '' : 'none'; });
+  document.getElementById('eventFormMemoDate').value = memo.dateKey;
+  document.getElementById('eventFormMemoText').value = memo.text;
+  refreshDateDisplay('eventFormMemoDate');
+  setEventTypeUI('memo');
+}
+function submitMemoForm(){
+  const text = document.getElementById('eventFormMemoText').value.trim();
+  const dateKey = document.getElementById('eventFormMemoDate').value;
+  if(!text){ showToast('메모 내용을 입력해주세요.'); return; }
+  if(!dateKey){ showToast('날짜를 선택해주세요.'); return; }
+  const editing = editingMemoId ? DAY_MEMOS.find(m => m.id === editingMemoId) : null;
+  if(editing){
+    editing.text = text;
+    editing.dateKey = dateKey;
+    syncMemoUpdateToServer(editing);
+  } else {
+    const memo = { id: 'memo' + (dayMemoIdCounter++), serverId: null, dateKey, text };
+    DAY_MEMOS.push(memo);
+    syncMemoCreateToServer(memo);
+  }
+  // 저장한 날짜가 바로 보이게 맞춤
+  scheduleFocusDate = parseDateInputValue(dateKey);
+  monthSelectedDate = parseDateInputValue(dateKey);
+  dismissView(closeEventForm);
+  refreshActiveScheduleView();
+  showToast(editing ? '메모를 수정했어요.' : '메모를 추가했어요.');
 }
 function closeEventForm(){
   document.getElementById('eventFormView').classList.remove('active');
   document.getElementById('dayEventList').style.display = '';
   editingEventId = null;
+  editingMemoId = null;
   editingLinkedPieceIds = [];
   editingOriginalAvailBlocks = [];
   closeAllCustomPopups();
@@ -17726,7 +17879,17 @@ document.getElementById('visibilityPicker').addEventListener('click', (e) => {
   renderVisibilityPicker();
 });
 
+document.getElementById('eventFormMemoDeleteBtn').addEventListener('click', () => {
+  const memo = DAY_MEMOS.find(m => m.id === editingMemoId);
+  if(!memo) return;
+  DAY_MEMOS.splice(DAY_MEMOS.indexOf(memo), 1);
+  syncMemoDeleteToServer(memo);
+  dismissView(closeEventForm);
+  refreshActiveScheduleView();
+  showToast('메모를 삭제했어요.');
+});
 document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
+  if(formEventType === 'memo'){ submitMemoForm(); return; }
   // 예약 가능 시간 + 신규 추가 모드일 때는 그리드에서 선택한 칸들로 등록
   if(formEventType === 'available'){
 
@@ -19038,7 +19201,13 @@ function renderMonthSchedView(){
       ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
       : '';
 
-    cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${labelsHtml}${moreHtml}`;
+    // 메모가 있으면 날짜 바로 아래 맨 위에 첫 메모 한 줄
+    const cellMemos = getMemosForDate(cellDate);
+    const memoHtml = cellMemos.length
+      ? `<div class="month-event-label month-memo-label">${escapeHtml(truncateForMonthLabel('📝' + cellMemos[0].text.split('\n')[0]))}</div>`
+      : '';
+
+    cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${memoHtml}${labelsHtml}${moreHtml}`;
     cell.addEventListener('click', () => {
       monthSelectedDate = cellDate;
       renderMonthSchedView();
@@ -19056,8 +19225,14 @@ function renderMonthSelectedPanel(){
   const events = filterEventsByScheduleGroup(getEventsForDate(monthSelectedDate));
   const dateLabel = `${monthSelectedDate.getMonth()+1}월 ${monthSelectedDate.getDate()}일 ${WEEKDAY_KO[monthSelectedDate.getDay()]}요일`;
 
-  const rowsHtml = events.length === 0
-    ? `<div class="month-selected-empty">등록된 일정이 없어요.</div>`
+  const selMemos = getMemosForDate(monthSelectedDate);
+  const memoRowsHtml = selMemos.map(memo => `
+        <div class="month-selected-row month-memo-row" data-memo="${memo.id}">
+          <span class="month-memo-icon">📝</span>
+          <span class="month-selected-text">${escapeHtml(memo.text)}</span>
+        </div>`).join('');
+  const rowsHtml = memoRowsHtml + (events.length === 0
+    ? (selMemos.length ? '' : `<div class="month-selected-empty">등록된 일정이 없어요.</div>`)
     : events.map(ev => {
         const isSpecial = ev.isPendingHold || ev.isReservationLinked; // 이 둘은 채팅에서만 관리되는 일정이라 여기서 수정/삭제 안 함
         // 확정된 약속 + 아직 응답 기다리는 예약 요청 모두, 누르면 그 채팅방으로 이동
@@ -19076,7 +19251,7 @@ function renderMonthSelectedPanel(){
           </span>`}
         </div>
       `;
-      }).join('');
+      }).join(''));
 
   panel.innerHTML = `
     <div class="month-selected-header">
@@ -19086,6 +19261,13 @@ function renderMonthSelectedPanel(){
     ${rowsHtml}
   `;
 
+  panel.querySelectorAll('.month-memo-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const memo = DAY_MEMOS.find(m => m.id === row.dataset.memo);
+      scheduleFocusDate = new Date(monthSelectedDate);
+      if(memo) openMemoForm(memo);
+    });
+  });
   panel.querySelectorAll('.month-selected-row.clickable').forEach(row => {
     row.addEventListener('click', (e) => {
       if(e.target.closest('.month-selected-row-actions')) return;
