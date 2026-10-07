@@ -6501,6 +6501,8 @@
   .month-memo-label{ background:#FDE68A; color:#78350F; }
   .month-memo-row{ cursor:pointer; }
   .month-memo-icon{ flex-shrink:0; font-size:12px; }
+  .memo-check{ color:#111; font-weight:800; margin-right:2px; }
+  body.dark-mode .day-memo-card .memo-check, body.dark-mode .month-memo-row .memo-check{ color:#FDE68A; }
   .month-selected-text{
     font-size:12.5px;
     color:var(--text);
@@ -15718,7 +15720,7 @@ function renderDayView(){
   memos.forEach(memo => {
     const memoCard = document.createElement('div');
     memoCard.className = 'day-memo-card';
-    memoCard.innerHTML = `<span>✅</span><span class="day-memo-text">${escapeHtml(memo.text)}</span>`;
+    memoCard.innerHTML = `<span class="memo-check">✓</span><span class="day-memo-text">${escapeHtml(memo.text)}</span>`;
     memoCard.addEventListener('click', () => openMemoForm(memo));
     list.appendChild(memoCard);
   });
@@ -19204,7 +19206,7 @@ function renderMonthSchedView(){
     // 메모가 있으면 날짜 바로 아래 맨 위에 첫 메모 한 줄
     const cellMemos = getMemosForDate(cellDate);
     const memoHtml = cellMemos.length
-      ? `<div class="month-event-label month-memo-label">${escapeHtml(truncateForMonthLabel('✅' + cellMemos[0].text.split('\n')[0]))}</div>`
+      ? `<div class="month-event-label month-memo-label"><span class="memo-check">✓</span>${escapeHtml(truncateForMonthLabel(cellMemos[0].text.split('\n')[0]))}</div>`
       : '';
 
     cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${memoHtml}${labelsHtml}${moreHtml}`;
@@ -19228,7 +19230,7 @@ function renderMonthSelectedPanel(){
   const selMemos = getMemosForDate(monthSelectedDate);
   const memoRowsHtml = selMemos.map(memo => `
         <div class="month-selected-row month-memo-row" data-memo="${memo.id}">
-          <span class="month-memo-icon">✅</span>
+          <span class="month-memo-icon memo-check">✓</span>
           <span class="month-selected-text">${escapeHtml(memo.text)}</span>
         </div>`).join('');
   const rowsHtml = memoRowsHtml + (events.length === 0
