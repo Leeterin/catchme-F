@@ -17349,7 +17349,7 @@ function renderFormAvailBars(){
     }
     const editing = formAvailEdit && formAvailEdit.dk === dk && ranges[formAvailEdit.idx] ? formAvailEdit.idx : -1;
     const times = on
-      ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-fa-edit-open="${dk}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span>${ranges.length > 1 ? `<button type="button" class="qa-del" data-fa-del="${dk}|${i}" aria-label="이 시간 빼기">&times;</button>` : ''}</span>`).join('')
+      ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-fa-edit-open="${dk}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span><button type="button" class="qa-del" data-fa-del="${dk}|${i}" aria-label="이 시간 빼기">&times;</button></span>`).join('')
       : '<span class="qa-time off">안 열어요</span>';
     const busyHtml = busy.filter(b => b.e > formAvailAxis.s && b.s < formAvailAxis.e)
       .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${formAvailBarStyle(b)}"></i>`).join('');
@@ -17415,7 +17415,11 @@ document.getElementById('formAvailRows').addEventListener('click', (e) => {
   const del = e.target.closest('[data-fa-del]');
   if(del){
     const [dk, idx] = del.dataset.faDel.split('|');
-    formAvailRanges[dk] = formAvailRanges[dk].filter((_, i) => i !== Number(idx));
+    const left = formAvailRanges[dk].filter((_, i) => i !== Number(idx));
+    // 마지막 하나까지 빼면 그 날은 "안 열어요" - 다시 켜면 방금 뺀 시간으로 돌아옴
+    if(left.length) formAvailRanges[dk] = left;
+    else { formAvailStash[dk] = quickCloneRanges(formAvailRanges[dk]); delete formAvailRanges[dk]; }
+    hapticImpact('MEDIUM');
     formAvailEdit = null;
     renderFormAvailBars();
     return;
@@ -17485,20 +17489,28 @@ function formAvailMinAt(track, clientX){
     const dr = formAvailDrag;
     if(!dr || dr.tap || dr.edge === 'x') return;
     if(!dr.moved && Math.abs(e.clientX - dr.x) < 6) return; // 톡 누른 건 끌기로 안 봄
+    if(!dr.moved) hapticImpact('LIGHT'); // 막대를 잡아 끌기 시작
     dr.moved = true;
     const r = dr.ranges[dr.idx];
     const { lo: prevEnd, hi: nextStart } = dr.bounds;
     const m = formAvailMinAt(dr.track, e.clientX);
     const ps = r.s, pe = r.e;
-    if(dr.edge === 's') r.s = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, quickStickySnap(r.s, m)));
-    else if(dr.edge === 'e') r.e = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, quickStickySnap(r.e, m)));
+    let want;
+    if(dr.edge === 's'){ want = quickStickySnap(r.s, m); r.s = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, want)); }
+    else if(dr.edge === 'e'){ want = quickStickySnap(r.e, m); r.e = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, want)); }
     else {
       const len = dr.orig.e - dr.orig.s;
-      r.s = Math.max(prevEnd, Math.min(nextStart - len, quickStickySnap(r.s, dr.orig.s + m - dr.startMin)));
+      want = quickStickySnap(r.s, dr.orig.s + m - dr.startMin);
+      r.s = Math.max(prevEnd, Math.min(nextStart - len, want));
       r.e = r.s + len;
     }
+    // 더 못 가는 끝(옆 시간·일정·최소 길이)에 닿으면 한 번 쿵
+    const wall = (dr.edge === 'e' ? r.e : r.s) !== want;
+    const hitWall = wall && !dr.atWall;
+    dr.atWall = wall;
+    if(hitWall) hapticImpact('HEAVY');
     if(r.s === ps && r.e === pe) return;
-    hapticTick(); // 5분 칸 넘어갈 때마다 톡
+    if(!hitWall) hapticStep(dr.edge === 'e' ? r.e : r.s); // 5분 칸 넘어갈 때마다 톡 (30분·정각은 더 세게)
     // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
     dr.el.style.cssText = formAvailBarStyle(r);
     const label = document.querySelector(`[data-fa-times="${dr.dk}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
@@ -20768,6 +20780,19 @@ function hapticSelectionEnd(){
 function quickStickySnap(cur, m){
   if(Math.abs(m - cur) < QUICK_AVAIL_STEP * 0.8) return cur;
   return Math.round(m / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP;
+}
+function hapticImpact(style){
+  try {
+    const hp = getHapticsPlugin();
+    if(hp){ Promise.resolve(hp.impact({ style })).catch(() => {}); return; }
+    if(navigator.vibrate) navigator.vibrate(style === 'HEAVY' ? 20 : style === 'MEDIUM' ? 12 : 8);
+  } catch(e) {}
+}
+// 막대 끝이 지나는 칸에 따라 세기를 다르게 - 5분은 톡, 30분은 툭, 정각은 퉁
+function hapticStep(min){
+  if(min % 60 === 0) hapticImpact('MEDIUM');
+  else if(min % 30 === 0) hapticImpact('LIGHT');
+  else hapticTick();
 }
 function hapticTick(){
   try {
@@ -28691,7 +28716,7 @@ function renderQuickAvail(){
     const weekend = dow === 0 || dow === 6;
     const editing = quickAvailEdit && quickAvailEdit.dow === dow && ranges[quickAvailEdit.idx] ? quickAvailEdit.idx : -1;
     const times = on
-      ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-qa-edit-open="${row.key}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span>${ranges.length > 1 ? `<button type="button" class="qa-del" data-qa-del="${row.key}|${i}" aria-label="이 시간 빼기">&times;</button>` : ''}</span>`).join('')
+      ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-qa-edit-open="${row.key}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span><button type="button" class="qa-del" data-qa-del="${row.key}|${i}" aria-label="이 시간 빼기">&times;</button></span>`).join('')
       : '<span class="qa-time off">안 열어요</span>';
     const busy = (quickAvailBusy[dow] || []).filter(b => b.e > quickAvailAxis.s && b.s < quickAvailAxis.e)
       .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${quickBarStyle({ s: Math.max(b.s, quickAvailAxis.s), e: Math.min(b.e, quickAvailAxis.e) })}"></i>`).join('');
@@ -28829,7 +28854,10 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   if(del){
     const [key, idx] = del.dataset.qaDel.split('|');
     const row = quickAvailRow(key);
-    setQuickRowRanges(row, quickAvailPattern[row.dows[0]].filter((_, i) => i !== Number(idx)));
+    const cur = quickAvailPattern[row.dows[0]];
+    if(cur.length === 1) quickAvailStash[row.key] = quickCloneRanges(cur); // 마지막 하나를 빼면 꺼짐 - 다시 켜면 되돌아옴
+    setQuickRowRanges(row, cur.filter((_, i) => i !== Number(idx)));
+    hapticImpact('MEDIUM');
     quickAvailEdit = null;
     renderQuickAvail();
     return;
@@ -28938,6 +28966,7 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
   const dr = quickDrag;
   if(!dr || dr.tap || dr.edge === 'x') return;
   if(!dr.moved && Math.abs(e.clientX - dr.x) < 6) return; // 톡 누른 건 끌기로 안 봄
+  if(!dr.moved) hapticImpact('LIGHT'); // 막대를 잡아 끌기 시작
   dr.moved = true;
   const r = dr.ranges[dr.idx];
   const prevEnd = dr.idx > 0 ? dr.ranges[dr.idx - 1].e : quickAvailAxis.s;
@@ -28946,14 +28975,16 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
   if(!dr.stuck && dr.offset) dr.offset = Math.abs(dr.offset) < 2 ? 0 : dr.offset * 0.75;
   const m = quickMinAt(dr.track, e.clientX) - dr.offset;
   // 가려는 값(s, e)을 먼저 구하고, 내 일정에 걸리면 경계에서 멈춤
-  let ns = r.s, ne = r.e;
-  if(dr.edge === 's') ns = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, quickStickySnap(r.s, m)));
-  else if(dr.edge === 'e') ne = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, quickStickySnap(r.e, m)));
+  let ns = r.s, ne = r.e, want;
+  if(dr.edge === 's'){ want = quickStickySnap(r.s, m); ns = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, want)); }
+  else if(dr.edge === 'e'){ want = quickStickySnap(r.e, m); ne = Math.min(nextStart, Math.max(r.s + QUICK_AVAIL_MIN_LEN, want)); }
   else {
     const len = dr.orig.e - dr.orig.s;
-    ns = Math.max(prevEnd, Math.min(nextStart - len, quickStickySnap(r.s, dr.orig.s + m - dr.startMin)));
+    want = quickStickySnap(r.s, dr.orig.s + m - dr.startMin);
+    ns = Math.max(prevEnd, Math.min(nextStart - len, want));
     ne = ns + len;
   }
+  const wall = (dr.edge === 'e' ? ne : ns) !== want; // 옆 시간·하루 끝·최소 길이에 막힘
   const hits = [];
   if(dr.edge !== 'e'){ const h = quickDetentHit(dr, r.s, ns); if(h) hits.push({ ...h, shift: h.at - r.s }); }
   if(dr.edge !== 's'){ const h = quickDetentHit(dr, r.e, ne); if(h) hits.push({ ...h, shift: h.at - r.e }); }
@@ -28977,12 +29008,15 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
   } else {
     dr.stuck = null;
   }
+  const hitWall = !hit && wall && !dr.atWall;
+  dr.atWall = !hit && wall;
+  if(hitWall) hapticImpact('HEAVY'); // 더 못 가는 끝에 닿으면 한 번 쿵
   const changed = r.s !== ns || r.e !== ne;
   r.s = ns;
   r.e = ne;
   if(!changed) return;
   if(dr.rattled) dr.rattled = false; // 일정에 걸린 순간은 드드득 진동만
-  else hapticTick(); // 5분 칸 넘어갈 때마다 톡
+  else if(!hitWall) hapticStep(dr.edge === 'e' ? r.e : r.s); // 5분 칸 넘어갈 때마다 톡 (30분·정각은 더 세게)
   // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
   dr.el.style.cssText = quickBarStyle(r);
   const label = document.querySelector(`[data-qa-times="${dr.row.key}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
