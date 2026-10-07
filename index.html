@@ -13952,11 +13952,36 @@ function setFeedCreateCategoryChips(category, locked){
     chip.classList.toggle('locked', locked);
   });
 }
+function selectFeedCreateCategory(cat){
+  setFeedCreateCategoryChips(cat, false);
+  document.getElementById('feedCreateHeaderTitle').textContent = FEED_CATEGORY_LABELS[cat] + ' 추천하기';
+}
+// 카카오 장소의 분류 코드로 카테고리를 정함 (약속 후 리뷰 요청과 같은 규칙: 카페 CE7, 음식점 FD6, 관광명소/문화시설은 체험)
+// 그 밖의 코드(마트, 편의점 등)나 코드가 없으면 null - 이때는 사용자가 고른 걸 그대로 씀
+function feedCategoryFromKakao(r){
+  const group = r && r.category_group_code;
+  if(group === 'CE7') return 'cafe';
+  if(group === 'FD6') return 'food';
+  if(group === 'AT4' || group === 'CT1') return 'experience';
+  return null;
+}
 document.querySelectorAll('#feedCreateCategoryRow .feed-create-category-chip').forEach(chip => {
-  chip.addEventListener('click', () => {
+  chip.addEventListener('click', async () => {
     if(feedFormMode === 'editReview') return; // 수정할 때는 카테고리를 못 바꿈
-    setFeedCreateCategoryChips(chip.dataset.cat, false);
-    document.getElementById('feedCreateHeaderTitle').textContent = FEED_CATEGORY_LABELS[chip.dataset.cat] + ' 추천하기';
+    const cat = chip.dataset.cat;
+    if(cat === feedCreateSelectedCategory) return;
+    // 검색해서 고른 장소의 카카오 분류와 다른 카테고리를 누르면 한 번 확인 (카페를 음식점으로 잘못 올리는 걸 막음)
+    const kakaoCat = feedPlacePicked && feedPlacePicked.kakaoCategory;
+    if(kakaoCat && kakaoCat !== cat){
+      const ok = await appConfirm({
+        title: '카테고리를 바꿀까요?',
+        html: `카카오 지도에서는 <b>${escapeHtml(FEED_CATEGORY_LABELS[kakaoCat])}</b>(으)로 분류된 곳이에요.<br><b>${escapeHtml(FEED_CATEGORY_LABELS[cat])}</b>(으)로 올릴까요?`,
+        yesText: FEED_CATEGORY_LABELS[cat] + '(으)로 올리기',
+        noText: '그대로 두기',
+      });
+      if(!ok) return;
+    }
+    selectFeedCreateCategory(cat);
   });
 });
 
@@ -14129,7 +14154,14 @@ document.getElementById('feedPlaceInput').addEventListener('input', () => {
               lat: parseFloat(r.y), lon: parseFloat(r.x),
               address: r.road_address_name || r.address_name || null,
               phone: r.phone || null,
+              kakaoCategory: feedCategoryFromKakao(r),
             };
+            // 고른 장소의 카카오 분류에 맞춰 카테고리를 자동으로 바꿈 (수정 중엔 카테고리 고정이라 그대로)
+            const autoCat = feedPlacePicked.kakaoCategory;
+            if(feedFormMode !== 'editReview' && autoCat && autoCat !== feedCreateSelectedCategory){
+              selectFeedCreateCategory(autoCat);
+              showToast(`카카오 분류에 맞춰 '${FEED_CATEGORY_LABELS[autoCat]}'(으)로 바꿨어요.`);
+            }
             resultsBox.style.display = 'none';
             showFeedPlaceMap(feedPlacePicked.lat, feedPlacePicked.lon);
             renderFeedPlaceCreateInfo(feedPlacePicked);
