@@ -4655,6 +4655,12 @@
     border-color:#38BDF8;
   }
   .day-event-card.friend-view{ padding:12px 14px; cursor:default; }
+  /* 약속 잡기 화면에서 친구 예약 가능 시간 사이에 같이 보여주는 "내 일정" - 누를 수 없고 친구 시간과 헷갈리지 않게 회색 점선 */
+  .day-event-card.my-own{ background:transparent; border:1px dashed var(--line); padding:9px 14px; opacity:.85; }
+  .day-event-card.my-own .day-event-time{ color:var(--text-dim); }
+  .day-event-card.my-own .day-event-title{ font-size:13px; color:var(--text-dim); }
+  .my-own-tag{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:6px; font-size:10.5px; font-weight:700; background:var(--surface-2); color:var(--text-dim); border:1px solid var(--line); vertical-align:1px; }
+  .day-event-overlap{ margin-top:5px; font-size:11.5px; font-weight:600; color:#B45309; }
   .day-event-card.pending-hold{
     background:#FEF9C3;
     border:1px solid #EAB308;
@@ -6291,6 +6297,9 @@
     overflow-wrap:anywhere;
   }
   .week-cal-block.show-actions{ z-index:3; }
+  /* 약속 잡기 일주일 보기: 왼쪽은 친구 예약 가능 시간, 오른쪽은 내 일정 - 겹쳐도 둘 다 보이게 나눠 그림 */
+  .week-cal-block.fr-half{ right:48%; }
+  .week-cal-block.my-own{ left:54%; right:1px; padding:2px 2px; background:repeating-linear-gradient(135deg, #94A3B8 0 4px, #A8B4C6 4px 8px); color:#FFFFFF; cursor:default; opacity:.9; }
   /* 아직 상대 응답을 기다리는 "예약중..." 시간대 - 확정된 일정과 확실히 다르게 줄무늬로 표시 */
   .week-cal-block.pending{
     background:repeating-linear-gradient(135deg, #F59E0B 0 6px, #FBBF6B 6px 12px) !important;
@@ -7950,7 +7959,7 @@
       <div class="friend-reserve-view" id="friendReserveView">
         <button class="profile-back" id="friendReserveBackBtn">&#8249; 뒤로</button>
         <div class="friend-calendar-title" id="friendReserveTitle"></div>
-        <div class="mp-input-group"><label>날짜</label><div class="feed-create-category" id="friendReserveDateLabel"></div><div class="reserve-window-hint" id="friendReserveWindowHint"></div></div>
+        <div class="mp-input-group"><label>날짜</label><div class="feed-create-category" id="friendReserveDateLabel"></div><div class="reserve-window-hint" id="friendReserveWindowHint"></div><div class="reserve-window-hint" id="friendReserveMyEvents" style="display:none;"></div></div>
         <div class="mp-input-group">
           <label>시작 시간</label>
           <select id="friendReserveStartSelect" style="display:none;"></select>
@@ -20063,7 +20072,7 @@ function renderFriendCalPrivacyNote(){
   const note = document.getElementById('friendCalPrivacyNote');
   const icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12" style="vertical-align:-1px;"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
   note.innerHTML = friendCalendarMode === 'reserve'
-    ? `${icon} 예약 가능한 시간만 모아서 보여줘요. 원하는 시간을 누르면 약속 요청을 보낼 수 있어요.`
+    ? `${icon} 친구가 열어둔 예약 가능 시간과 내 일정(회색)을 같이 보여줘요. 원하는 시간을 누르면 약속 요청을 보낼 수 있어요.`
     : `${icon} 나에게 "친구"로 공개해둔 일정만 내용이 보여요. 가능한 시간을 누르면 약속을 요청할 수 있어요.`;
 }
 
@@ -20282,6 +20291,18 @@ function isFriendScheduleCached(friend, dateObj){
   return !!friendRealScheduleCache[cacheKey];
 }
 
+// 약속 잡기 화면에 같이 보여줄 그날 "내 일정" (분 단위) - 내 예약 가능 시간 막대는 빼고, 내가 보낸 대기 중 요청은 넣음
+function myBusyRangesForDate(dateObj){
+  return getEventsForDate(dateObj)
+    .filter(ev => ev.type !== 'available' || ev.isPendingHold || ev.isReservationLinked)
+    .map(ev => {
+      const r = getEventDisplayRangeForDate(ev, dateObj);
+      return { s: r.startMin, e: r.endMin, title: ev.title || '일정', pending: !!ev.isPendingHold };
+    })
+    .filter(r => r.e > r.s);
+}
+function myRangeLabel(r){ return `${minutesToLabel(r.s)}-${minutesToLabel(r.e)} ${r.pending ? '(대기 중) ' : ''}${r.title}`; }
+
 function renderFriendToday(){
   const friend = FRIENDS.find(f => f.id === activeFriendCalendarId);
   const list = document.getElementById('friendTodayList');
@@ -20307,13 +20328,36 @@ function renderFriendToday(){
     return;
   }
 
-  blocks.forEach(b => {
+  // 약속 잡기에서는 그날 내 일정도 시간 순서대로 사이사이에 끼워서 보여줌 - 상대 시간만 보고는 내가 되는지 알 수 없었음
+  let mine = [];
+  if(friendCalendarMode === 'reserve'){
+    const isToday = dateKeyNum(friendDayFocusDate) === dateKeyNum(TODAY);
+    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+    mine = myBusyRangesForDate(friendDayFocusDate).filter(r => !isToday || r.e > nowMin);
+  }
+  const items = blocks.map(b => ({ at: b.startHour * 60, b }))
+    .concat(mine.map(r => ({ at: r.s, mine: r })))
+    .sort((x, y) => x.at - y.at || (x.mine ? -1 : 1));
+
+  items.forEach(({ b, mine: r }) => {
+    if(r){
+      const mc = document.createElement('div');
+      mc.className = 'day-event-card friend-view my-own';
+      mc.innerHTML = `
+        <div class="day-event-time">${minutesToLabel(r.s)}-${minutesToLabel(r.e)}</div>
+        <div class="day-event-title"><span class="my-own-tag">내 일정</span>${r.pending ? '(대기 중) ' : ''}${escapeHtml(r.title)}</div>
+      `;
+      list.appendChild(mc);
+      return;
+    }
     const card = document.createElement('div');
     card.className = 'day-event-card friend-view' + (b.isBookable ? ' available' : '');
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
+    const overlap = mine.filter(x => x.s < b.endHour * 60 && x.e > b.startHour * 60);
     card.innerHTML = `
       <div class="day-event-time">${String(b.startHour).padStart(2,'0')}:00-${String(b.endHour).padStart(2,'0')}:00</div>
       <div class="day-event-title">${label}</div>
+      ${overlap.length ? `<div class="day-event-overlap">내 일정과 겹쳐요 · ${overlap.map(x => escapeHtml(myRangeLabel(x))).join(', ')}</div>` : ''}
     `;
     if(b.isBookable){
       card.style.cursor = 'pointer';
@@ -20391,7 +20435,7 @@ function renderFriendWeek(){
       const startIdx = HOURS.indexOf(b.startHour);
       const endIdx = HOURS.indexOf(b.endHour - 1);
       const block = document.createElement('div');
-      block.className = 'week-cal-block';
+      block.className = 'week-cal-block' + (friendCalendarMode === 'reserve' ? ' fr-half' : '');
       block.style.top = (startIdx * WEEK_ROW_H + 1) + 'px';
       block.style.height = ((endIdx - startIdx + 1) * WEEK_ROW_H - 2) + 'px';
       const label = b.title ? b.title : (b.isBookable ? '예약 가능' : '일정');
@@ -20410,6 +20454,19 @@ function renderFriendWeek(){
       }
       body.appendChild(block);
     });
+
+    // 약속 잡기에서는 오른쪽 절반에 내 일정을 같이 그려서, 친구가 열어둔 시간 중 내가 되는 때를 한눈에 보게 함
+    if(friendCalendarMode === 'reserve' && !isPast){
+      myBusyRangesForDate(d).forEach(r => {
+        const mb = document.createElement('div');
+        mb.className = 'week-cal-block my-own';
+        mb.style.top = (r.s / 60 * WEEK_ROW_H + 1) + 'px';
+        mb.style.height = Math.max(10, (r.e - r.s) / 60 * WEEK_ROW_H - 2) + 'px';
+        mb.textContent = r.title;
+        mb.title = `내 일정 ${d.getMonth()+1}/${d.getDate()} ${myRangeLabel(r)}`;
+        body.appendChild(mb);
+      });
+    }
 
     dayCol.appendChild(body);
     daysWrap.appendChild(dayCol);
@@ -20684,6 +20741,11 @@ function openFriendReserve(dateObj, hour){
   const hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   document.getElementById('friendReserveWindowHint').textContent =
     `${friend.name}님이 열어둔 ${hm(windowStartHour * 60)}–${hm(windowEndHour * 60)} 안에서 시간을 골라요`;
+  // 이 구간에 걸치는 내 일정도 같이 알려줌 - 시간 고를 때 내 일정을 따로 확인하러 나가지 않아도 되게
+  const myIn = myBusyRangesForDate(dateObj).filter(r => r.s < windowEndHour * 60 && r.e > windowStartHour * 60);
+  const myEl = document.getElementById('friendReserveMyEvents');
+  myEl.textContent = myIn.length ? `이 시간대 내 일정: ${myIn.map(myRangeLabel).join(', ')}` : '이 시간대에 내 일정은 없어요';
+  myEl.style.display = '';
 
   updateFriendReserveStartOptions(hour * 60);
   document.getElementById('friendReserveNoteInput').value = '';
