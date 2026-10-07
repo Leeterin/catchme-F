@@ -5950,7 +5950,15 @@
   .ecs-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; box-shadow:0 0 0 1px rgba(0,0,0,0.12); }
   .ecs-hex{ font-family:'Roboto Mono',monospace; font-size:12px; letter-spacing:0.2px; }
   /* 일정 폼 - 이동시간 */
-  .travel-info{ margin-top:8px; padding:12px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line); }
+  .travel-field{ display:flex; align-items:center; gap:10px; margin-top:6px; }
+  .travel-field-label{ flex:0 0 28px; font-size:12.5px; font-weight:700; color:var(--text-dim); }
+  .travel-input-wrap{ flex:1; position:relative; min-width:0; }
+  .travel-from-row:empty{ display:none; }
+  .travel-from-row{ padding-left:38px; margin-top:6px !important; }
+  /* 검색칸을 누르면 키보드에 안 가리게: 버튼 영역을 잠깐 숨기고 아래 여백을 줘서 검색칸을 위로 올림 */
+  .event-form-view.travel-typing .event-form-footer{ display:none; }
+  .event-form-view.travel-typing .event-form-scroll{ padding-bottom:100vh; }
+  .travel-info{ margin-top:10px; padding:12px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line); }
   .travel-head{ display:flex; align-items:center; gap:8px; }
   .travel-min{ font-size:17px; font-weight:800; color:var(--text); }
   .travel-depart{ font-size:12.5px; color:var(--text-dim); flex:1; }
@@ -7479,9 +7487,20 @@
       <!-- 이동시간 (설정 > 앱 관리에서 켠 사람만) - 목적지를 고르면 카카오 대중교통 이동시간을 받아와 일정 앞에 "이동시간" 칸으로 표시 -->
       <div class="mp-input-group" id="travelGroup" style="display:none;">
         <label>이동시간</label>
-        <div style="position:relative;">
-          <input class="search-input" id="travelDestInput" placeholder="목적지를 검색하세요 (예: 강남역)" autocomplete="off" />
-          <div class="location-search-results" id="travelDestResults" style="display:none;"></div>
+        <div class="travel-field">
+          <span class="travel-field-label">출발</span>
+          <div class="travel-input-wrap">
+            <input class="search-input" id="travelFromInput" placeholder="출발지 검색 (예: 잠실역)" autocomplete="off" />
+            <div class="location-search-results" id="travelFromResults" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="travel-from-row" id="travelFromChips"></div>
+        <div class="travel-field">
+          <span class="travel-field-label">도착</span>
+          <div class="travel-input-wrap">
+            <input class="search-input" id="travelDestInput" placeholder="목적지 검색 (예: 강남역)" autocomplete="off" />
+            <div class="location-search-results" id="travelDestResults" style="display:none;"></div>
+          </div>
         </div>
         <div class="travel-info" id="travelInfo" style="display:none;"></div>
       </div>
@@ -16528,7 +16547,11 @@ function defaultTravelOrigin(){
   return pick ? { name: pick.short, lat: pick.lat, lon: pick.lon } : null;
 }
 async function computeFormTravel(){
-  if(!formTravel || !formTravel.to || !formTravel.from){ renderTravelSection(); return; }
+  if(!formTravel || !formTravel.to || !formTravel.from){
+    if(formTravel){ formTravel.minutes = null; formTravel.source = null; }
+    renderTravelSection();
+    return;
+  }
   const seq = ++travelCalcSeq;
   formTravel.minutes = null;
   formTravel.source = 'loading';
@@ -16553,96 +16576,118 @@ function renderTravelSection(){
   // 기능을 꺼도 이미 이동시간이 있는 일정은 수정 화면에서 보이게 (지울 수 있도록)
   const show = formEventType !== 'available' && (isTravelEnabled() || !!formTravel);
   group.style.display = show ? '' : 'none';
-  const info = document.getElementById('travelInfo');
-  const input = document.getElementById('travelDestInput');
   if(!show) return;
-  if(!formTravel || !formTravel.to){
-    info.style.display = 'none';
-    input.style.display = '';
-    return;
-  }
-  input.style.display = 'none';
+  const t = formTravel || {};
+  const fromInput = document.getElementById('travelFromInput');
+  const destInput = document.getElementById('travelDestInput');
+  // 검색 중(입력칸에 포커스)이 아닐 때만 고른 장소 이름으로 채움
+  if(document.activeElement !== fromInput) fromInput.value = t.from ? (t.from.name || '') : '';
+  if(document.activeElement !== destInput) destInput.value = t.to ? (t.to.name || '') : '';
+
+  // 출발지 바로가기 - 앞 일정 장소 / 자주 쓰는 출발지(집·회사 등)
+  const opts = travelOriginOptions();
+  const fromKey = t.from ? (opts.find(o => o.lat === t.from.lat && o.lon === t.from.lon) || {}).key : null;
+  const chips = document.getElementById('travelFromChips');
+  chips.innerHTML = opts.map(o => `<button type="button" class="travel-from-chip${o.key === fromKey ? ' on' : ''}" data-from="${escapeHtml(o.key)}">${escapeHtml(o.key === 'prev' ? '앞 일정 장소' : o.short)}</button>`).join('');
+  chips.querySelectorAll('.travel-from-chip').forEach(b => b.addEventListener('click', () => {
+    const o = opts.find(x => x.key === b.dataset.from);
+    if(!o) return;
+    formTravel = { ...(formTravel || {}), from: { name: o.short, lat: o.lat, lon: o.lon } };
+    computeFormTravel();
+  }));
+
+  const info = document.getElementById('travelInfo');
+  if(!t.from && !t.to){ info.style.display = 'none'; return; }
   info.style.display = '';
-  const t = formTravel;
   const hm = m => `${String(Math.floor(((m % 1440) + 1440) % 1440 / 60)).padStart(2, '0')}:${String(((m % 60) + 60) % 60).padStart(2, '0')}`;
   let head;
-  if(!t.from) head = `<span class="travel-depart">어디서 출발할지 골라주세요</span>`;
+  if(!t.from) head = `<span class="travel-depart">출발지를 골라주세요</span>`;
+  else if(!t.to) head = `<span class="travel-depart">도착지를 골라주세요</span>`;
   else if(t.source === 'loading') head = `<span class="travel-depart">이동시간 계산 중...</span>`;
   else head = `
     <span class="travel-min">🚇 ${t.minutes}분</span>
     <span class="travel-depart">${hm(travelFormStartMin() - t.minutes)} 출발${t.source === 'fallback' ? ' · 대략적인 시간' : ''}</span>
     <button type="button" class="travel-adj" data-adj="-5" aria-label="5분 줄이기">−</button>
     <button type="button" class="travel-adj" data-adj="5" aria-label="5분 늘리기">+</button>`;
-  const opts = travelOriginOptions();
-  const fromKey = t.from ? (opts.find(o => o.lat === t.from.lat && o.lon === t.from.lon) || {}).key : null;
   info.innerHTML = `
     <div class="travel-head">${head}</div>
-    <div class="travel-route">${t.from ? `<b>${escapeHtml(t.from.name || '출발지')}</b> → ` : ''}<b>${escapeHtml(t.to.name || '목적지')}</b></div>
-    <div class="travel-from-row">
-      <span style="font-size:11.5px;color:var(--text-dim);align-self:center;">출발</span>
-      ${opts.map(o => `<button type="button" class="travel-from-chip${o.key === fromKey ? ' on' : ''}" data-from="${escapeHtml(o.key)}">${escapeHtml(o.key === 'prev' ? '앞 일정 장소' : o.short)}</button>`).join('')}
-      <button type="button" class="travel-from-chip${t.from && !fromKey ? ' on' : ''}" data-from="other">${t.from && !fromKey ? escapeHtml(t.from.name || '다른 곳') : '다른 곳…'}</button>
-    </div>
     <button type="button" class="travel-remove" id="travelRemoveBtn">이동시간 빼기</button>
   `;
   info.querySelectorAll('.travel-adj').forEach(b => b.addEventListener('click', () => {
-    t.minutes = Math.max(0, Math.min(600, (t.minutes || 0) + parseInt(b.dataset.adj, 10)));
-    t.source = 'manual';
+    formTravel.minutes = Math.max(0, Math.min(600, (formTravel.minutes || 0) + parseInt(b.dataset.adj, 10)));
+    formTravel.source = 'manual';
     renderTravelSection();
-  }));
-  info.querySelectorAll('.travel-from-chip').forEach(b => b.addEventListener('click', () => {
-    if(b.dataset.from === 'other'){
-      openDepartureLocationPicker({
-        title: '어디서 출발해요?',
-        showSaved: false,
-        onConfirm: (picked) => {
-          if(!formTravel) return;
-          formTravel.from = { name: picked.placeName || picked.address, lat: picked.lat, lon: picked.lon };
-          computeFormTravel();
-        },
-      });
-      return;
-    }
-    const o = opts.find(x => x.key === b.dataset.from);
-    if(!o) return;
-    t.from = { name: o.short, lat: o.lat, lon: o.lon };
-    computeFormTravel();
   }));
   document.getElementById('travelRemoveBtn').addEventListener('click', () => {
     formTravel = null;
-    document.getElementById('travelDestInput').value = '';
     renderTravelSection();
   });
 }
-// 목적지 검색 - 장소 추천 글쓰기와 같은 카카오 장소 검색
-let travelDestSearchTimer = null;
-document.getElementById('travelDestInput').addEventListener('input', () => {
-  const val = document.getElementById('travelDestInput').value.trim();
-  const resultsBox = document.getElementById('travelDestResults');
-  clearTimeout(travelDestSearchTimer);
-  if(val.length < 2){ resultsBox.style.display = 'none'; return; }
-  travelDestSearchTimer = setTimeout(() => {
-    ensureKakaoMapsLoaded(() => {
-      const places = new kakao.maps.services.Places();
-      places.keywordSearch(val, (results, status) => {
-        if(status !== kakao.maps.services.Status.OK || results.length === 0){ resultsBox.style.display = 'none'; return; }
-        resultsBox.innerHTML = results.slice(0, 6).map((r, i) => `
-          <div class="location-search-result-row" data-idx="${i}">
-            <div class="location-search-result-name">${escapeHtml(r.place_name)}</div>
-            <div class="location-search-result-addr">${escapeHtml(r.road_address_name || r.address_name)}</div>
-          </div>`).join('');
-        resultsBox.style.display = 'block';
-        resultsBox.querySelectorAll('.location-search-result-row').forEach(row => {
-          row.addEventListener('click', () => {
-            const r = results[parseInt(row.dataset.idx, 10)];
-            resultsBox.style.display = 'none';
-            formTravel = { to: { name: r.place_name, lat: parseFloat(r.y), lon: parseFloat(r.x) }, from: defaultTravelOrigin(), minutes: null, source: null };
-            computeFormTravel();
+// 출발/도착 검색칸 공용 - 장소 추천 글쓰기와 같은 카카오 장소 검색
+function bindTravelPlaceSearch(inputId, resultsId, onPick){
+  const input = document.getElementById(inputId);
+  const resultsBox = document.getElementById(resultsId);
+  let timer = null;
+  input.addEventListener('input', () => {
+    const val = input.value.trim();
+    clearTimeout(timer);
+    if(val.length < 2){ resultsBox.style.display = 'none'; return; }
+    timer = setTimeout(() => {
+      ensureKakaoMapsLoaded(() => {
+        const places = new kakao.maps.services.Places();
+        places.keywordSearch(val, (results, status) => {
+          if(status !== kakao.maps.services.Status.OK || results.length === 0){ resultsBox.style.display = 'none'; return; }
+          resultsBox.innerHTML = results.slice(0, 6).map((r, i) => `
+            <div class="location-search-result-row" data-idx="${i}">
+              <div class="location-search-result-name">${escapeHtml(r.place_name)}</div>
+              <div class="location-search-result-addr">${escapeHtml(r.road_address_name || r.address_name)}</div>
+            </div>`).join('');
+          resultsBox.style.display = 'block';
+          resultsBox.querySelectorAll('.location-search-result-row').forEach(row => {
+            row.addEventListener('click', () => {
+              const r = results[parseInt(row.dataset.idx, 10)];
+              resultsBox.style.display = 'none';
+              input.blur();
+              onPick({ name: r.place_name, lat: parseFloat(r.y), lon: parseFloat(r.x) });
+            });
           });
         });
       });
-    });
-  }, 300);
+    }, 300);
+  });
+  // 키보드가 올라와도 검색칸과 결과가 보이게: 버튼 영역을 잠깐 숨기고 검색칸을 스크롤 맨 위쪽으로 올림
+  input.addEventListener('focus', () => {
+    const view = document.getElementById('eventFormView');
+    view.classList.add('travel-typing');
+    // "이동시간" 제목이 스크롤 영역 맨 위에 오게 - 폰 키보드가 다 올라온 뒤 화면 높이가 바뀌므로 한 번 더 맞춤
+    const lift = () => {
+      const scroller = view.querySelector('.event-form-scroll');
+      if(!scroller || document.activeElement !== input) return;
+      const anchor = document.getElementById('travelGroup');
+      const delta = anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 4;
+      scroller.scrollTop = scroller.scrollTop + delta;
+    };
+    setTimeout(lift, 80);
+    setTimeout(lift, 450);
+  });
+  input.addEventListener('blur', () => {
+    // 결과를 누르는 동안 화면이 움직이지 않게 조금 있다가 되돌림
+    setTimeout(() => {
+      if(document.activeElement && document.activeElement.closest && document.activeElement.closest('#travelGroup')) return;
+      document.getElementById('eventFormView').classList.remove('travel-typing');
+      resultsBox.style.display = 'none';
+      renderTravelSection();
+    }, 300);
+  });
+}
+bindTravelPlaceSearch('travelFromInput', 'travelFromResults', (place) => {
+  formTravel = { ...(formTravel || {}), from: place };
+  computeFormTravel();
+});
+bindTravelPlaceSearch('travelDestInput', 'travelDestResults', (place) => {
+  formTravel = { ...(formTravel || {}), to: place };
+  if(!formTravel.from) formTravel.from = defaultTravelOrigin(); // 출발지를 안 골랐으면 앞 일정 장소 → 집 순으로 자동
+  computeFormTravel();
 });
 
 // "이 시간에도 예약 받기" 항상 켜짐 - 이 기기에만 저장 (기본은 꺼짐)
@@ -16715,8 +16760,9 @@ function openEventForm(existingEvent){
   editingEventId = existingEvent ? existingEvent.id : null;
   eventColorLastPicked = null;
   formTravel = existingEvent && existingEvent.travel ? JSON.parse(JSON.stringify(existingEvent.travel)) : null;
-  document.getElementById('travelDestInput').value = '';
   document.getElementById('travelDestResults').style.display = 'none';
+  document.getElementById('travelFromResults').style.display = 'none';
+  document.getElementById('eventFormView').classList.remove('travel-typing');
   editingLinkedPieceIds = [];
   absorbedAvailIds = [];
   document.getElementById('dayEventList').style.display = 'none';
