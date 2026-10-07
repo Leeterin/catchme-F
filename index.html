@@ -5221,6 +5221,7 @@
   .qa-handle::after{ content:''; position:absolute; left:50%; top:50%; width:6px; height:20px; margin:-10px 0 0 -3px; border-radius:3px; background:#fff; box-shadow:0 0 0 1.5px var(--accent); }
   .qa-busy{ position:absolute; top:3px; bottom:3px; border-radius:5px; background:rgba(120,120,128,.38); pointer-events:none; z-index:2; }
   .qa-busy.soft{ background:none; border:1.5px dashed rgba(120,120,128,.8); }
+  .qa-busy.once{ background:rgba(120,120,128,.18); }
   .qa-bar{ z-index:1; }
   .qa-handle{ z-index:3; }
   .qa-info{ margin:6px 8px 0; padding:7px 9px; border-radius:8px; background:var(--surface-2); font-size:12px; line-height:1.45; color:var(--text); }
@@ -5252,6 +5253,7 @@
   .qa-legend{ display:flex; justify-content:flex-end; gap:10px; margin:6px 8px 0; font-size:10px; color:var(--text-dim); }
   .qa-legend i{ display:inline-block; width:12px; height:8px; margin-right:3px; border-radius:2px; vertical-align:-1px; background:rgba(120,120,128,.38); }
   .qa-legend i.soft{ background:none; border:1.2px dashed rgba(120,120,128,.8); }
+  .qa-legend i.once{ background:rgba(120,120,128,.18); }
   .qa-axis{ position:relative; height:16px; margin:6px 8px 0; font-size:10px; color:var(--text-dim); }
   .qa-axis span{ position:absolute; transform:translateX(-50%); white-space:nowrap; }
   .quick-avail-hint{ font-size:11px; color:var(--text-dim); line-height:1.45; margin:10px 0 12px; text-align:center; }
@@ -28727,6 +28729,25 @@ function quickHoursText(min){
   const h = Math.floor(min / 60), m = min % 60;
   return h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`;
 }
+// 4주 내내 그 요일에 있는 내 일정(회색) - 일정 추가 화면처럼 막대를 못 놓음.
+// 그날만 있는 일정(옅은 회색)은 막대는 지나갈 수 있고 저장할 때 그날만 빼고 엶
+function quickBusyWeekly(b){ return !b.soft && b.dates.length >= QUICK_AVAIL_WEEKS; }
+function quickHardBusy(dow){ return quickMergeRanges((quickAvailBusy[dow] || []).filter(quickBusyWeekly).map(b => ({ s: b.s, e: b.e }))); }
+// 매주 있는 일정과 겹친 부분은 잘라내고 30분 안 되는 조각은 버림
+function quickFitRanges(dow, ranges){
+  const hard = quickHardBusy(dow);
+  if(!ranges.some(r => hard.some(h => h.s < r.e && h.e > r.s))) return ranges; // 안 겹치면 그대로 (지금 열린 시간과 괜히 달라지지 않게)
+  return subtractMinuteRanges(ranges, hard).sort((a, b) => a.s - b.s).filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN);
+}
+// idx번째 막대가 늘어나거나 움직일 수 있는 범위 - 옆 막대와 매주 있는 일정 사이
+function quickBounds(dow, ranges, idx, lo, hi){
+  const r = ranges[idx];
+  [...quickHardBusy(dow), ...ranges.filter((_, i) => i !== idx)].forEach(o => {
+    if(o.e <= r.s) lo = Math.max(lo, o.e);
+    else if(o.s >= r.e) hi = Math.min(hi, o.s);
+  });
+  return { lo, hi };
+}
 function quickBusyAt(dow, min){ return (quickAvailBusy[dow] || []).filter(b => b.s <= min && b.e > min); }
 // 회색/점선을 눌렀을 때 그 시간에 있는 일정 설명
 function quickAvailInfoHtml(dow, min){
@@ -28734,7 +28755,7 @@ function quickAvailInfoHtml(dow, min){
   if(!items.length) return '';
   return `<div class="qa-info">${items.map(b => {
     const when = b.dates.length >= QUICK_AVAIL_WEEKS ? `매주 ${WEEKDAY_KO[dow]}요일` : b.dates.map(d => `${d.getMonth() + 1}/${d.getDate()}`).join(', ');
-    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : '이 시간은 빼고 열어요';
+    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : quickBusyWeekly(b) ? '매주 있는 일정이라 이 시간은 열 수 없어요' : '그날만 이 시간은 빼고 열어요';
     return `<div class="qa-info-item"><b>${escapeHtml(b.title)}</b> ${minutesToLabel(b.s)}–${minutesToLabel(b.e)}<small>${when} · ${note}</small></div>`;
   }).join('')}</div>`;
 }
@@ -28781,6 +28802,10 @@ function quickAxisRangeHtml(){
 function renderQuickAvail(){
   // 자동일 땐 정해둔 시간이 다 보이게 넓히고, 직접 고른 범위는 그대로 둠 (밖으로 나간 막대는 잘려 보임)
   quickAvailAxis = quickAvailAxisPref ? { ...quickAvailAxisPref } : quickAxisCover(quickAvailAxis);
+  quickTabKeys().forEach(k => QUICK_AVAIL_DOWS.forEach(dow => {
+    const pat = quickAvailTabs[k].pattern;
+    if(pat[dow] && pat[dow].length) pat[dow] = quickFitRanges(dow, pat[dow]);
+  }));
   // 3시간마다 눈금, 넓게 볼 땐 글자는 6시간마다
   const ticks = [];
   for(let h = Math.ceil(quickAvailAxis.s / 180) * 3; h * 60 <= quickAvailAxis.e; h += 3) ticks.push(h);
@@ -28796,7 +28821,7 @@ function renderQuickAvail(){
       ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-qa-edit-open="${row.key}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span><button type="button" class="qa-del" data-qa-del="${row.key}|${i}" aria-label="이 시간 빼기">&times;</button></span>`).join('')
       : '<span class="qa-time off">안 열어요</span>';
     const busy = (quickAvailBusy[dow] || []).filter(b => b.e > quickAvailAxis.s && b.s < quickAvailAxis.e)
-      .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${quickBarStyle({ s: Math.max(b.s, quickAvailAxis.s), e: Math.min(b.e, quickAvailAxis.e) })}"></i>`).join('');
+      .map(b => `<i class="qa-busy${b.soft ? ' soft' : quickBusyWeekly(b) ? '' : ' once'}" style="${quickBarStyle({ s: Math.max(b.s, quickAvailAxis.s), e: Math.min(b.e, quickAvailAxis.e) })}"></i>`).join('');
     const others = quickMergeRanges(quickTabKeys().filter(k => k !== quickAvailTab).flatMap(k => quickAvailTabs[k].pattern[dow]))
       .map(r => `<i class="qa-other" style="${quickBarStyle(r)}"></i>`).join('');
     return `<div class="qa-row${on ? '' : ' off'}">
@@ -28814,7 +28839,7 @@ function renderQuickAvail(){
   const busyAll = QUICK_AVAIL_DOWS.flatMap(dow => quickAvailBusy[dow] || []);
   const anyOther = quickTabKeys().some(k => k !== quickAvailTab && QUICK_AVAIL_DOWS.some(dow => quickAvailTabs[k].pattern[dow].length));
   if(busyAll.length || anyOther){
-    html += `<div class="qa-legend">${busyAll.some(b => !b.soft) ? '<span><i></i>내 일정</span>' : ''}${busyAll.some(b => b.soft) ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>다른 탭에 연 시간</span>' : ''}</div>`;
+    html += `<div class="qa-legend">${busyAll.some(quickBusyWeekly) ? '<span><i></i>매주 일정</span>' : ''}${busyAll.some(b => !b.soft && !quickBusyWeekly(b)) ? '<span><i class="once"></i>그날만 있는 일정</span>' : ''}${busyAll.some(b => b.soft) ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>다른 탭에 연 시간</span>' : ''}</div>`;
   }
   document.getElementById('quickAvailRows').innerHTML = html;
   // 평일/주말 한 번에 열기 - 다 열려 있으면 한 번에 닫기로 바뀜
@@ -28866,13 +28891,13 @@ function futureAvailableEvents(){
 // 한 줄에 시간을 하나 더 넣음 - 누른 곳(centerMin)이 있으면 거기, 없으면 가장 넓은 빈 곳 가운데에 2시간
 function quickAvailAddRange(row, centerMin){
   const ranges = quickAvailPattern[row.dows[0]];
-  const gaps = subtractMinuteRanges([{ s: quickAvailAxis.s, e: quickAvailAxis.e }], ranges).filter(g => g.e - g.s >= 60);
+  const gaps = subtractMinuteRanges([{ s: quickAvailAxis.s, e: quickAvailAxis.e }], [...ranges, ...quickHardBusy(row.dows[0])]).filter(g => g.e - g.s >= QUICK_AVAIL_MIN_LEN);
   let gap;
   if(centerMin != null) gap = gaps.find(g => g.s <= centerMin && g.e >= centerMin);
   else gap = gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
   if(!gap){
     if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
-    return;
+    return false;
   }
   const len = Math.min(120, gap.e - gap.s);
   const c = centerMin != null ? centerMin : (gap.s + gap.e) / 2;
@@ -28880,6 +28905,7 @@ function quickAvailAddRange(row, centerMin){
   s = Math.max(gap.s, Math.min(gap.e - len, s));
   setQuickRowRanges(row, [...ranges, { s, e: s + len }].sort((a, b) => a.s - b.s));
   renderQuickAvail();
+  return true;
 }
 document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'quickAvailOverlay'){ goBackOrClose(closeQuickAvail); return; }
@@ -28919,7 +28945,9 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
       quickAvailStash[row.key] = quickCloneRanges(cur);
       setQuickRowRanges(row, []);
     } else {
-      setQuickRowRanges(row, quickAvailStash[row.key] || [row.def]);
+      const fit = quickFitRanges(row.dows[0], quickCloneRanges(quickAvailStash[row.key] || [row.def]));
+      if(fit.length) setQuickRowRanges(row, fit);
+      else { quickAvailAddRange(row); return; }
     }
     if(quickAvailEdit && quickAvailEdit.dow === row.dows[0]) quickAvailEdit = null;
     renderQuickAvail();
@@ -28973,8 +29001,7 @@ document.getElementById('quickAvailRows').addEventListener('change', (e) => {
   const ranges = quickCloneRanges(quickAvailPattern[dow]);
   const r = ranges[idx];
   if(!r) return;
-  const prevEnd = idx > 0 ? ranges[idx - 1].e : 0;
-  const nextStart = idx < ranges.length - 1 ? ranges[idx + 1].s : 24 * 60;
+  const { lo: prevEnd, hi: nextStart } = quickBounds(dow, ranges, idx, 0, 24 * 60);
   let s = val('sh') * 60 + val('sm');
   let en = Math.min(24 * 60, val('eh') * 60 + val('em'));
   if(f === 'sh' || f === 'sm'){
@@ -29009,7 +29036,7 @@ quickAvailRowsEl.addEventListener('pointerdown', (e) => {
     if(edge === 'm' && /clip-/.test(bar.className)) edge = 'x'; // 잘려 보이는 막대는 통째로 옮기지 않음 (톡 누르면 시간 고르기)
     const ranges = quickCloneRanges(quickAvailPattern[row.dows[0]]);
     hapticSelectionStart();
-    quickDrag = { row, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, startMin: quickMinAt(track, e.clientX), el: bar || handle.closest('[data-qa-bar]'), x: e.clientX, y: e.clientY, moved: false, offset: 0, stuck: null, stuckX: 0, passed: new Set() };
+    quickDrag = { row, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, bounds: quickBounds(row.dows[0], ranges, Number(idx), quickAvailAxis.s, quickAvailAxis.e), startMin: quickMinAt(track, e.clientX), el: bar || handle.closest('[data-qa-bar]'), x: e.clientX, y: e.clientY, moved: false, offset: 0, stuck: null, stuckX: 0, passed: new Set() };
     try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
     e.preventDefault();
     return;
@@ -29031,7 +29058,7 @@ function quickDetentHit(dr, p, c){
   const right = c > p;
   let hit = null;
   (quickAvailBusy[dr.row.dows[0]] || []).forEach(b => {
-    if(b.soft || dr.passed.has(b)) return;
+    if(b.soft || quickBusyWeekly(b) || dr.passed.has(b)) return; // 매주 일정은 아예 못 넘어가는 벽
     if(p > b.s && p < b.e) return; // 이미 일정 안에 있던 끝은 안 막음
     const edge = right ? b.s : b.e;
     if(right ? !(p <= b.s && c > b.s) : !(p >= b.e && c < b.e)) return;
@@ -29046,8 +29073,7 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
   if(!dr.moved) hapticImpact('LIGHT'); // 막대를 잡아 끌기 시작
   dr.moved = true;
   const r = dr.ranges[dr.idx];
-  const prevEnd = dr.idx > 0 ? dr.ranges[dr.idx - 1].e : quickAvailAxis.s;
-  const nextStart = dr.idx < dr.ranges.length - 1 ? dr.ranges[dr.idx + 1].s : quickAvailAxis.e;
+  const { lo: prevEnd, hi: nextStart } = dr.bounds;
   // 넘어간 뒤엔 손가락보다 뒤처져 있던 만큼을 조금씩 줄여서 다시 손가락 밑으로 따라오게 함
   if(!dr.stuck && dr.offset) dr.offset = Math.abs(dr.offset) < 2 ? 0 : dr.offset * 0.75;
   const m = quickMinAt(dr.track, e.clientX) - dr.offset;
@@ -29061,7 +29087,7 @@ quickAvailRowsEl.addEventListener('pointermove', (e) => {
     ns = Math.max(prevEnd, Math.min(nextStart - len, want));
     ne = ns + len;
   }
-  const wall = (dr.edge === 'e' ? ne : ns) !== want; // 옆 시간·하루 끝·최소 길이에 막힘
+  const wall = (dr.edge === 'e' ? ne : ns) !== want; // 옆 시간·매주 일정·하루 끝·최소 길이에 막힘
   const hits = [];
   if(dr.edge !== 'e'){ const h = quickDetentHit(dr, r.s, ns); if(h) hits.push({ ...h, shift: h.at - r.s }); }
   if(dr.edge !== 's'){ const h = quickDetentHit(dr, r.e, ne); if(h) hits.push({ ...h, shift: h.at - r.e }); }
