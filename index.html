@@ -4764,6 +4764,15 @@
     padding:30px 0;
   }
 
+  /* 꾹 눌러도 글자 선택·복사 메뉴가 뜨지 않게 - 입력칸, 채팅 말풍선, 주소·링크처럼 복사가 필요한 곳만 예외 */
+  html, body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; overscroll-behavior:none; }
+  input, textarea, [contenteditable="true"],
+  .msg-bubble-text, .inv-share-link,
+  .location-picker-bottom-addr, .location-search-result-addr, .feed-place-info-addr{
+    -webkit-user-select:text; user-select:text; -webkit-touch-callout:default;
+  }
+  .inv-share-link{ -webkit-user-select:all; user-select:all; }
+  .msg-bubble-image img{ -webkit-touch-callout:default; } /* 채팅 사진은 꾹 눌러 저장 가능 */
   /* ---------------- 일정 추가 폼 ---------------- */
   .event-form-view{
     display:none;
@@ -4782,12 +4791,18 @@
        버튼이 항상 화면 맨 밑에 붙어있고, 내용이 길면 그 영역만 따로 스크롤되게 함 - 단,
        평소엔 숨겨져 있어야 하므로 기본 display는 none, .active일 때만 flex로 전환 */
     flex-direction:column;
+    overflow:hidden;
+    overscroll-behavior:none;
   }
   .event-form-view.active{ display:flex; }
+  /* 위아래로만 스크롤 - 옆으로 흔들리거나 끝에서 튕기며 뒤 화면까지 같이 움직이지 않게 */
   .event-form-scroll{
     flex:1;
     min-height:0;
+    overflow-x:hidden;
     overflow-y:auto;
+    overscroll-behavior:contain;
+    touch-action:pan-y;
   }
   .event-form-footer{
     flex-shrink:0;
