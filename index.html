@@ -10424,7 +10424,7 @@ function renderHomeDash(){
   renderHomeFriendMatches();
   const items = homeUpcomingAppointments();
   if(!items.length){
-    // 맨 위 버튼 이름이 상황에 따라 바뀌니(친구 추가하기/내 시간 열기/약속 잡기) 그 이름 그대로 안내
+    // 맨 위 버튼 이름이 상황에 따라 바뀌니(친구 추가하기/약속 잡기) 그 이름 그대로 안내
     const ctaTitle = (document.getElementById('homePlanCtaTitle') || {}).textContent || '약속 잡기';
     listEl.innerHTML = `<div class="home-empty">아직 잡힌 약속이 없어요. 위의 <b>${escapeHtml(ctaTitle)}</b>로 시작해 보세요.</div>`;
     return;
@@ -10524,14 +10524,13 @@ function refreshHomeDashIfVisible(){
   } catch(e){} // 앱 시작 직후(변수들이 아직 준비 전)에 불려도 조용히 넘어감
 }
 // 맨 위 큰 버튼은 지금 상황에서 가장 먼저 할 일로 바뀜 (체크리스트 대신 버튼 하나만):
-// 친구가 없으면 '친구 추가하기' → 내 예약 가능 시간이 2주 동안 하루도 없으면 '내 시간 열기' → 둘 다 있으면 '약속 잡기'.
+// 친구가 없으면 '친구 추가하기', 있으면 '약속 잡기' (내 예약 가능 시간이 없어도 '약속 잡기' - 친구 시간에 예약/링크 등은 내 시간 없이도 됨).
 // 친구/일정을 서버에서 받아오기 전에는 잘못 바뀌어 보이지 않게 기본 '약속 잡기'를 그대로 둠
 let homeFriendsLoaded = false;
 let homeScheduleLoaded = false;
 let homeAvailOpenDays = 0; // renderHomeAvailCard가 셈 - 앞으로 2주 중 예약 가능 시간이 있는 날 수
 const HOME_PLAN_CTA = {
   friends: { title: '친구 추가하기', sub: '아이디로 찾거나, 링크로 가입 안 한 친구에게도 시간을 물어볼 수 있어요' },
-  avail: { title: '내 시간 열기', sub: '열어두면 친구가 그 시간에 나에게 약속을 요청할 수 있어요' },
   plan: { title: '약속 잡기', sub: '친구만 고르면 잡을 수 있는 방법을 알려줘요' },
 };
 function renderHomePlanCta(){
@@ -10539,7 +10538,6 @@ function renderHomePlanCta(){
   if(!btn) return;
   let mode = 'plan';
   if(homeFriendsLoaded && !FRIENDS.length) mode = 'friends';
-  else if(homeFriendsLoaded && homeScheduleLoaded && homeAvailOpenDays === 0) mode = 'avail';
   btn.dataset.mode = mode;
   document.getElementById('homePlanCtaTitle').textContent = HOME_PLAN_CTA[mode].title;
   document.getElementById('homePlanCtaSub').textContent = HOME_PLAN_CTA[mode].sub;
@@ -10547,7 +10545,6 @@ function renderHomePlanCta(){
 document.getElementById('homePlanCta').addEventListener('click', () => {
   if(!authToken) return;
   const mode = document.getElementById('homePlanCta').dataset.mode;
-  if(mode === 'avail') return openQuickAvail();
   openPlanStart(); // 친구가 없으면 이 화면이 '링크로 물어보기 / 아이디로 친구 추가'를 보여줌
 });
 
