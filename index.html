@@ -7517,7 +7517,7 @@
             <button id="availWeekNext" type="button">&#8250;</button>
           </div>
           <div id="formAvailRows"></div>
-          <p class="quick-avail-hint">빈 곳을 누르면 시간을 더 넣어요. 회색은 내 일정이라 그 시간은 빼고 열어요.</p>
+          <p class="quick-avail-hint">빈 곳을 누르면 시간을 더 넣어요. 회색은 내 일정이라 그 위로는 막대를 놓을 수 없어요.</p>
         </div>
       </div>
 
@@ -17276,6 +17276,24 @@ function formAvailBusyFor(d){
   });
   return { busy, other };
 }
+// 막대를 못 놓는 곳 - 내 일정(회색). 겹쳐도 예약 받는 일정(점선)과 이미 연 시간은 막지 않음
+function formAvailHardBusy(dk){
+  return quickMergeRanges(formAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft).map(b => ({ s: b.s, e: b.e })));
+}
+// 일정과 겹친 부분은 잘라내고 30분 안 되는 조각은 버림
+function formAvailFitRanges(dk, ranges){
+  return subtractMinuteRanges(ranges, formAvailHardBusy(dk)).sort((a, b) => a.s - b.s).filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN);
+}
+// idx번째 막대가 늘어나거나 움직일 수 있는 범위 - 옆 막대와 내 일정 사이
+function formAvailBounds(dk, ranges, idx, lo, hi){
+  const r = ranges[idx];
+  const obs = [...formAvailHardBusy(dk), ...ranges.filter((_, i) => i !== idx)];
+  obs.forEach(o => {
+    if(o.e <= r.s) lo = Math.max(lo, o.e);
+    else if(o.s >= r.e) hi = Math.min(hi, o.s);
+  });
+  return { lo, hi };
+}
 function formAvailPct(min){ return (min - formAvailAxis.s) / (formAvailAxis.e - formAvailAxis.s) * 100; }
 function formAvailBarStyle(r){
   const s = Math.max(r.s, formAvailAxis.s), e = Math.min(r.e, formAvailAxis.e);
@@ -17299,6 +17317,11 @@ function renderFormAvailBars(){
     `${days[0].getMonth()+1}월 ${days[0].getDate()}일 - ${days[6].getMonth()+1}월 ${days[6].getDate()}일`;
   const todayKey = dateKeyOf(TODAY);
   const info = days.map(d => ({ d, dk: dateKeyOf(d), ...formAvailBusyFor(d) }));
+  info.forEach(({ dk }) => {
+    if(!formAvailRanges[dk]) return;
+    const fit = formAvailFitRanges(dk, formAvailRanges[dk]);
+    if(fit.length) formAvailRanges[dk] = fit; else delete formAvailRanges[dk];
+  });
   // 내 일정·정해둔 시간이 있는 범위에 앞뒤 1시간 여유 (최소 12시간). 아무것도 없으면 0~24시 전부
   const all = info.flatMap(x => [...x.busy, ...x.other, ...(formAvailRanges[x.dk] || [])]);
   if(!all.length) formAvailAxis = { s: 0, e: 24 * 60 };
@@ -17357,11 +17380,11 @@ function renderFormAvailBars(){
 // 한 줄에 시간을 하나 더 넣음 - 누른 곳(centerMin)이 있으면 거기, 없으면 가장 넓은 빈 곳 가운데에 2시간
 function formAvailAddRange(dk, centerMin){
   const ranges = formAvailRanges[dk] || [];
-  const gaps = subtractMinuteRanges([{ s: formAvailAxis.s, e: formAvailAxis.e }], ranges).filter(g => g.e - g.s >= 60);
+  const gaps = subtractMinuteRanges([{ s: formAvailAxis.s, e: formAvailAxis.e }], [...ranges, ...formAvailHardBusy(dk)]).filter(g => g.e - g.s >= QUICK_AVAIL_MIN_LEN);
   const gap = centerMin != null ? gaps.find(g => g.s <= centerMin && g.e >= centerMin) : gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
   if(!gap){
     if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
-    return;
+    return false;
   }
   const len = Math.min(120, gap.e - gap.s);
   const c = centerMin != null ? centerMin : (gap.s + gap.e) / 2;
@@ -17369,6 +17392,7 @@ function formAvailAddRange(dk, centerMin){
   s = Math.max(gap.s, Math.min(gap.e - len, s));
   formAvailRanges[dk] = [...ranges, { s, e: s + len }].sort((a, b) => a.s - b.s);
   renderFormAvailBars();
+  return true;
 }
 document.getElementById('formAvailRows').addEventListener('click', (e) => {
   const tg = e.target.closest('[data-fa-toggle]');
@@ -17376,7 +17400,12 @@ document.getElementById('formAvailRows').addEventListener('click', (e) => {
     const dk = tg.dataset.faToggle;
     const cur = formAvailRanges[dk] || [];
     if(cur.length){ formAvailStash[dk] = quickCloneRanges(cur); delete formAvailRanges[dk]; }
-    else formAvailRanges[dk] = quickCloneRanges(formAvailStash[dk] || [formAvailDefault(dk)]);
+    else {
+      const fit = formAvailFitRanges(dk, quickCloneRanges(formAvailStash[dk] || [formAvailDefault(dk)]));
+      if(fit.length) formAvailRanges[dk] = fit;
+      else if(formAvailAddRange(dk)) return; // 기본 시간이 일정으로 꽉 차 있으면 가장 넓은 빈 곳에
+      else return;
+    }
     if(formAvailEdit && formAvailEdit.dk === dk) formAvailEdit = null;
     renderFormAvailBars();
     return;
@@ -17412,8 +17441,7 @@ document.getElementById('formAvailRows').addEventListener('change', (e) => {
   const ranges = quickCloneRanges(formAvailRanges[dk]);
   const r = ranges[idx];
   if(!r) return;
-  const prevEnd = idx > 0 ? ranges[idx - 1].e : 0;
-  const nextStart = idx < ranges.length - 1 ? ranges[idx + 1].s : 24 * 60;
+  const { lo: prevEnd, hi: nextStart } = formAvailBounds(dk, ranges, idx, 0, 24 * 60);
   let s = val('sh') * 60 + val('sm');
   let en = Math.min(24 * 60, val('eh') * 60 + val('em'));
   if(f === 'sh' || f === 'sm'){
@@ -17445,7 +17473,7 @@ function formAvailMinAt(track, clientX){
       let [, idx, edge] = (handle ? handle.dataset.faHandle : bar.dataset.faBar + '|m').split('|');
       if(edge === 'm' && /clip-/.test(bar.className)) edge = 'x'; // 잘려 보이는 막대는 통째로 옮기지 않음 (톡 누르면 시간 고르기)
       const ranges = quickCloneRanges(formAvailRanges[dk]);
-      formAvailDrag = { dk, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, startMin: formAvailMinAt(track, e.clientX), el: bar || handle.closest('[data-fa-bar]'), x: e.clientX, y: e.clientY, moved: false };
+      formAvailDrag = { dk, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, bounds: formAvailBounds(dk, ranges, Number(idx), formAvailAxis.s, formAvailAxis.e), startMin: formAvailMinAt(track, e.clientX), el: bar || handle.closest('[data-fa-bar]'), x: e.clientX, y: e.clientY, moved: false };
       try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
       e.preventDefault();
       return;
@@ -17458,8 +17486,7 @@ function formAvailMinAt(track, clientX){
     if(!dr.moved && Math.abs(e.clientX - dr.x) < 6) return; // 톡 누른 건 끌기로 안 봄
     dr.moved = true;
     const r = dr.ranges[dr.idx];
-    const prevEnd = dr.idx > 0 ? dr.ranges[dr.idx - 1].e : formAvailAxis.s;
-    const nextStart = dr.idx < dr.ranges.length - 1 ? dr.ranges[dr.idx + 1].s : formAvailAxis.e;
+    const { lo: prevEnd, hi: nextStart } = dr.bounds;
     const snap = m => Math.round(m / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP;
     const m = formAvailMinAt(dr.track, e.clientX);
     if(dr.edge === 's') r.s = Math.max(prevEnd, Math.min(r.e - QUICK_AVAIL_MIN_LEN, snap(m)));
@@ -17482,6 +17509,10 @@ function formAvailMinAt(track, clientX){
     if(isTap){
       const min = formAvailMinAt(dr.track, e.clientX);
       const hit = formAvailBusyFor(parseDateInputValue(dr.dk)).busy.find(b => b.s <= min && b.e > min);
+      if(hit && !hit.soft && dr.tap){
+        showToast(`${hit.title} ${minutesToLabel(hit.s)}–${minutesToLabel(hit.e)} · 일정이 있어 이 시간은 열 수 없어요`);
+        return;
+      }
       if(hit){
         showToast(`${hit.title} ${minutesToLabel(hit.s)}–${minutesToLabel(hit.e)} · ${hit.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : '이 시간은 빼고 열어요'}`);
         return;
