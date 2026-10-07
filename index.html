@@ -17725,8 +17725,17 @@ document.getElementById('monthAddEventBtn').addEventListener('click', () => {
 });
 document.getElementById('eventFormBackBtn').addEventListener('click', () => goBackOrClose(closeEventForm));
 
+// 새로 추가할 때 '예약 가능 시간'을 누르면 칸 그리드 대신 빠르게 열기의 요일별 막대 화면으로 보냄
+// (이미 있는 예약 가능 시간을 고칠 때는 그 날짜 하나를 다루니 지금 화면 그대로)
 document.querySelectorAll('.event-type-btn').forEach(btn => {
-  btn.addEventListener('click', () => setEventTypeUI(btn.dataset.type));
+  btn.addEventListener('click', () => {
+    if(btn.dataset.type === 'available' && !editingEventId){
+      dismissView(closeEventForm);
+      openQuickAvail();
+      return;
+    }
+    setEventTypeUI(btn.dataset.type);
+  });
 });
 
 document.querySelectorAll('#eventFormView .repeat-mode-btn').forEach(btn => {
@@ -30344,8 +30353,7 @@ async function loadInviteCalendarDays(){
 function goRegisterAvailabilityFromInvite(){
   const open = () => {
     scheduleFocusDate = new Date();
-    openEventForm();
-    setEventTypeUI('available');
+    openQuickAvail();
   };
   if(viewCloseStack.length > 0){
     window.addEventListener('popstate', () => setTimeout(open, 0), { once: true });
