@@ -5170,9 +5170,96 @@
   .plan-option-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:var(--accent); color:#fff; font-size:10.5px; font-weight:700; vertical-align:1px; }
   .plan-option .plan-option-status{ color:var(--accent); font-weight:600; }
   .plan-option.unavailable .plan-option-status{ color:var(--text-dim); }
-  .plan-link-row{ margin-top:10px; }
-  .plan-section-label{ margin:12px 2px 6px; font-size:11.5px; font-weight:700; color:var(--text-dim); }
-  .plan-section-label + .plan-friend-list{ max-height:170px; }
+  .plan-link-row{ margin-top:12px; }
+  .plan-section-label{ margin:14px 2px 7px; font-size:12px; font-weight:700; color:var(--text-dim); letter-spacing:-0.01em; }
+  .plan-section-label + .plan-friend-list{ max-height:180px; }
+
+  /* ---------------- 약속 잡기: 가장 빠른 약속 추천 (네이티브 스타일) ---------------- */
+  .plan-earliest-section{ margin-bottom:14px; }
+  .plan-section-header{
+    display:flex; align-items:center; justify-content:space-between;
+    margin:2px 2px 8px;
+  }
+  .plan-section-title{
+    font-size:12.5px; font-weight:700; color:var(--text); letter-spacing:-0.01em;
+  }
+  .plan-section-desc{
+    font-size:11px; font-weight:500; color:var(--text-dim);
+  }
+  .plan-earliest-list{ display:flex; flex-direction:column; gap:7px; }
+  .plan-earliest-card{
+    display:flex; align-items:center; gap:11px; width:100%;
+    padding:11px 13px; border-radius:14px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--text);
+    text-align:left; font-family:inherit; cursor:pointer;
+    box-sizing:border-box; position:relative;
+    transition:all .15s ease;
+  }
+  .plan-earliest-card:hover{
+    border-color:var(--glass-border);
+    background:var(--surface);
+    transform:translateY(-1px);
+    box-shadow:0 4px 12px rgba(0,0,0,0.14);
+  }
+  .plan-earliest-card:active{ transform:scale(0.988); }
+  .plan-earliest-avatar-wrap{ position:relative; flex-shrink:0; }
+  .plan-earliest-avatar-wrap .plan-friend-avatar{
+    width:36px; height:36px; border-radius:50%; font-size:13.5px;
+  }
+  .plan-avail-indicator{
+    position:absolute; bottom:0; right:0;
+    width:9px; height:9px; border-radius:50%;
+    background:#10B981; border:2px solid var(--surface-2);
+  }
+  .plan-earliest-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .plan-earliest-top{ display:flex; align-items:center; gap:6px; }
+  .plan-earliest-name{
+    font-size:13.5px; font-weight:700; color:var(--text);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .plan-tag-today{
+    display:inline-block; font-size:10px; font-weight:700;
+    padding:1.5px 5px; border-radius:4px;
+    background:rgba(16,185,129,0.15); color:#10B981;
+    line-height:1.2;
+  }
+  .plan-earliest-time{
+    display:flex; align-items:baseline; gap:5px;
+    font-size:12px; line-height:1.3;
+  }
+  .plan-time-main{ font-weight:700; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .plan-time-sub{ font-size:11px; color:var(--text-dim); font-weight:500; }
+  .plan-earliest-action{
+    flex-shrink:0; display:flex; align-items:center; gap:2px;
+    padding:6px 10px; border-radius:8px;
+    background:var(--accent-soft); color:var(--accent);
+    font-size:11.5px; font-weight:700; letter-spacing:-0.01em;
+    transition:all .15s ease;
+  }
+  .plan-earliest-card:hover .plan-earliest-action{
+    background:var(--accent); color:#fff;
+  }
+  .plan-earliest-loading{
+    display:flex; align-items:center; justify-content:center; gap:7px;
+    padding:16px 10px; font-size:11.5px; color:var(--text-dim);
+    border-radius:12px; background:var(--surface-2); border:1px solid var(--line);
+  }
+  .plan-earliest-loading-spinner{
+    width:13px; height:13px; border:2px solid var(--line);
+    border-top-color:var(--accent); border-radius:50%;
+    animation:planSpin 0.7s linear infinite;
+  }
+  @keyframes planSpin{ to{ transform:rotate(360deg); } }
+
+  .plan-friend-slot-badge{
+    margin-left:auto; flex-shrink:0;
+    font-size:11px; font-weight:700; color:var(--text-dim);
+    background:var(--surface-2); border:1px solid var(--line);
+    padding:2px 7px; border-radius:6px; font-variant-numeric:tabular-nums;
+  }
+  .plan-friend-slot-badge.today{
+    color:#10B981; background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.25);
+  }
   /* 예약 가능 시간 빠르게 열기 */
   /* 시간표 탭 위 "예약 가능 시간 빠르게 열기" 입구 */
   .quick-avail-entry{
@@ -14181,6 +14268,46 @@ function renderFeedPlaceCreateInfo(picked){
 
 // 제목(상호명) 입력창에 타이핑하면 카카오 장소 검색 결과를 보여주고, 고르면 지도에 표시 + 좌표/주소/전화/위치 자동입력
 let feedPlaceSearchTimer = null;
+let feedPlaceSearchToken = 0;
+function searchFeedPlaceKakao(query){
+  return new Promise(resolve => {
+    ensureKakaoMapsLoaded(() => {
+      new kakao.maps.services.Places().keywordSearch(query, (res, status) => {
+        if(status !== kakao.maps.services.Status.OK || !res) return resolve([]);
+        resolve(res.map(r => ({
+          name: r.place_name, address: r.road_address_name || r.address_name || '',
+          phone: r.phone || null, lat: parseFloat(r.y), lon: parseFloat(r.x), source: 'kakao',
+          autoCategory: feedCategoryFromKakao(r),
+        })));
+      });
+    });
+  });
+}
+async function searchFeedPlaceNaver(query){
+  if(!authToken) return [];
+  try {
+    const data = await apiRequest('/places/search?query=' + encodeURIComponent(query) + '&sort=random');
+    return (data.places || []).filter(p => p.name).map(p => ({
+      name: p.name, address: p.address || '', phone: p.phone || null,
+      lat: typeof p.lat === 'number' ? p.lat : null, lon: typeof p.lon === 'number' ? p.lon : null, source: 'naver',
+      // 네이버 분류 예: "음식점>한식", "카페,디저트>카페"
+      autoCategory: /^카페/.test(p.category || '') ? 'cafe' : /^음식점/.test(p.category || '') ? 'food' : null,
+    }));
+  } catch(err){
+    return [];
+  }
+}
+// 카카오 결과를 먼저 두고, 카카오에 없는 네이버 결과(새로 생긴 가게 등)만 뒤에 붙임
+function mergeFeedPlaceResults(kakaoList, naverList){
+  const norm = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+  const merged = kakaoList.slice(0, 6);
+  naverList.forEach(n => {
+    const dup = kakaoList.some(k => norm(k.name) === norm(n.name) ||
+      (typeof n.lat === 'number' && distanceKm(k.lat, k.lon, n.lat, n.lon) < 0.05 && (norm(k.name).includes(norm(n.name)) || norm(n.name).includes(norm(k.name)))));
+    if(!dup) merged.push(n);
+  });
+  return merged.slice(0, 10);
+}
 document.getElementById('feedPlaceInput').addEventListener('input', () => {
   feedPlacePicked = null;
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
@@ -14188,48 +14315,43 @@ document.getElementById('feedPlaceInput').addEventListener('input', () => {
   const val = document.getElementById('feedPlaceInput').value.trim();
   const resultsBox = document.getElementById('feedPlaceResults');
   clearTimeout(feedPlaceSearchTimer);
+  const token = ++feedPlaceSearchToken;
   if(!val){
     resultsBox.style.display = 'none';
     return;
   }
-  feedPlaceSearchTimer = setTimeout(() => {
-    ensureKakaoMapsLoaded(() => {
-      const places = new kakao.maps.services.Places();
-      places.keywordSearch(val, (results, status) => {
-        if(status !== kakao.maps.services.Status.OK || results.length === 0){
-          resultsBox.style.display = 'none';
-          return;
+  feedPlaceSearchTimer = setTimeout(async () => {
+    // 카카오에 아직 안 올라온 새로 생긴 가게도 찾을 수 있게, 네이버 지역 검색 결과도 같이 받아서 합침
+    const [kakaoList, naverList] = await Promise.all([searchFeedPlaceKakao(val), searchFeedPlaceNaver(val)]);
+    if(token !== feedPlaceSearchToken) return; // 그 사이 더 타이핑했으면 무시
+    const results = mergeFeedPlaceResults(kakaoList, naverList);
+    if(results.length === 0){
+      resultsBox.style.display = 'none';
+      return;
+    }
+    resultsBox.innerHTML = results.map((r, i) => `
+      <div class="location-search-result-row" data-idx="${i}">
+        <div class="location-search-result-name">${escapeHtml(r.name)}${r.source === 'naver' ? ' <span style="font-size:10.5px;font-weight:700;color:#03C75A;">네이버</span>' : ''}</div>
+        <div class="location-search-result-addr">${escapeHtml(r.address || '')}</div>
+      </div>
+    `).join('');
+    resultsBox.style.display = 'block';
+    resultsBox.querySelectorAll('.location-search-result-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const r = results[parseInt(row.dataset.idx, 10)];
+        document.getElementById('feedPlaceInput').value = r.name;
+        feedPlacePicked = { lat: r.lat, lon: r.lon, address: r.address || null, phone: r.phone || null, kakaoCategory: r.autoCategory };
+        // 고른 장소의 분류에 맞춰 카테고리를 자동으로 바꿈 (수정 중엔 카테고리 고정이라 그대로)
+        const autoCat = feedPlacePicked.kakaoCategory;
+        if(feedFormMode !== 'editReview' && autoCat && autoCat !== feedCreateSelectedCategory){
+          selectFeedCreateCategory(autoCat);
+          showToast(`${r.source === 'naver' ? '네이버' : '카카오'} 분류에 맞춰 '${FEED_CATEGORY_LABELS[autoCat]}'(으)로 바꿨어요.`);
         }
-        resultsBox.innerHTML = results.slice(0, 6).map((r, i) => `
-          <div class="location-search-result-row" data-idx="${i}">
-            <div class="location-search-result-name">${escapeHtml(r.place_name)}</div>
-            <div class="location-search-result-addr">${escapeHtml(r.road_address_name || r.address_name)}</div>
-          </div>
-        `).join('');
-        resultsBox.style.display = 'block';
-        resultsBox.querySelectorAll('.location-search-result-row').forEach(row => {
-          row.addEventListener('click', () => {
-            const r = results[parseInt(row.dataset.idx, 10)];
-            document.getElementById('feedPlaceInput').value = r.place_name;
-            feedPlacePicked = {
-              lat: parseFloat(r.y), lon: parseFloat(r.x),
-              address: r.road_address_name || r.address_name || null,
-              phone: r.phone || null,
-              kakaoCategory: feedCategoryFromKakao(r),
-            };
-            // 고른 장소의 카카오 분류에 맞춰 카테고리를 자동으로 바꿈 (수정 중엔 카테고리 고정이라 그대로)
-            const autoCat = feedPlacePicked.kakaoCategory;
-            if(feedFormMode !== 'editReview' && autoCat && autoCat !== feedCreateSelectedCategory){
-              selectFeedCreateCategory(autoCat);
-              showToast(`카카오 분류에 맞춰 '${FEED_CATEGORY_LABELS[autoCat]}'(으)로 바꿨어요.`);
-            }
-            resultsBox.style.display = 'none';
-            showFeedPlaceMap(feedPlacePicked.lat, feedPlacePicked.lon);
-            renderFeedPlaceCreateInfo(feedPlacePicked);
-            // 주소 칸은 고른 장소의 주소로 항상 채움 (다른 장소로 다시 고르면 그 주소로 바뀜)
-            document.getElementById('feedLocationInput').value = r.road_address_name || r.address_name || '';
-          });
-        });
+        resultsBox.style.display = 'none';
+        if(typeof r.lat === 'number' && typeof r.lon === 'number') showFeedPlaceMap(r.lat, r.lon);
+        renderFeedPlaceCreateInfo(feedPlacePicked);
+        // 주소 칸은 고른 장소의 주소로 항상 채움 (다른 장소로 다시 고르면 그 주소로 바뀜)
+        document.getElementById('feedLocationInput').value = r.address || '';
       });
     });
   }, 300);
@@ -30122,6 +30244,7 @@ const PLAN_LINK_OPTION = {
 };
 function renderPlanStartFriends(){
   planFriendSeq++;
+  const curSeq = planFriendSeq;
   document.getElementById('planStartTitle').textContent = '누구랑 만날까요?';
   const body = document.getElementById('planStartBody');
   delete body.dataset.friendId;
@@ -30133,7 +30256,20 @@ function renderPlanStartFriends(){
     return;
   }
   body.innerHTML = `
-    <div class="plan-friend-list">
+    <div class="plan-earliest-section" id="planEarliestSection">
+      <div class="plan-section-header">
+        <span class="plan-section-title">가장 빠른 약속</span>
+        <span class="plan-section-desc">열려 있는 시간</span>
+      </div>
+      <div class="plan-earliest-list" id="planEarliestList">
+        <div class="plan-earliest-loading">
+          <span class="plan-earliest-loading-spinner"></span>
+          <span>열려 있는 일정을 확인하는 중</span>
+        </div>
+      </div>
+    </div>
+    <div class="plan-section-label">친구 목록</div>
+    <div class="plan-friend-list" id="planFullFriendList">
       ${FRIENDS.map(f => `
         <button type="button" class="plan-friend-row" data-plan-friend="${escapeHtml(f.id)}">
           ${planFriendAvatarHtml(f)}
@@ -30150,6 +30286,167 @@ function renderPlanStartFriends(){
         </button>`).join('')}
     </div>` : ''}
     <div class="plan-link-row">${planOptionHtml(PLAN_LINK_OPTION)}</div>`;
+
+  loadAndRenderEarliestFriends(curSeq);
+}
+
+// 친구들의 가장 빠른 예약 가능 시간을 찾아 정렬하고 표시 (지금 시간 기준 가장 빠른 순)
+async function loadAndRenderEarliestFriends(seq){
+  const sec = document.getElementById('planEarliestSection');
+  if(!authToken || !FRIENDS.length){
+    if(sec) sec.style.display = 'none';
+    return;
+  }
+
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const startKey = toDateInputValue(now);
+  const end = new Date(now);
+  end.setDate(end.getDate() + PLAN_LOOKAHEAD_DAYS - 1);
+  const endKey = toDateInputValue(end);
+
+  const months = [[now.getFullYear(), now.getMonth() + 1]];
+  if(end.getMonth() !== now.getMonth()){
+    months.push([end.getFullYear(), end.getMonth() + 1]);
+  }
+
+  const realFriends = FRIENDS.filter(f => f.username && f.id !== DEMO_FRIEND.id);
+  await Promise.all(realFriends.flatMap(f => months.map(([y, m]) => loadFriendMonthData(f, y, m))));
+
+  if(seq !== planFriendSeq) return;
+
+  const earliestList = [];
+
+  realFriends.forEach(friend => {
+    let bestSlot = null;
+    months.forEach(([y, m]) => {
+      const data = friendMonthDataCache[`${friend.username}::${y}-${m}`];
+      if(!data || !data.days) return;
+      const hours = data.hours || [];
+      data.days.forEach(day => {
+        if(day.date < startKey || day.date > endKey) return;
+        const isToday = day.date === startKey;
+        (day.bookable || []).forEach((bookable, idx) => {
+          if(!bookable) return;
+          const h = hours[idx] ?? idx;
+          const slotEndMin = (h + 1) * 60;
+          if(isToday && (slotEndMin - nowMin < 30 || h * 60 < nowMin - 15)) return;
+
+          const slotDate = parseDateInputValue(day.date);
+          slotDate.setHours(h, 0, 0, 0);
+          const timeMs = slotDate.getTime();
+
+          if(!bestSlot || timeMs < bestSlot.timeMs){
+            bestSlot = {
+              friend,
+              dateKey: day.date,
+              dateObj: slotDate,
+              hour: h,
+              timeMs,
+              isToday,
+            };
+          }
+        });
+      });
+    });
+
+    if(bestSlot){
+      const d = bestSlot.dateObj;
+      const h = bestSlot.hour;
+      const diffMin = Math.round((bestSlot.timeMs - now.getTime()) / 60000);
+      let timeDisplay = '';
+      let timeSub = '';
+      let shortTimeLabel = '';
+
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowKey = toDateInputValue(tomorrow);
+
+      if(bestSlot.isToday){
+        timeDisplay = `오늘 ${h}:00`;
+        if(diffMin > 0 && diffMin <= 60){
+          timeSub = `약 ${diffMin}분 뒤`;
+        } else if(diffMin > 60 && diffMin < 720){
+          timeSub = `${Math.round(diffMin / 60)}시간 뒤`;
+        } else {
+          timeSub = '';
+        }
+        shortTimeLabel = `오늘 ${h}:00`;
+      } else if(bestSlot.dateKey === tomorrowKey){
+        timeDisplay = `내일 ${h}:00`;
+        timeSub = '';
+        shortTimeLabel = `내일 ${h}:00`;
+      } else {
+        timeDisplay = `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]}) ${h}:00`;
+        timeSub = '';
+        shortTimeLabel = `${d.getMonth() + 1}/${d.getDate()} ${h}:00`;
+      }
+
+      bestSlot.timeDisplay = timeDisplay;
+      bestSlot.timeSub = timeSub;
+      bestSlot.shortTimeLabel = shortTimeLabel;
+      earliestList.push(bestSlot);
+    }
+  });
+
+  earliestList.sort((a, b) => a.timeMs - b.timeMs);
+
+  const curSec = document.getElementById('planEarliestSection');
+  const listEl = document.getElementById('planEarliestList');
+  if(!curSec || !listEl) return;
+
+  if(!earliestList.length){
+    curSec.style.display = 'none';
+    return;
+  }
+
+  curSec.style.display = '';
+  listEl.innerHTML = earliestList.slice(0, 3).map(item => `
+    <button type="button" class="plan-earliest-card" data-plan-friend-fast="${escapeHtml(item.friend.id)}">
+      <div class="plan-earliest-avatar-wrap">
+        ${planFriendAvatarHtml(item.friend)}
+        <span class="plan-avail-indicator"></span>
+      </div>
+      <div class="plan-earliest-info">
+        <div class="plan-earliest-top">
+          <span class="plan-earliest-name">${escapeHtml(item.friend.name)}</span>
+          ${item.isToday ? `<span class="plan-tag-today">오늘</span>` : ''}
+        </div>
+        <div class="plan-earliest-time">
+          <span class="plan-time-main">${escapeHtml(item.timeDisplay)}</span>
+          ${item.timeSub ? `<span class="plan-time-sub">${escapeHtml(item.timeSub)}</span>` : ''}
+        </div>
+      </div>
+      <div class="plan-earliest-action">
+        <span>예약</span>
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      </div>
+    </button>
+  `).join('');
+
+  const fullListEl = document.getElementById('planFullFriendList');
+  if(fullListEl){
+    const slotMap = new Map(earliestList.map(e => [e.friend.id, e]));
+    const sortedFriends = FRIENDS.slice().sort((a, b) => {
+      const slotA = slotMap.get(a.id);
+      const slotB = slotMap.get(b.id);
+      if(slotA && slotB) return slotA.timeMs - slotB.timeMs;
+      if(slotA) return -1;
+      if(slotB) return 1;
+      return 0;
+    });
+
+    fullListEl.innerHTML = sortedFriends.map(f => {
+      const slot = slotMap.get(f.id);
+      return `
+        <button type="button" class="plan-friend-row" data-plan-friend="${escapeHtml(f.id)}">
+          ${planFriendAvatarHtml(f)}
+          <span>${escapeHtml(f.name)}<small>@${escapeHtml(f.username || '')}</small></span>
+          ${slot ? `<span class="plan-friend-slot-badge ${slot.isToday ? 'today' : ''}">${escapeHtml(slot.shortTimeLabel)}</span>` : ''}
+        </button>
+      `;
+    }).join('');
+  }
 }
 // 약속 잡기 시트에 보여줄 모임(단체 채팅방) - 멤버가 나 말고도 있는 방만. "친구 그룹"(공개 범위용)과는 다른 것
 function planGroupRooms(){
@@ -30223,6 +30520,14 @@ document.getElementById('planStartBody').addEventListener('click', (e) => {
       if(method === 'match') openCalendarMatch(friendId);
       else openFriendCalendar(friendId, 'reserve');
     }
+    return;
+  }
+  const fastBtn = e.target.closest('[data-plan-friend-fast]');
+  if(fastBtn){
+    const friendId = fastBtn.dataset.planFriendFast;
+    dismissView(closePlanStart);
+    calendarOpenedFromChat = planStartChatRoomId;
+    openFriendCalendar(friendId, 'reserve');
     return;
   }
   const groupBtn = e.target.closest('[data-plan-group]');
