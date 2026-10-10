@@ -4974,7 +4974,7 @@
   }
   .custom-select-list::-webkit-scrollbar{ display:none; width:0; height:0; }
 
-  /* 아이폰 타이머 같은 시간 휠 (예약하기) - 가운데 줄에 걸린 값이 선택됨 */
+  /* 아이폰 타이머 같은 시간 휠 (앱의 모든 시간 고르기) - 가운데 줄에 걸린 값이 선택됨 */
   .time-wheel-title{
     text-align:center;
     font-size:12.5px;
@@ -5029,6 +5029,9 @@
     -webkit-user-select:none;
   }
   .time-wheel-item.selected{ color:var(--text); font-weight:700; transform:scale(1.08); }
+  .time-wheel.list .time-wheel-col{ width:auto; min-width:140px; }
+  .time-wheel.list #timeWheelMinCol, .time-wheel.list .time-wheel-unit{ display:none; }
+  .time-wheel.list .time-wheel-item{ font-family:inherit; font-size:17px; padding:0 12px; }
   .time-wheel-unit{
     position:relative;
     font-size:13px;
@@ -7954,26 +7957,7 @@
     </div>
   </div>
 
-  <!-- 커스텀 시간 선택 팝업 -->
-  <div class="custom-picker-overlay" id="customTimePopup" style="display:none;">
-    <div class="custom-picker-card">
-      <div class="custom-picker-time-cols">
-        <div class="custom-picker-col" id="customTimeHourCol"></div>
-        <div class="custom-picker-colon">:</div>
-        <div class="custom-picker-col" id="customTimeMinCol"></div>
-      </div>
-      <button type="button" class="custom-picker-confirm" id="customTimeConfirm">확인</button>
-    </div>
-  </div>
-
-  <!-- 커스텀 셀렉트(시작시간/예약시간) 선택 팝업 -->
-  <div class="custom-select-popup" id="customSelectPopup" style="display:none;">
-    <div class="custom-picker-card">
-      <div class="custom-select-list" id="customSelectList"></div>
-    </div>
-  </div>
-
-  <!-- 예약하기 시작/종료 시간 - 아이폰 타이머처럼 돌려서 고르는 휠 -->
+  <!-- 앱의 모든 시간 고르기 - 아이폰 타이머처럼 돌려서 고르는 휠 -->
   <div class="custom-picker-overlay" id="timeWheelPopup" style="display:none;">
     <div class="custom-picker-card">
       <div class="time-wheel-title" id="timeWheelTitle"></div>
@@ -17580,19 +17564,13 @@ let datePickerViewDate = new Date();
 // 팝업이 여러 개 동시에 열려 배경이 겹쳐 보이는 일이 없도록, 새 팝업을 열기 전 항상 나머지를 먼저 닫음
 function closeAllCustomPopups(){
   const datePopup = document.getElementById('customDatePopup');
-  const timePopup = document.getElementById('customTimePopup');
-  const selectPopup = document.getElementById('customSelectPopup');
   if(datePopup) datePopup.style.display = 'none';
-  if(timePopup) timePopup.style.display = 'none';
-  if(selectPopup) selectPopup.style.display = 'none';
   const wheelPopup = document.getElementById('timeWheelPopup');
   if(wheelPopup && wheelPopup.style.display !== 'none'){
     wheelPopup.style.display = 'none';
-    timeWheelTarget = null;
+    timeWheelOnPick = null;
   }
   activeDatePickerTarget = null;
-  activeTimePickerTarget = null;
-  activeSelectTarget = null;
 }
 
 function openDatePicker(targetId){
@@ -17662,11 +17640,7 @@ document.querySelectorAll('.date-picker-btn').forEach(btn => {
   btn.addEventListener('click', () => openDatePicker(btn.dataset.target));
 });
 
-let activeTimePickerTarget = null;
-let pendingTimeHour = 9;
-let pendingTimeMin = 0;
-// 일정 폼의 종료 시간을 고를 때, 시작 시간(분) 이후만 고를 수 있게 하는 하한값 (null이면 제한 없음)
-let timePickerMinAfter = null;
+const TIME_PICKER_TITLES = { eventFormStart: '시작 시간', eventFormEnd: '종료 시간', meetupTimeField: '시간' };
 
 function timeStrToMin(str){
   const [h, m] = (str || '00:00').split(':').map(Number);
@@ -17684,86 +17658,25 @@ function eventFormEndIsSameDay(){
 }
 
 function openTimePicker(targetId){
-  closeAllCustomPopups();
-  activeTimePickerTarget = targetId;
-  timePickerMinAfter = null;
+  // 일정 폼의 종료 시간을 고를 때는 시작 시간 이후만 고를 수 있게 함
+  let minAfter = null;
   if(targetId === 'eventFormEnd' && eventFormEndIsSameDay()){
     const startMin = timeStrToMin(document.getElementById('eventFormStart').value);
-    if(startMin < 23 * 60 + 59) timePickerMinAfter = startMin;
+    if(startMin < 23 * 60 + 59) minAfter = startMin;
   }
-  const current = document.getElementById(targetId).value || '09:00';
-  let [h, m] = current.split(':').map(Number);
-  if(timePickerMinAfter !== null && h * 60 + m <= timePickerMinAfter){
-    const def = Math.min(timePickerMinAfter + 60, 23 * 60 + 59);
-    h = Math.floor(def / 60); m = def % 60;
-  }
-  renderTimeColumns(h, m);
-  document.getElementById('customTimePopup').style.display = 'flex';
-}
-function closeTimePicker(){
-  document.getElementById('customTimePopup').style.display = 'none';
-  activeTimePickerTarget = null;
-}
-function renderTimeColumns(selH, selM){
-  pendingTimeHour = selH;
-  pendingTimeMin = selM;
-
-  const hourCol = document.getElementById('customTimeHourCol');
-  const minCol = document.getElementById('customTimeMinCol');
-  hourCol.innerHTML = '';
-  minCol.innerHTML = '';
-
-  const minAfter = timePickerMinAfter;
   // 일반 일정(시작/종료 시간)은 1분 단위, 그 외(약속 시간 등)는 5분 단위로 고름
-  const minStep = (activeTimePickerTarget === 'eventFormStart' || activeTimePickerTarget === 'eventFormEnd') ? 1 : 5;
-  const minHour = minAfter === null ? 0 : Math.floor(minAfter / 60);
-  // 종료 시간 제한이 있을 때, 시작 시간과 같은 "시"를 고르면 시작 분 이후의 분만 보여줌
-  const renderMinutes = () => {
-    minCol.innerHTML = '';
-    const lowest = (minAfter !== null && pendingTimeHour === minHour) ? (minAfter % 60) + minStep : 0;
-    if(pendingTimeMin < lowest) pendingTimeMin = lowest;
-    for(let m = lowest; m < 60; m += minStep){
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = 'custom-picker-time-opt' + (m === pendingTimeMin ? ' selected' : '');
-      el.textContent = String(m).padStart(2, '0');
-      el.addEventListener('click', () => {
-        pendingTimeMin = m;
-        minCol.querySelectorAll('.custom-picker-time-opt').forEach(o => o.classList.remove('selected'));
-        el.classList.add('selected');
-      });
-      minCol.appendChild(el);
-    }
-  };
-
-  for(let h = minHour; h < 24; h++){
-    const el = document.createElement('button');
-    el.type = 'button';
-    el.className = 'custom-picker-time-opt' + (h === selH ? ' selected' : '');
-    el.textContent = String(h).padStart(2, '0');
-    el.addEventListener('click', () => {
-      pendingTimeHour = h;
-      hourCol.querySelectorAll('.custom-picker-time-opt').forEach(o => o.classList.remove('selected'));
-      el.classList.add('selected');
-      if(minAfter !== null) renderMinutes();
-    });
-    hourCol.appendChild(el);
-  }
-  renderMinutes();
-
-  requestAnimationFrame(() => {
-    const selHourEl = hourCol.querySelector('.selected');
-    if(selHourEl) selHourEl.scrollIntoView({ block: 'center' });
-    const selMinEl = minCol.querySelector('.selected');
-    if(selMinEl) selMinEl.scrollIntoView({ block: 'center' });
-  });
+  const step = (targetId === 'eventFormStart' || targetId === 'eventFormEnd') ? 1 : 5;
+  const values = [];
+  for(let v = 0; v < 24 * 60; v += step) if(minAfter === null || v > minAfter) values.push(v);
+  let cur = timeStrToMin(document.getElementById(targetId).value || '09:00');
+  if(minAfter !== null && cur <= minAfter) cur = Math.min(minAfter + 60, 23 * 60 + 59);
+  openWheelPicker({ title: TIME_PICKER_TITLES[targetId] || '시간', values, value: cur, onPick: v => applyTimePickerValue(targetId, minToTimeStr(v)) });
 }
-document.getElementById('customTimeConfirm').addEventListener('click', () => {
-  const val = `${String(pendingTimeHour).padStart(2, '0')}:${String(pendingTimeMin).padStart(2, '0')}`;
-  document.getElementById(activeTimePickerTarget).value = val;
-  refreshTimeDisplay(activeTimePickerTarget);
+function applyTimePickerValue(targetId, val){
+  document.getElementById(targetId).value = val;
+  refreshTimeDisplay(targetId);
   // 일정 폼에서 시작 시간을 고르면 종료 시간은 기본으로 1시간 뒤로 맞춤 (자정을 넘기면 하루짜리 일정은 다음 날로)
-  if(activeTimePickerTarget === 'eventFormStart'){
+  if(targetId === 'eventFormStart'){
     let endMin = timeStrToMin(val) + 60;
     if(endMin >= 24 * 60){
       if(formRepeatMode === 'once'){
@@ -17782,11 +17695,7 @@ document.getElementById('customTimeConfirm').addEventListener('click', () => {
     document.getElementById('eventFormEnd').value = minToTimeStr(endMin);
     refreshTimeDisplay('eventFormEnd');
   }
-  closeTimePicker();
-});
-document.getElementById('customTimePopup').addEventListener('click', (e) => {
-  if(e.target.id === 'customTimePopup') closeTimePicker();
-});
+}
 document.querySelectorAll('.time-picker-btn').forEach(btn => {
   btn.addEventListener('click', () => openTimePicker(btn.dataset.target));
 });
@@ -21576,33 +21485,7 @@ function updateFriendReserveEndOptions(){
 }
 document.getElementById('friendReserveStartSelect').addEventListener('change', updateFriendReserveEndOptions);
 
-// ---------- 커스텀 셀렉트 팝업 (시작시간/예약시간 select 대체) ----------
-let activeSelectTarget = null;
-function openCustomSelect(selectId){
-  closeAllCustomPopups();
-  activeSelectTarget = selectId;
-  const select = document.getElementById(selectId);
-  const list = document.getElementById('customSelectList');
-  list.innerHTML = '';
-  Array.from(select.options).forEach(opt => {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'custom-select-opt' + (opt.value === select.value ? ' selected' : '');
-    row.textContent = opt.textContent;
-    row.addEventListener('click', () => {
-      select.value = opt.value;
-      select.dispatchEvent(new Event('change'));
-      refreshSelectDisplay(selectId);
-      closeCustomSelect();
-    });
-    list.appendChild(row);
-  });
-  document.getElementById('customSelectPopup').style.display = 'flex';
-}
-function closeCustomSelect(){
-  document.getElementById('customSelectPopup').style.display = 'none';
-  activeSelectTarget = null;
-}
+// ---------- 커스텀 셀렉트 버튼 (숨겨진 select를 대신 보여줌) ----------
 function refreshSelectDisplay(selectId){
   const select = document.getElementById(selectId);
   const btn = document.querySelector(`.custom-select-btn[data-target="${selectId}"]`);
@@ -21611,19 +21494,17 @@ function refreshSelectDisplay(selectId){
   btn.textContent = opt ? opt.textContent : '선택';
 }
 document.querySelectorAll('.custom-select-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if(TIME_WHEEL_SELECTS[btn.dataset.target]) openTimeWheel(btn.dataset.target);
-    else openCustomSelect(btn.dataset.target);
-  });
+  btn.addEventListener('click', () => openWheelForSelect(document.getElementById(btn.dataset.target)));
 });
 
-// ---------- 예약하기 시작/종료 시간: 아이폰 타이머처럼 돌려서 고르는 휠 ----------
-// 고를 수 있는 값은 기존처럼 숨겨진 select의 선택지(분 단위, 5분 간격)를 그대로 씀 - 휠은 그걸 "시"/"분" 두 칸으로 나눠 보여줄 뿐
-const TIME_WHEEL_SELECTS = { friendReserveStartSelect: '시작 시간', friendReserveEndSelect: '종료 시간' };
+// ---------- 앱의 모든 시간 고르기: 아이폰 타이머처럼 돌려서 고르는 휠 ----------
+// 'hm' 모드는 하루 중 분 값을 "시"/"분" 두 칸으로 나눠 보여주고, 'list' 모드는 선택지 글자를 한 칸으로 보여줌
+const TIME_WHEEL_TITLES = { friendReserveStartSelect: '시작 시간', friendReserveEndSelect: '종료 시간', matchMinHours: '만날 시간', invStartHour: '시작 시간', invEndHour: '끝 시간' };
 const TIME_WHEEL_ITEM_H = 40;
-let timeWheelTarget = null;
+let timeWheelOnPick = null;
+let timeWheelMode = 'hm';
 let timeWheelValues = [];
-let timeWheelHour = 0;
+let timeWheelHour = 0; // list 모드에선 고른 선택지 번호
 let timeWheelMin = 0;
 
 // 휠이 한 칸 넘어갈 때마다 "드르륵" 진동 - 앱에선 아이폰 기본 선택 진동(Haptics), 그 외엔 지원하면 짧은 진동
@@ -21665,12 +21546,12 @@ function hapticTick(){
   } catch(e) {}
 }
 
-function fillTimeWheelCol(col, items, selected){
+function fillTimeWheelCol(col, items, selected, label){
   col.innerHTML = '';
   items.forEach((v, i) => {
     const el = document.createElement('div');
     el.className = 'time-wheel-item';
-    el.textContent = String(v).padStart(2, '0');
+    el.textContent = label ? label(v) : String(v).padStart(2, '0');
     // 위아래 숫자를 톡 누르면 그 칸으로 굴러감
     el.addEventListener('click', () => col.scrollTo({ top: i * TIME_WHEEL_ITEM_H, behavior: 'smooth' }));
     col.appendChild(el);
@@ -21690,27 +21571,35 @@ function refillTimeWheelMinutes(){
   timeWheelMin = mins.reduce((best, m) => Math.abs(m - timeWheelMin) < Math.abs(best - timeWheelMin) ? m : best, mins[0]);
   fillTimeWheelCol(document.getElementById('timeWheelMinCol'), mins, timeWheelMin);
 }
-function openTimeWheel(selectId){
+// values: hm 모드면 하루 중 분(숫자), list 모드면 선택지 값. 확인을 누르면 onPick(고른 값)
+function openWheelPicker({ title, values, value, mode = 'hm', labels = [], onPick }){
   closeAllCustomPopups();
-  const select = document.getElementById(selectId);
-  timeWheelValues = Array.from(select.options).map(o => parseInt(o.value, 10)).filter(v => !isNaN(v));
-  if(!timeWheelValues.length) return;
-  timeWheelTarget = selectId;
-  const cur = parseInt(select.value, 10);
-  const start = isNaN(cur) ? timeWheelValues[0] : cur;
-  timeWheelHour = Math.floor(start / 60);
-  timeWheelMin = start % 60;
-  document.getElementById('timeWheelTitle').textContent = TIME_WHEEL_SELECTS[selectId] || '';
+  if(!values.length) return;
+  timeWheelOnPick = onPick;
+  timeWheelMode = mode;
+  timeWheelValues = values;
+  document.getElementById('timeWheelTitle').textContent = title || '';
+  const popup = document.getElementById('timeWheelPopup');
+  popup.querySelector('.time-wheel').classList.toggle('list', mode === 'list');
   // 화면에 보인 다음에 채워야 스크롤 위치(가운데 맞춤)가 먹힘
-  document.getElementById('timeWheelPopup').style.display = 'flex';
-  const hours = [...new Set(timeWheelValues.map(v => Math.floor(v / 60)))];
-  fillTimeWheelCol(document.getElementById('timeWheelHourCol'), hours, timeWheelHour);
-  refillTimeWheelMinutes();
+  popup.style.display = 'flex';
+  const hourCol = document.getElementById('timeWheelHourCol');
+  if(mode === 'list'){
+    timeWheelHour = Math.max(0, values.indexOf(value));
+    fillTimeWheelCol(hourCol, values.map((_, i) => i), timeWheelHour, i => labels[i] || String(values[i]));
+  } else {
+    // 지금 값이 선택지에 없으면 가장 가까운 값에서 시작
+    const start = values.reduce((best, v) => Math.abs(v - value) < Math.abs(best - value) ? v : best, values[0]);
+    timeWheelHour = Math.floor(start / 60);
+    timeWheelMin = start % 60;
+    fillTimeWheelCol(hourCol, [...new Set(values.map(v => Math.floor(v / 60)))], timeWheelHour);
+    refillTimeWheelMinutes();
+  }
   hapticSelectionStart();
 }
 function closeTimeWheel(){
   document.getElementById('timeWheelPopup').style.display = 'none';
-  timeWheelTarget = null;
+  timeWheelOnPick = null;
   hapticSelectionEnd();
 }
 function watchTimeWheelCol(col, onChange){
@@ -21727,28 +21616,76 @@ function watchTimeWheelCol(col, onChange){
 }
 watchTimeWheelCol(document.getElementById('timeWheelHourCol'), (h) => {
   timeWheelHour = h;
-  refillTimeWheelMinutes();
+  if(timeWheelMode === 'hm') refillTimeWheelMinutes();
 });
 watchTimeWheelCol(document.getElementById('timeWheelMinCol'), (m) => {
   timeWheelMin = m;
 });
 document.getElementById('timeWheelConfirm').addEventListener('click', () => {
-  if(!timeWheelTarget) return closeTimeWheel();
-  const select = document.getElementById(timeWheelTarget);
-  const val = timeWheelHour * 60 + timeWheelMin;
-  if(timeWheelValues.includes(val)){
-    select.value = val;
-    select.dispatchEvent(new Event('change'));
-    refreshSelectDisplay(timeWheelTarget);
-  }
+  const onPick = timeWheelOnPick;
+  const val = timeWheelMode === 'list' ? timeWheelValues[timeWheelHour] : timeWheelHour * 60 + timeWheelMin;
   closeTimeWheel();
+  if(onPick && timeWheelValues.includes(val)) onPick(val);
 });
 document.getElementById('timeWheelPopup').addEventListener('click', (e) => {
   if(e.target.id === 'timeWheelPopup') closeTimeWheel();
 });
-document.getElementById('customSelectPopup').addEventListener('click', (e) => {
-  if(e.target.id === 'customSelectPopup') closeCustomSelect();
-});
+
+// select 하나를 휠로 고름 - 시·분이 따로 있는 칸(sh/sm, eh/em)은 둘을 묶어 한 휠로, 값이 하루 중 분인 칸은 시·분 휠로, 나머지는 한 줄 휠로
+const TIME_WHEEL_INLINE = '[data-fa-edit-f], [data-qa-edit-f], [data-qa-range-f], .inv-fine-sel, #invStartHour, #invEndHour';
+function openWheelForSelect(select){
+  if(!select) return;
+  const pick = (v, changed) => {
+    (changed || select).dispatchEvent(new Event('change', { bubbles: true }));
+    if(select.id) refreshSelectDisplay(select.id);
+  };
+  const pairKey = select.dataset.faEditF ? 'faEditF' : select.dataset.qaEditF ? 'qaEditF' : null;
+  if(pairKey){
+    const attr = pairKey === 'faEditF' ? 'data-fa-edit-f' : 'data-qa-edit-f';
+    const panel = select.parentElement;
+    const side = select.dataset[pairKey][0];
+    const hSel = panel.querySelector(`[${attr}="${side}h"]`), mSel = panel.querySelector(`[${attr}="${side}m"]`);
+    const hours = Array.from(hSel.options).map(o => Number(o.value));
+    const mins = Array.from(mSel.options).map(o => Number(o.value));
+    const values = hours.flatMap(h => mins.map(m => h * 60 + m)).filter(v => v <= 24 * 60);
+    openWheelPicker({ title: side === 's' ? '시작 시간' : '끝 시간', values, value: Number(hSel.value) * 60 + Number(mSel.value), onPick: v => {
+      hSel.value = String(Math.floor(v / 60));
+      mSel.value = String(v % 60);
+      pick(v, select);
+    } });
+    return;
+  }
+  const opts = Array.from(select.options);
+  const title = TIME_WHEEL_TITLES[select.id] || select.getAttribute('aria-label') || (select.dataset.qaRangeF === 's' ? '보이는 시간 시작' : select.dataset.qaRangeF === 'e' ? '보이는 시간 끝' : '');
+  if(select.id === 'friendReserveStartSelect' || select.id === 'friendReserveEndSelect' || select.classList.contains('inv-fine-sel')){
+    const values = opts.map(o => parseInt(o.value, 10)).filter(v => !isNaN(v));
+    openWheelPicker({ title, values, value: parseInt(select.value, 10), onPick: v => { select.value = String(v); pick(v); } });
+    return;
+  }
+  openWheelPicker({ title, mode: 'list', values: opts.map(o => o.value), labels: opts.map(o => o.textContent), value: select.value, onPick: v => { select.value = v; pick(v); } });
+}
+// 화면 안의 시간 select는 기본 고르기 대신 휠을 띄움 - 눌렀다 뗄 때(스크롤하며 스친 건 무시)
+let timeWheelTouch = null;
+document.addEventListener('touchstart', (e) => {
+  const sel = e.target.closest && e.target.closest(TIME_WHEEL_INLINE);
+  timeWheelTouch = sel ? { sel, x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+}, { capture: true, passive: true });
+document.addEventListener('touchmove', (e) => {
+  if(timeWheelTouch && Math.hypot(e.touches[0].clientX - timeWheelTouch.x, e.touches[0].clientY - timeWheelTouch.y) > 10) timeWheelTouch = null;
+}, { capture: true, passive: true });
+document.addEventListener('touchend', (e) => {
+  const t = timeWheelTouch;
+  timeWheelTouch = null;
+  if(!t || !(e.target.closest && e.target.closest(TIME_WHEEL_INLINE) === t.sel)) return;
+  e.preventDefault();
+  openWheelForSelect(t.sel);
+}, { capture: true, passive: false });
+document.addEventListener('mousedown', (e) => {
+  const sel = e.target.closest && e.target.closest(TIME_WHEEL_INLINE);
+  if(!sel) return;
+  e.preventDefault();
+  openWheelForSelect(sel);
+}, true);
 
 function closeFriendReserveView(){
   document.getElementById('friendReserveView').classList.remove('active');
