@@ -16520,6 +16520,7 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
   SCHEDULE_EVENTS.push(ev);
   resyncAllScheduleEvents();
   syncEventCreateToServer(ev);
+  return ev;
 }
 
 let formRepeatMode = 'once';
@@ -18192,7 +18193,8 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
       if(ev.id === editingEventId || editingLinkedPieceIds.includes(ev.id)) return false;
       // "이 시간에도 예약 받기"를 켠 일정과 예약 가능 시간은 겹쳐도 서로 막지 않으니 물어보지 않음
       // (켠 일정을 열어둔 시간 위에 넣을 때 / 열어둔 시간을 켠 일정 위에 열 때 둘 다)
-      if(formEventType !== 'available' && formAllowBooking && ev.type === 'available') return false;
+      // 안 켠 일정은 겹친 예약 가능 시간을 그 시간만 닫으니(cutAvailableByBusyEvent) 역시 물어보지 않음 (잘라낼 수 없는 반복/기간 시간만 물어봄)
+      if(formEventType !== 'available' && ev.type === 'available' && (formAllowBooking || isMergeableAvail(ev))) return false;
       if(formEventType === 'available' && ev.type !== 'available' && !blocksBooking(ev)) return false;
       const disp = getEventDisplayRangeForDate(ev, date);
       return disp.startMin < winEnd && disp.endMin > winStart;
@@ -18221,6 +18223,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
         return;
       }
     }
+    let closedAvail = 0; // 이 일정과 겹쳐서 그 시간만 닫은 예약 가능 조각 수
     try {
       if(editingEventId && scope === 'this'){
         // 이 일정만: 반복에서 그날을 빼고(이 날만 삭제와 같음), 그날 하나짜리 일정을 바뀐 내용으로 새로 만듦
@@ -18231,7 +18234,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           if(!ev.recurring.exceptions.includes(occKey)) ev.recurring.exceptions.push(occKey);
           resyncAllScheduleEvents();
           if(ev.serverId) syncEventUpdateToServer(ev);
-          createScheduleEvent({
+          const created = createScheduleEvent({
             title, startMin, endMin,
             visibility: { ...formVisibility },
             recurringWeekdays: null,
@@ -18243,8 +18246,9 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
             blocksBooking: formEventType === 'available' || !formAllowBooking,
             travel: travelForSave(),
           });
+          closedAvail = cutAvailableByBusyEvent(created);
         }
-        showToast(`${scheduleFocusDate.getMonth() + 1}월 ${scheduleFocusDate.getDate()}일 일정만 수정했어요.`);
+        showToast(`${scheduleFocusDate.getMonth() + 1}월 ${scheduleFocusDate.getDate()}일 일정만 수정했어요.${closedAvail ? ' 겹친 예약 가능 시간은 닫았어요.' : ''}`);
       } else if(editingEventId){
         const ev = SCHEDULE_EVENTS.find(e => e.id === editingEventId);
         if(ev){
@@ -18285,10 +18289,11 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
 
           resyncAllScheduleEvents();
           syncEventUpdateToServer(ev);
+          closedAvail = cutAvailableByBusyEvent(ev);
         }
-        showToast('일정을 수정했어요.');
+        showToast(closedAvail ? '일정을 수정했어요. 겹친 예약 가능 시간은 닫았어요.' : '일정을 수정했어요.');
       } else {
-        createScheduleEvent({
+        const created = createScheduleEvent({
           title, startMin, endMin,
           visibility: { ...formVisibility },
           recurringWeekdays: formRepeatMode === 'weekly' ? Array.from(formSelectedWeekdays) : null,
@@ -18300,7 +18305,8 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
           blocksBooking: formEventType === 'available' || !formAllowBooking,
           travel: travelForSave(),
         });
-        showToast('일정이 추가됐어요.');
+        closedAvail = cutAvailableByBusyEvent(created);
+        showToast(closedAvail ? '일정이 추가됐어요. 겹친 예약 가능 시간은 닫았어요.' : '일정이 추가됐어요.');
         if(formEventType !== 'available') setTimeout(() => maybePromptFirstInvite(false), 900);
       }
     } catch(err){
@@ -18901,6 +18907,30 @@ function sameAvailAudience(a, b){
 // 이 일정과 겹쳐도 합칠 수 있는 예약 가능 조각인지 (반복/기간으로 연 시간은 잘라 합칠 수 없어서 제외)
 function isMergeableAvail(ev){
   return !!ev && ev.type === 'available' && !!ev.dateKey && !ev.recurring && !ev.dateRange && !ev.isPendingHold && !ev.isReservationLinked;
+}
+// "이 시간에도 예약 받기"를 안 켠 일정이 생기면, 겹친 예약 가능 시간은 그 시간만 닫음 (앞뒤로 남는 시간은 그대로 열어둠)
+// 반복/기간으로 연 시간은 잘라낼 수 없어서 그대로 둠. 닫은 조각 수를 돌려줌
+function cutAvailableByBusyEvent(busy){
+  if(!busy || busy.type === 'available' || !blocksBooking(busy)) return 0;
+  let cut = 0;
+  SCHEDULE_EVENTS.filter(isMergeableAvail).forEach(av => {
+    const date = parseDateInputValue(av.dateKey);
+    if(!eventAppliesToDate(busy, dateKeyNum(date), date.getDay(), av.dateKey)) return;
+    const r = getEventDisplayRangeForDate(busy, date);
+    if(r.startMin >= av.endMin || r.endMin <= av.startMin) return; // 안 겹침
+    const left = subtractMinuteRanges([{ s: av.startMin, e: av.endMin }], [{ s: r.startMin, e: r.endMin }]);
+    const idx = SCHEDULE_EVENTS.indexOf(av);
+    if(idx >= 0) SCHEDULE_EVENTS.splice(idx, 1);
+    syncEventDeleteToServer(av);
+    left.forEach(p => {
+      const piece = { ...av, id: 'ev' + (scheduleEventIdCounter++), startMin: p.s, endMin: p.e, serverId: null };
+      SCHEDULE_EVENTS.push(piece);
+      syncEventCreateToServer(piece);
+    });
+    cut++;
+  });
+  if(cut) resyncAllScheduleEvents();
+  return cut;
 }
 // dateKey의 startMin~endMin을 aud로 엶 - 겹치는 예약 가능 조각은 겹친 부분만 대상을 합침. 합친 조각 수를 돌려줌
 function openAvailableRangeMerging(dateKey, startMin, endMin, aud){
