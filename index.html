@@ -5853,6 +5853,26 @@
     background:var(--surface-2); color:var(--text); font-size:14px; font-weight:700; cursor:pointer;
   }
   .app-confirm-btns button.yes{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  /* 일주일 보기에서 일정 칸을 한 번 누르면 아래에서 올라오는 창 - 정확한 시간 + 수정/삭제 */
+  .week-block-sheet-overlay{
+    position:fixed; inset:0; z-index:9600; background:rgba(15,16,20,0.35);
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .week-block-sheet-overlay[hidden]{ display:none; }
+  .week-block-sheet{
+    width:100%; max-width:480px; padding:18px 18px calc(16px + env(safe-area-inset-bottom)); border-radius:20px 20px 0 0;
+    background:var(--surface); color:var(--text); box-shadow:0 -10px 32px rgba(0,0,0,0.2);
+  }
+  .week-block-sheet-title{ font-size:16px; font-weight:800; margin-bottom:6px; word-break:break-all; }
+  .week-block-sheet-time{ font-size:14px; color:var(--text-dim); font-weight:600; margin-bottom:16px; }
+  .week-block-sheet-btns{ display:flex; gap:8px; }
+  .week-block-sheet-btns button{
+    flex:1; padding:12px 0; border-radius:12px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--text); font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .week-block-sheet-btns button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .week-block-sheet-btns button.danger{ color:var(--cta); }
+  .week-block-sheet-btns button.danger.armed{ background:var(--cta); border-color:var(--cta); color:#fff; }
   .custom-picker-overlay{
     position:fixed;
     inset:0;
@@ -19148,6 +19168,18 @@ function renderWeekView(){
     body.className = 'week-cal-day-body';
     body.style.height = (WEEK_ROW_H * visibleHours.length) + 'px';
 
+    // 빈 칸을 누르면 그 시간(1시간)으로 일정 추가 창을 엶 - 일정 칸은 각자 클릭을 막아서 여기로 안 옴
+    body.addEventListener('click', (e) => {
+      if(e.target !== body) return;
+      const h = visibleHours[Math.floor(e.offsetY / WEEK_ROW_H)];
+      if(h === undefined) return;
+      scheduleFocusDate = new Date(d);
+      openEventForm();
+      document.getElementById('eventFormStart').value = minutesToLabel(h * 60);
+      document.getElementById('eventFormEnd').value = minutesToLabel(Math.min(h * 60 + 60, 24 * 60 - 1));
+      ['eventFormStart', 'eventFormEnd'].forEach(refreshTimeDisplay);
+    });
+
     const key = dateKeyOf(d);
     const texts = textsByDay[dayIdx];
     const dayEvents = getEventsForDate(d); // 수정/삭제 버튼에서 실제 일정 객체를 찾기 위함
@@ -19189,37 +19221,10 @@ function renderWeekView(){
           : text;
         block.appendChild(label);
 
+        // 칸이 좁아서 시간이 안 보이니, 한 번 누르면 아래에서 창이 올라와 정확한 시간을 보여줌
+        const sheetTimeText = `${d.getMonth()+1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]}) ${minutesToLabel(blockRange.startMin)} – ${minutesToLabel(blockRange.endMin)}`;
         if(matchedEv && !isPending && !isLinked){
-          const actions = document.createElement('div');
-          actions.className = 'week-cal-block-actions';
-          actions.innerHTML = `
-            <button class="week-cal-block-edit" title="일정 수정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-            <button class="week-cal-block-delete" title="더블클릭하면 삭제돼요"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
-          `;
-          block.appendChild(actions);
-
-          block.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const alreadyOpen = block.classList.contains('show-actions');
-            wrap.querySelectorAll('.week-cal-block.show-actions').forEach(b => b.classList.remove('show-actions'));
-            if(!alreadyOpen) block.classList.add('show-actions');
-          });
-
-          actions.querySelector('.week-cal-block-edit').addEventListener('click', (e) => {
-            e.stopPropagation();
-            block.classList.remove('show-actions');
-            scheduleFocusDate = new Date(d); // "이 날만 삭제"가 이 블록의 날짜를 지우도록 (위 한달 보기와 같은 이유)
-            openEventForm(matchedEv);
-          });
-          // 휴지통은 dblclick으로만 삭제되는데, 첫 번째 클릭이 그대로 block으로 버블링되면
-          // block의 클릭 핸들러가 먼저 반응해서 액션 팝오버를 닫아버리고, 그 다음 두 번째 클릭이
-          // (이미 display:none이 된) 버튼에 도달하지 못해 dblclick이 영영 완성되지 않는 문제가 있음.
-          // -> 단일 click에서도 반드시 stopPropagation 해서 팝오버가 유지되게 함.
-          actions.querySelector('.week-cal-block-delete').addEventListener('click', (e) => {
-            e.stopPropagation();
-          });
-          actions.querySelector('.week-cal-block-delete').addEventListener('dblclick', (e) => {
-            e.stopPropagation();
+          const deleteThisBlock = () => {
             if(matchedEv.recurring){
               // 반복 일정은 전체를 지우지 않고, 이 날짜만 예외로 등록해서 그 날만 빠지게 함
               if(!matchedEv.recurring.exceptions) matchedEv.recurring.exceptions = [];
@@ -19234,12 +19239,33 @@ function renderWeekView(){
               renderWeekView();
               showToast('일정을 삭제했어요.');
             }
+          };
+          block.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openWeekBlockSheet(text, sheetTimeText, [
+              { label: '수정', primary: true, onTap: () => {
+                scheduleFocusDate = new Date(d); // "이 날만 삭제"가 이 블록의 날짜를 지우도록 (위 한달 보기와 같은 이유)
+                openEventForm(matchedEv);
+              } },
+              // 실수로 지워지지 않게 한 번 더 눌러야 삭제됨 (예전 휴지통 더블클릭 대신)
+              { label: '삭제', danger: true, confirmLabel: '한 번 더 누르면 삭제', onTap: deleteThisBlock },
+            ]);
           });
         } else if((isLinked || isPending) && matchedEv.sourceChatRoomId){
-          // 확정된 약속이든 아직 응답 기다리는 예약 요청이든, 누르면 그 요청을 보낸 채팅방으로 이동
-          block.addEventListener('click', () => goToReservationChat(matchedEv.sourceChatRoomId));
+          // 확정된 약속이든 아직 응답 기다리는 예약 요청이든, 시간을 보여주고 그 요청을 보낸 채팅방으로 갈 수 있게 함
+          block.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openWeekBlockSheet(text, sheetTimeText, [
+              { label: '채팅방 열기', primary: true, onTap: () => goToReservationChat(matchedEv.sourceChatRoomId) },
+            ]);
+          });
         } else {
-          block.addEventListener('click', () => goToDaySchedule(d));
+          block.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openWeekBlockSheet(text, sheetTimeText, [
+              { label: '이 날 일정 보기', primary: true, onTap: () => goToDaySchedule(d) },
+            ]);
+          });
         }
         body.appendChild(block);
 
@@ -19273,6 +19299,52 @@ function renderWeekView(){
   });
 
   wrap.appendChild(daysWrap);
+}
+
+// 일주일 뷰에서 일정 칸을 눌렀을 때 아래에서 올라오는 창 - 제목, 정확한 시간, 버튼들.
+// 버튼에 confirmLabel이 있으면 첫 번째 탭은 그 문구로 바뀌기만 하고, 두 번째 탭에서 실행됨
+function closeWeekBlockSheet(){
+  const overlay = document.getElementById('weekBlockSheetOverlay');
+  if(overlay) overlay.hidden = true;
+}
+function openWeekBlockSheet(title, timeText, buttons){
+  let overlay = document.getElementById('weekBlockSheetOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'weekBlockSheetOverlay';
+    overlay.className = 'week-block-sheet-overlay';
+    overlay.innerHTML = `<div class="week-block-sheet" role="dialog" aria-modal="true">
+      <div class="week-block-sheet-title"></div>
+      <div class="week-block-sheet-time"></div>
+      <div class="week-block-sheet-btns"></div>
+    </div>`;
+    // 창 바깥(어두운 배경)을 누르면 닫힘
+    overlay.addEventListener('click', (e) => { if(e.target === overlay) dismissView(closeWeekBlockSheet); });
+    document.body.appendChild(overlay);
+  }
+  overlay.querySelector('.week-block-sheet-title').textContent = title;
+  overlay.querySelector('.week-block-sheet-time').textContent = timeText;
+  const btnRow = overlay.querySelector('.week-block-sheet-btns');
+  btnRow.innerHTML = '';
+  buttons.forEach(b => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = b.label;
+    if(b.primary) btn.classList.add('primary');
+    if(b.danger) btn.classList.add('danger');
+    btn.addEventListener('click', () => {
+      if(b.confirmLabel && !btn.classList.contains('armed')){
+        btn.classList.add('armed');
+        btn.textContent = b.confirmLabel;
+        return;
+      }
+      dismissView(closeWeekBlockSheet);
+      b.onTap();
+    });
+    btnRow.appendChild(btn);
+  });
+  if(!viewCloseStack.includes(closeWeekBlockSheet)) pushViewState(closeWeekBlockSheet);
+  overlay.hidden = false;
 }
 
 // 일주일 뷰에서 일정 블록 바깥을 누르면 열려있던 수정/삭제 버튼을 닫음
