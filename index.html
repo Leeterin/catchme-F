@@ -3756,6 +3756,20 @@
     padding:5px 14px;
     border-radius:999px;
   }
+  /* 그룹방 안내줄 - "OO님이 나갔어요" / "OO님을 초대했어요" */
+  .chat-sys-notice{
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px;
+    margin:10px 0;
+  }
+  .chat-sys-notice span{
+    background:var(--surface-2); color:var(--text-dim);
+    font-size:11.5px; font-weight:600; padding:5px 12px; border-radius:999px;
+  }
+  .group-invite-plus{ background:var(--accent-soft) !important; color:var(--accent); font-size:22px; font-weight:700; }
+  .chat-sys-reinvite{
+    border:1px solid var(--accent); background:transparent; color:var(--accent);
+    font-size:11.5px; font-weight:700; padding:4px 10px; border-radius:999px; cursor:pointer;
+  }
   .msg-row{
     display:flex;
     align-items:flex-end;
@@ -8634,6 +8648,10 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
               <span id="extraCalendarOptionLabel">캘린더 보기</span>
             </div>
+            <div class="chat-extra-option" id="extraInviteOption" style="display:none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+              <span>친구 초대하기</span>
+            </div>
             <div class="chat-extra-option" id="extraPastApptOption">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
               <span>지난 약속 보기</span>
@@ -8743,6 +8761,17 @@
       <div class="profile-status" id="groupMemberProfileStatus"></div>
       <div id="groupMemberProfileContactInfo" style="margin-top:6px;"></div>
       <div class="person-profile-actions" id="groupMemberProfileActions"></div>
+    </div>
+
+    <!-- 이미 있는 그룹 채팅방에 친구 초대 -->
+    <div class="calendar-match-view" id="inviteMembersView">
+      <div class="match-panel-header">
+        <button class="profile-back" id="inviteMembersBackBtn">&#8249;</button>
+        <span>친구 초대하기</span>
+      </div>
+      <div class="hotplace-list-desc">채팅방에 추가할 친구를 골라주세요.</div>
+      <div id="inviteMembersList"></div>
+      <button class="profile-chat-btn" id="inviteMembersBtn" style="margin-top:14px;">초대하기</button>
     </div>
 
     <!-- 새 모임(그룹 채팅) 만들기 -->
@@ -9963,6 +9992,14 @@ function connectRealtimeSocket(){
 
   realtimeSocket.on('newMessage', ({ roomId, message }) => {
     if(!roomId || !message) return;
+
+    // 그룹방에서 누가 나가거나 초대됐으면 멤버 목록을 서버에서 다시 받아옴
+    if(message.type === 'TEXT' && parseSysNotice(message.text) && CHAT_ROOMS[roomId]){
+      loadChatRoomsFromServer().then(() => {
+        if(activeChatRoomId === roomId) renderChatMessages();
+        if(activeGroupMembersRoomId === roomId && document.getElementById('groupMembersView').classList.contains('active')) openGroupMembersView(roomId, true);
+      });
+    }
 
     // 아직 목록에 없는 방(새로 생긴 실시간 상대방 등)이면 방 목록부터 새로 불러옴
     if(!CHAT_ROOMS[roomId]){
@@ -12285,7 +12322,7 @@ function renderMeetupDetail(){
         renderMeetups();
         renderMeetupDetail();
         showToast('모임을 취소했어요.');
-      }, `"${meetup.title}" 모임을 취소할까요? 이미 참여한 사람들과의 채팅방은 그대로 남아요.`);
+      }, `"${meetup.title}" 모임을 취소할까요? 이미 참여한 사람들과의 채팅방은 그대로 남아요.`, { okLabel: '모임 취소하기' });
     });
   }
 
@@ -24669,10 +24706,25 @@ document.addEventListener('click', (e) => {
   document.querySelectorAll('.sort-dropdown-menu.open').forEach(el => el.classList.remove('open'));
 });
 
-function openCancelConfirm(action, title){
+// opts.keepAvail: 약속 취소일 때만 "예약 가능 일정 남겨두기"를 보여줌 (이미 지난 약속이면 false로 넘겨서 숨김)
+// opts.okLabel: 확인 버튼 글자 (나가기/초대처럼 약속 취소가 아닌 확인창에서 씀)
+function openCancelConfirm(action, title, opts = {}){
   pendingCancelAction = action;
   document.getElementById('reservationCancelConfirmTitle').textContent = title || '약속을 취소할까요?';
+  document.getElementById('reservationCancelConfirmKeepBtn').style.display = opts.keepAvail ? '' : 'none';
+  const okBtn = document.getElementById('reservationCancelConfirmDeleteBtn');
+  okBtn.textContent = opts.okLabel || (opts.keepAvail ? '그냥 삭제하기' : '네');
+  okBtn.classList.toggle('danger', opts.danger !== false);
   document.getElementById('reservationCancelConfirmOverlay').classList.add('show');
+}
+// "6월 3일 (화)" + "14:00-15:00" 같은 라벨의 시작 시각이 이미 지났는지
+function isLabelTimePast(dateLabel, timeLabel){
+  const d = parseDateLabelToDate(dateLabel);
+  const t = parseTimeLabelMinutes(timeLabel);
+  if(!d) return false;
+  const start = new Date(d);
+  start.setHours(0, (t ? t.startMin : 0), 0, 0);
+  return start.getTime() <= Date.now();
 }
 function closeReservationCancelConfirm(){
   pendingCancelAction = null;
@@ -26078,7 +26130,7 @@ document.getElementById('chatRowMenuLeaveOption').addEventListener('click', () =
   closeChatRowMenu();
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
-  openCancelConfirm(() => leaveChatRoom(roomId), `"${room.name}" 채팅방을 나가시겠습니까?`);
+  openCancelConfirm(() => leaveChatRoom(roomId), `"${room.name}" 채팅방을 나가시겠습니까?`, { okLabel: '나가기' });
 });
 
 document.getElementById('chatRowMenuDeleteOption').addEventListener('click', () => {
@@ -26086,7 +26138,7 @@ document.getElementById('chatRowMenuDeleteOption').addEventListener('click', () 
   closeChatRowMenu();
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
-  openCancelConfirm(() => deleteChatRoom(roomId), `"${room.name}" 채팅방을 삭제할까요? 모든 멤버에게서 대화가 사라져요.`);
+  openCancelConfirm(() => deleteChatRoom(roomId), `"${room.name}" 채팅방을 삭제할까요? 모든 멤버에게서 대화가 사라져요.`, { okLabel: '삭제하기' });
 });
 
 // 메뉴 바깥을 누르면 닫힘 (꾹 눌러서 연 직후 손 뗄 때의 클릭은 제외)
@@ -27160,6 +27212,15 @@ function renderChatMessages(){
       lastDateKey = dateKey;
     }
 
+    // 그룹방 안내(누가 나갔어요 / 초대했어요) - 말풍선 대신 가운데 작은 안내줄
+    const sys = parseSysNotice(m.text);
+    if(sys){
+      if(isSearchHit) isSearchHit = false;
+      frag.appendChild(buildSysNoticeEl(sys, room));
+      lastOtherRunKey = null;
+      return;
+    }
+
     const row = document.createElement('div');
     row.className = 'msg-row ' + m.who + (m._animate ? ' msg-pop' : '') + (m._pending ? ' msg-sending' : '') + (m._failed ? ' msg-failed' : '');
     m._animate = false; // 처음 보낼 때 한 번만 튀어오르게 (다시 그릴 때는 모션 없이)
@@ -27262,7 +27323,7 @@ function renderChatMessages(){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => withdrawReservation(m));
       }
       if(showConfirmedExtras){
-        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable)));
+        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable), '', { keepAvail: !(m.startMs ? m.startMs <= Date.now() : isLabelTimePast(m.dateLabel, m.timeLabel)) }));
       }
     } else if(m.type === 'location-suggest'){
       const voteCount = (m.voterIds || []).length;
@@ -27363,7 +27424,7 @@ function renderChatMessages(){
             try {
               await apiRequest(`/chats/location-recommend/${m.requestId}/cancel`, { method: 'POST' });
             } catch(err){ showToast(err.message); }
-          }, '모임 장소 추천을 취소할까요?');
+          }, '모임 장소 추천을 취소할까요?', { okLabel: '추천 취소하기' });
         });
       }
     } else if(m.type === 'location-recommend'){
@@ -27436,7 +27497,7 @@ function renderChatMessages(){
           viewDayFromChat(parseDateLabelToDate(winning.dateLabel));
         });
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => {
-          openCancelConfirm((keepAvailable) => cancelGroupTimeOption(activeChatRoomId, m, keepAvailable));
+          openCancelConfirm((keepAvailable) => cancelGroupTimeOption(activeChatRoomId, m, keepAvailable), '', { keepAvail: !(winning.dateObj ? new Date(winning.dateObj).getTime() <= Date.now() : isLabelTimePast(winning.dateLabel, winning.timeLabel)) });
         });
       } else if(m.status === 'cancelled'){
         row.innerHTML = `
@@ -27793,8 +27854,82 @@ function parseCalShare(text){
     rest: text.slice(m[0].length),
   };
 }
+// ---------- 그룹방 안내줄 (나갔어요 / 초대했어요) ----------
+// 서버가 일반 TEXT로 ⟦sys|leave|id|아이디|이름⟧ / ⟦sys|invite|id|이름|id,아이디,이름;...⟧ 를 남김
+const SYS_NOTICE_RE = /^⟦sys\|([^⟧]*)⟧/;
+function parseSysNotice(text){
+  const m = SYS_NOTICE_RE.exec(text || '');
+  if(!m) return null;
+  const dec = (v) => { try { return decodeURIComponent(v || ''); } catch(_){ return v || ''; } };
+  const parts = m[1].split('|');
+  if(parts[0] === 'leave'){
+    return { kind: 'leave', user: { id: parts[1] || '', username: dec(parts[2]), name: dec(parts[3]) || '알 수 없음' } };
+  }
+  if(parts[0] === 'invite'){
+    const invited = (parts[3] || '').split(';').filter(Boolean).map(s => {
+      const [id, username, name] = s.split(',');
+      return { id, username: dec(username), name: dec(name) };
+    });
+    return { kind: 'invite', inviter: { id: parts[1] || '', name: dec(parts[2]) }, invited };
+  }
+  return null;
+}
+function sysNoticeLabel(sys){
+  const isMe = (u) => !!(currentUser && u.id === currentUser.id);
+  if(sys.kind === 'leave') return isMe(sys.user) ? '내가 나갔어요.' : `${sys.user.name}님이 나갔어요.`;
+  const who = isMe(sys.inviter) ? '내가' : `${sys.inviter.name}님이`;
+  const names = sys.invited.map(u => isMe(u) ? '나' : `${u.name}님`);
+  const last = sys.invited[sys.invited.length - 1];
+  return `${who} ${names.join(', ')}${last && isMe(last) ? '를' : '을'} 초대했어요.`;
+}
+function buildSysNoticeEl(sys, room){
+  const el = document.createElement('div');
+  el.className = 'chat-sys-notice';
+  const label = document.createElement('span');
+  label.textContent = sysNoticeLabel(sys);
+  el.appendChild(label);
+  // 나간 사람이 아직 방에 없고 내 친구면 "다시 초대" 버튼
+  if(sys.kind === 'leave' && room && room.isRealRoom && room.isGroup && sys.user.username
+    && !(currentUser && sys.user.id === currentUser.id)
+    && !(room.members || []).some(mem => mem.userId === sys.user.id)
+    && FRIENDS.some(f => f.username === sys.user.username)){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'chat-sys-reinvite';
+    btn.textContent = '다시 초대';
+    btn.addEventListener('click', () => {
+      openCancelConfirm(() => inviteRoomMembers(activeChatRoomId, [sys.user.username]), `${sys.user.name}님을 다시 초대할까요?`, { okLabel: '초대하기', danger: false });
+    });
+    el.appendChild(btn);
+  }
+  return el;
+}
+
+// 이미 있는 그룹방에 친구 초대 (나간 사람 다시 초대도 이걸로)
+async function inviteRoomMembers(roomId, usernames){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !usernames.length) return false;
+  try {
+    const data = await apiRequest(`/chats/${roomId}/members`, { method: 'POST', body: JSON.stringify({ usernames }) });
+    if(data.message && !room.messages.some(x => x._serverId === data.message.id)){
+      room.messages.push(mapServerMessageToLocal(data.message, room));
+    }
+    touchRoom(roomId);
+    await loadChatRoomsFromServer();
+    if(activeChatRoomId === roomId) renderChatMessages();
+    renderChatList();
+    showToast('초대했어요.');
+    return true;
+  } catch(err){
+    showToast(err.message);
+    return false;
+  }
+}
+
 // 채팅 목록/답장 미리보기/검색용 - 머리말은 빼고 사람이 읽을 글만
 function stripCalShare(text){
+  const sys = parseSysNotice(text);
+  if(sys) return sysNoticeLabel(sys);
   const p = parseCalShare(text);
   if(!p) return text || '';
   return `📅 일정 공유${p.rest.trim() ? ' - ' + p.rest.trim() : ''}`;
@@ -28839,6 +28974,57 @@ async function jumpChatToDate(y, mo, d){
 // ---------- 채팅방: 그룹 멤버 목록 (전용 화면) ----------
 let activeGroupMembersRoomId = null;
 
+// ---------- 그룹 채팅방: 친구 초대 (채팅방 메뉴 / 멤버 화면에서 열림) ----------
+let inviteMembersRoomId = null;
+let inviteMembersFromViewId = null; // 이 화면을 열기 직전에 보던 화면 - 닫으면 그리로 돌아감
+let selectedInviteUsernames = [];
+
+function openInviteMembersView(roomId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !room.isGroup || !room.isRealRoom) return;
+  inviteMembersRoomId = roomId;
+  selectedInviteUsernames = [];
+  const memberIds = new Set((room.members || []).map(m => m.userId).filter(Boolean));
+  const candidates = FRIENDS.filter(f => f.id !== DEMO_FRIEND.id && f.username && !memberIds.has(f.id));
+  const list = document.getElementById('inviteMembersList');
+  list.innerHTML = candidates.length === 0
+    ? '<div class="search-empty">초대할 수 있는 친구가 없어요. 친구가 모두 이 채팅방에 있어요.</div>'
+    : candidates.map(f => `
+      <div class="search-result-row" style="cursor:pointer;" data-username="${escapeHtml(f.username)}">
+        <div class="placeholder-avatar" style="background:${f.color}">${escapeHtml(f.name[0])}</div>
+        <div class="search-result-info"><b>${escapeHtml(f.name)}</b><span>@${escapeHtml(f.username)}</span></div>
+      </div>
+    `).join('');
+  document.getElementById('inviteMembersBtn').style.display = candidates.length ? '' : 'none';
+
+  const fromView = document.getElementById('groupMembersView').classList.contains('active') ? 'groupMembersView' : 'chatRoomView';
+  inviteMembersFromViewId = fromView;
+  document.getElementById(fromView).classList.remove('active');
+  document.getElementById('inviteMembersView').classList.add('active');
+  pushViewState(closeInviteMembersView);
+}
+function closeInviteMembersView(){
+  document.getElementById('inviteMembersView').classList.remove('active');
+  document.getElementById(inviteMembersFromViewId || 'chatRoomView').classList.add('active');
+  if(inviteMembersFromViewId === 'groupMembersView' && inviteMembersRoomId) openGroupMembersView(inviteMembersRoomId, true);
+}
+document.getElementById('inviteMembersBackBtn').addEventListener('click', () => goBackOrClose(closeInviteMembersView));
+document.getElementById('inviteMembersList').addEventListener('click', (e) => {
+  const row = e.target.closest('.search-result-row');
+  if(!row || !row.dataset.username) return;
+  const idx = selectedInviteUsernames.indexOf(row.dataset.username);
+  if(idx >= 0){ selectedInviteUsernames.splice(idx, 1); row.classList.remove('checked'); }
+  else { selectedInviteUsernames.push(row.dataset.username); row.classList.add('checked'); }
+});
+document.getElementById('inviteMembersBtn').addEventListener('click', async () => {
+  if(selectedInviteUsernames.length === 0){ showToast('초대할 친구를 골라주세요.'); return; }
+  const btn = document.getElementById('inviteMembersBtn');
+  btn.disabled = true;
+  const ok = await inviteRoomMembers(inviteMembersRoomId, selectedInviteUsernames.slice());
+  btn.disabled = false;
+  if(ok) goBackOrClose(closeInviteMembersView);
+});
+
 // ---------- 채팅방 목록: 새 모임(그룹) 만들기 ----------
 let selectedNewGroupUsernames = [];
 // 'group' = 모임 만들기(친구 여러 명 골라서 모임방, 1명이면 1:1 모임), 'dm' = 친구랑 채팅하기(한 명 누르면 바로 1:1 대화방)
@@ -28953,19 +29139,25 @@ document.getElementById('newGroupCreateBtn').addEventListener('click', async () 
   }
 });
 
-function openGroupMembersView(roomId){
+// refreshOnly: 이미 열려 있는 화면 내용만 다시 그림 (누가 나가거나 초대됐을 때)
+function openGroupMembersView(roomId, refreshOnly){
   const room = CHAT_ROOMS[roomId];
   if(!room || !room.isGroup) return;
   activeGroupMembersRoomId = roomId;
 
   document.getElementById('groupMembersTitle').textContent = `${room.name} 멤버 (${room.members.length}명)`;
   const body = document.getElementById('groupMembersListBody');
-  body.innerHTML = room.members.map((m, idx) => `
+  body.innerHTML = (room.isRealRoom ? `
+    <div class="search-result-row group-invite-row" style="cursor:pointer;">
+      <div class="placeholder-avatar group-invite-plus">+</div>
+      <div class="search-result-info"><b>친구 초대하기</b><span>이 채팅방에 친구를 추가해요</span></div>
+    </div>` : '') + room.members.map((m, idx) => `
     <div class="search-result-row" style="cursor:pointer;" data-idx="${idx}">
       <div class="placeholder-avatar" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="${escapeHtml(m.name)}" />` : escapeHtml(m.name[0])}</div>
       <div class="search-result-info"><b>${escapeHtml(m.name)}</b>${m.name === '나' ? '<span>나</span>' : '<span>탭해서 프로필 보기</span>'}</div>
     </div>
   `).join('');
+  if(refreshOnly) return;
 
   document.getElementById('chatRoomView').classList.remove('active');
   document.getElementById('groupMembersView').classList.add('active');
@@ -28980,6 +29172,7 @@ document.getElementById('groupMembersListBody').addEventListener('click', (e) =>
   if(!row) return;
   const room = CHAT_ROOMS[activeGroupMembersRoomId];
   if(!room) return;
+  if(row.classList.contains('group-invite-row')){ openInviteMembersView(activeGroupMembersRoomId); return; }
   const member = room.members[parseInt(row.dataset.idx, 10)];
   if(!member || member.name === '나') return; // 내 프로필은 따로 안 보여줌
   openGroupMemberProfile(member);
@@ -29100,7 +29293,13 @@ function updateChatExtraOptionForRoom(){
     option.innerHTML = `${EXTRA_OPTION_ICON_CALENDAR}<span>${room ? escapeHtml(room.name) + '님 ' : ''}캘린더 보기</span>`;
   }
   document.getElementById('extraMuteOptionLabel').textContent = (room && room.muted) ? '알림 켜기' : '알림 끄기';
+  document.getElementById('extraInviteOption').style.display = (room && room.isGroup && room.isRealRoom) ? '' : 'none';
 }
+document.getElementById('extraInviteOption').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('chatExtraDropdown').classList.remove('open');
+  if(activeChatRoomId) openInviteMembersView(activeChatRoomId);
+});
 
 document.getElementById('extraMuteOption').addEventListener('click', async (e) => {
   e.stopPropagation();
@@ -29337,7 +29536,7 @@ function renderActiveRecommendSheet(){
         renderActiveRecommendBar();
         showToast('모임 장소 추천을 취소했어요.');
       } catch(err){ showToast(err.message); }
-    }, '진행 중인 모임 장소 추천을 취소할까요?');
+    }, '진행 중인 모임 장소 추천을 취소할까요?', { okLabel: '추천 취소하기' });
   });
 }
 
@@ -29498,7 +29697,7 @@ document.getElementById('extraLeaveOption').addEventListener('click', () => {
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
 
-  openCancelConfirm(() => leaveChatRoom(roomId), `"${room.name}" 채팅방을 나가시겠습니까?`);
+  openCancelConfirm(() => leaveChatRoom(roomId), `"${room.name}" 채팅방을 나가시겠습니까?`, { okLabel: '나가기' });
 });
 
 // 채팅방 나가기 - 목록에서 완전히 제거하고 채팅 목록으로 돌아감
