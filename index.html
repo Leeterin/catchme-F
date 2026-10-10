@@ -19954,10 +19954,10 @@ function renderMonthSchedView(){
       ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
       : '';
 
-    // 메모가 있으면 날짜 바로 아래 맨 위에 메모마다 한 줄씩
+    // 메모가 있으면 날짜 바로 아래 맨 위에 메모마다 한 줄씩 (체크 표시는 아래 목록에서만)
     const cellMemos = getMemosForDate(cellDate);
     const memoHtml = cellMemos.map(memo =>
-      `<div class="month-event-label month-memo-label"><span class="memo-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>${escapeHtml(truncateForMonthLabel(memo.text.split('\n')[0]))}</div>`
+      `<div class="month-event-label month-memo-label">${escapeHtml(truncateForMonthLabel(memo.text.split('\n')[0]))}</div>`
     ).join('');
 
     cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${memoHtml}${labelsHtml}${moreHtml}`;
