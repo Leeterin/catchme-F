@@ -5404,7 +5404,6 @@
   .qa-range-toggle span{ color:var(--accent); margin-left:4px; }
   .qa-range-edit{ justify-content:flex-end; margin-bottom:2px; }
   .qa-range-note{ margin:0 8px 4px; font-size:11px; color:var(--text-dim); }
-  .qa-quick{ display:flex; gap:6px; margin:4px 0 2px; }
   /* 빠르게 열기·일정 추가 막대 화면은 꾹 눌러도 돋보기·글자 선택·복사 메뉴가 안 뜨게 (시간 고르기 select는 그대로) */
   #quickAvailOverlay, #quickAvailOverlay *:not(select):not(option), #formAvailRows, #formAvailRows *:not(select):not(option){
     -webkit-user-select:none !important; user-select:none !important; -webkit-touch-callout:none !important;
@@ -5416,7 +5415,6 @@
   .qa-switch[aria-checked="true"]{ color:var(--text); }
   .qa-switch[aria-checked="true"] i{ background:var(--accent); }
   .qa-switch[aria-checked="true"] i::after{ transform:translateX(12px); }
-  .qa-quick button{ flex:1; padding:8px 0; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text); font-size:12px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
   .qa-legend{ display:flex; justify-content:flex-end; gap:10px; margin:6px 8px 0; font-size:10px; color:var(--text-dim); }
   .qa-legend i{ display:inline-block; width:12px; height:8px; margin-right:3px; border-radius:2px; vertical-align:-1px; background:rgba(120,120,128,.38); }
   .qa-legend i.soft{ background:none; border:1.2px dashed rgba(120,120,128,.8); }
@@ -8292,10 +8290,6 @@
       <!-- 누구에게 열지는 대상마다 탭으로 나눠 정함 - 두 탭에 같은 시간을 열면 그 시간은 둘 다에게 열림 -->
       <div class="qa-tabs" id="quickAvailTabs"></div>
       <div class="qa-tab-hint" id="quickAvailTabHint"></div>
-      <div class="qa-quick">
-        <button type="button" data-qa-bulk="weekday">평일 모두 열기</button>
-        <button type="button" data-qa-bulk="weekend">주말 모두 열기</button>
-      </div>
       <div class="quick-avail-rows" id="quickAvailRows"></div>
       <p class="quick-avail-hint">막대 끝을 끌거나 시간 글자를 눌러 5분 단위로 맞출 수 있어요. 빈 곳을 누르면 시간을 더 넣어요.<br/>회색은 내 일정이라 그 시간은 빼고 열고, 점선은 겹쳐도 예약 받는 일정이에요. 눌러보면 무슨 일정인지 보여요.</p>
       <button type="button" class="profile-chat-btn" id="quickAvailSubmitBtn">열어두기</button>
@@ -29018,9 +29012,8 @@ const QUICK_AXIS_PREF_KEY = 'catchme_quick_axis';
 let quickAvailBusy = {}; // 요일 -> 정한 기간 동안 그 요일에 있는 내 일정 [{s, e, soft, items}] - 막대 위에 회색/점선으로 보여줌
 let quickAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dow, min }
 let quickAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dow, idx }
-let quickAvailStash = {}; // 줄을 껐다 다시 켤 때 되돌릴 시간 (탭마다 따로)
-// 대상별 탭 - 모든 친구 / 그룹마다 / 업무용. 탭마다 { initial, pattern, stash }를 따로 들고 있고,
-// 지금 보는 탭의 것을 quickAvailPattern/quickAvailInitial/quickAvailStash로 가리킴
+// 대상별 탭 - 모든 친구 / 그룹마다 / 업무용. 탭마다 { initial, pattern }을 따로 들고 있고,
+// 지금 보는 탭의 것을 quickAvailPattern/quickAvailInitial로 가리킴
 let quickAvailTabs = {};
 let quickAvailTab = 'friends';
 function quickTabList(){
@@ -29075,7 +29068,6 @@ function selectQuickTab(key){
   const tb = quickAvailTabs[key];
   quickAvailPattern = tb.pattern;
   quickAvailInitial = tb.initial;
-  quickAvailStash = tb.stash;
   quickAvailEdit = null;
   quickAvailInfo = null;
 }
@@ -29093,7 +29085,7 @@ function renderQuickTabs(){
 }
 function quickRangesTotal(ranges){ return (ranges || []).reduce((sum, r) => sum + r.e - r.s, 0); }
 function quickCloneRanges(ranges){ return (ranges || []).map(r => ({ s: r.s, e: r.e })); }
-// 월~일 일곱 줄 - 평일/주말을 한 번에 여는 건 위의 버튼으로
+// 월~일 일곱 줄
 function quickAvailRows(){
   return QUICK_AVAIL_DOWS.map(dow => ({ key: String(dow), label: WEEKDAY_KO[dow], dows: [dow], def: QUICK_AVAIL_GROUPS.find(g => g.dows.includes(dow)).def }));
 }
@@ -29215,7 +29207,7 @@ function openQuickAvail(){
     const initial = quickAvailCurrentPattern(tb.key);
     const pattern = {};
     QUICK_AVAIL_DOWS.forEach(dow => { pattern[dow] = quickCloneRanges(initial[dow]); });
-    quickAvailTabs[tb.key] = { initial, pattern, stash: {} };
+    quickAvailTabs[tb.key] = { initial, pattern };
   });
   selectQuickTab(quickAvailTabs[quickAvailTab] ? quickAvailTab : 'friends');
   quickAvailBusy = quickAvailBusyPattern();
@@ -29859,11 +29851,6 @@ function renderQuickAvail(){
   const last = quickAvailEnd(); last.setDate(last.getDate() - 1);
   document.getElementById('quickAvailDesc').innerHTML = `정한 시간이 ${quickAvailRepeat === 'month'
     ? `<b>4주 동안(~${last.getMonth() + 1}/${last.getDate()}) 매주 반복</b>해서` : `<b>이번 주만(~${last.getMonth() + 1}/${last.getDate()})</b>`} 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.`;
-  // 평일/주말 한 번에 열기 - 다 열려 있으면 한 번에 닫기로 바뀜
-  document.querySelectorAll('[data-qa-bulk]').forEach(b => {
-    const g = QUICK_AVAIL_GROUPS.find(x => x.key === b.dataset.qaBulk);
-    b.textContent = `${g.label} 모두 ${g.dows.every(dow => quickAvailPattern[dow].length) ? '닫기' : '열기'}`;
-  });
   const btn = document.getElementById('quickAvailSubmitBtn');
   // 전체(모든 탭)를 한 번에 저장함. 시간 합계는 탭끼리 겹친 시간을 한 번만 셈
   renderQuickTabs();
@@ -29954,33 +29941,12 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     renderQuickAvail();
     return;
   }
-  const bulk = e.target.closest('[data-qa-bulk]');
-  if(bulk){
-    const g = QUICK_AVAIL_GROUPS.find(x => x.key === bulk.dataset.qaBulk);
-    if(g.dows.every(dow => quickAvailPattern[dow].length)){
-      g.dows.forEach(dow => { quickAvailStash[dow] = quickCloneRanges(quickAvailPattern[dow]); quickAvailPattern[dow] = []; });
-    } else {
-      // 꺼진 날만 켬 - 전에 정해둔 시간이 있으면 그걸로, 없으면 이미 켜둔 다른 날과 같은 시간(없으면 기본 시간)으로
-      const ref = g.dows.map(dow => quickAvailPattern[dow]).find(r => r.length) || [g.def];
-      g.dows.forEach(dow => { if(!quickAvailPattern[dow].length) quickAvailPattern[dow] = quickCloneRanges(quickAvailStash[dow] || ref); });
-    }
-    quickAvailEdit = null;
-    renderQuickAvail();
-    return;
-  }
   const tg = e.target.closest('[data-qa-toggle]');
   if(tg){
-    // 끄면 그 줄 시간을 기억해뒀다가 다시 켤 때 되돌림
+    // 요일 버튼은 끄기만 함 - 켜는 건 막대에서 시간을 골라야 (아무 시간이나 저절로 들어가지 않게)
     const row = quickAvailRow(tg.dataset.qaToggle);
-    const cur = quickAvailPattern[row.dows[0]];
-    if(cur.length){
-      quickAvailStash[row.key] = quickCloneRanges(cur);
-      setQuickRowRanges(row, []);
-    } else {
-      const fit = quickFitRanges(row.dows[0], quickCloneRanges(quickAvailStash[row.key] || [row.def]));
-      if(fit.length) setQuickRowRanges(row, fit);
-      else { quickAvailAddRange(row); return; }
-    }
+    if(!quickAvailPattern[row.dows[0]].length){ showToast('막대에서 열 시간을 눌러 골라 주세요.'); return; }
+    setQuickRowRanges(row, []);
     if(quickAvailEdit && quickAvailEdit.dow === row.dows[0]) quickAvailEdit = null;
     renderQuickAvail();
     return;
@@ -29992,7 +29958,6 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     const [key, idx] = del.dataset.qaDel.split('|');
     const row = quickAvailRow(key);
     const cur = quickAvailPattern[row.dows[0]];
-    if(cur.length === 1) quickAvailStash[row.key] = quickCloneRanges(cur); // 마지막 하나를 빼면 꺼짐 - 다시 켜면 되돌아옴
     setQuickRowRanges(row, cur.filter((_, i) => i !== Number(idx)));
     hapticImpact('MEDIUM');
     quickAvailEdit = null;
