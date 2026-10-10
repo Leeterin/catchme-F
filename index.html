@@ -4114,6 +4114,16 @@
     color:var(--cta);
   }
   .reservation-btn.cancel:hover{ background:rgba(255,107,74,0.1); }
+  /* 버튼 줄이 두 개 이어지면 붙지 않게, 버튼 글자는 한 줄로(아이콘+글자 가운데 정렬) */
+  .reservation-card-actions + .reservation-card-actions{ margin-top:8px; }
+  .reservation-btn{ display:inline-flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap; min-width:0; }
+  .reservation-btn svg{ width:14px; height:14px; flex-shrink:0; }
+  /* 장소 제안 카드 - 폭을 일정하게, 주소는 고정폭 글꼴 대신 읽기 편한 글꼴로 */
+  .reservation-card.ls-card{ width:78%; max-width:300px; }
+  .ls-card .reservation-card-time{ font-family:inherit; font-size:14px; font-weight:600; line-height:1.4; word-break:keep-all; }
+  .ls-card .reservation-card-actions + .reservation-card-actions{ margin-top:4px; }
+  .reservation-btn.ls-cancel-btn{ background:none; border:none; color:var(--text-dim); font-weight:600; padding:6px; }
+  .reservation-btn.ls-cancel-btn:hover{ color:var(--cta); }
   /* 모임 장소 추천 - 카카오톡 투표처럼 채팅방에 남는 "출발지 모으기" 카드의 제출 현황 막대 */
   .lr-progress{
     height:6px;
@@ -26223,7 +26233,7 @@ function renderChatMessages(){
       const showCancel = m.who === 'me' && isPending;
       const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
       const cardHtml = `
-        <div class="reservation-card">
+        <div class="reservation-card ls-card">
           <div class="reservation-card-header">${ICO.pin} 장소 제안 - 여기 어때요?</div>
           <div class="reservation-card-time">${escapeHtml(locationSuggestTitle(activeChatRoomId, m))}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
