@@ -8558,7 +8558,7 @@
         <div class="chat-input-row">
           <input type="file" id="chatImageInput" accept="image/*" style="display:none;" />
           <button type="button" id="chatImageBtn" title="사진 · 약속 잡기 · 장소" aria-label="사진, 약속 잡기, 장소 메뉴" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-          <input type="text" id="chatInput" placeholder="메시지를 입력하세요" maxlength="200" />
+          <input type="text" id="chatInput" lang="ko" placeholder="메시지를 입력하세요" maxlength="200" />
           <button id="chatSendBtn" title="전송" aria-label="전송"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5.5 11.5 12 5l6.5 6.5"/></svg></button>
         </div>
 
@@ -25602,8 +25602,12 @@ document.getElementById('dayViewChatBackBtn').addEventListener('click', () => go
 // 브라우저의 기본 동작(포커스+스크롤)을 막고, 우리가 직접 { preventScroll: true } 옵션으로 포커스를
 // 줘서 "포커스는 주되 스크롤은 절대 안 하도록" 만듦. 이러면 헤더가 애초에 밀릴 일이 없어서 튈 수가 없음.
 function focusWithoutScrollJump(input){
+  // 꾹 누르기(글자 선택/붙여넣기 메뉴)는 기본 동작 그대로 둠 - 막으면 선택이 안 되고 메뉴도 안 떴음
+  let touchStartAt = 0;
+  input.addEventListener('touchstart', () => { touchStartAt = Date.now(); }, { passive: true });
   input.addEventListener('touchend', (e) => {
     if(document.activeElement === input) return; // 이미 포커스돼있으면(예: 커서 위치만 바꾸는 탭) 손대지 않음
+    if(Date.now() - touchStartAt > 350) return;
     e.preventDefault();
     input.focus({ preventScroll: true });
   });
@@ -25703,6 +25707,9 @@ document.addEventListener('touchmove', (e) => {
   // 채팅에서 연 전체화면 지도(장소 고르기/장소 투표 등) 위에서는 아무것도 안 함 - 지도는 스스로 터치를 처리하는데,
   // 여기서 손가락이 움직일 때마다 화면 구조를 훑느라(getComputedStyle) 두 손가락 확대/축소가 버벅였음
   if(e.target.closest && e.target.closest('.location-picker-full, .invite-overlay')) return;
+  // 입력칸 위에서는 막지 않음 - 손가락이 살짝만 움직여도 막혀서 탭이 탭으로 안 잡히고(붙여넣기 메뉴가 바로 안 뜸),
+  // 글자 선택 손잡이도 끌 수 없었음
+  if(e.target.closest && e.target.closest('input, textarea')) return;
   if(isInsideScrollableArea(e.target)) return;
   e.preventDefault();
 }, { passive: false });
