@@ -9244,7 +9244,9 @@ if('scrollRestoration' in history) history.scrollRestoration = 'manual';
 // 되감기는 비동기라, 그 사이에 새로 여는 화면의 pushState는 되감기가 끝난 뒤에 쌓아야 순서가 안 꼬임
 let historyUnwinding = 0;
 let pendingHistoryPushes = 0;
+let viewPushCollector = null; // jumpToView가 여는 동안엔 닫기 함수를 따로 모아서 한 항목으로 묶음
 function pushViewState(closeFn){
+  if(viewPushCollector){ viewPushCollector.push(closeFn); return; }
   viewCloseStack.push(closeFn);
   if(historyUnwinding > 0){ pendingHistoryPushes++; return; }
   history.pushState({ catchmeView: viewCloseStack.length }, '', '');
@@ -9892,8 +9894,7 @@ async function handlePushTap(data){
     if(!CHAT_ROOMS[data.roomId]) await loadChatRoomsFromServer();
     if(!CHAT_ROOMS[data.roomId]) return;
     if(activeChatRoomId === data.roomId) return;
-    switchTopTab('chat');
-    openChatRoom(data.roomId);
+    jumpToView(() => { showTab('chat'); openChatRoom(data.roomId); });
   } else if(data.type === 'friend'){
     switchTopTab('friends');
   } else if(data.type === 'invite'){
@@ -9905,8 +9906,7 @@ async function handlePushTap(data){
     switchScheduleView('day');
   } else if(data.type === 'openAvail'){
     // 일요일 저녁 "다음 주 시간 열어둘까요?" 알림 - 바로 빠르게 열기 화면
-    switchTopTab('schedule');
-    openQuickAvail();
+    jumpToView(() => { showTab('schedule'); openQuickAvail(); });
   }
 }
 // 로그아웃하면 이 기기로 더 이상 내 알림이 안 오게 서버에서 토큰을 지움
@@ -10683,6 +10683,50 @@ function switchTopTab(tabKey){
     pushViewState(backToPrev);
   }
 }
+// 다른 탭 안쪽 화면으로 바로 갈 때(홈 → 그룹, 친구 프로필 → 채팅방 등) - 뒤로가기 한 번이면 들어오기 전 화면 그대로.
+// showTab은 탭 하위 화면을 초기화해서 원래 화면을 기억해뒀다가 직접 되살림 (탭 첫 화면으로 가지 않게)
+// openFn 안에서는 switchTopTab 대신 showTab을 써야 함 (switchTopTab은 원래 화면의 뒤로가기 기록을 지움)
+const SCREEN_DISPLAY_SELECTORS = ['.bottom-nav', '.date-header', '#homeDash', '#calendarCard', '#myProfileView', '#settingsView'];
+function snapshotScreen(){
+  const tab = currentTopTab;
+  const root = tab === null ? document.getElementById('homeDash') : panels[tab];
+  return {
+    tab, root,
+    active: new Set(root.querySelectorAll('.active')),
+    roomId: tab === 'chat' && document.getElementById('chatRoomView').classList.contains('active') ? activeChatRoomId : null,
+    chatOpen: document.body.classList.contains('chat-open'),
+    displays: SCREEN_DISPLAY_SELECTORS.map(sel => [sel, document.querySelector(sel).style.display]),
+    scrollY: window.scrollY,
+  };
+}
+function restoreScreen(snap){
+  currentTopTab = snap.tab;
+  Object.values(panels).forEach(p => p.classList.remove('active'));
+  navItems.forEach(n => n.classList.remove('active'));
+  document.querySelector(`.nav-item[data-tab="${snap.tab === null ? 'home' : snap.tab}"]`).classList.add('active');
+  if(snap.tab !== null) panels[snap.tab].classList.add('active');
+  snap.root.querySelectorAll('.active').forEach(el => { if(!snap.active.has(el)) el.classList.remove('active'); });
+  snap.active.forEach(el => el.classList.add('active'));
+  if(snap.roomId && CHAT_ROOMS[snap.roomId]) openChatRoom(snap.roomId, { noPush: true }); // 그 방의 뒤로가기 기록은 이미 밑에 있음
+  snap.displays.forEach(([sel, val]) => { document.querySelector(sel).style.display = val; });
+  document.body.classList.toggle('chat-open', snap.chatOpen);
+  if(snap.tab === null) renderHomeDash();
+  window.scrollTo(0, snap.scrollY);
+}
+function jumpToView(openFn){
+  const snap = snapshotScreen();
+  const opened = [];
+  const prevCollector = viewPushCollector;
+  viewPushCollector = opened;
+  try { openFn(); } finally { viewPushCollector = prevCollector; }
+  pushViewState(() => {
+    for(let i = opened.length - 1; i >= 0; i--){
+      try { opened[i](); } catch(err){ console.error('[뒤로가기] 화면 닫기 실패:', err); }
+    }
+    restoreScreen(snap);
+  });
+}
+
 navItems.forEach(item => {
   item.addEventListener('click', () => {
     switchTopTab(item.dataset.tab === 'home' ? null : item.dataset.tab);
@@ -10749,8 +10793,7 @@ function renderHomeAvailCard(){
 document.getElementById('homeAvailQuickBtn').addEventListener('click', () => openQuickAvail());
 document.getElementById('homeAvailCalBtn').addEventListener('click', () => switchTopTab('schedule'));
 document.getElementById('homePastApptBtn').addEventListener('click', () => {
-  switchTopTab('chat');
-  openPastAppointmentsView(null); // null = 모든 채팅방의 지난 약속
+  jumpToView(() => { showTab('chat'); openPastAppointmentsView(null); }); // null = 모든 채팅방의 지난 약속
 });
 // ---------- 홈: 답할 차례 ----------
 // 서버(/chats/pending)가 모든 방에서 "내가 답해야 할 것"(받은 예약 요청, 아직 투표 안 한 시간 제안)을 모아줌.
@@ -10939,8 +10982,7 @@ function renderHomePending(){
       const x = items[parseInt(btn.dataset.idx, 10)];
       if(!x) return;
       if(x.kind === 'friendRequest'){ switchTopTab('friends'); return; }
-      switchTopTab('chat');
-      openChatRoom(x.roomId);
+      jumpToView(() => { showTab('chat'); openChatRoom(x.roomId); });
     });
   });
 }
@@ -10983,8 +11025,7 @@ function renderHomeDash(){
       e.stopPropagation();
       const x = shown[parseInt(btn.dataset.idx, 10)];
       if(!x) return;
-      switchTopTab('chat');
-      openChatRoom(x.roomId);
+      jumpToView(() => { showTab('chat'); openChatRoom(x.roomId); });
       // 장소 정하기: 그 약속(핀)에 장소를 붙이는 기존 흐름 그대로 (채팅 + 메뉴의 '장소'와 같음)
       if(btn.dataset.act === 'place') addMeetPlace(x.room, x.roomId, x.pin);
     });
@@ -12265,8 +12306,7 @@ function renderMeetupDetail(){
   if(chatLinkBtn){
     chatLinkBtn.addEventListener('click', async () => {
       const roomId = await joinMeetupChatRoom(meetup);
-      showTab('chat');
-      openChatRoom(roomId);
+      jumpToView(() => { showTab('chat'); openChatRoom(roomId); });
     });
   }
 
@@ -20543,7 +20583,9 @@ document.getElementById('manageGroupsFromProfileBtn').addEventListener('click', 
 // ============================================================
 // 친구 그룹 관리 (인스타 "친한 친구"처럼 이름 붙여 만드는 그룹 - 목록/만들기/이름변경/멤버선택/삭제)
 // ============================================================
+let groupsOpenedFromProfile = false;
 function openFriendGroupsView(){
+  groupsOpenedFromProfile = document.getElementById('friendProfileView').classList.contains('active');
   renderFriendGroupsList();
   document.getElementById('friendsListView').classList.remove('active');
   document.getElementById('friendProfileView').classList.remove('active');
@@ -20554,7 +20596,14 @@ function openFriendGroupsView(){
 }
 function closeFriendGroupsView(){
   document.getElementById('friendGroupsView').classList.remove('active');
-  document.getElementById('friendsListView').classList.add('active');
+  const profileFriend = groupsOpenedFromProfile && FRIENDS.find(f => f.id === document.getElementById('friendGroupChipPicker').dataset.friendId);
+  if(profileFriend){
+    renderFriendGroupChipPicker(profileFriend); // 프로필에서 들어왔으면 프로필로 (그 사이 만든/지운 그룹도 반영)
+    document.getElementById('friendProfileView').classList.add('active');
+  } else {
+    document.getElementById('friendsListView').classList.add('active');
+  }
+  groupsOpenedFromProfile = false;
 }
 document.getElementById('openGroupsBtn').addEventListener('click', openFriendGroupsView);
 document.getElementById('groupsBackBtn').addEventListener('click', () => goBackOrClose(closeFriendGroupsView));
@@ -20670,12 +20719,14 @@ function renderHomeGroupCard(){
     </button>`).join('') + add;
 }
 function openGroupsFromHome(groupId){
-  switchTopTab('friends');
-  openFriendGroupsView();
-  if(groupId){ openFriendGroupDetail(groupId); return; }
-  const input = document.getElementById('newFriendGroupNameInput');
+  jumpToView(() => {
+    showTab('friends');
+    openFriendGroupsView();
+    if(groupId) openFriendGroupDetail(groupId);
+  });
+  if(groupId) return;
   document.getElementById('groupCreateBox').scrollIntoView({ block: 'start' });
-  input.focus();
+  document.getElementById('newFriendGroupNameInput').focus();
 }
 document.getElementById('homeGroupList').addEventListener('click', (e) => {
   const chip = e.target.closest('[data-home-group], [data-home-group-new]');
@@ -20683,8 +20734,7 @@ document.getElementById('homeGroupList').addEventListener('click', (e) => {
   openGroupsFromHome(chip.dataset.homeGroup || null);
 });
 document.getElementById('homeGroupManageBtn').addEventListener('click', () => {
-  switchTopTab('friends');
-  openFriendGroupsView();
+  jumpToView(() => { showTab('friends'); openFriendGroupsView(); });
 });
 
 let editingGroupId = null;
@@ -22523,8 +22573,7 @@ function openPersonProfile(user, context, viewPrefix){
       try {
         const data = await apiRequest('/chats/direct', { method: 'POST', body: JSON.stringify({ username: user.username }) });
         await loadChatRoomsFromServer();
-        showTab('chat');
-        openChatRoom(data.roomId);
+        jumpToView(() => { showTab('chat'); openChatRoom(data.roomId); });
       } catch(err){
         showToast(err.message);
       }
@@ -22534,8 +22583,7 @@ function openPersonProfile(user, context, viewPrefix){
       if(!CHAT_ROOMS['dm-' + user.id]){
         CHAT_ROOMS['dm-' + user.id] = { name: user.name, color: user.color, initial: user.name[0], avatar: avatarUrl(user), messages: [] };
       }
-      showTab('chat');
-      openChatRoom('dm-' + user.id);
+      jumpToView(() => { showTab('chat'); openChatRoom('dm-' + user.id); });
     };
   }
 
@@ -22699,16 +22747,14 @@ document.getElementById('profileChatBtn').addEventListener('click', async () => 
   }
 
   if(friend.id === DEMO_FRIEND.id){
-    showTab('chat');
-    openChatRoom('dm-demo-minji');
+    jumpToView(() => { showTab('chat'); openChatRoom('dm-demo-minji'); });
     return;
   }
 
   try {
     const data = await apiRequest('/chats/direct', { method: 'POST', body: JSON.stringify({ username: friend.username }) });
     await loadChatRoomsFromServer();
-    showTab('chat');
-    openChatRoom(data.roomId);
+    jumpToView(() => { showTab('chat'); openChatRoom(data.roomId); });
   } catch(err){
     showToast(err.message);
   }
@@ -28968,8 +29014,7 @@ function openGroupMemberProfile(member){
     document.getElementById('groupMemberChatBtn').addEventListener('click', async () => {
       try {
         const roomId = await resolveFriendRoomId(friend);
-        showTab('chat');
-        openChatRoom(roomId);
+        jumpToView(() => { showTab('chat'); openChatRoom(roomId); });
       } catch(err){
         showToast(err.message);
       }
@@ -29020,8 +29065,7 @@ function openChatRoomCounterpartProfile(){
     openStrangerProfileFromChat({ id: room.counterpartId, name: room.name, username: room.counterpartUsername, avatar: room.avatar, color: room.color });
     return;
   }
-  showTab('friends');
-  openFriendProfile(friend.id);
+  jumpToView(() => { showTab('friends'); openFriendProfile(friend.id); });
 }
 
 // 1:1 방은 상단 프로필을 눌러도 프로필로 넘어가지 않음 (그룹방만 멤버 목록 열기)
@@ -31376,8 +31420,7 @@ function showRoomAfterProposal(roomId){
     renderChatMessages();
     renderPinnedSchedule();
   } else {
-    switchTopTab('chat');
-    openChatRoom(roomId);
+    jumpToView(() => { showTab('chat'); openChatRoom(roomId); });
   }
 }
 // 1:1 방에서도 쓰이는데 예전엔 항상 "그룹에 제안했어요"라고 떠서 헷갈렸음
