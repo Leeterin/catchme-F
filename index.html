@@ -6338,6 +6338,34 @@
   }
   .group-chip-btn.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .group-chip-empty-hint{ font-size:11.5px; color:var(--text-dim); padding:4px 2px; line-height:1.5; }
+  /* 그룹 이모티콘 고르기 - 자주 쓰는 것 중에 누르거나, 옆 칸에 직접 넣기 */
+  .group-emoji-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(36px, 1fr)); gap:5px; }
+  .group-emoji-btn{
+    height:36px; border:1.5px solid var(--line); border-radius:10px; background:var(--surface);
+    font-size:18px; line-height:1; cursor:pointer; padding:0;
+  }
+  .group-emoji-btn.on{ border-color:var(--accent); background:var(--accent-soft); }
+  .group-create-box{ padding:14px; border:1px solid var(--line); border-radius:16px; background:var(--surface-2); margin-bottom:16px; }
+  .group-create-box > b{ display:block; font-size:14px; margin-bottom:10px; }
+  .group-create-sub{ display:block; margin:14px 0 0; font-size:12px; font-weight:700; color:var(--text); }
+  .group-create-sub span{ font-weight:400; color:var(--text-dim); }
+  .group-create-btn{
+    width:100%; margin-top:14px; padding:12px; border:none; border-radius:12px;
+    background:var(--accent); color:#fff; font-size:14px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .group-create-btn:disabled{ opacity:0.6; }
+  .group-emoji-field{ width:52px; flex-shrink:0; text-align:center; padding-left:0 !important; padding-right:0 !important; font-size:18px; }
+  /* 홈: 내 그룹 */
+  .home-group-list{ display:flex; flex-wrap:wrap; gap:6px; }
+  .home-group-chip{
+    display:inline-flex; align-items:center; gap:6px; max-width:100%;
+    padding:7px 12px 7px 9px; border:1px solid var(--line); border-radius:999px; background:var(--surface-2);
+    color:var(--text); font-size:13px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer;
+  }
+  .home-group-chip .em{ font-size:16px; line-height:1; }
+  .home-group-chip .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px; }
+  .home-group-chip small{ font-size:11.5px; font-weight:500; color:var(--text-dim); }
+  .home-group-chip.add{ border-style:dashed; background:none; color:var(--text-dim); padding-left:12px; }
 
   .friend-groups-view{ display:none; padding:6px 4px 4px; }
   .friend-groups-view.active{ display:block; }
@@ -7547,6 +7575,11 @@
         <button type="button" id="homeAvailCalBtn">캘린더에서 보기</button>
       </div>
     </div>
+    <!-- 내 그룹 - 친구 그룹을 홈에서 바로 보고, 눌러서 고치고, 새로 만들 수 있게 -->
+    <div class="home-card" id="homeGroupCard">
+      <div class="home-card-title"><span>내 그룹</span><button type="button" class="home-card-link" id="homeGroupManageBtn">관리</button></div>
+      <div class="home-group-list" id="homeGroupList"></div>
+    </div>
   </div>
 
   <!-- Calendar (홈 화면 메인 콘텐츠) -->
@@ -7908,22 +7941,19 @@
       <button class="profile-back" id="groupsBackBtn">&#8249; 뒤로</button>
       <h2 style="margin-bottom:4px;">친구 그룹</h2>
       <p class="desc" style="margin-bottom:14px;">그룹을 만들어서, 그 그룹에 속한 친구에게만 공개할 일정을 정할 수 있어요.</p>
-      <div class="mp-input-group">
-        <div style="display:flex;gap:8px;">
-          <input type="text" class="search-input" id="newFriendGroupNameInput" placeholder="새 그룹 이름 (예: 가족, 동네친구)" maxlength="20" style="flex:1;" />
-          <button type="button" class="add-friend-btn" id="createGroupBtn" style="width:44px;height:44px;flex-shrink:0;">+</button>
+      <!-- 새 그룹 만들기 - 이모티콘·이름을 정하고, 친구는 안 골라도 만들 수 있음 (나중에 그룹 안에서 넣으면 됨) -->
+      <div class="group-create-box" id="groupCreateBox">
+        <b>새 그룹 만들기</b>
+        <div class="group-emoji-grid" id="newGroupEmojiGrid"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <input type="text" class="search-input group-emoji-field" id="newFriendGroupEmojiInput" placeholder="👥" maxlength="16" aria-label="그룹 이모티콘 직접 넣기" />
+          <input type="text" class="search-input" id="newFriendGroupNameInput" placeholder="그룹 이름 (예: 가족, 동네친구)" maxlength="20" style="flex:1;" />
         </div>
+        <label class="group-create-sub">같이 넣을 친구 <span>(안 골라도 돼요. 나중에 넣을 수 있어요)</span></label>
+        <div class="group-chip-picker" id="newGroupMemberPicker"></div>
+        <button type="button" class="group-create-btn" id="createGroupBtn">그룹 만들기</button>
       </div>
       <div id="friendGroupsListContainer"></div>
-      <!-- 업무용 링크도 "누구에게 열까요?"에서 그룹처럼 고르니까, 이모티콘도 여기서 같이 정함 -->
-      <div class="mp-input-group" style="margin-top:18px;">
-        <label>업무용 링크 이모티콘 <span style="font-weight:400;color:var(--text-dim);">(업무용 링크에 연 시간에 붙어요)</span></label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input type="text" class="search-input" id="workEmojiInput" placeholder="💼" maxlength="16" style="width:52px;flex-shrink:0;text-align:center;padding-left:0;padding-right:0;" />
-          <span style="flex:1;font-size:13px;color:var(--text-dim);">업무용 링크</span>
-          <button type="button" class="search-add-btn" id="saveWorkEmojiBtn" style="flex-shrink:0;">저장</button>
-        </div>
-      </div>
     </div>
 
     <!-- 그룹 상세 (이름 변경 / 멤버 선택 / 삭제) -->
@@ -7932,6 +7962,7 @@
       <div class="friend-calendar-title" id="groupDetailTitle" style="margin-bottom:10px;">그룹</div>
       <div class="mp-input-group">
         <label>이모티콘 · 그룹 이름 <span style="font-weight:400;color:var(--text-dim);">(이모티콘은 캘린더의 예약 가능 시간에 붙어요)</span></label>
+        <div class="group-emoji-grid" id="groupEmojiGrid" style="margin-bottom:10px;"></div>
         <div style="display:flex;gap:8px;align-items:center;">
           <input type="text" class="search-input" id="groupEmojiInput" placeholder="👥" maxlength="16" style="width:52px;flex-shrink:0;text-align:center;padding-left:0;padding-right:0;" />
           <input type="text" class="search-input" id="renameGroupInput" placeholder="그룹 이름" maxlength="20" style="flex:1;" />
@@ -10610,6 +10641,8 @@ function showTab(tabKey){
       // 친구 프로필/검색 등 하위 화면이 열려있었다면 정리하고 항상 친구 목록(첫 화면)부터 보여줌
       document.getElementById('friendProfileView').classList.remove('active');
       document.getElementById('friendSearchView').classList.remove('active');
+      document.getElementById('friendGroupsView').classList.remove('active');
+      document.getElementById('friendGroupDetailView').classList.remove('active');
       document.getElementById('friendsListView').classList.add('active');
       renderFriendsList();
     }
@@ -10918,6 +10951,7 @@ function renderHomeDash(){
   renderHomeAvailCard();
   renderHomePlanCta();
   renderHomeFriendMatches();
+  renderHomeGroupCard();
   const items = homeUpcomingAppointments();
   if(!items.length){
     // 맨 위 버튼 이름이 상황에 따라 바뀌니(친구 추가하기/약속 잡기) 그 이름 그대로 안내
@@ -20106,6 +20140,7 @@ async function loadFriendsFromServer(){
       memberIds: Array.isArray(g.memberIds) ? g.memberIds : [],
     }));
     renderScheduleGroupFilterRow();
+    renderHomeGroupCard();
     resyncAllScheduleEvents(); // 예약 가능 이름에 그룹 이름/이모티콘이 붙어서 그룹을 받아온 뒤 다시 맞춤
     refreshActiveScheduleView();
     INCOMING_FRIEND_REQUESTS = requestsData.incoming.map(r => ({
@@ -20512,19 +20547,11 @@ function openFriendGroupsView(){
   renderFriendGroupsList();
   document.getElementById('friendsListView').classList.remove('active');
   document.getElementById('friendProfileView').classList.remove('active');
+  document.getElementById('friendGroupDetailView').classList.remove('active');
   document.getElementById('friendGroupsView').classList.add('active');
-  document.getElementById('workEmojiInput').value = settingsState.work_emoji && settingsState.work_emoji !== DEFAULT_WORK_EMOJI ? settingsState.work_emoji : '';
+  resetGroupCreateForm();
   pushViewState(closeFriendGroupsView);
 }
-document.getElementById('saveWorkEmojiBtn').addEventListener('click', () => {
-  const emoji = parseEmojiInput(document.getElementById('workEmojiInput').value);
-  if(emoji === null){ showToast('이모티콘은 하나만 넣어주세요.'); return; }
-  settingsState.work_emoji = emoji || DEFAULT_WORK_EMOJI;
-  saveSettingToServer('work_emoji');
-  resyncAllScheduleEvents();
-  refreshActiveScheduleView();
-  showToast(`업무용 링크 이모티콘을 ${settingsState.work_emoji}(으)로 정했어요.`);
-});
 function closeFriendGroupsView(){
   document.getElementById('friendGroupsView').classList.remove('active');
   document.getElementById('friendsListView').classList.add('active');
@@ -20551,21 +20578,113 @@ function renderFriendGroupsList(){
   });
 }
 
+// 그룹 이모티콘 - 자주 쓰는 것 중에 누르거나 옆 칸에 직접 넣음 (만들기/고치기 둘 다)
+const GROUP_EMOJI_PRESETS = ['👥', '👨‍👩‍👧', '❤️', '🏠', '🎓', '🏫', '🏢', '⚽', '🏀', '🎸', '🎮', '🍻', '☕', '🍜', '✈️', '📚', '🐶', '🌸', '⭐', '🔥'];
+function renderGroupEmojiGrid(gridId, inputId){
+  const current = String(document.getElementById(inputId).value || '').trim();
+  document.getElementById(gridId).innerHTML = GROUP_EMOJI_PRESETS.map(em =>
+    `<button type="button" class="group-emoji-btn${em === current ? ' on' : ''}" data-emoji="${em}" aria-label="${em}">${em}</button>`).join('');
+}
+[['newGroupEmojiGrid', 'newFriendGroupEmojiInput'], ['groupEmojiGrid', 'groupEmojiInput']].forEach(([gridId, inputId]) => {
+  document.getElementById(gridId).addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-emoji]');
+    if(!btn) return;
+    const input = document.getElementById(inputId);
+    input.value = input.value.trim() === btn.dataset.emoji ? '' : btn.dataset.emoji; // 같은 걸 또 누르면 해제 (기본 👥)
+    renderGroupEmojiGrid(gridId, inputId);
+  });
+  document.getElementById(inputId).addEventListener('input', () => renderGroupEmojiGrid(gridId, inputId));
+});
+
+// 새 그룹에 같이 넣을 친구 - 안 골라도 만들 수 있음
+let newGroupMemberIds = [];
+function groupableFriends(){ return FRIENDS.filter(f => f.id !== DEMO_FRIEND.id); }
+function renderNewGroupMemberPicker(){
+  const box = document.getElementById('newGroupMemberPicker');
+  const friends = groupableFriends();
+  box.innerHTML = friends.length
+    ? friends.map(f => `<button type="button" class="group-chip-btn${newGroupMemberIds.includes(f.id) ? ' on' : ''}" data-friend-id="${escapeHtml(f.id)}">${escapeHtml(f.name)}</button>`).join('')
+    : `<div class="group-chip-empty-hint">아직 친구가 없어도 그룹을 먼저 만들 수 있어요.</div>`;
+}
+document.getElementById('newGroupMemberPicker').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-friend-id]');
+  if(!chip) return;
+  const id = chip.dataset.friendId;
+  newGroupMemberIds = newGroupMemberIds.includes(id) ? newGroupMemberIds.filter(x => x !== id) : [...newGroupMemberIds, id];
+  chip.classList.toggle('on', newGroupMemberIds.includes(id));
+});
+function resetGroupCreateForm(){
+  document.getElementById('newFriendGroupNameInput').value = '';
+  document.getElementById('newFriendGroupEmojiInput').value = '';
+  newGroupMemberIds = [];
+  renderGroupEmojiGrid('newGroupEmojiGrid', 'newFriendGroupEmojiInput');
+  renderNewGroupMemberPicker();
+}
+
 document.getElementById('createGroupBtn').addEventListener('click', async () => {
   const input = document.getElementById('newFriendGroupNameInput');
   const name = input.value.trim();
-  if(!name){ showToast('그룹 이름을 입력해주세요.'); return; }
+  if(!name){ showToast('그룹 이름을 입력해주세요.'); input.focus(); return; }
+  const emoji = parseEmojiInput(document.getElementById('newFriendGroupEmojiInput').value);
+  if(emoji === null){ showToast('이모티콘은 하나만 넣어주세요.'); return; }
   if(!authToken) return;
+  const btn = document.getElementById('createGroupBtn');
+  btn.disabled = true;
   try {
-    const data = await apiRequest('/friends/groups', { method: 'POST', body: JSON.stringify({ name }) });
-    MY_GROUPS.push({ id: data.group.id, name: data.group.name, emoji: data.group.emoji || null, createdAt: data.group.createdAt, memberIds: data.group.memberIds || [] });
+    const data = await apiRequest('/friends/groups', { method: 'POST', body: JSON.stringify({ name, emoji }) });
+    const group = { id: data.group.id, name: data.group.name, emoji: data.group.emoji || null, createdAt: data.group.createdAt, memberIds: data.group.memberIds || [] };
+    MY_GROUPS.push(group);
+    const memberIds = newGroupMemberIds.filter(id => FRIENDS.some(f => f.id === id));
+    let memberFailed = false;
+    if(memberIds.length){
+      try {
+        await apiRequest(`/friends/groups/${group.id}/members`, { method: 'PUT', body: JSON.stringify({ friendIds: memberIds }) });
+        group.memberIds = memberIds;
+        FRIENDS.forEach(f => { if(memberIds.includes(f.id)) f.groupIds = [...(f.groupIds || []), group.id]; });
+      } catch(_){ memberFailed = true; } // 그룹은 만들어졌으니 친구는 그룹 안에서 다시 넣으면 됨
+    }
     renderScheduleGroupFilterRow();
-    input.value = '';
+    resetGroupCreateForm();
     renderFriendGroupsList();
-    showToast(`"${name}" 그룹을 만들었어요.`);
+    renderHomeGroupCard();
+    showToast(memberFailed ? `"${name}" 그룹은 만들었는데 친구를 넣지 못했어요. 그룹을 눌러 다시 넣어주세요.` : `"${name}" 그룹을 만들었어요.`);
   } catch(err){
     showToast(err.message);
+  } finally {
+    btn.disabled = false;
   }
+});
+
+// 홈: 내 그룹 - 누르면 그 그룹 화면, "+ 새 그룹"은 만들기 칸으로
+function renderHomeGroupCard(){
+  const list = document.getElementById('homeGroupList');
+  if(!list) return;
+  const add = `<button type="button" class="home-group-chip add" data-home-group-new>+ 새 그룹</button>`;
+  if(!MY_GROUPS.length){
+    list.innerHTML = `<div class="home-empty" style="width:100%;">그룹을 만들면 그 그룹 친구에게만 일정이나 예약 가능 시간을 열 수 있어요.</div>${add}`;
+    return;
+  }
+  list.innerHTML = MY_GROUPS.map(g => `
+    <button type="button" class="home-group-chip" data-home-group="${escapeHtml(g.id)}">
+      <span class="em">${escapeHtml(groupEmojiOf(g))}</span><span class="nm">${escapeHtml(g.name)}</span><small>${g.memberIds.length}명</small>
+    </button>`).join('') + add;
+}
+function openGroupsFromHome(groupId){
+  switchTopTab('friends');
+  openFriendGroupsView();
+  if(groupId){ openFriendGroupDetail(groupId); return; }
+  const input = document.getElementById('newFriendGroupNameInput');
+  document.getElementById('groupCreateBox').scrollIntoView({ block: 'start' });
+  input.focus();
+}
+document.getElementById('homeGroupList').addEventListener('click', (e) => {
+  const chip = e.target.closest('[data-home-group], [data-home-group-new]');
+  if(!chip) return;
+  openGroupsFromHome(chip.dataset.homeGroup || null);
+});
+document.getElementById('homeGroupManageBtn').addEventListener('click', () => {
+  switchTopTab('friends');
+  openFriendGroupsView();
 });
 
 let editingGroupId = null;
@@ -20576,6 +20695,7 @@ function openFriendGroupDetail(groupId){
   document.getElementById('groupDetailTitle').textContent = group.name;
   document.getElementById('renameGroupInput').value = group.name;
   document.getElementById('groupEmojiInput').value = group.emoji || '';
+  renderGroupEmojiGrid('groupEmojiGrid', 'groupEmojiInput');
   renderGroupMemberCheckList(group);
 
   document.getElementById('friendGroupsView').classList.remove('active');
@@ -20586,6 +20706,7 @@ function closeFriendGroupDetailView(){
   document.getElementById('friendGroupDetailView').classList.remove('active');
   document.getElementById('friendGroupsView').classList.add('active');
   renderFriendGroupsList();
+  renderHomeGroupCard(); // 멤버 수/이름/이모티콘이 바뀌었을 수 있음
 }
 document.getElementById('groupDetailBackBtn').addEventListener('click', () => goBackOrClose(closeFriendGroupDetailView));
 
@@ -20650,6 +20771,7 @@ document.getElementById('renameGroupBtn').addEventListener('click', async () => 
     await apiRequest(`/friends/groups/${group.id}`, { method: 'PATCH', body: JSON.stringify({ name, emoji }) });
     resyncAllScheduleEvents(); // 캘린더의 예약 가능 이름에 붙은 그룹 이름/이모티콘도 바로 바뀌게
     refreshActiveScheduleView();
+    renderHomeGroupCard();
     showToast('그룹을 저장했어요.');
   } catch(err){
     group.name = previous; // 실패하면 되돌림
@@ -20657,6 +20779,7 @@ document.getElementById('renameGroupBtn').addEventListener('click', async () => 
     document.getElementById('groupDetailTitle').textContent = previous;
     document.getElementById('renameGroupInput').value = previous;
     document.getElementById('groupEmojiInput').value = previousEmoji || '';
+    renderGroupEmojiGrid('groupEmojiGrid', 'groupEmojiInput');
     showToast(err.message);
   }
 });
@@ -20669,6 +20792,7 @@ document.getElementById('deleteGroupBtn').addEventListener('click', async () => 
     await apiRequest(`/friends/groups/${group.id}`, { method: 'DELETE' });
     MY_GROUPS = MY_GROUPS.filter(g => g.id !== group.id);
     renderScheduleGroupFilterRow();
+    renderHomeGroupCard();
     FRIENDS.forEach(f => { f.groupIds = (f.groupIds || []).filter(id => id !== group.id); });
     // 이 그룹으로 공개돼있던 로컬 일정들에서 이 그룹만 빼줌 (다른 그룹이 같이 걸려있었으면 그건 그대로 유지 - 서버도 똑같이 처리함)
     SCHEDULE_EVENTS.forEach(ev => {
