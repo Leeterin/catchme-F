@@ -6257,6 +6257,9 @@
   .travel-head{ display:flex; align-items:center; gap:8px; }
   .travel-min{ font-size:17px; font-weight:800; color:var(--text); }
   .travel-depart{ font-size:12.5px; color:var(--text-dim); flex:1; }
+  .travel-depart-btn{ position:relative; display:inline-flex; align-items:center; gap:4px; height:30px; padding:0 10px; border-radius:9px; border:1px solid var(--accent); background:var(--surface); color:var(--accent); font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  .travel-depart-btn input{ position:absolute; inset:0; width:100%; height:100%; opacity:0; border:0; cursor:pointer; }
+  .travel-depart-note{ font-size:12px; color:var(--text-dim); flex:1; min-width:0; }
   .travel-adj{ width:30px; height:30px; border-radius:9px; border:1px solid var(--line); background:var(--surface); color:var(--text); font-size:15px; font-weight:700; cursor:pointer; }
   .travel-route{ margin-top:6px; font-size:12px; color:var(--text-dim); line-height:1.5; }
   .travel-route b{ color:var(--text); font-weight:600; }
@@ -17106,11 +17109,13 @@ function travelRouteLinkHtml(travel, date, startMin){
   const url = travelRouteUrl(travel);
   if(!url) return '';
   const depart = travelDepartLabel(date, startMin, travel.minutes);
-  return `<a class="travel-map-link" href="${escapeHtml(url)}" target="_blank" rel="noopener"${depart ? ` data-depart="${escapeHtml(depart)}"` : ''}>카카오맵에서 경로 보기${depart ? ` · ${escapeHtml(depart)} 출발` : ''} &#8250;</a>`;
+  return `<a class="travel-map-link" href="${escapeHtml(url)}" target="_blank" rel="noopener" data-mode="${travel.mode === 'car' ? 'car' : 'transit'}"${depart ? ` data-depart="${escapeHtml(depart)}"` : ''}>카카오맵에서 경로 보기${depart ? ` · ${escapeHtml(depart)} 출발` : ''} &#8250;</a>`;
 }
-function openTravelRoute(url, depart){
+function openTravelRoute(url, depart, mode){
   if(!depart){ openMapUrl(url); return; }
-  showToast(`카카오맵에서 출발 시간을 맞춰주세요 · ${depart} 출발`, 4500);
+  // 카카오맵 화면에서 시간 바꾸는 곳 - 자동차는 "미래 운행 정보"(시계 버튼), 대중교통은 경로 위 날짜·시간
+  const where = mode === 'car' ? '경로 화면의 시계(미래 운행 정보)' : '경로 위 날짜·시간';
+  showToast(`카카오맵 ${where}를 눌러 ${depart} 출발로 맞춰주세요`, 5000);
   const cap = window.Capacitor;
   const isNative = cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
   // 앱에선 안내를 읽을 틈을 주고 카카오맵으로 넘어감 (웹은 늦게 열면 팝업 차단돼서 바로 엶)
@@ -17122,7 +17127,7 @@ document.addEventListener('click', (e) => {
   if(!a) return;
   e.preventDefault();
   e.stopImmediatePropagation();
-  openTravelRoute(a.href, a.dataset.depart);
+  openTravelRoute(a.href, a.dataset.depart, a.dataset.mode);
 }, true);
 function setTravelEnabled(on){
   try { localStorage.setItem('catchme_travel_time', on ? 'on' : 'off'); } catch(_){}
@@ -17239,7 +17244,8 @@ function renderTravelSection(){
   else if(t.source === 'loading') head = `<span class="travel-depart">이동시간 계산 중...</span>`;
   else head = `
     <span class="travel-min">${TRAVEL_MODES[mode].icon} ${t.minutes}분</span>
-    <span class="travel-depart">${hm(travelFormStartMin() - t.minutes)} 출발 기준${t.source === 'fallback' ? ' · 대략적인 시간' : ''}</span>
+    <label class="travel-depart-btn" aria-label="출발 시간 설정">🕒 ${hm(travelFormStartMin() - t.minutes)} 출발<input type="time" id="travelDepartInput" value="${hm(travelFormStartMin() - t.minutes)}" /></label>
+    <span class="travel-depart-note">${t.source === 'fallback' ? '대략적인 시간' : t.source === 'manual' ? '직접 정한 시간' : ''}</span>
     <button type="button" class="travel-adj" data-adj="-5" aria-label="5분 줄이기">−</button>
     <button type="button" class="travel-adj" data-adj="5" aria-label="5분 늘리기">+</button>`;
   const nightNote = t.night && t.source !== 'loading' && t.from && t.to ? `<div class="travel-route">새벽이라 지하철·버스가 거의 없어요. 자동차로 바꿔 보세요.</div>` : '';
@@ -17256,6 +17262,17 @@ function renderTravelSection(){
     formTravel.source = 'manual';
     renderTravelSection();
   }));
+  // 출발 시간 설정 - 고른 시각에 출발해서 일정 시작에 도착하도록 이동시간을 맞춤 (시작보다 늦으면 전날 출발로 봄)
+  const departInput = document.getElementById('travelDepartInput');
+  if(departInput) departInput.addEventListener('change', () => {
+    if(!departInput.value) return;
+    const [h, m] = departInput.value.split(':').map(Number);
+    const mins = (((travelFormStartMin() - (h * 60 + (m || 0))) % 1440) + 1440) % 1440;
+    if(mins > 600){ showToast('이동시간은 10시간까지만 넣을 수 있어요.'); renderTravelSection(); return; }
+    formTravel.minutes = mins;
+    formTravel.source = 'manual';
+    renderTravelSection();
+  });
   document.getElementById('travelRemoveBtn').addEventListener('click', () => {
     formTravel = null;
     renderTravelSection();
@@ -19784,7 +19801,7 @@ function renderWeekView(){
       const routeUrl = travelRouteUrl(ev.travel);
       if(routeUrl){
         tb.classList.add('has-route');
-        tb.addEventListener('click', (e) => { e.stopPropagation(); openTravelRoute(routeUrl, travelDepartLabel(d, r.startMin, tm)); });
+        tb.addEventListener('click', (e) => { e.stopPropagation(); openTravelRoute(routeUrl, travelDepartLabel(d, r.startMin, tm), ev.travel.mode); });
       }
       body.appendChild(tb);
     });
