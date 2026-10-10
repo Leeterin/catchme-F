@@ -29191,10 +29191,6 @@ function openQuickAvail(){
     QUICK_AVAIL_DOWS.forEach(dow => { pattern[dow] = quickCloneRanges(initial[dow]); });
     quickAvailTabs[tb.key] = { initial, pattern, stash: {} };
   });
-  // 아직 하나도 안 열어봤으면 많이들 고르는 시간(평일 저녁 + 주말 오후)을 친구·업무용 탭에 미리 골라둠 - 그대로 "열어두기"만 눌러도 됨
-  if(!SCHEDULE_EVENTS.some(e => e.type === 'available')){
-    ['friends', 'work'].forEach(k => QUICK_AVAIL_GROUPS.forEach(g => g.dows.forEach(dow => { quickAvailTabs[k].pattern[dow] = [{ ...g.def }]; })));
-  }
   selectQuickTab(quickAvailTabs[quickAvailTab] ? quickAvailTab : 'friends');
   quickAvailBusy = quickAvailBusyPattern();
   quickAvailInfo = null;
@@ -30145,7 +30141,18 @@ function endQuickDrag(e){
   const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
   if(isTap){
     const min = quickMinAt(dr.track, e.clientX);
-    if(quickBusyAt(dow, min).length){
+    const busyHere = quickBusyAt(dow, min);
+    // 겹쳐도 예약 받는 일정·그날만 있는 일정 위는 빈 곳처럼 누르면 시간이 들어감 (막대 위면 시간 고르기) - 매주 일정 위만 설명을 보여줌
+    if(!busyHere.some(quickBusyWeekly)){
+      quickAvailInfo = null;
+      if(!dr.tap){ quickAvailEdit = { dow, idx: dr.idx }; renderQuickAvail(); return; }
+      if(quickAvailAddRange(dr.row, min)){
+        const b = busyHere[0];
+        if(b) showToast(`${b.title} · ${b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : '그날만 이 시간은 빼고 열어요'}`);
+        return;
+      }
+    }
+    if(busyHere.length){
       // 같은 곳을 다시 누르면 설명을 닫음
       const ids = m => quickBusyAt(dow, m).map(b => quickAvailBusy[dow].indexOf(b)).join();
       const same = quickAvailInfo && quickAvailInfo.dow === dow && ids(quickAvailInfo.min) === ids(min);
