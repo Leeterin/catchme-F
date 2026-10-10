@@ -12770,10 +12770,10 @@ function renderFeedPosts(){
 }
 renderFeedPosts();
 
-// 내가 ⭐ 저장한 글 - 음식점/카페/체험 전부에서 모으고, 검색어·정렬은 목록과 똑같이 적용.
+// 내가 ⭐ 저장한 장소 - 음식점/카페/체험 전부에서 모으고, 검색어·정렬은 목록과 똑같이 적용. 장소마다 대표 글 하나씩.
 // 일부러 먼 곳도 저장해두니까 위치 반경 필터는 적용하지 않음
 function getFeedSavedPosts(q){
-  return ['food', 'cafe', 'experience']
+  return uniqueFeedPlaces(['food', 'cafe', 'experience']
     .flatMap(cat => FEED_POSTS[cat] || [])
     .filter(p => p.savedByMe)
     .filter(p => !q || [p.title, p.location, p.address].some(v => (v || '').toLowerCase().includes(q)))
@@ -12781,39 +12781,50 @@ function getFeedSavedPosts(q){
       if(feedSortMode === 'popular') return (b.likeCount || 0) - (a.likeCount || 0);
       if(feedSortMode === 'rating') return (b.rating || 0) - (a.rating || 0);
       return new Date(b.createdAt) - new Date(a.createdAt);
-    });
+    }));
 }
-// '저장' 칩을 골랐을 때의 목록 - 장소 모아보기/내 리뷰와 같은 그리드·리스트 보기
+// '저장' 칩을 골랐을 때의 목록 - 리뷰가 아니라 저장한 장소를 한 줄씩 보여주고, 누르면 그 장소의 글 모아보기로 감
 function renderFeedSavedView(container, q){
-  const posts = getFeedSavedPosts(q);
+  const places = getFeedSavedPosts(q);
+  const allPosts = ['food', 'cafe', 'experience'].flatMap(cat => FEED_POSTS[cat] || []);
   const header = document.createElement('div');
   header.className = 'feed-saved-header';
-  header.innerHTML = `
-    <div class="feed-saved-title">저장한 곳 <b>${posts.length}</b></div>
-    <div class="feed-tag-view-toggle">
-      <button type="button" class="feed-tag-view-btn${feedTagViewMode === 'grid' ? ' active' : ''}" data-view="grid" title="그리드로 보기">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      </button>
-      <button type="button" class="feed-tag-view-btn${feedTagViewMode === 'list' ? ' active' : ''}" data-view="list" title="세로로 보기">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
-      </button>
-    </div>
-  `;
-  header.querySelectorAll('.feed-tag-view-btn').forEach(btn => btn.addEventListener('click', () => {
-    if(btn.dataset.view === feedTagViewMode) return;
-    feedTagViewMode = btn.dataset.view;
-    // 장소 모아보기/작성자 화면의 전환 버튼도 같은 보기 방식으로 맞춤
-    document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn, #feedAuthorViewToggle .feed-tag-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === feedTagViewMode));
-    renderFeedPosts();
-  }));
+  header.innerHTML = `<div class="feed-saved-title">저장한 장소 <b>${places.length}</b></div>`;
   container.appendChild(header);
   const body = document.createElement('div');
   container.appendChild(body);
-  renderFeedPostCollection(body, posts, {
-    emptyText: q
-      ? `"${feedSearchQuery}"에 대한 저장한 곳이 없어요.`
-      : '아직 저장한 곳이 없어요. 글을 열고 ☆을 눌러 가보고 싶은 곳을 저장해보세요.',
-    showPlace: true,
+  if(places.length === 0){
+    body.innerHTML = `<div class="search-empty">${q
+      ? `"${escapeHtml(feedSearchQuery)}"에 대한 저장한 장소가 없어요.`
+      : '아직 저장한 장소가 없어요. 장소에서 ☆을 눌러 가보고 싶은 곳을 저장해보세요.'}</div>`;
+    return;
+  }
+  body.className = 'feed-tag-list';
+  places.forEach(primary => {
+    const key = feedPlaceKey(primary);
+    const reviews = allPosts.filter(p => feedPlaceKey(p) === key);
+    const ratings = reviews.map(p => p.rating).filter(r => typeof r === 'number');
+    const avg = ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : null;
+    const cover = reviews.map(p => p.photos && p.photos[0]).find(Boolean) || '';
+    const addr = primary.address || primary.location || '';
+    const row = document.createElement('div');
+    row.className = 'feed-tag-list-row';
+    row.innerHTML = `
+      <div class="feed-tag-list-thumb">${cover ? `<img loading="lazy" src="${cover}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
+      <div class="feed-tag-list-body">
+        <div class="feed-tag-list-author">${escapeHtml(primary.title || '')}</div>
+        ${avg !== null ? `<div class="feed-tag-list-rating">${renderStarsHtml(avg)} ${avg.toFixed(1)}</div>` : ''}
+        <div class="feed-tag-list-note">${addr ? escapeHtml(addr) + ' · ' : ''}리뷰 ${reviews.length}개</div>
+      </div>
+      <button type="button" class="feed-post-btn star saved" title="저장 해제" style="align-self:center;flex-shrink:0;">${ICO.starFilled}</button>
+    `;
+    row.querySelector('.star').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSavedPlace(primary.category, primary);
+      showToast('장소 저장을 취소했어요.');
+    });
+    row.addEventListener('click', () => openFeedPlaceTagView(primary.title));
+    body.appendChild(row);
   });
 }
 
@@ -12959,7 +12970,7 @@ function feedPostDetailHtml(post){
       <button type="button" class="feed-meet-place-btn">${ICO.pin}<span>약속 장소로 선택</span></button>
 
       <div class="feed-detail-mini-actions">
-        <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
+        <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="이 장소 저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
         <button type="button" class="feed-detail-mini-btn feed-share-btn" title="채팅방에 보내기">${ICO.send}</button>
       </div>
 
@@ -13016,14 +13027,14 @@ function wireFeedPostDetail(container, post){
     kebabMenu.classList.toggle('open');
   });
 
-  // 저장(나중에 가볼 곳) 토글
+  // 이 리뷰의 장소를 저장(나중에 가볼 곳) 토글 - 리뷰가 아니라 장소가 저장됨
   const saveBtn = container.querySelector('.feed-save-btn');
   saveBtn.addEventListener('click', () => {
     toggleSavedPlace(activeFeedCategory, post);
     const nowSaved = isPlaceSaved(activeFeedCategory, post);
     saveBtn.classList.toggle('active', nowSaved);
     saveBtn.innerHTML = nowSaved ? ICO.starFilled : ICO.starOutline;
-    showToast(nowSaved ? '저장했어요.' : '저장을 취소했어요.');
+    showToast(nowSaved ? '장소를 저장했어요.' : '장소 저장을 취소했어요.');
   });
 
   // 친구한테 메시지로 전송
@@ -13751,11 +13762,24 @@ function openFeedPlaceTagView(placeName){
   // 실주소/전화/길찾기/공유 - 이 장소로 올라온 글 중 대표(가장 최근) 글의 정보를 씀
   const placeInfoEl = document.getElementById('feedTagPlaceInfo');
   const primaryPost = posts[0] || null;
-  placeInfoEl.innerHTML = primaryPost ? buildPlaceInfoRowHtml(primaryPost) : '';
+  placeInfoEl.innerHTML = primaryPost ? buildPlaceInfoRowHtml(primaryPost) + '<button type="button" class="feed-post-btn star feed-tag-save-btn" style="margin-top:8px;width:auto;padding:8px 14px;display:inline-flex;align-items:center;gap:6px;"></button>' : '';
   if(primaryPost){
     const addrEl = placeInfoEl.querySelector('.feed-place-info-addr');
     if(addrEl) addrEl.addEventListener('click', (e) => { e.stopPropagation(); openPlaceDetailMap(primaryPost); });
     wirePlaceInfoRow(placeInfoEl, primaryPost);
+    // 이 장소 저장(⭐ 나중에 가볼 곳)
+    const saveBtn = placeInfoEl.querySelector('.feed-tag-save-btn');
+    const paintSave = () => {
+      const saved = isPlaceSaved(primaryPost.category, primaryPost);
+      saveBtn.classList.toggle('saved', saved);
+      saveBtn.innerHTML = `${saved ? ICO.starFilled : ICO.starOutline} ${saved ? '저장한 장소' : '장소 저장'}`;
+    };
+    paintSave();
+    saveBtn.addEventListener('click', () => {
+      toggleSavedPlace(primaryPost.category, primaryPost);
+      paintSave();
+      showToast(isPlaceSaved(primaryPost.category, primaryPost) ? '장소를 저장했어요.' : '장소 저장을 취소했어요.');
+    });
   }
 
   feedTagCurrentPosts = posts;
@@ -22682,34 +22706,45 @@ function scheduleChatCacheSave(roomId){
 const AUTO_REPLIES = ['오 좋아요!', '넵 확인했어요', '그때 봐요 :)', '조금만 기다려주세요'];
 
 // ---------- 예약 확정 시 장소 저장/핫플 추천 (⭐ 저장 목록) ----------
-// 저장 여부는 서버에 남음(게시물의 savedByMe) - 예전엔 앱 메모리에만 있어서 앱을 껐다 켜면 사라졌음.
+// 리뷰가 아니라 "장소"를 저장함 - 서버가 리뷰마다 savedByMe(그 리뷰의 장소를 내가 저장했는지)를 내려줌.
 // category 인자는 예전 호출부와 모양을 맞추려고 남겨둔 것 (이제 게시물 자체로 판단)
+// 같은 장소인지: 서버 장소 id(placeId)가 같으면 같은 곳, 없으면(옛 글) 이름으로 판단
+function feedPlaceKey(post){
+  return post.placeId || ('t:' + (post.title || '').trim().toLowerCase());
+}
+// 저장 목록에 같은 장소가 리뷰 수만큼 반복되지 않게 장소마다 하나(앞에 있는 글)만 남김
+function uniqueFeedPlaces(posts){
+  const seen = new Set();
+  return posts.filter(p => { const k = feedPlaceKey(p); if(seen.has(k)) return false; seen.add(k); return true; });
+}
 function savedPostsOf(category){
-  return (FEED_POSTS[category] || []).filter(p => p.savedByMe);
+  return uniqueFeedPlaces((FEED_POSTS[category] || []).filter(p => p.savedByMe));
 }
 function isPlaceSaved(category, post){
   return !!(post && post.savedByMe);
 }
-// 같은 게시물이 목록/장소 모아보기 등에 따로 들고 있는 복사본까지 같이 맞춤
-function setPostSavedEverywhere(postId, saved, extra){
-  Object.values(FEED_POSTS).forEach(list => (list || []).forEach(p => { if(p.id === postId) p.savedByMe = saved; }));
-  feedTagCurrentPosts.forEach(p => { if(p.id === postId) p.savedByMe = saved; });
+// 같은 장소의 리뷰들(목록/장소 모아보기 등에 따로 들고 있는 복사본 포함)을 전부 같이 맞춤
+function setPostSavedEverywhere(placeKey, saved, extra){
+  Object.values(FEED_POSTS).forEach(list => (list || []).forEach(p => { if(feedPlaceKey(p) === placeKey) p.savedByMe = saved; }));
+  feedTagCurrentPosts.forEach(p => { if(feedPlaceKey(p) === placeKey) p.savedByMe = saved; });
   if(extra) extra.savedByMe = saved;
 }
 function toggleSavedPlace(category, post){
   if(!post || !post.id) return;
   const next = !post.savedByMe;
-  setPostSavedEverywhere(post.id, next, post); // 화면은 바로 바뀌게 먼저 반영하고, 서버 저장이 실패하면 되돌림
+  const placeKey = feedPlaceKey(post);
+  setPostSavedEverywhere(placeKey, next, post); // 화면은 바로 바뀌게 먼저 반영하고, 서버 저장이 실패하면 되돌림
   if(feedShowSaved) renderFeedPosts();
   apiRequest(`/feed/${post.id}/save`, { method: 'POST' })
     .then(data => {
       if(data && typeof data.saved === 'boolean' && data.saved !== next){
-        setPostSavedEverywhere(post.id, data.saved, post);
+        setPostSavedEverywhere(placeKey, data.saved, post);
+        if(feedShowSaved) renderFeedPosts();
         renderSavedPlacesGroups();
       }
     })
     .catch(err => {
-      setPostSavedEverywhere(post.id, !next, post);
+      setPostSavedEverywhere(placeKey, !next, post);
       if(feedShowSaved) renderFeedPosts();
       renderSavedPlacesGroups();
       showToast(err.message || '저장하지 못했어요. 잠시 후 다시 시도해주세요.');
