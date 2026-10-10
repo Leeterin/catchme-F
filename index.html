@@ -6270,9 +6270,10 @@
   .travel-map-link{ display:inline-block; margin-left:6px; color:var(--accent); font-size:12px; font-weight:700; text-decoration:none; white-space:nowrap; }
   .week-cal-block.travel.has-route{ cursor:pointer; }
   /* 일주일 보기 - 요일 아래 메모 줄 */
-  .week-cal-memo{ flex-shrink:0; height:28px; margin:0 1px 2px; padding:2px 3px; border-radius:5px; font-size:9.5px; font-weight:700; line-height:12px; color:#78350F; background:#FEF3C7; border:1px solid #FDE68A; overflow:hidden; word-break:keep-all; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; cursor:pointer; box-sizing:border-box; }
+  .week-cal-memo{ flex-shrink:0; height:30px; margin:0 1px; display:flex; flex-direction:column; box-sizing:border-box; }
   .week-cal-memo.empty{ visibility:hidden; }
-  body.dark-mode .week-cal-memo{ color:#FDE68A; background:rgba(253,230,138,0.12); border-color:rgba(253,230,138,0.3); }
+  .week-cal-memo-item{ flex-shrink:0; height:28px; margin-bottom:2px; padding:2px 3px; border-radius:5px; font-size:9.5px; font-weight:700; line-height:12px; color:#78350F; background:#FEF3C7; border:1px solid #FDE68A; overflow:hidden; word-break:keep-all; overflow-wrap:anywhere; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; cursor:pointer; box-sizing:border-box; }
+  body.dark-mode .week-cal-memo-item{ color:#FDE68A; background:rgba(253,230,138,0.12); border-color:rgba(253,230,138,0.3); }
   /* 캘린더 - 일정 바로 앞 이동시간 칸 */
   .week-cal-block.travel{
     background:repeating-linear-gradient(135deg, rgba(148,163,184,0.28) 0 5px, rgba(148,163,184,0.12) 5px 10px) !important;
@@ -16391,7 +16392,7 @@ function renderDayView(){
       </div>
       <div class="day-event-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</div>
       <div class="day-event-title">${escapeHtml(ev.title)}</div>
-      ${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<div class="day-event-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${ev.travel.to && ev.travel.to.name ? ` · ${escapeHtml(ev.travel.to.name)}` : ''}${travelRouteLinkHtml(ev.travel)}</div>` : ''}
+      ${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<div class="day-event-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${ev.travel.to && ev.travel.to.name ? ` · ${escapeHtml(ev.travel.to.name)}` : ''}${travelRouteLinkHtml(ev.travel, scheduleFocusDate, disp.startMin)}</div>` : ''}
       <div class="day-event-extras">${eventPlaceNoteHtml(ev)}</div>
       <div class="day-event-tags">
         ${visibilityButtonsHtml(ev.visibility, 'day-event-tag')}
@@ -17091,10 +17092,38 @@ function travelRouteUrl(travel){
   const pt = p => `${encodeURIComponent((p.name || '').replace(/,/g, ' '))},${p.lat},${p.lon}`;
   return `https://map.kakao.com/link/by/${travel.mode === 'car' ? 'car' : 'traffic'}/${pt(travel.from)}/${pt(travel.to)}`;
 }
-function travelRouteLinkHtml(travel){
-  const url = travelRouteUrl(travel);
-  return url ? `<a class="travel-map-link" href="${escapeHtml(url)}" target="_blank" rel="noopener">카카오맵에서 경로 보기 &#8250;</a>` : '';
+// 출발 날짜·시각 글자 "10/12(일) 15:20" - 일정 날짜(date)와 시작 분(startMin)에서 이동시간을 뺀 시각 (자정 전이면 전날로)
+function travelDepartLabel(date, startMin, minutes){
+  if(!date || typeof startMin !== 'number' || typeof minutes !== 'number') return '';
+  const total = startMin - minutes;
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate() + Math.floor(total / 1440));
+  const min = ((total % 1440) + 1440) % 1440;
+  return `${day.getMonth()+1}/${day.getDate()}(${WEEKDAY_KO[day.getDay()]}) ${minutesToLabel(min)}`;
 }
+// 카카오맵은 링크로 출발 시각을 받지 않아서(출발지·도착지·수단만 받음), 경로 보기 링크에 설정한 출발 시각을 붙여 두고
+// 누르면 그 시각으로 맞추라고 알려줌 - date/startMin을 넘기면 출발 시각을 같이 보여줌
+function travelRouteLinkHtml(travel, date, startMin){
+  const url = travelRouteUrl(travel);
+  if(!url) return '';
+  const depart = travelDepartLabel(date, startMin, travel.minutes);
+  return `<a class="travel-map-link" href="${escapeHtml(url)}" target="_blank" rel="noopener"${depart ? ` data-depart="${escapeHtml(depart)}"` : ''}>카카오맵에서 경로 보기${depart ? ` · ${escapeHtml(depart)} 출발` : ''} &#8250;</a>`;
+}
+function openTravelRoute(url, depart){
+  if(!depart){ openMapUrl(url); return; }
+  showToast(`카카오맵에서 출발 시간을 맞춰주세요 · ${depart} 출발`, 4500);
+  const cap = window.Capacitor;
+  const isNative = cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
+  // 앱에선 안내를 읽을 틈을 주고 카카오맵으로 넘어감 (웹은 늦게 열면 팝업 차단돼서 바로 엶)
+  if(isNative) setTimeout(() => openMapUrl(url), 1200);
+  else openMapUrl(url);
+}
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a.travel-map-link[data-depart]');
+  if(!a) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  openTravelRoute(a.href, a.dataset.depart);
+}, true);
 function setTravelEnabled(on){
   try { localStorage.setItem('catchme_travel_time', on ? 'on' : 'off'); } catch(_){}
 }
@@ -17218,7 +17247,7 @@ function renderTravelSection(){
     <div class="travel-head">${head}</div>
     ${nightNote}
     <div class="travel-foot">
-      ${travelRouteLinkHtml({ ...t, mode })}
+      ${travelRouteLinkHtml({ ...t, mode }, travelFormDate(), travelFormStartMin())}
       <button type="button" class="travel-remove" id="travelRemoveBtn">이동시간 빼기</button>
     </div>
   `;
@@ -19566,7 +19595,13 @@ function renderWeekView(){
   // 이번 주에 메모가 있으면 요일 아래에 메모 줄을 한 줄 둠 (없는 요일은 빈 칸으로 높이만 맞춤)
   const memosByDay = days.map(d => getMemosForDate(d));
   const hasWeekMemo = memosByDay.some(m => m.length);
-  if(hasWeekMemo) hourCol.appendChild(Object.assign(document.createElement('div'), { className: 'week-cal-memo empty' }));
+  // 메모 줄 높이는 그 주에 메모가 가장 많은 날에 맞춤 (메모 한 개당 한 칸)
+  const weekMemoRowH = Math.max(...memosByDay.map(m => m.length)) * 30;
+  if(hasWeekMemo){
+    const spacer = Object.assign(document.createElement('div'), { className: 'week-cal-memo empty' });
+    spacer.style.height = weekMemoRowH + 'px';
+    hourCol.appendChild(spacer);
+  }
   visibleHours.forEach(h => {
     const hourEl = document.createElement('div');
     hourEl.className = 'week-cal-hour';
@@ -19600,25 +19635,21 @@ function renderWeekView(){
       const dayMemos = memosByDay[dayIdx];
       const memoEl = document.createElement('div');
       memoEl.className = 'week-cal-memo' + (dayMemos.length ? '' : ' empty');
-      if(dayMemos.length){
-        const first = dayMemos[0].text.split('\n')[0];
-        memoEl.textContent = first + (dayMemos.length > 1 ? ` +${dayMemos.length - 1}` : ''); // 칸이 좁아서 체크 표시 없이 글자만 (노란 칸이 메모 표시)
-        // 누르면 아래 창에 그날 메모 - 하나면 바로 수정/삭제, 여러 개면 하루 보기로
-        memoEl.addEventListener('click', () => {
+      memoEl.style.height = weekMemoRowH + 'px';
+      // 메모마다 한 칸씩 (칸이 좁아서 체크 표시 없이 글자만 - 노란 칸이 메모 표시). 누르면 그 메모 수정/삭제
+      dayMemos.forEach(memo => {
+        const item = document.createElement('div');
+        item.className = 'week-cal-memo-item';
+        item.textContent = memo.text.split('\n')[0];
+        item.addEventListener('click', () => {
           const dateText = `${d.getMonth()+1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]}) 메모`;
-          if(dayMemos.length === 1){
-            const memo = dayMemos[0];
-            openWeekBlockSheet(memo.text, dateText, [
-              { label: '수정', primary: true, onTap: () => { scheduleFocusDate = new Date(d); openMemoForm(memo); } },
-              { label: '삭제', danger: true, confirmLabel: '한 번 더 누르면 삭제', onTap: () => deleteMemo(memo) },
-            ]);
-          } else {
-            openWeekBlockSheet(dayMemos.map(m => m.text.split('\n')[0]).join(' · '), dateText, [
-              { label: '이 날 일정 보기', primary: true, onTap: () => goToDaySchedule(d) },
-            ]);
-          }
+          openWeekBlockSheet(memo.text, dateText, [
+            { label: '수정', primary: true, onTap: () => { scheduleFocusDate = new Date(d); openMemoForm(memo); } },
+            { label: '삭제', danger: true, confirmLabel: '한 번 더 누르면 삭제', onTap: () => deleteMemo(memo) },
+          ]);
         });
-      }
+        memoEl.appendChild(item);
+      });
       dayCol.appendChild(memoEl);
     }
 
@@ -19707,7 +19738,7 @@ function renderWeekView(){
               } },
               // 실수로 지워지지 않게 한 번 더 눌러야 삭제됨 (예전 휴지통 더블클릭 대신)
               { label: '삭제', danger: true, confirmLabel: '한 번 더 누르면 삭제', onTap: deleteThisBlock },
-            ], matchedEv);
+            ], matchedEv, d);
           });
         } else if((isLinked || isPending) && matchedEv.sourceChatRoomId){
           // 확정된 약속이든 아직 응답 기다리는 예약 요청이든, 시간을 보여주고 그 요청을 보낸 채팅방으로 갈 수 있게 함
@@ -19715,7 +19746,7 @@ function renderWeekView(){
             e.stopPropagation();
             openWeekBlockSheet(text, sheetTimeText, [
               { label: '채팅방 열기', primary: true, onTap: () => goToReservationChat(matchedEv.sourceChatRoomId) },
-            ], matchedEv);
+            ], matchedEv, d);
           });
         } else {
           block.addEventListener('click', (e) => {
@@ -19753,7 +19784,7 @@ function renderWeekView(){
       const routeUrl = travelRouteUrl(ev.travel);
       if(routeUrl){
         tb.classList.add('has-route');
-        tb.addEventListener('click', (e) => { e.stopPropagation(); openMapUrl(routeUrl); });
+        tb.addEventListener('click', (e) => { e.stopPropagation(); openTravelRoute(routeUrl, travelDepartLabel(d, r.startMin, tm)); });
       }
       body.appendChild(tb);
     });
@@ -19771,7 +19802,7 @@ function closeWeekBlockSheet(){
   const overlay = document.getElementById('weekBlockSheetOverlay');
   if(overlay) overlay.hidden = true;
 }
-function openWeekBlockSheet(title, timeText, buttons, ev){
+function openWeekBlockSheet(title, timeText, buttons, ev, date){
   let overlay = document.getElementById('weekBlockSheetOverlay');
   if(!overlay){
     overlay = document.createElement('div');
@@ -19789,7 +19820,7 @@ function openWeekBlockSheet(title, timeText, buttons, ev){
   }
   overlay.querySelector('.week-block-sheet-title').textContent = title;
   overlay.querySelector('.week-block-sheet-time').textContent = timeText;
-  overlay.querySelector('.week-block-sheet-detail').innerHTML = eventPlaceNoteHtml(ev) + (ev && ev.travel && ev.travel.minutes ? travelRouteLinkHtml(ev.travel) : '');
+  overlay.querySelector('.week-block-sheet-detail').innerHTML = eventPlaceNoteHtml(ev) + (ev && ev.travel && ev.travel.minutes ? travelRouteLinkHtml(ev.travel, date, date ? getEventDisplayRangeForDate(ev, date).startMin : null) : '');
   const btnRow = overlay.querySelector('.week-block-sheet-btns');
   btnRow.innerHTML = '';
   buttons.forEach(b => {
@@ -19906,11 +19937,11 @@ function renderMonthSchedView(){
       ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
       : '';
 
-    // 메모가 있으면 날짜 바로 아래 맨 위에 첫 메모 한 줄
+    // 메모가 있으면 날짜 바로 아래 맨 위에 메모마다 한 줄씩
     const cellMemos = getMemosForDate(cellDate);
-    const memoHtml = cellMemos.length
-      ? `<div class="month-event-label month-memo-label"><span class="memo-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>${escapeHtml(truncateForMonthLabel(cellMemos[0].text.split('\n')[0]))}</div>`
-      : '';
+    const memoHtml = cellMemos.map(memo =>
+      `<div class="month-event-label month-memo-label"><span class="memo-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>${escapeHtml(truncateForMonthLabel(memo.text.split('\n')[0]))}</div>`
+    ).join('');
 
     cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${memoHtml}${labelsHtml}${moreHtml}`;
     cell.addEventListener('click', () => {
@@ -19951,7 +19982,7 @@ function renderMonthSelectedPanel(){
         <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''}>
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}"></span>
           <span class="month-selected-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</span>
-          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<span class="month-selected-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${travelRouteLinkHtml(ev.travel)}</span>` : ''}${eventPlaceNoteHtml(ev)}</span>
+          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<span class="month-selected-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${travelRouteLinkHtml(ev.travel, monthSelectedDate, disp.startMin)}</span>` : ''}${eventPlaceNoteHtml(ev)}</span>
           ${goesToChat ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
           ${isSpecial ? '' : `
           <span class="month-selected-row-actions">
