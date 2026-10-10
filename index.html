@@ -6481,6 +6481,7 @@
     word-break:keep-all;
     overflow-wrap:anywhere;
   }
+  .week-cal-block-extra{ margin-top:1px; font-size:7.5px; font-weight:500; opacity:.9; }
   .week-cal-block.show-actions{ z-index:3; }
   /* 약속 잡기 일주일 보기: 왼쪽은 친구 예약 가능 시간, 오른쪽은 내 일정 - 겹쳐도 둘 다 보이게 나눠 그림 */
   .week-cal-block.fr-half{ right:48%; }
@@ -6731,6 +6732,10 @@
     white-space:nowrap;
     min-width:0;
   }
+  .month-selected-main{ display:flex; flex-direction:column; min-width:0; }
+  .month-selected-place, .month-selected-note{ margin-top:2px; font-size:11px; color:var(--text-dim); word-break:break-word; }
+  .month-selected-place a{ color:var(--accent); font-weight:600; text-decoration:none; }
+  .month-selected-note{ white-space:pre-wrap; }
   .month-selected-empty{
     font-size:12px;
     color:var(--text-dim);
@@ -19327,6 +19332,13 @@ function renderWeekView(){
           ? availableShortFor(availableForOf(matchedEv), matchedEv.visibility)
           : text;
         block.appendChild(label);
+        // 장소·메모는 칸 높이가 되는 만큼만 이름 아래에 (넘치면 잘리고, 눌러서 뜨는 창에 전부 나옴)
+        if(matchedEv && !isPending && !isLinked && (matchedEv.place?.name || matchedEv.note)){
+          const extra = document.createElement('div');
+          extra.className = 'week-cal-block-extra';
+          extra.textContent = [matchedEv.place?.name ? '📍' + matchedEv.place.name : '', matchedEv.note || ''].filter(Boolean).join(' · ');
+          block.appendChild(extra);
+        }
 
         // 칸이 좁아서 시간이 안 보이니, 한 번 누르면 아래에서 창이 올라와 정확한 시간을 보여줌
         const sheetTimeText = `${d.getMonth()+1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]}) ${minutesToLabel(blockRange.startMin)} – ${minutesToLabel(blockRange.endMin)}`;
@@ -19590,7 +19602,7 @@ function renderMonthSelectedPanel(){
         <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''}>
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}"></span>
           <span class="month-selected-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</span>
-          <span class="month-selected-text">${escapeHtml(ev.title)}</span>
+          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${eventPlaceNoteHtml(ev, 'month-selected-place', 'month-selected-note')}</span>
           ${goesToChat ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
           ${isSpecial ? '' : `
           <span class="month-selected-row-actions">
@@ -19618,7 +19630,7 @@ function renderMonthSelectedPanel(){
   });
   panel.querySelectorAll('.month-selected-row.clickable').forEach(row => {
     row.addEventListener('click', (e) => {
-      if(e.target.closest('.month-selected-row-actions')) return;
+      if(e.target.closest('.month-selected-row-actions') || e.target.closest('a')) return;
       goToReservationChat(row.dataset.room);
     });
   });
