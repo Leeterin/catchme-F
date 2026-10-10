@@ -15794,6 +15794,7 @@ function mapServerLocationSuggestMessage(m){
     locationLon: l.locationLon,
     status: RESERVATION_STATUS_MAP[l.status] || 'pending',
     voterIds: l.voterIds || [],
+    pinId: l.pinId || null, // 어느 약속을 위한 제안인지 (없으면 날짜 미정 약속 / 예전 제안)
     time: m.createdAt,
   };
 }
@@ -23228,6 +23229,7 @@ function mapServerPinToLocal(p){
     reservationMsgId: p.sourceMessageId,
     dateObj: p.dateLabel ? parseDateLabelToDate(p.dateLabel) : null,
     createdAt: p.createdAt ? new Date(p.createdAt).getTime() : null,
+    forPinId: p.forPinId || null, // 장소만 있는 핀이면 어느 약속의 장소인지
   };
 }
 function loadPinsCache(roomId){
@@ -23330,6 +23332,10 @@ function placePinTime(p){
   return typeof p.createdAt === 'number' ? p.createdAt : Date.now();
 }
 function placePinBelongsTo(room, placePin, pin){
+  if(pin && !pin.dateObj) pin = null; // 날짜 미정 약속 카드(장소만 있는 핀)는 "지금 약속"과 같음
+  // 어느 약속의 장소인지 서버에 저장돼 있으면 그대로 따름
+  const owner = placePin.forPinId && (room.pinnedSchedules || []).find(p => p.serverId === placePin.forPinId);
+  if(owner) return pin ? pin === owner : !isPinPast(owner) && owner === currentMeetPin(room);
   const t = placePinTime(placePin);
   const ends = pastPinEndTimes(room);
   if(pin && pin.dateObj && isPinPast(pin)){
@@ -23429,6 +23435,7 @@ async function suggestHotplaceToChat(post){
           place: post.place, note: post.note, location: post.location,
           locationLat: typeof post.lat === 'number' ? post.lat : null,
           locationLon: typeof post.lon === 'number' ? post.lon : null,
+          ...suggestTargetBody(room, null),
           ...(post.kakao || {}),
         }),
       });
@@ -23494,6 +23501,7 @@ async function fixHotplaceLocation(post){
           locationLat: typeof post.lat === 'number' ? post.lat : null,
           locationLon: typeof post.lon === 'number' ? post.lon : null,
           immediate: true,
+          ...suggestTargetBody(room, post.pinned),
           ...(post.kakao || {}),
         }),
       });
@@ -23572,40 +23580,73 @@ function locationSuggestTime(m){
 function pastPinEndTimes(room){
   return (room.pinnedSchedules || []).filter(p => p.dateObj && isPinPast(p)).map(p => pinEndDate(p).getTime());
 }
-function isStaleLocationSuggest(room, m){
+// 지금 장소를 정하는 약속 - 아직 안 끝난 약속 중 가장 가까운 것 (없으면 null = 날짜 미정 약속)
+function currentMeetPin(room){
+  return (room.pinnedSchedules || []).filter(p => p.dateObj && !isPinPast(p))
+    .sort((a, b) => pinEndDate(a) - pinEndDate(b))[0] || null;
+}
+// 새 장소 제안/확정이 어느 약속을 위한 건지 - 약속 카드에서 열었으면 그 약속, 아니면 지금 약속
+function suggestTargetPin(room, pinned){
+  if(pinned && pinned.dateObj && !isPinPast(pinned)) return pinned;
+  return currentMeetPin(room);
+}
+// 장소 제안 API에 같이 보내는 값: 어느 약속 것인지 + 마지막 지난 약속이 끝난 시각(그 전 제안/장소는 중복 검사에서 빠짐)
+function suggestTargetBody(room, pinned){
+  const target = suggestTargetPin(room, pinned);
+  const ends = pastPinEndTimes(room);
+  return { pinId: (target && target.serverId) || null, cycleStart: ends.length ? Math.max(...ends) : 0 };
+}
+function meetGroupKey(room, pinned){
+  const target = suggestTargetPin(room, pinned);
+  return target && target.serverId ? 'pin:' + target.serverId : 'cur';
+}
+// 장소 제안이 어느 약속 것인지(key)와 이미 지난 약속 것인지(stale).
+// 약속을 정해서 올린 제안은 그 약속이 끝나야 마감, 약속 없이 올린 예전 제안은 올라온 시각으로 판단
+// (그 뒤에 끝난 약속이 있으면 그 약속 것, 없으면 지금 약속 것)
+function locationSuggestGroup(room, m){
+  if(m.pinId){
+    const target = (room.pinnedSchedules || []).find(p => p.serverId === m.pinId);
+    if(target) return { key: 'pin:' + target.serverId, stale: isPinPast(target) };
+    if(room._pinsLoaded) return { key: 'gone:' + m.pinId, stale: true }; // 약속이 취소돼서 카드가 지워짐
+  }
   const t = locationSuggestTime(m);
-  return pastPinEndTimes(room).some(end => t < end);
+  const ends = pastPinEndTimes(room);
+  const cycle = ends.filter(end => end <= t).length;
+  if(cycle < ends.length) return { key: 'cycle:' + cycle, stale: true };
+  return { key: meetGroupKey(room, null), stale: false };
+}
+function isStaleLocationSuggest(room, m){
+  return locationSuggestGroup(room, m).stale;
 }
 // 지금 약속을 위해 투표 중인 제안 (지난 약속 때 올라와서 아직 대기 중인 건 뺌)
 function isOpenLocationSuggest(room, m){
   return m.type === 'location-suggest' && m.status === 'pending' && !isStaleLocationSuggest(room, m);
 }
-// 장소 제안 번호 - 이 방에서 올라온 순서대로 1, 2, 3... (누가 제안했든 이어서 매김).
-// 장소가 확정됐거나 그 사이 약속이 끝났으면 새 약속으로 보고 다시 1번부터 매김
+// 장소 제안 번호 - 약속마다 올라온 순서대로 1, 2, 3... (누가 제안했든 이어서 매김).
+// 다른 약속 것이거나, 같은 약속에서 장소가 하나 확정된 뒤(2차 장소 등)면 다시 1번부터 매김
 function locationSuggestNumbers(room){
-  const ends = pastPinEndTimes(room);
   const nums = new Map();
-  let no = 0, prev = null;
+  const groups = new Map(); // key -> { no, last }
   (room.messages || []).filter(x => x.type === 'location-suggest').forEach(x => {
-    if(prev){
-      const a = locationSuggestTime(prev), b = locationSuggestTime(x);
-      if(prev.status === 'confirmed' || ends.some(end => a < end && end <= b)) no = 0;
-    }
-    nums.set(x, ++no);
-    prev = x;
+    const { key } = locationSuggestGroup(room, x);
+    const g = groups.get(key) || { no: 0, last: null };
+    if(g.last && g.last.status === 'confirmed') g.no = 0;
+    nums.set(x, ++g.no);
+    g.last = x;
+    groups.set(key, g);
   });
-  return { nums, last: prev, ends };
+  return { nums, groups };
 }
 function locationSuggestNo(roomId, m){
   const room = CHAT_ROOMS[roomId];
   if(!room) return 0;
   return locationSuggestNumbers(room).nums.get(m) || 0;
 }
-// 지금 새로 제안하면 붙을 번호 바로 앞 번호 (새 약속이면 0이라 1번부터 시작)
-function nextLocationSuggestBaseNo(room){
-  const { nums, last, ends } = locationSuggestNumbers(room);
-  if(!last || last.status === 'confirmed' || ends.some(end => locationSuggestTime(last) < end)) return 0;
-  return nums.get(last);
+// 이 약속에 새로 제안하면 붙을 번호 바로 앞 번호 (새 약속이면 0이라 1번부터 시작)
+function nextLocationSuggestBaseNo(room, pinned){
+  const g = locationSuggestNumbers(room).groups.get(meetGroupKey(room, pinned));
+  if(!g || !g.last || g.last.status === 'confirmed') return 0;
+  return g.no;
 }
 function locationSuggestTitle(roomId, m){
   const no = locationSuggestNo(roomId, m);
@@ -23864,10 +23905,10 @@ document.getElementById('placeViewerAddBtn').addEventListener('click', () => {
   if(!room) return;
   const pin = pinned || (room.pinnedSchedules || []).find(p => p.dateObj && !isPinPast(p)) || null;
   // 이미 정해진 장소가 있으면 바꾸지 않고 다음 차수 장소로 추가됨
-  if(pin && !roomMeetPlaces(room, pin).length){
-    changePinLocation(room, roomId, pin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
+  if(pin && pin.dateObj && !roomMeetPlaces(room, pin).length){
+    changePinLocation(room, roomId, pin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId, pinned: pin });
   } else {
-    openLocationPicker('', null, null, (label, lat, lon) => fixHotplaceLocation({ place: label, location: '', lat, lon }), { roomId });
+    openLocationPicker('', null, null, (label, lat, lon) => fixHotplaceLocation({ place: label, location: '', lat, lon, pinned: pin }), { roomId, pinned: pin });
   }
 });
 
@@ -24544,7 +24585,7 @@ function renderLocationPickerCandidates(){
   wrap.hidden = !locationPickerCandidates.length;
   // 번호는 이번 약속에 이미 올라온 제안 다음부터 이어서 (보내면 채팅 카드에 같은 번호로 붙음)
   const room = locationPickerOpts && CHAT_ROOMS[locationPickerOpts.roomId];
-  const baseNo = room ? nextLocationSuggestBaseNo(room) : 0;
+  const baseNo = room ? nextLocationSuggestBaseNo(room, locationPickerOpts && locationPickerOpts.pinned) : 0;
   document.getElementById('locationPickerCandidateRow').innerHTML = locationPickerCandidates.map((c, idx) => `
     <div class="location-picker-candidate"><span>${baseNo + idx + 1}. ${escapeHtml(c.label)}</span><button type="button" data-idx="${idx}" aria-label="빼기">&times;</button></div>
   `).join('');
@@ -24595,7 +24636,7 @@ document.getElementById('locationPickerSuggestSendBtn').addEventListener('click'
       try {
         const data = await apiRequest(`/chats/${roomId}/location-suggestions`, {
           method: 'POST',
-          body: JSON.stringify({ place, location, locationLat: c.lat, locationLon: c.lon, ...(c.kakao || {}) }),
+          body: JSON.stringify({ place, location, locationLat: c.lat, locationLon: c.lon, ...suggestTargetBody(room, opts.pinned), ...(c.kakao || {}) }),
         });
         room.messages.push(mapServerLocationSuggestMessage(data.message));
         sent++;
@@ -25725,11 +25766,11 @@ function addMeetPlace(room, roomId, pinned){
     return;
   }
   if(!pinned || !roomMeetPlaces(room, pinned).length){
-    if(pinned) changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
-    else openLocationPicker('', null, null, (label, lat, lon, addr) => fixHotplaceLocation({ place: label, location: addr || '', lat, lon }), { roomId });
+    if(pinned && pinned.dateObj) changePinLocation(room, roomId, pinned, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId, pinned });
+    else openLocationPicker('', null, null, (label, lat, lon, addr) => fixHotplaceLocation({ place: label, location: addr || '', lat, lon, pinned }), { roomId, pinned });
     return;
   }
-  openLocationPicker('', null, null, (label, lat, lon, addr) => fixHotplaceLocation({ place: label, location: addr && addr !== label ? addr : '', lat, lon }), { roomId });
+  openLocationPicker('', null, null, (label, lat, lon, addr) => fixHotplaceLocation({ place: label, location: addr && addr !== label ? addr : '', lat, lon, pinned }), { roomId, pinned });
 }
 
 // 고정 카드에 보여줄 장소 주소 -저장된 주소가 있으면 그걸, 없으면(예전에 정한 장소) 좌표로 한 번만 주소를 찾아서 채움
