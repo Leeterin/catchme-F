@@ -13016,6 +13016,11 @@ function pinEndDate(pin){
   else end.setHours(24, 0, 0, 0);
   return end;
 }
+// 이미 끝난 약속인지 - 지난 약속엔 장소 정하기/추가 버튼을 안 띄움
+function isPinPast(pin){
+  const end = pinEndDate(pin);
+  return !!end && end.getTime() <= Date.now();
+}
 
 // 이 방에서 후기를 물어볼 만한 지난 약속 하나 (가장 최근에 끝난 것)
 function findPlaceReviewCandidate(roomId){
@@ -25296,7 +25301,7 @@ function renderPinnedSchedule(){
           </div>`;
         }).join('')}</div>` : ''}
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 내 캘린더</button>` : ''}
-        <button type="button" class="pin-action-btn pin-add-loc">${places.length ? '+ 장소 추가' : '장소 정하기'}</button>
+        ${isPinPast(pinned) ? '' : `<button type="button" class="pin-action-btn pin-add-loc">${places.length ? '+ 장소 추가' : '장소 정하기'}</button>`}
         ${!dateObj ? `<button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>` : ''}
       </div>
     `;
@@ -25386,6 +25391,7 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       : null,
   }));
   const multiPlaces = meetPlaces.length > 1;
+  const pinPast = isPinPast(pin); // 지난 약속이면 장소 정하기/추가(2차...) 버튼을 안 띄움
 
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
@@ -25403,8 +25409,10 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
     <div class="appt-detail-section">
       <div class="appt-detail-label">${ICO.pin} 장소${multiPlaces ? ` (${meetPlaces.length}곳)` : ''}</div>
       ${meetPlaces.length === 0
-        ? `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>
-           <button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">장소 정하기</button>`
+        ? (pinPast
+          ? `<div class="appt-detail-empty">장소 없이 지나간 약속이에요.</div>`
+          : `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>
+           <button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">장소 정하기</button>`)
         : meetPlaces.map(({ pin: p, srcMsg }, idx) => {
             const senderLabel = srcMsg
               ? (srcMsg.who === 'me' ? '내가 추천' : `${escapeHtml(getGroupSenderName(room, srcMsg) || room.name)}님이 추천`)
@@ -25423,7 +25431,7 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
               </div>
             `;
           }).join('')}
-      ${meetPlaces.length ? `<button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">+ 장소 추가 (${meetPlaceOrderLabel(meetPlaces.length)})</button>` : ''}
+      ${meetPlaces.length && !pinPast ? `<button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">+ 장소 추가 (${meetPlaceOrderLabel(meetPlaces.length)})</button>` : ''}
     </div>
     ${apptDetailFromHome ? `
     <div class="appt-detail-actions">
@@ -28319,7 +28327,8 @@ function startPlaceFromChat(){
   const roomId = activeChatRoomId;
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
-  const pin = (room.pinnedSchedules || []).find(p => p.dateObj) || null;
+  // 지난 약속에 2차 장소가 붙지 않게, 아직 안 끝난 약속을 고름
+  const pin = (room.pinnedSchedules || []).find(p => p.dateObj && !isPinPast(p)) || null;
   addMeetPlace(room, roomId, pin);
 }
 
