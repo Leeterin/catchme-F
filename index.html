@@ -6209,6 +6209,20 @@
   .ecs-btn.on{ background:var(--surface); color:var(--text); font-weight:700; box-shadow:0 1px 4px rgba(23,24,29,0.10); }
   .ecs-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; box-shadow:0 0 0 1px rgba(0,0,0,0.12); }
   .ecs-hex{ font-family:'Roboto Mono',monospace; font-size:12px; letter-spacing:0.2px; }
+  /* 일정 폼 - 색상 접힌 줄 (누르면 아래 패널이 펼쳐짐) */
+  .event-color-toggle{
+    width:100%; display:flex; align-items:center; gap:8px;
+    height:44px; padding:0 12px;
+    border:1px solid var(--line); border-radius:12px;
+    background:var(--surface); color:var(--text);
+    font-size:14px; font-weight:600; font-family:'Inter',sans-serif; text-align:left;
+    cursor:pointer;
+  }
+  .event-color-toggle .ect-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .event-color-toggle .ect-auto{ background:conic-gradient(#ff6b6b, #ffd43b, #51cf66, #339af0, #cc5de8, #ff6b6b); }
+  .event-color-toggle .ect-chev{ color:var(--text-dim); font-size:12px; transition:transform .15s ease; }
+  .event-color-toggle[aria-expanded="true"] .ect-chev{ transform:rotate(180deg); }
+  .event-color-panel{ margin-top:10px; animation:ecmOpen .18s ease both; }
   /* 일정 폼 - 기본 라벨 10개 (색은 고정, 이름은 내가 바꿀 수 있음) */
   .ecl-head{ display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px; }
   .ecl-head span{ font-size:11.5px; color:var(--text-dim); }
@@ -6238,6 +6252,9 @@
   .travel-half .search-input{ width:100%; box-sizing:border-box; font-size:14px; padding-left:12px; padding-right:10px; text-overflow:ellipsis; }
   .travel-arrow{ flex:0 0 auto; padding-bottom:12px; color:var(--text-dim); font-weight:700; }
   .travel-from-row:empty{ display:none; }
+  .travel-mode-row{ display:flex; gap:3px; padding:3px; margin-bottom:8px; border:1px solid var(--line); border-radius:12px; background:var(--surface-2); }
+  .travel-mode-btn{ flex:1; height:34px; border:none; border-radius:9px; background:transparent; color:var(--text-dim); font-size:13px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
+  .travel-mode-btn.on{ background:var(--surface); color:var(--text); font-weight:700; box-shadow:0 1px 4px rgba(23,24,29,0.10); }
   .travel-from-row{ margin-top:8px !important; }
   /* 검색칸을 누른 동안만 아래에 여백을 줘서 검색칸이 위로 올라갈 공간을 만듦 (키보드 뒤라 화면엔 안 보임, 버튼은 그대로) */
   .event-form-view.travel-typing .event-form-scroll{ padding-bottom:var(--travel-kb-h, 50vh); }
@@ -7791,13 +7808,17 @@
         </div>
         <div class="mp-input-group">
           <label>색상</label>
-          <div class="ecl-head"><span id="eventColorLabelHint">라벨을 고르거나 직접 색을 골라요</span><button type="button" class="ecl-edit-btn" id="eventColorLabelEditBtn">이름 바꾸기</button></div>
-          <div class="event-color-labels" id="eventColorLabels"></div>
-          <div class="event-color-picker" id="eventColorPicker"></div>
-          <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 (항상 펼쳐져 있음) -->
-          <div class="event-color-mixer" id="eventColorMixer" style="display:none;">
-            <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
-            <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
+          <!-- 지금 고른 색 한 줄만 보이고, 누르면 라벨·직접 선택이 펼쳐짐 -->
+          <button type="button" class="event-color-toggle" id="eventColorToggle" aria-expanded="false"></button>
+          <div class="event-color-panel" id="eventColorPanel" style="display:none;">
+            <div class="ecl-head"><span id="eventColorLabelHint">라벨을 고르거나 직접 색을 골라요</span><button type="button" class="ecl-edit-btn" id="eventColorLabelEditBtn">이름 바꾸기</button></div>
+            <div class="event-color-labels" id="eventColorLabels"></div>
+            <div class="event-color-picker" id="eventColorPicker"></div>
+            <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 -->
+            <div class="event-color-mixer" id="eventColorMixer" style="display:none;">
+              <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
+              <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
+            </div>
           </div>
         </div>
         <!-- 장소 - 카카오 장소 검색으로 고르거나 그냥 적어도 됨 (나만 보임). 이동시간을 켠 사람은 도착지로도 자동으로 채움 -->
@@ -7809,9 +7830,13 @@
           </div>
           <div class="event-place-addr" id="eventPlaceAddr" style="display:none;"></div>
         </div>
-        <!-- 이동시간 (설정 > 앱 관리에서 켠 사람만) - 목적지를 고르면 카카오 대중교통 이동시간을 받아와 일정 앞에 "이동시간" 칸으로 표시 -->
+        <!-- 이동시간 (기본 켜짐, 설정 > 앱 관리에서 끌 수 있음) - 목적지를 고르면 자동차/대중교통 이동시간을 출발 시각 기준으로 받아와 일정 앞에 "이동시간" 칸으로 표시 -->
         <div class="mp-input-group" id="travelGroup" style="display:none;">
           <label>이동시간</label>
+          <div class="travel-mode-row" id="travelModeRow">
+            <button type="button" class="travel-mode-btn" data-travel-mode="car">🚗 자동차</button>
+            <button type="button" class="travel-mode-btn" data-travel-mode="transit">🚇 대중교통</button>
+          </div>
           <!-- 출발 → 도착을 한 줄에 반씩. 검색 결과는 줄 전체 폭으로 펼침 -->
           <div class="travel-row">
             <div class="travel-half">
@@ -11629,7 +11654,7 @@ function openSettingsDetail(id){
         <div class="toggle${isAllowBookingAlways() ? ' on' : ''}" id="allowBookingAlwaysToggle"><div class="knob"></div></div>
       </div>
       <div class="settings-toggle-row">
-        <div><div class="stt-label">일정에 이동시간 넣기</div><div class="stt-sub">일정을 추가할 때 목적지를 고르면 대중교통 이동시간을 계산해서 캘린더에 일정 앞 "이동시간"으로 보여줘요</div></div>
+        <div><div class="stt-label">일정에 이동시간 넣기</div><div class="stt-sub">일정을 추가할 때 목적지를 고르면 자동차·대중교통 이동시간을 출발 시각 기준으로 계산해서 캘린더에 일정 앞 "이동시간"으로 보여줘요</div></div>
         <div class="toggle${isTravelEnabled() ? ' on' : ''}" id="travelTimeToggle"><div class="knob"></div></div>
       </div>
       <div class="settings-simple-row"><span>오류 신고하기</span><button class="settings-action-btn" id="appmanageBugReportBtn">신고 &#8250;</button></div>
@@ -16363,7 +16388,7 @@ function renderDayView(){
       </div>
       <div class="day-event-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</div>
       <div class="day-event-title">${escapeHtml(ev.title)}</div>
-      ${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<div class="day-event-travel">🚇 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${ev.travel.to && ev.travel.to.name ? ` · ${escapeHtml(ev.travel.to.name)}` : ''}</div>` : ''}
+      ${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<div class="day-event-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${ev.travel.to && ev.travel.to.name ? ` · ${escapeHtml(ev.travel.to.name)}` : ''}</div>` : ''}
       <div class="day-event-extras">${eventPlaceNoteHtml(ev)}</div>
       <div class="day-event-tags">
         ${visibilityButtonsHtml(ev.visibility, 'day-event-tag')}
@@ -16912,7 +16937,7 @@ document.getElementById('eventColorLabels').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-ecl]');
   if(!btn) return;
   formColor = EVENT_COLOR_LABELS[+btn.dataset.ecl].color;
-  renderEventColorPicker();
+  setEventColorPanelOpen(false);
 });
 document.getElementById('eventColorLabels').addEventListener('input', (e) => {
   const inp = e.target.closest('[data-ecl-name]');
@@ -16920,6 +16945,7 @@ document.getElementById('eventColorLabels').addEventListener('input', (e) => {
   const names = colorLabelNames();
   names[+inp.dataset.eclName] = inp.value.trim().slice(0, COLOR_LABEL_NAME_MAX) || EVENT_COLOR_LABELS[+inp.dataset.eclName].name;
   saveColorLabelNames(names);
+  renderEventColorToggle();
 });
 document.getElementById('eventColorLabelEditBtn').addEventListener('click', () => {
   eventColorLabelEditing = !eventColorLabelEditing;
@@ -16936,8 +16962,24 @@ document.getElementById('eventColorLabelEditBtn').addEventListener('click', () =
 
 // 일정 폼의 색상 선택 UI를 formColor 상태에 맞게 다시 그림
 // 위: 라벨 10개 / 아래: [자동 | 직접 선택] - 직접 선택일 때만 색 판을 펼침
+let eventColorPanelOpen = false;
+function renderEventColorToggle(){
+  const isCustom = !!formColor && colorLabelIndex(formColor) < 0;
+  const name = !formColor ? '자동' : isCustom ? formColor.toUpperCase() : colorLabelName(formColor);
+  const btn = document.getElementById('eventColorToggle');
+  btn.setAttribute('aria-expanded', eventColorPanelOpen ? 'true' : 'false');
+  btn.innerHTML = `<span class="ecs-dot${formColor ? '' : ' ect-auto'}"${formColor ? ` style="background:${formColor}"` : ''}></span><span class="ect-name${isCustom ? ' ecs-hex' : ''}">${escapeHtml(name)}</span><span class="ect-chev">▼</span>`;
+  document.getElementById('eventColorPanel').style.display = eventColorPanelOpen ? '' : 'none';
+}
+function setEventColorPanelOpen(open){
+  eventColorPanelOpen = open;
+  if(!open && eventColorLabelEditing){ eventColorLabelEditing = false; clearTimeout(colorLabelSaveTimer); saveSettingToServer('color_labels'); }
+  renderEventColorPicker();
+}
+document.getElementById('eventColorToggle').addEventListener('click', () => setEventColorPanelOpen(!eventColorPanelOpen));
 function renderEventColorPicker(){
   const isCustom = !!formColor && colorLabelIndex(formColor) < 0;
+  renderEventColorToggle();
   renderEventColorLabels();
   document.getElementById('eventColorPicker').innerHTML = `
     <button type="button" class="ecs-btn${formColor ? '' : ' on'}" data-color="">자동</button>
@@ -16961,7 +17003,7 @@ document.getElementById('eventColorPicker').addEventListener('click', (e) => {
   const btn = e.target.closest('button[data-color]');
   if(!btn) return;
   formColor = btn.dataset.color || null;
-  renderEventColorPicker();
+  setEventColorPanelOpen(false);
 });
 
 // ---------- 나만의 색 조제 (채도/밝기 판 + 색상 바) ----------
@@ -17030,6 +17072,7 @@ function applyEventColorMixer(pick = true){
     label.textContent = hex.toUpperCase();
     label.className = 'ecs-hex';
   }
+  renderEventColorToggle();
 }
 
 // 손가락/마우스로 누른 채 움직이는 동안 계속 따라오게 (pointer capture로 영역 밖으로 나가도 유지)
@@ -17140,20 +17183,31 @@ document.getElementById('allowBookingAlwaysNo').addEventListener('click', () => 
   document.getElementById('allowBookingAlwaysPrompt').style.display = 'none';
 });
 
-// ---------- 일정 이동시간 (설정에서 켠 사람만) ----------
+// ---------- 일정 이동시간 (기본 켜짐, 설정에서 끌 수 있음) ----------
 // 목적지를 고르면 출발지(같은 날 바로 앞 일정의 목적지 → 없으면 자주 쓰는 출발지 '집')에서
-// 카카오 대중교통으로 걸리는 시간을 받아와서, 캘린더에 일정 바로 앞 "이동시간" 칸으로 보여줌
+// 자동차/대중교통으로 걸리는 시간을 출발 시각의 교통 기준으로 받아와서, 캘린더에 일정 바로 앞 "이동시간" 칸으로 보여줌
 function isTravelEnabled(){
-  try { return localStorage.getItem('catchme_travel_time') === 'on'; } catch(_){ return false; }
+  try { return localStorage.getItem('catchme_travel_time') !== 'off'; } catch(_){ return true; } // 기본은 켜짐, 끈 사람만 꺼짐
+}
+// 이동 수단 - 자동차 / 대중교통. 마지막에 고른 걸 다음 일정에도 기본으로
+const TRAVEL_MODES = { car: { icon: '🚗', name: '자동차' }, transit: { icon: '🚇', name: '대중교통' } };
+function getTravelMode(){
+  try { return localStorage.getItem('catchme_travel_mode') === 'car' ? 'car' : 'transit'; } catch(_){ return 'transit'; }
+}
+function setTravelMode(mode){
+  try { localStorage.setItem('catchme_travel_mode', mode); } catch(_){}
+}
+function travelModeIcon(travel){
+  return (TRAVEL_MODES[travel && travel.mode] || TRAVEL_MODES.transit).icon;
 }
 function setTravelEnabled(on){
   try { localStorage.setItem('catchme_travel_time', on ? 'on' : 'off'); } catch(_){}
 }
-let formTravel = null; // { to:{name,lat,lon}, from:{name,lat,lon}|null, minutes:number|null, source:'kakao'|'fallback'|'manual'|null }
+let formTravel = null; // { to:{name,lat,lon}, from:{name,lat,lon}|null, mode:'car'|'transit', minutes:number|null, source:'kakao'|'fallback'|'manual'|null, night:boolean }
 let travelCalcSeq = 0;
 function travelForSave(){
   if(formEventType === 'available' || !formTravel || !formTravel.to || typeof formTravel.minutes !== 'number') return null;
-  return { minutes: formTravel.minutes, to: formTravel.to, from: formTravel.from || null };
+  return { minutes: formTravel.minutes, to: formTravel.to, from: formTravel.from || null, mode: formTravel.mode || getTravelMode() };
 }
 function travelFormDate(){
   const v = document.getElementById('eventFormStartDate').value;
@@ -17193,15 +17247,21 @@ async function computeFormTravel(){
     return;
   }
   const seq = ++travelCalcSeq;
+  if(!formTravel.mode) formTravel.mode = getTravelMode();
   formTravel.minutes = null;
   formTravel.source = 'loading';
+  formTravel.night = false;
   renderTravelSection();
   try {
-    const q = `fromLat=${formTravel.from.lat}&fromLon=${formTravel.from.lon}&toLat=${formTravel.to.lat}&toLon=${formTravel.to.lon}`;
+    // 일정 시작에 도착하도록 출발하는 시각의 교통 기준으로 계산 (새벽 10분 길이 출근 시간엔 30분일 수 있음)
+    const arrive = travelFormDate();
+    arrive.setHours(0, travelFormStartMin(), 0, 0);
+    const q = `fromLat=${formTravel.from.lat}&fromLon=${formTravel.from.lon}&toLat=${formTravel.to.lat}&toLon=${formTravel.to.lon}&mode=${formTravel.mode}&arriveAt=${encodeURIComponent(arrive.toISOString())}`;
     const data = await apiRequest(`/events/travel-time?${q}`);
     if(seq !== travelCalcSeq || !formTravel) return;
     formTravel.minutes = Math.max(0, Math.round(data.minutes));
     formTravel.source = data.source;
+    formTravel.night = !!data.night;
   } catch(err){
     if(seq !== travelCalcSeq || !formTravel) return;
     formTravel.minutes = 30;
@@ -17209,6 +17269,13 @@ async function computeFormTravel(){
     showToast('이동시간을 계산하지 못해서 30분으로 넣었어요. 직접 바꿀 수 있어요.');
   }
   renderTravelSection();
+}
+let travelRecalcTimer = 0;
+function onTravelFormTimeChanged(){
+  renderTravelSection();
+  if(!formTravel || !formTravel.from || !formTravel.to || formTravel.source === 'manual') return;
+  clearTimeout(travelRecalcTimer);
+  travelRecalcTimer = setTimeout(computeFormTravel, 300);
 }
 function renderTravelSection(){
   const group = document.getElementById('travelGroup');
@@ -17218,6 +17285,8 @@ function renderTravelSection(){
   group.style.display = show ? '' : 'none';
   if(!show) return;
   const t = formTravel || {};
+  const mode = t.mode || getTravelMode();
+  document.querySelectorAll('#travelModeRow [data-travel-mode]').forEach(b => b.classList.toggle('on', b.dataset.travelMode === mode));
   const fromInput = document.getElementById('travelFromInput');
   const destInput = document.getElementById('travelDestInput');
   // 검색 중(입력칸에 포커스)이 아닐 때만 고른 장소 이름으로 채움
@@ -17245,12 +17314,14 @@ function renderTravelSection(){
   else if(!t.to) head = `<span class="travel-depart">도착지를 골라주세요</span>`;
   else if(t.source === 'loading') head = `<span class="travel-depart">이동시간 계산 중...</span>`;
   else head = `
-    <span class="travel-min">🚇 ${t.minutes}분</span>
-    <span class="travel-depart">${hm(travelFormStartMin() - t.minutes)} 출발${t.source === 'fallback' ? ' · 대략적인 시간' : ''}</span>
+    <span class="travel-min">${TRAVEL_MODES[mode].icon} ${t.minutes}분</span>
+    <span class="travel-depart">${hm(travelFormStartMin() - t.minutes)} 출발 기준${t.source === 'fallback' ? ' · 대략적인 시간' : ''}</span>
     <button type="button" class="travel-adj" data-adj="-5" aria-label="5분 줄이기">−</button>
     <button type="button" class="travel-adj" data-adj="5" aria-label="5분 늘리기">+</button>`;
+  const nightNote = t.night && t.source !== 'loading' && t.from && t.to ? `<div class="travel-route">새벽이라 지하철·버스가 거의 없어요. 자동차로 바꿔 보세요.</div>` : '';
   info.innerHTML = `
     <div class="travel-head">${head}</div>
+    ${nightNote}
     <button type="button" class="travel-remove" id="travelRemoveBtn">이동시간 빼기</button>
   `;
   info.querySelectorAll('.travel-adj').forEach(b => b.addEventListener('click', () => {
@@ -17401,6 +17472,14 @@ document.getElementById('eventPlaceInput').addEventListener('change', (e) => {
   else if(!formPlace || formPlace.name !== val) formPlace = { name: val, address: null, lat: null, lon: null };
   renderEventPlace();
 });
+document.getElementById('travelModeRow').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-travel-mode]');
+  if(!b) return;
+  setTravelMode(b.dataset.travelMode);
+  formTravel = { ...(formTravel || {}), mode: b.dataset.travelMode };
+  if(formTravel.source === 'manual') formTravel.source = null; // 수단을 바꾸면 다시 자동 계산
+  computeFormTravel();
+});
 bindTravelPlaceSearch('travelFromInput', 'travelFromResults', (place) => {
   formTravel = { ...(formTravel || {}), from: place };
   computeFormTravel();
@@ -17490,6 +17569,7 @@ function openEventForm(existingEvent){
   document.querySelectorAll('.event-type-btn').forEach(b => { b.style.display = (existingEvent && b.dataset.type === 'memo') ? 'none' : ''; });
   eventColorLastPicked = null;
   eventColorLabelEditing = false;
+  eventColorPanelOpen = false;
   formTravel = existingEvent && existingEvent.travel ? JSON.parse(JSON.stringify(existingEvent.travel)) : null;
   formPlace = existingEvent && existingEvent.place ? { ...existingEvent.place } : null;
   document.getElementById('eventPlaceResults').style.display = 'none';
@@ -17853,6 +17933,7 @@ function renderCustomDateGrid(){
       cell.addEventListener('click', () => {
         document.getElementById(activeDatePickerTarget).value = cellVal;
         refreshDateDisplay(activeDatePickerTarget);
+        if(activeDatePickerTarget === 'eventFormStartDate') onTravelFormTimeChanged();
         closeDatePicker();
       });
     }
@@ -17870,6 +17951,7 @@ document.getElementById('customDateNext').addEventListener('click', () => {
 document.getElementById('customDateToday').addEventListener('click', () => {
   document.getElementById(activeDatePickerTarget).value = toDateInputValue(TODAY);
   refreshDateDisplay(activeDatePickerTarget);
+  if(activeDatePickerTarget === 'eventFormStartDate') onTravelFormTimeChanged();
   closeDatePicker();
 });
 document.getElementById('customDatePopup').addEventListener('click', (e) => {
@@ -17914,6 +17996,7 @@ function openTimePicker(targetId){
 function applyTimePickerValue(targetId, val){
   document.getElementById(targetId).value = val;
   refreshTimeDisplay(targetId);
+  if(targetId === 'eventFormStart') onTravelFormTimeChanged();
   // 일정 폼에서 시작 시간을 고르면 종료 시간은 기본으로 1시간 뒤로 맞춤 (자정을 넘기면 하루짜리 일정은 다음 날로)
   if(targetId === 'eventFormStart'){
     let endMin = timeStrToMin(val) + 60;
