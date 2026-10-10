@@ -2876,6 +2876,8 @@
   .chat-room-view.over-friend-cal{ z-index:2850; } /* 물어보기로 들어온 방을 밀어 닫는 동안 뒤에 친구 캘린더가 보이게 */
   /* 밀어서 나가는 중엔 왼쪽 가장자리에 그림자를 줘서 채팅 목록 위에 떠 있는 느낌 */
   .chat-room-view.swiping{ box-shadow:-8px 0 24px rgba(0,0,0,.18); will-change:transform; }
+  /* 아이폰 입력 커서(깜빡이는 막대)는 화면 밀기(transform)를 따라오지 않고 제자리에 남아서, 미는 동안은 숨김 */
+  .chat-room-view.swiping input, .chat-room-view.swiping textarea{ caret-color:transparent; }
 
   .chat-room-header{
     display:flex;
@@ -9669,6 +9671,44 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   if(!cap || typeof cap.getPlatform !== 'function' || cap.getPlatform() !== 'ios') return;
   const kb = cap.Plugins && cap.Plugins.Keyboard;
   if(kb && kb.setAccessoryBarVisible) kb.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
+})();
+
+// 키보드가 떠 있을 때 화면을 손가락으로 아래로 쓸어내리면 키보드를 내림 (모든 화면 공통)
+(function setupSwipeDownDismissKeyboard(){
+  const NON_TEXT_INPUT = /^(checkbox|radio|range|button|submit|reset|file|color|image|hidden)$/i;
+  const KEEP_KEYBOARD_AREAS = '[id$="Results"], #eventTitleSuggest, #locationPickerSuggestList, #chatSearchSenderList, .chat-keyboard';
+  function focusedTextField(){
+    const el = document.activeElement;
+    if(!el || el === document.body) return null;
+    if(el.tagName === 'TEXTAREA' || el.isContentEditable) return el;
+    if(el.tagName === 'INPUT' && !NON_TEXT_INPUT.test(el.type || '')) return el;
+    return null;
+  }
+  let startX = 0, startY = 0, tracking = false;
+  document.addEventListener('touchstart', (e) => {
+    tracking = false;
+    if(e.touches.length !== 1) return;
+    const field = focusedTextField();
+    // 입력칸 안에서 끄는 건 글자 선택/커서 이동이라 그대로 둠
+    if(!field || field.contains(e.target)) return;
+    // 검색 결과/추천 목록은 포커스가 빠지면 사라지는 곳이 있어, 목록을 스크롤할 때는 키보드를 그대로 둠
+    if(e.target.closest && e.target.closest(KEEP_KEYBOARD_AREAS)) return;
+    startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true, capture: true });
+  document.addEventListener('touchmove', (e) => {
+    if(!tracking) return;
+    const t = e.touches[0];
+    const mx = t.clientX - startX, my = t.clientY - startY;
+    if(Math.abs(mx) > 30 && Math.abs(mx) > Math.abs(my)){ tracking = false; return; } // 가로 밀기는 무시
+    if(my > 40 && my > Math.abs(mx) * 1.5){
+      tracking = false;
+      const field = focusedTextField();
+      if(field) field.blur();
+    }
+  }, { passive: true, capture: true });
+  document.addEventListener('touchend', () => { tracking = false; }, { passive: true, capture: true });
+  document.addEventListener('touchcancel', () => { tracking = false; }, { passive: true, capture: true });
 })();
 
 // ---------- 카카오맵 링크를 앱에서 열기 ----------
