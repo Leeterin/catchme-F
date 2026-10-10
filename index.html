@@ -30568,6 +30568,21 @@ function inviteHoursLabel(hours){
 function inviteOpenSet(inv){
   return inv && inv.status === 'OPEN' && Array.isArray(inv.openCells) ? new Set(inv.openCells) : null;
 }
+// 응답 받는 중인데 후보 날짜가 다 지난 링크 = 마감 (서버가 계산해 주고, 예전 응답이면 여기서 계산)
+function inviteExpired(inv){
+  if(!inv || inv.status !== 'OPEN') return false;
+  if(typeof inv.expired === 'boolean') return inv.expired;
+  const end = inviteDateObj([...inv.dates].sort().pop());
+  end.setHours(inv.endHour);
+  return end.getTime() <= Date.now();
+}
+// 이미 끝난 1시간 칸 (진행 중인 칸은 아직 고를 수 있음)
+function invitePastCell(key){
+  const [date, hh] = key.split('|');
+  const end = inviteDateObj(date);
+  end.setHours(Number(hh) + 1);
+  return end.getTime() <= Date.now();
+}
 function inviteDatesSummary(inv){
   const first = inviteDateLabel(inv.dates[0]);
   const more = inv.dates.length > 1 ? ` 외 ${inv.dates.length - 1}일` : '';
@@ -31127,11 +31142,11 @@ function openInviteCreate(fromList, opts = {}){
   // 기본은 "내 캘린더의 예약 가능 시간"으로 - 직접 고르기는 탭으로 바꿀 수 있음
   inviteState.draft = {
     source: opts.source || 'calendar',
-    dates: new Set([inviteYmd(sat)]), title: '', startHour: 10, endHour: 22,
+    dates: new Set([inviteYmd(sat)]), title: opts.title || '', startHour: opts.startHour ?? 10, endHour: opts.endHour ?? 22,
     calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
     calDates: new Set(),
     calError: '',
-    audience: 'friends', // 친구용(모두 + 친구만 시간) / 'group:<id>'(모든 친구 + 그 그룹에 연 시간) / 업무용(모두 + 업무용 시간)
+    audience: opts.audience || 'friends', // 친구용(모두 + 친구만 시간) / 'group:<id>'(모든 친구 + 그 그룹에 연 시간) / 업무용(모두 + 업무용 시간)
     place: opts.place || null, // 추천 게시물에서 "약속 장소로 선택"하고 들어오면 장소가 붙어있음
   };
   inviteState.fromList = !!fromList;
@@ -31139,6 +31154,19 @@ function openInviteCreate(fromList, opts = {}){
   showInviteOverlay();
   renderInviteOverlay();
   loadInviteCalendarDays();
+}
+
+// 마감된 링크를 같은 방식·이름·장소로 날짜만 새로 골라 다시 만듦
+function remakeInvite(inv){
+  openInviteCreate(true, {
+    source: inv.fromCalendar ? 'calendar' : 'manual',
+    // 자동으로 붙은 이름("토요일 만날 시간 골라줘!" 등)은 새 날짜와 안 맞을 수 있어서 직접 적은 이름만 가져옴
+    title: /골라줘!$/.test(inv.title) ? '' : inv.title,
+    place: inv.place,
+    audience: inv.fromCalendar ? inv.audience : undefined,
+    startHour: inv.fromCalendar ? undefined : inv.startHour,
+    endHour: inv.fromCalendar ? undefined : inv.endHour,
+  });
 }
 
 async function loadInviteCalendarDays(){
@@ -31333,9 +31361,12 @@ function renderInviteListHtml(){
       <div class="inv-hero-sub">날짜만 골라 링크를 보내면, CATCHME에 가입 안 한 친구도 링크를 열어 가능한 시간을 바로 골라줄 수 있어요.</div>
     </div>`;
   if(!list.length) return intro + '<div class="inv-empty">아직 만든 약속 링크가 없어요.</div>';
-  return intro + '<div class="inv-label">내가 만든 약속</div>' + list.map(inv => {
+  // 마감된 링크는 아래로 (나머지 순서는 그대로)
+  const sorted = [...list].sort((a, b) => inviteExpired(a) - inviteExpired(b));
+  return intro + '<div class="inv-label">내가 만든 약속</div>' + sorted.map(inv => {
     const badge = inv.status === 'CONFIRMED' ? '<span class="inv-badge done">확정</span>'
       : inv.status === 'CANCELLED' ? '<span class="inv-badge off">취소됨</span>'
+      : inviteExpired(inv) ? '<span class="inv-badge off">마감</span>'
       : `<span class="inv-badge">응답 ${inv.responses.length}명</span>`;
     const sub = inv.status === 'CONFIRMED' ? inviteConfirmedLabel(inv) : inviteDatesSummary(inv);
     return `<button type="button" class="inv-list-item" data-act="open" data-token="${escapeHtml(inv.token)}">
@@ -31495,6 +31526,10 @@ function renderInviteGridHtml(inv, mode){
     dates = dates.filter(date => hours.some(h => open.has(inviteCellKey(date, h))));
     hours = hours.filter(h => dates.some(date => open.has(inviteCellKey(date, h))));
   }
+  // 응답 받는 중이면 지난 칸은 빗금으로 막고, 통째로 지난 날짜는 숨김 (마감된 링크는 기록이라 그대로 보여줌)
+  const expired = inviteExpired(inv);
+  const hidePast = isOpen && !expired;
+  if(hidePast) dates = dates.filter(date => hours.some(h => !invitePastCell(inviteCellKey(date, h))));
   let html = '<div class="inv-grid-wrap"><table class="inv-grid"><thead><tr><th></th>';
   dates.forEach(date => {
     const label = inviteDateLabel(date);
@@ -31508,8 +31543,9 @@ function renderInviteGridHtml(inv, mode){
       const n = counts[key] || 0;
       const heat = n ? (0.15 + 0.6 * n / max).toFixed(2) : 0;
       let cls = 'inv-cell';
-      if(!isOpen) cls += ' readonly';
+      if(!isOpen || expired) cls += ' readonly';
       if(open && !open.has(key)) cls += ' closed';
+      else if(hidePast && invitePastCell(key)) cls += ' closed';
       if(confirmedCells.has(key)) cls += ' confirmed';
       else if(mode === 'guest' && st.myCells.has(key)) cls += ' mine';
       const partial = mode === 'guest' && st.myCells.has(key) ? inviteMinePartialBg(key, myBlocks) : '';
@@ -31526,8 +31562,10 @@ function renderInviteManageHtml(){
   const inv = inviteState.invite;
   const link = inviteLink(inv.token);
   const n = inv.responses.length;
+  const expired = inviteExpired(inv);
+  const canPick = inv.status === 'OPEN' && !expired; // 확정할 칸을 고를 수 있는 상태
   let html = `<div class="inv-hero">
-      <div class="inv-hero-eyebrow">${inv.status === 'CONFIRMED' ? '확정된 약속' : inv.status === 'CANCELLED' ? '취소된 약속' : '응답 받는 중'}</div>
+      <div class="inv-hero-eyebrow">${inv.status === 'CONFIRMED' ? '확정된 약속' : inv.status === 'CANCELLED' ? '취소된 약속' : expired ? '마감된 약속' : '응답 받는 중'}</div>
       <div class="inv-hero-title">${escapeHtml(inv.title)}</div>
       <div class="inv-hero-sub">${escapeHtml(inviteDatesSummary(inv))}</div>
     </div>${invitePlaceHtml(inv.place, false)}`;
@@ -31539,6 +31577,8 @@ function renderInviteManageHtml(){
         <div class="inv-card-desc">내 캘린더에 담았어요. 친구들은 같은 링크에서 확정된 시간을 볼 수 있어요.</div>
         <div class="inv-share-btns" style="margin-top:10px;"><button type="button" data-act="share">확정 소식 다시 보내기</button></div>
       </div>`;
+  } else if(expired){
+    html += `<div class="inv-card"><div class="inv-card-desc">후보 날짜가 모두 지나서 친구들이 더 이상 응답할 수 없어요. 아래 "새 날짜로 다시 만들기"를 누르면 이름과 장소는 그대로 두고 날짜만 다시 골라 새 링크를 만들 수 있어요.</div></div>`;
   } else if(inv.status === 'OPEN'){
     html += `<div class="inv-card accent">
         <div class="inv-card-title">${ICO.pin} 이 링크를 친구들에게 보내주세요</div>
@@ -31555,16 +31595,16 @@ function renderInviteManageHtml(){
     html += '<div class="inv-card"><div class="inv-card-desc">이 약속은 취소됐어요. 링크를 열어도 더 이상 응답할 수 없어요.</div></div>';
   }
 
-  html += `<div class="inv-sub-head"><b>응답 ${n}명</b><span>${inv.status === 'OPEN' && n ? '칸을 눌러 확정할 시간을 골라요' : '칸의 숫자 = 가능한 인원'}</span></div>`;
+  html += `<div class="inv-sub-head"><b>응답 ${n}명</b><span>${canPick && n ? '칸을 눌러 확정할 시간을 골라요' : '칸의 숫자 = 가능한 인원'}</span></div>`;
   if(n === 0){
-    html += '<div class="inv-card"><div class="inv-card-desc">아직 응답한 친구가 없어요. 링크를 보내면 응답이 올 때마다 알려드릴게요.</div></div>';
+    html += `<div class="inv-card"><div class="inv-card-desc">${expired ? '응답한 친구가 없었어요.' : '아직 응답한 친구가 없어요. 링크를 보내면 응답이 올 때마다 알려드릴게요.'}</div></div>`;
   }
   const openNow = inviteOpenSet(inv);
-  if(openNow && openNow.size === 0){
+  if(!expired && openNow && openNow.size === 0){
     html += '<div class="inv-card"><div class="inv-card-desc">지금은 캘린더에 남은 예약 가능 시간이 없어서 친구들이 고를 칸이 없어요. 캘린더에서 예약 가능 시간을 다시 등록해주세요.</div></div>';
   }
   html += renderInviteGridHtml(inv, 'manage');
-  if(inv.status === 'OPEN' && n){
+  if(canPick && n){
     html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>칸을 눌러 고르고, 끝나는 시간은 아래에서 늘릴 수 있어요</span></div>`;
     const sel = inviteState.confirmSel;
     if(sel){
@@ -31583,7 +31623,7 @@ function renderInviteManageHtml(){
     }
   }
   if(n){
-    const sel = inv.status === 'OPEN' ? inviteState.confirmSel : null;
+    const sel = canPick ? inviteState.confirmSel : null;
     const okNames = sel ? new Set(inviteAvailableFor(inv, sel).map(r => r.name)) : null;
     html += `<div class="inv-label">${sel ? '고른 시간에 되는 사람' : '응답한 사람'}</div><div class="inv-people">`
       + inv.responses.map(r => {
@@ -31642,6 +31682,11 @@ function renderInviteGuestHtml(){
     return html;
   }
 
+  if(inviteExpired(inv)){
+    return `<div class="inv-hero"><div class="inv-hero-eyebrow">${creator}님의 약속</div><div class="inv-hero-title">${escapeHtml(inv.title)}</div></div>${invitePlaceHtml(inv.place, false)}
+      <div class="inv-card"><div class="inv-card-desc">날짜가 지나서 마감된 링크예요. ${creator}님에게 새 링크를 받아주세요.</div></div>`;
+  }
+
   // 응답 받는 중 - 가입 이야기는 꺼내지 않고, 이름 + 시간 고르기만
   const others = inv.responses.filter(r => !r.mine);
   let html = `<div class="inv-hero">
@@ -31681,6 +31726,10 @@ function renderInviteFoot(){
   const foot = document.getElementById('inviteFoot');
   const inv = st.invite;
   if(!inv){ foot.innerHTML = ''; return; }
+  if(st.mode === 'manage' && inviteExpired(inv)){
+    foot.innerHTML = '<button type="button" class="inv-primary" data-act="remake">새 날짜로 다시 만들기</button>';
+    return;
+  }
   if(st.mode === 'manage' && inv.status === 'OPEN'){
     const sel = st.confirmSel;
     let main;
@@ -31701,7 +31750,7 @@ function renderInviteFoot(){
     foot.innerHTML = `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite"${st.busy ? ' disabled' : ''}>${st.armed === 'cancel' ? '한 번 더 누르면 모두의 캘린더에서 약속이 취소돼요' : '확정된 약속 취소하기'}</button>`;
     return;
   }
-  if(st.mode === 'guest' && inv.status === 'OPEN'){
+  if(st.mode === 'guest' && inv.status === 'OPEN' && !inviteExpired(inv)){
     const n = st.myCells.size;
     const label = st.busy ? '보내는 중...'
       : n === 0 ? '되는 시간을 눌러 골라주세요'
@@ -31755,8 +31804,9 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
 
   const cell = e.target.closest('.inv-cell');
   if(cell){
-    if(!inv || inv.status !== 'OPEN') return;
+    if(!inv || inv.status !== 'OPEN' || inviteExpired(inv)) return;
     const key = cell.dataset.cell;
+    if(invitePastCell(key)){ showToast('이미 지난 시간이에요.'); return; }
     if(st.mode === 'guest'){
       if(cell.classList.contains('closed')){ showToast(`${inviteCreatorName(inv)}님이 안 되는 시간이에요.`); return; }
       if(st.myCells.has(key)) st.myCells.delete(key); else st.myCells.add(key);
@@ -31779,7 +31829,7 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
 
   // 비회원 화면: 날짜/시간 머리글을 누르면 그 줄 전체를 한 번에 켜고 끔
   const head = e.target.closest('.inv-grid th[data-date], .inv-grid th[data-hour]');
-  if(head && st.mode === 'guest' && inv && inv.status === 'OPEN'){
+  if(head && st.mode === 'guest' && inv && inv.status === 'OPEN' && !inviteExpired(inv)){
     let keys = [];
     if(head.dataset.date){
       for(let h = inv.startHour; h < inv.endHour; h++) keys.push(inviteCellKey(head.dataset.date, h));
@@ -31788,6 +31838,7 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
     }
     const open = inviteOpenSet(inv);
     if(open) keys = keys.filter(k => open.has(k));
+    keys = keys.filter(k => !invitePastCell(k));
     if(!keys.length) return;
     const allOn = keys.every(k => st.myCells.has(k));
     keys.forEach(k => { if(allOn) st.myCells.delete(k); else st.myCells.add(k); });
@@ -31817,6 +31868,7 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
   if(!actEl) return;
   const act = actEl.dataset.act;
   if(act === 'new') openInviteCreate(true);
+  else if(act === 'remake' && inv) remakeInvite(inv);
   else if(act === 'open') openInviteByToken(actEl.dataset.token, { fromList: true });
   else if(act === 'create') createInviteFromDraft();
   else if(act === 'src' && st.draft){
