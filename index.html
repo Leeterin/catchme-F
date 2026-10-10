@@ -5398,7 +5398,13 @@
   .qa-range-edit{ justify-content:flex-end; margin-bottom:2px; }
   .qa-range-note{ margin:0 8px 4px; font-size:11px; color:var(--text-dim); }
   .qa-quick{ display:flex; gap:6px; margin:4px 0 2px; }
-  .qa-repeat{ margin:0 0 10px; }
+  .qa-repeat{ display:flex; justify-content:flex-end; margin:-2px 0 4px; }
+  .qa-switch{ display:inline-flex; align-items:center; gap:6px; background:none; border:none; padding:2px 0; font-size:12px; font-weight:600; color:var(--text-dim); font-family:inherit; cursor:pointer; }
+  .qa-switch i{ position:relative; width:30px; height:18px; border-radius:999px; background:rgba(120,120,128,.32); transition:background .15s; }
+  .qa-switch i::after{ content:''; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:transform .15s; }
+  .qa-switch[aria-checked="true"]{ color:var(--text); }
+  .qa-switch[aria-checked="true"] i{ background:var(--accent); }
+  .qa-switch[aria-checked="true"] i::after{ transform:translateX(12px); }
   .qa-quick button{ flex:1; padding:8px 0; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text); font-size:12px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
   .qa-legend{ display:flex; justify-content:flex-end; gap:10px; margin:6px 8px 0; font-size:10px; color:var(--text-dim); }
   .qa-legend i{ display:inline-block; width:12px; height:8px; margin-right:3px; border-radius:2px; vertical-align:-1px; background:rgba(120,120,128,.38); }
@@ -7551,7 +7557,7 @@
     <!-- 예약 가능 시간 빠르게 열기 입구 - 항상 보이게 둬서 열어둔 기간이 지나 비었을 때도 바로 다시 열 수 있게 함 -->
     <button type="button" class="quick-avail-entry" id="quickAvailEntryBtn">
       <span class="quick-avail-entry-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-      <span class="quick-avail-entry-text"><b>예약 가능 시간 빠르게 열기</b><small id="quickAvailEntryStatus">요일별 시간만 정하면 한 달 동안 반복해서 열 수 있어요</small></span>
+      <span class="quick-avail-entry-text"><b>예약 가능 시간 빠르게 열기</b><small id="quickAvailEntryStatus">요일별 시간만 정하면 4주 동안 반복해서 열 수 있어요</small></span>
       <span class="quick-avail-entry-go">&rsaquo;</span>
     </button>
     <div class="segment-control" id="scheduleSegment">
@@ -8262,15 +8268,14 @@
     </div>
   </div>
 
-  <!-- 예약 가능 시간 빠르게 열기 - 월~일 시간 막대를 맞춰서 이번 주만, 또는 한 달 동안 매주 반복해서 예약 가능 시간을 만듦 -->
+  <!-- 예약 가능 시간 빠르게 열기 - 월~일 시간 막대를 맞춰서 이번 주만, 또는 4주 동안 매주 반복해서 예약 가능 시간을 만듦 -->
   <div class="mini-confirm-overlay" id="quickAvailOverlay">
     <div class="mini-confirm-card quick-avail-card">
       <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
       <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
-      <div class="repeat-toggle-row qa-repeat" id="quickAvailRepeatRow">
-        <button class="repeat-mode-btn" data-qa-repeat="once" type="button">이번 주만</button>
-        <button class="repeat-mode-btn" data-qa-repeat="month" type="button">한 달 동안 반복</button>
+      <div class="qa-repeat" id="quickAvailRepeatRow">
+        <button type="button" class="qa-switch" id="quickAvailRepeatSwitch" role="switch" aria-checked="false"><span>4주 반복</span><i></i></button>
       </div>
       <p class="quick-avail-desc" id="quickAvailDesc"></p>
       <!-- 누구에게 열지는 대상마다 탭으로 나눠 정함 - 두 탭에 같은 시간을 열면 그 시간은 둘 다에게 열림 -->
@@ -28955,15 +28960,15 @@ function openMyAvailabilityForm(){
 
 // ---------- 예약 가능 시간 빠르게 열기 ----------
 // 칸 드래그 + 분 단위 조정은 처음 쓰는 사람한텐 너무 무거워서, 요일마다 "몇 시부터 몇 시까지"를 막대로만 정해서
-// 이번 주만 또는 한 달 동안 매주 반복해서 만듦. 처음엔 평일/주말 두 줄만 보여주고, 원하면 요일별로 펼침.
+// 이번 주만 또는 4주 동안 매주 반복해서 만듦. 처음엔 평일/주말 두 줄만 보여주고, 원하면 요일별로 펼침.
 // 반복 일정 대신 날짜별 하루짜리 일정으로 만드는 이유: 예약이 확정되면 서버가
 // 겹치는 "예약 가능"을 잘라내는데(clearAvailabilityInRange) 반복 일정은 그 처리를 못 해서 패턴 전체가 깨짐
-// 'once' = 오늘부터 7일(이번 주만), 'month' = 오늘부터 다음 달 같은 날 전까지 매주 반복
+// 'once' = 오늘부터 7일(이번 주만), 'month' = 오늘부터 4주(28일) 동안 매주 반복
 let quickAvailRepeat = 'once';
 const QUICK_REPEAT_KEY = 'catchme_quick_repeat';
 function quickAvailEnd(){
   const end = new Date(TODAY);
-  if(quickAvailRepeat === 'month') end.setMonth(end.getMonth() + 1); else end.setDate(end.getDate() + 7);
+  end.setDate(end.getDate() + (quickAvailRepeat === 'month' ? 28 : 7));
   return end;
 }
 function quickAvailDays(){ return Math.round((quickAvailEnd() - new Date(TODAY)) / 86400000); }
@@ -29230,7 +29235,7 @@ function renderQuickAvailEntry(){
   document.getElementById('quickAvailEntryBtn').classList.toggle('compact', n > 0);
   el.textContent = n > 0
     ? `예약 가능 시간: 앞으로 2주 중 ${n}일 열려 있어요 · 더 열기`
-    : '아직 열어둔 시간이 없어요 · 요일별 시간만 정하면 한 달 동안 반복해서 열 수 있어요';
+    : '아직 열어둔 시간이 없어요 · 요일별 시간만 정하면 4주 동안 반복해서 열 수 있어요';
 }
 document.getElementById('quickAvailEntryBtn').addEventListener('click', openQuickAvail);
 document.getElementById('firstEventAddBtn').addEventListener('click', () => {
@@ -29828,10 +29833,10 @@ function renderQuickAvail(){
     html += `<div class="qa-legend">${busyAll.some(quickBusyWeekly) ? `<span><i></i>${quickAvailRepeat === 'month' ? '매주 일정' : '내 일정'}</span>` : ''}${busyAll.some(b => !b.soft && !quickBusyWeekly(b)) ? '<span><i class="once"></i>그날만 있는 일정</span>' : ''}${busyAll.some(b => b.soft) ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>다른 탭에 연 시간</span>' : ''}</div>`;
   }
   document.getElementById('quickAvailRows').innerHTML = html;
-  document.querySelectorAll('[data-qa-repeat]').forEach(b => b.classList.toggle('active', b.dataset.qaRepeat === quickAvailRepeat));
+  document.getElementById('quickAvailRepeatSwitch').setAttribute('aria-checked', quickAvailRepeat === 'month' ? 'true' : 'false');
   const last = quickAvailEnd(); last.setDate(last.getDate() - 1);
   document.getElementById('quickAvailDesc').innerHTML = `정한 시간이 ${quickAvailRepeat === 'month'
-    ? `<b>한 달 동안(~${last.getMonth() + 1}/${last.getDate()}) 매주 반복</b>해서` : `<b>이번 주만(~${last.getMonth() + 1}/${last.getDate()})</b>`} 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.`;
+    ? `<b>4주 동안(~${last.getMonth() + 1}/${last.getDate()}) 매주 반복</b>해서` : `<b>이번 주만(~${last.getMonth() + 1}/${last.getDate()})</b>`} 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.`;
   // 평일/주말 한 번에 열기 - 다 열려 있으면 한 번에 닫기로 바뀜
   document.querySelectorAll('[data-qa-bulk]').forEach(b => {
     const g = QUICK_AVAIL_GROUPS.find(x => x.key === b.dataset.qaBulk);
@@ -29904,10 +29909,8 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     if(quickAvailTabs[tabBtn.dataset.qaTab]){ selectQuickTab(tabBtn.dataset.qaTab); renderQuickAvail(); }
     return;
   }
-  const repeatBtn = e.target.closest('[data-qa-repeat]');
-  if(repeatBtn){
-    if(repeatBtn.dataset.qaRepeat === quickAvailRepeat) return;
-    quickAvailRepeat = repeatBtn.dataset.qaRepeat;
+  if(e.target.closest('#quickAvailRepeatSwitch')){
+    quickAvailRepeat = quickAvailRepeat === 'month' ? 'once' : 'month';
     try { localStorage.setItem(QUICK_REPEAT_KEY, quickAvailRepeat); } catch(err) {}
     // 기간이 바뀌면 "지금 열려 있는 시간"도 그 기간 기준으로 다시 봄 - 안 고친 탭은 새 기준으로 맞추고, 고친 탭은 고친 시간 그대로 둠
     quickTabKeys().forEach(k => {
@@ -30300,7 +30303,7 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
   // 열린 날 수(정한 기간 기준)를 그대로 말하면 다른 곳의 "앞으로 2주 중 N일"과 숫자가 달라 헷갈림 -
   // 여기선 "얼마 동안 열렸는지"만 말하고, 지금 열린 정도는 상태 문구(앞으로 2주 중 N일)로 통일
   const msgs = [];
-  if(opened) msgs.push(`예약 가능 시간을 ${quickAvailRepeat === 'month' ? '한 달 동안 매주 반복해서' : '이번 주에'} 열었어요.${mergedCount ? ' 다른 대상에 열린 시간과 겹치는 부분은 하나로 합쳤어요.' : ''}`);
+  if(opened) msgs.push(`예약 가능 시간을 ${quickAvailRepeat === 'month' ? '4주 동안 매주 반복해서' : '이번 주에'} 열었어요.${mergedCount ? ' 다른 대상에 열린 시간과 겹치는 부분은 하나로 합쳤어요.' : ''}`);
   if(closedDays.size) msgs.push(opened ? `줄인 시간은 닫았어요.` : `${closedDays.size}일의 시간을 닫았어요.`);
   if(skippedRecurring.size) msgs.push('반복으로 열어둔 시간은 캘린더에서 직접 지워 주세요.');
   showToast(msgs.join(' '), skippedRecurring.size ? 3600 : undefined);
