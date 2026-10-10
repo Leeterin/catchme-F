@@ -11189,10 +11189,12 @@ async function loadSettingsFromServer(){
       const serverKey = SETTINGS_KEY_MAP[localKey];
       if(localKey === 'color_labels'){
         // 서버에 아직 없으면(예전 계정) 폰에 기억해 둔 이름을 서버로 올림
-        if(Array.isArray(data.settings[serverKey])){
-          settingsState.color_labels = data.settings[serverKey];
+        const local = settingsState.color_labels;
+        const server = data.settings[serverKey];
+        if(Array.isArray(server) && (server.some(Boolean) || !local.some(Boolean))){
+          settingsState.color_labels = server;
           try { localStorage.setItem('catchme_color_labels', JSON.stringify(settingsState.color_labels)); } catch(_){}
-        } else if(data.settings[serverKey] === null && settingsState.color_labels.some(Boolean)) saveSettingToServer('color_labels');
+        } else if(server !== undefined && local.some(Boolean)) saveSettingToServer('color_labels');
         return;
       }
       if(data.settings[serverKey] !== undefined) settingsState[localKey] = data.settings[serverKey];
