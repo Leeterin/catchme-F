@@ -6187,26 +6187,6 @@
   .visibility-pick-btn.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .visibility-hint{ margin-top:7px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
   .visibility-pick-btn.private.on{ border-color:var(--cta); color:var(--cta); background:rgba(255,107,74,0.1); }
-  /* 일정 폼 - 이 일정 색 고르기: [자동 | 직접 선택] 두 칸 (직접 선택 칸에 지금 고른 색 점 + 색 코드) */
-  .event-color-picker{
-    display:flex;
-    border:1px solid var(--line);
-    border-radius:12px;
-    background:var(--surface-2);
-    padding:3px;
-    gap:3px;
-  }
-  .ecs-btn{
-    flex:1;
-    display:flex; align-items:center; justify-content:center; gap:7px;
-    height:36px;
-    border:none; border-radius:9px;
-    background:transparent;
-    color:var(--text-dim);
-    font-size:13px; font-weight:600; font-family:'Inter',sans-serif;
-    cursor:pointer;
-  }
-  .ecs-btn.on{ background:var(--surface); color:var(--text); font-weight:700; box-shadow:0 1px 4px rgba(23,24,29,0.10); }
   .ecs-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; box-shadow:0 0 0 1px rgba(0,0,0,0.12); }
   .ecs-hex{ font-family:'Roboto Mono',monospace; font-size:12px; letter-spacing:0.2px; }
   /* 일정 폼 - 색상 접힌 줄 (누르면 아래 패널이 펼쳐짐) */
@@ -6219,7 +6199,6 @@
     cursor:pointer;
   }
   .event-color-toggle .ect-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .event-color-toggle .ect-auto{ background:conic-gradient(#ff6b6b, #ffd43b, #51cf66, #339af0, #cc5de8, #ff6b6b); }
   .event-color-toggle .ect-chev{ color:var(--text-dim); font-size:12px; transition:transform .15s ease; }
   .event-color-toggle[aria-expanded="true"] .ect-chev{ transform:rotate(180deg); }
   .event-color-panel{ margin-top:10px; animation:ecmOpen .18s ease both; }
@@ -6301,42 +6280,7 @@
   .week-block-sheet-detail{ margin:-4px 0 14px; }
   .week-block-sheet-detail .ev-info{ gap:5px; }
   .week-block-sheet-detail .ev-info-line{ font-size:13px; }
-  .event-color-mixer{
-    margin-top:10px;
-    padding:12px;
-    border-radius:14px;
-    background:var(--surface-2);
-    animation:ecmOpen .18s ease both;
-  }
   @keyframes ecmOpen{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
-  .ecm-sv{
-    position:relative;
-    height:140px;
-    border-radius:10px;
-    touch-action:none;
-    cursor:crosshair;
-    background:linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, rgba(255,255,255,0));
-    background-color:hsl(200,100%,50%);
-  }
-  .ecm-hue{
-    position:relative;
-    height:16px;
-    margin-top:12px;
-    border-radius:999px;
-    touch-action:none;
-    cursor:pointer;
-    background:linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
-  }
-  .ecm-sv-thumb, .ecm-hue-thumb{
-    position:absolute;
-    width:20px; height:20px;
-    margin:-10px 0 0 -10px;
-    border-radius:50%;
-    border:3px solid #fff;
-    box-shadow:0 0 0 1px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.25);
-    pointer-events:none;
-  }
-  .ecm-hue-thumb{ top:50%; }
 
   .group-chip-picker{
     display:flex;
@@ -7808,17 +7752,11 @@
         </div>
         <div class="mp-input-group">
           <label>색상</label>
-          <!-- 지금 고른 색 한 줄만 보이고, 누르면 라벨·직접 선택이 펼쳐짐 -->
+          <!-- 지금 고른 색 한 줄만 보이고, 누르면 라벨 10개가 펼쳐짐 -->
           <button type="button" class="event-color-toggle" id="eventColorToggle" aria-expanded="false"></button>
           <div class="event-color-panel" id="eventColorPanel" style="display:none;">
-            <div class="ecl-head"><span id="eventColorLabelHint">라벨을 고르거나 직접 색을 골라요</span><button type="button" class="ecl-edit-btn" id="eventColorLabelEditBtn">이름 바꾸기</button></div>
+            <div class="ecl-head"><span id="eventColorLabelHint">라벨을 골라요</span><button type="button" class="ecl-edit-btn" id="eventColorLabelEditBtn">이름 바꾸기</button></div>
             <div class="event-color-labels" id="eventColorLabels"></div>
-            <div class="event-color-picker" id="eventColorPicker"></div>
-            <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 -->
-            <div class="event-color-mixer" id="eventColorMixer" style="display:none;">
-              <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
-              <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
-            </div>
           </div>
         </div>
         <!-- 장소 - 카카오 장소 검색으로 고르거나 그냥 적어도 됨 (나만 보임). 이동시간을 켠 사람은 도착지로도 자동으로 채움 -->
@@ -16892,7 +16830,6 @@ const EVENT_COLOR_LABELS = [
   { color: '#78716C', name: '갈색' },
 ];
 const COLOR_LABEL_NAME_MAX = 12;
-const EVENT_CUSTOM_COLOR_START = '#0EA5E9'; // 직접 선택을 처음 눌렀을 때 판의 시작 색 (라벨 10색과 겹치지 않게)
 // 내가 바꾼 이름 (빈칸이면 기본 이름) - 서버 설정에 저장하고, 폰에도 기억해 둠
 function colorLabelNames(){
   const names = Array.isArray(settingsState.color_labels) ? settingsState.color_labels : [];
@@ -16927,7 +16864,7 @@ function renderEventColorLabels(){
   document.getElementById('eventColorLabelEditBtn').textContent = eventColorLabelEditing ? '완료' : '이름 바꾸기';
   document.getElementById('eventColorLabelHint').textContent = eventColorLabelEditing
     ? '라벨마다 이름을 적어요 (비우면 기본 이름)'
-    : '라벨을 고르거나 직접 색을 골라요';
+    : '라벨을 골라요';
   box.innerHTML = EVENT_COLOR_LABELS.map((l, i) => eventColorLabelEditing
     ? `<div class="ecl-btn" style="--ecl-c:${l.color}"><span class="ecs-dot" style="background:${l.color}"></span><input type="text" data-ecl-name="${i}" maxlength="${COLOR_LABEL_NAME_MAX}" placeholder="${escapeHtml(l.name)}" value="${escapeHtml(names[i] === l.name ? '' : names[i])}" /></div>`
     : `<button type="button" class="ecl-btn${sel === i ? ' on' : ''}" style="--ecl-c:${l.color}" data-ecl="${i}"><span class="ecs-dot" style="background:${l.color}"></span><span class="ecl-name">${escapeHtml(names[i])}</span>${sel === i ? '<span class="ecl-check">✓</span>' : ''}</button>`
@@ -16961,14 +16898,15 @@ document.getElementById('eventColorLabelEditBtn').addEventListener('click', () =
 });
 
 // 일정 폼의 색상 선택 UI를 formColor 상태에 맞게 다시 그림
-// 위: 라벨 10개 / 아래: [자동 | 직접 선택] - 직접 선택일 때만 색 판을 펼침
+// 접힌 줄을 누르면 라벨 10개가 펼쳐짐 (자동·직접 선택 없이 라벨 색만)
 let eventColorPanelOpen = false;
 function renderEventColorToggle(){
+  // 예전에 자동·직접 선택으로 만든 일정은 그 색을 그대로 보여 줌 (라벨을 고르면 바뀜)
   const isCustom = !!formColor && colorLabelIndex(formColor) < 0;
-  const name = !formColor ? '자동' : isCustom ? formColor.toUpperCase() : colorLabelName(formColor);
+  const name = !formColor ? '색 없음' : isCustom ? formColor.toUpperCase() : colorLabelName(formColor);
   const btn = document.getElementById('eventColorToggle');
   btn.setAttribute('aria-expanded', eventColorPanelOpen ? 'true' : 'false');
-  btn.innerHTML = `<span class="ecs-dot${formColor ? '' : ' ect-auto'}"${formColor ? ` style="background:${formColor}"` : ''}></span><span class="ect-name${isCustom ? ' ecs-hex' : ''}">${escapeHtml(name)}</span><span class="ect-chev">▼</span>`;
+  btn.innerHTML = `<span class="ecs-dot"${formColor ? ` style="background:${formColor}"` : ''}></span><span class="ect-name${isCustom ? ' ecs-hex' : ''}">${escapeHtml(name)}</span><span class="ect-chev">▼</span>`;
   document.getElementById('eventColorPanel').style.display = eventColorPanelOpen ? '' : 'none';
 }
 function setEventColorPanelOpen(open){
@@ -16978,138 +16916,9 @@ function setEventColorPanelOpen(open){
 }
 document.getElementById('eventColorToggle').addEventListener('click', () => setEventColorPanelOpen(!eventColorPanelOpen));
 function renderEventColorPicker(){
-  const isCustom = !!formColor && colorLabelIndex(formColor) < 0;
   renderEventColorToggle();
   renderEventColorLabels();
-  document.getElementById('eventColorPicker').innerHTML = `
-    <button type="button" class="ecs-btn${formColor ? '' : ' on'}" data-color="">자동</button>
-    <button type="button" class="ecs-btn${isCustom ? ' on' : ''}" id="eventColorCustomBtn" title="아래 판에서 원하는 색 고르기">
-      <span class="ecs-dot" id="eventColorCustomDot"${isCustom ? ` style="background:${formColor}"` : ''}></span>
-      <span class="${isCustom ? 'ecs-hex' : ''}" id="eventColorCustomLabel">${isCustom ? formColor.toUpperCase() : '직접 선택'}</span>
-    </button>
-  `;
-  document.getElementById('eventColorMixer').style.display = isCustom ? '' : 'none';
-  showEventColorMixer(); // 판은 지금 고른 색 위치로만 맞추고, 자동이면 자동 그대로 둠
 }
-document.getElementById('eventColorPicker').addEventListener('click', (e) => {
-  if(e.target.closest('#eventColorCustomBtn')){
-    document.getElementById('eventColorMixer').style.display = '';
-    // 라벨을 고른 상태면 판을 라벨 색 그대로 두면 계속 라벨로 보여서, 직접 골랐던 색(없으면 하늘색)에서 시작
-    if(colorLabelIndex(formColor) >= 0) Object.assign(eventColorMixerState, hexToHsv(eventColorLastPicked || EVENT_CUSTOM_COLOR_START));
-    applyEventColorMixer(true); // 판에 보이는 색을 이 일정 색으로
-    renderEventColorLabels();
-    return;
-  }
-  const btn = e.target.closest('button[data-color]');
-  if(!btn) return;
-  formColor = btn.dataset.color || null;
-  setEventColorPanelOpen(false);
-});
-
-// ---------- 나만의 색 조제 (채도/밝기 판 + 색상 바) ----------
-// 폰 기본 색상 선택창(input type=color)은 색이 바뀔 때마다 버튼을 다시 그리면서 창이 갑자기 닫히고 버벅여서,
-// 앱 안에서 직접 그리는 패널로 바꿈. 드래그하는 동안에는 필요한 부분(썸네일 위치/미리보기 색)만 바꿔서 끊김 없게 함
-const eventColorMixerState = { h: 200, s: 0.75, v: 0.97 };
-
-function hsvToHex(h, s, v){
-  const f = n => {
-    const k = (n + h / 60) % 6;
-    return v - v * s * Math.max(0, Math.min(k, 4 - k, 1));
-  };
-  return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('').toUpperCase();
-}
-function hexToHsv(hex){
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-  if(!m) return null;
-  const n = parseInt(m[1], 16);
-  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
-  let h = 0;
-  if(d){
-    if(max === r) h = ((g - b) / d) % 6;
-    else if(max === g) h = (b - r) / d + 2;
-    else h = (r - g) / d + 4;
-    h *= 60;
-    if(h < 0) h += 360;
-  }
-  return { h, s: max ? d / max : 0, v: max };
-}
-
-// 판 위치를 지금 고른 색에 맞춤 (라벨·자동이면 직접 골랐던 색이나 하늘색 위치) - 표시만 하고 색을 고른 걸로 치지는 않음
-let eventColorLastPicked = null; // '자동'을 눌렀다가 다시 '직접 선택'을 누르면 방금 고른 색으로 돌아오게
-function showEventColorMixer(){
-  Object.assign(eventColorMixerState, hexToHsv((colorLabelIndex(formColor) < 0 && formColor) || eventColorLastPicked || EVENT_CUSTOM_COLOR_START));
-  applyEventColorMixer(false);
-}
-
-// 패널 표시(썸네일 위치/미리보기) 갱신 - pick이면 그 색을 이 일정 색으로 바로 반영 (버튼 줄 전체를 다시 그리지 않음)
-function applyEventColorMixer(pick = true){
-  const { h, s, v } = eventColorMixerState;
-  const hex = hsvToHex(h, s, v);
-  document.getElementById('ecmSv').style.backgroundColor = `hsl(${h},100%,50%)`;
-  const svThumb = document.getElementById('ecmSvThumb');
-  svThumb.style.left = (s * 100) + '%';
-  svThumb.style.top = ((1 - v) * 100) + '%';
-  svThumb.style.background = hex;
-  const hueThumb = document.getElementById('ecmHueThumb');
-  hueThumb.style.left = (h / 360 * 100) + '%';
-  hueThumb.style.background = `hsl(${h},100%,50%)`;
-  // '직접 선택' 칸의 점은 판에 보이는 색을 따라감 (자동일 때도 어떤 색이 골라질지 미리 보임)
-  const customDot = document.getElementById('eventColorCustomDot');
-  if(customDot) customDot.style.background = hex;
-
-  if(!pick) return;
-  if(formColor && colorLabelIndex(formColor) >= 0 && document.querySelector('.ecl-btn.on')) document.querySelectorAll('.ecl-btn.on').forEach(el => { el.classList.remove('on'); const c = el.querySelector('.ecl-check'); if(c) c.remove(); });
-  formColor = hex;
-  eventColorLastPicked = hex;
-  const picker = document.getElementById('eventColorPicker');
-  picker.querySelectorAll('.on').forEach(el => el.classList.remove('on'));
-  const customBtn = document.getElementById('eventColorCustomBtn');
-  if(customBtn){
-    customBtn.classList.add('on');
-    document.getElementById('eventColorCustomDot').style.background = hex;
-    const label = document.getElementById('eventColorCustomLabel');
-    label.textContent = hex.toUpperCase();
-    label.className = 'ecs-hex';
-  }
-  renderEventColorToggle();
-}
-
-// 손가락/마우스로 누른 채 움직이는 동안 계속 따라오게 (pointer capture로 영역 밖으로 나가도 유지)
-function bindEventColorMixerDrag(el, onPoint){
-  let dragging = false;
-  let rafId = 0;
-  let lastEvent = null;
-  const handle = (e) => {
-    lastEvent = e;
-    if(rafId) return;
-    rafId = requestAnimationFrame(() => {
-      rafId = 0;
-      const rect = el.getBoundingClientRect();
-      const x = Math.min(1, Math.max(0, (lastEvent.clientX - rect.left) / rect.width));
-      const y = Math.min(1, Math.max(0, (lastEvent.clientY - rect.top) / rect.height));
-      onPoint(x, y);
-      applyEventColorMixer();
-    });
-  };
-  el.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    try { el.setPointerCapture(e.pointerId); } catch(err) {}
-    e.preventDefault();
-    handle(e);
-  });
-  el.addEventListener('pointermove', (e) => { if(dragging) handle(e); });
-  const end = () => { dragging = false; };
-  el.addEventListener('pointerup', end);
-  el.addEventListener('pointercancel', end);
-}
-bindEventColorMixerDrag(document.getElementById('ecmSv'), (x, y) => {
-  eventColorMixerState.s = x;
-  eventColorMixerState.v = 1 - y;
-});
-bindEventColorMixerDrag(document.getElementById('ecmHue'), (x) => {
-  eventColorMixerState.h = Math.min(359.9, x * 360);
-});
 
 // 일정 폼의 공개설정 UI(전체공개/나만보기/그룹들 버튼)를 formVisibility 상태에 맞게 다시 그림
 function renderVisibilityPicker(){
@@ -17567,7 +17376,6 @@ function openEventForm(existingEvent){
   document.getElementById('eventFormMemoText').value = '';
   // 일정을 수정할 땐 메모로 바꿀 수 없게 메모 버튼을 숨김 (메모 수정 땐 openMemoForm이 반대로 숨김)
   document.querySelectorAll('.event-type-btn').forEach(b => { b.style.display = (existingEvent && b.dataset.type === 'memo') ? 'none' : ''; });
-  eventColorLastPicked = null;
   eventColorLabelEditing = false;
   eventColorPanelOpen = false;
   formTravel = existingEvent && existingEvent.travel ? JSON.parse(JSON.stringify(existingEvent.travel)) : null;
@@ -17700,7 +17508,7 @@ function openEventForm(existingEvent){
     formVisibility = defaultVisibilityForNewEvent();
     renderVisibilityPicker();
 
-    formColor = null;
+    formColor = EVENT_COLOR_LABELS[0].color; // 새 일정은 첫 라벨 색으로 시작
     renderEventColorPicker();
   }
 
