@@ -3404,6 +3404,12 @@
     padding:10px 12px;
     cursor:pointer;
   }
+  .chat-pinned-schedule .pin-card.pin-card-stale{
+    background:var(--surface);
+    border-color:var(--line);
+    border-style:dashed;
+    opacity:.75;
+  }
   .chat-pinned-schedule .pin-top-row{
     display:flex;
     align-items:center;
@@ -22726,7 +22732,7 @@ function getRoomPlaceStatus(room, placeName){
   if(!room || !placeName) return null;
   const name = placeName.trim().toLowerCase();
   if(!name) return null;
-  const confirmedPin = (room.pinnedSchedules || []).find(p => !p.dateObj && (p.location || '').trim().toLowerCase() === name);
+  const confirmedPin = currentPlaceOnlyPins(room).find(p => (p.location || '').trim().toLowerCase() === name);
   if(confirmedPin) return 'confirmed';
   const pendingMsg = (room.messages || []).find(m => isOpenLocationSuggest(room, m) && (m.place || '').trim().toLowerCase() === name);
   if(pendingMsg) return 'pending';
@@ -23152,6 +23158,7 @@ function addLocationOnlyPin(roomId, room, location, lat, lon, note, sourceMsgId)
     location, locationLat: (lat === undefined ? null : lat), locationLon: (lon === undefined ? null : lon),
     note: note || null,
     sourceMsgId: sourceMsgId || null, // 핀을 눌렀을 때 이동할 채팅 메시지
+    createdAt: Date.now(),
   };
   room.pinnedSchedules.push(pin);
   syncPinCreateToServer(roomId, room, pin);
@@ -23220,6 +23227,7 @@ function mapServerPinToLocal(p){
     sourceMsgId: p.sourceMessageId,
     reservationMsgId: p.sourceMessageId,
     dateObj: p.dateLabel ? parseDateLabelToDate(p.dateLabel) : null,
+    createdAt: p.createdAt ? new Date(p.createdAt).getTime() : null,
   };
 }
 function loadPinsCache(roomId){
@@ -23312,8 +23320,28 @@ function roomMeetPlaces(room, pin){
     out.push(p);
   };
   if(pin && pin.location) add(pin);
-  (room.pinnedSchedules || []).filter(p => !p.dateLabel).forEach(add);
+  (room.pinnedSchedules || []).filter(p => !p.dateLabel && placePinBelongsTo(room, p, pin)).forEach(add);
   return out;
+}
+// "장소만 있는 핀"이 어느 약속 것인지 - 만든 시각으로 나눔. 지난 약속이 끝나기 전에 정한 장소는 그 약속 것,
+// 마지막 지난 약속이 끝난 뒤에 정한 장소는 지금(다가오는/아직 날짜 미정인) 약속 것.
+// 안 그러면 예전 약속 장소가 새 약속에도 계속 1차, 2차로 따라붙음
+function placePinTime(p){
+  return typeof p.createdAt === 'number' ? p.createdAt : Date.now();
+}
+function placePinBelongsTo(room, placePin, pin){
+  const t = placePinTime(placePin);
+  const ends = pastPinEndTimes(room);
+  if(pin && pin.dateObj && isPinPast(pin)){
+    const end = pinEndDate(pin).getTime();
+    const prev = ends.filter(e => e < end).reduce((a, b) => Math.max(a, b), -Infinity);
+    return t > prev && t <= end;
+  }
+  return ends.every(e => t > e);
+}
+// 지금 약속(다가오는 약속 또는 날짜 미정 약속)의 "장소만 있는 핀"들
+function currentPlaceOnlyPins(room){
+  return (room.pinnedSchedules || []).filter(p => !p.dateLabel && p.location && placePinBelongsTo(room, p, null));
 }
 function meetPlaceOrderLabel(idx){
   return `${idx + 1}차`;
@@ -23361,21 +23389,27 @@ function removePinnedLocation(pinId, placePinId){
   showToast(`"${name}"을(를) 삭제했어요.`);
 }
 
-// 상단 고정 카드 자체를 완전히 지움 (날짜/장소가 없어서 자동으로 안 없어지는 오래된 핀을 직접 정리할 때 사용)
-function deletePinnedItem(pinId){
-  const roomId = activeChatRoomId;
+// 날짜 미정 약속(장소만 정하고 시간을 못 정한 것)을 한 번에 정리 - 오래 방치된 카드를 직접 지울 때 사용
+const UNDATED_PLAN_STALE_DAYS = 14;
+async function clearUndatedPlan(roomId){
   const room = CHAT_ROOMS[roomId];
-  if(!room || !room.pinnedSchedules) return;
-  const pin = room.pinnedSchedules.find(p => p.id === pinId);
-  if(!pin) return;
-
-  room.pinnedSchedules = room.pinnedSchedules.filter(p => p.id !== pinId);
-  syncPinDeleteToServer(room, pin);
+  if(!room) return;
+  const olds = currentPlaceOnlyPins(room);
+  if(!olds.length) return;
+  const ok = await appConfirm({
+    title: '약속 정리',
+    html: `${olds.map(p => `"${escapeHtml(p.location)}"`).join(', ')} 장소를 지울까요?`,
+    yesText: '지우기',
+    noText: '그대로 두기',
+  });
+  if(!ok) return;
+  room.pinnedSchedules = room.pinnedSchedules.filter(p => !olds.includes(p));
+  olds.forEach(p => syncPinDeleteToServer(room, p));
 
   touchRoom(roomId);
   renderPinnedSchedule();
   renderChatList();
-  showToast('고정 카드를 삭제했어요.');
+  showToast('날짜 미정 약속을 정리했어요.');
 }
 
 // 마음에 드는 핫플을 채팅으로 제안 (상대가 수락하면 장소가 확정됨)
@@ -23828,7 +23862,7 @@ document.getElementById('placeViewerAddBtn').addEventListener('click', () => {
   const room = CHAT_ROOMS[roomId];
   goBackOrClose(closePlaceSuggestionMap);
   if(!room) return;
-  const pin = pinned || (room.pinnedSchedules || []).find(p => p.dateObj) || null;
+  const pin = pinned || (room.pinnedSchedules || []).find(p => p.dateObj && !isPinPast(p)) || null;
   // 이미 정해진 장소가 있으면 바꾸지 않고 다음 차수 장소로 추가됨
   if(pin && !roomMeetPlaces(room, pin).length){
     changePinLocation(room, roomId, pin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId });
@@ -25730,7 +25764,12 @@ function renderPinnedSchedule(){
   // 눌러서 들어가는 "약속 상세보기" 화면 안에서만 보여줌 - 안 그러면 장소 제안이 오갈 때마다 메인 화면
   // 상단이 장소 카드로 계속 지저분하게 쌓임
   const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-  const pins = room.pinnedSchedules.filter(p => p.dateObj && p.dateObj >= todayStart);
+  let pins = room.pinnedSchedules.filter(p => p.dateObj && p.dateObj >= todayStart);
+  // 다가오는 약속이 없는데 장소부터 정해둔 게 있으면 "날짜 미정 약속" 카드 하나로 보여줌 - 시간을 정하면
+  // 그 약속 카드에 이 장소들이 그대로 붙음 (roomMeetPlaces)
+  // (오늘 이미 끝난 약속은 오늘 하루 더 보이므로, 끝나지 않은 약속이 없는지로 판단)
+  if(!pins.some(p => !isPinPast(p))) pins = pins.concat(currentPlaceOnlyPins(room).slice(0, 1));
+  const onlyUndated = pins.length > 0 && pins.every(p => !p.dateObj);
   if(pins.length === 0){
     el.style.display = 'none';
     el.innerHTML = '';
@@ -25744,7 +25783,7 @@ function renderPinnedSchedule(){
   headerRow.className = 'pin-header-row';
   const headerTitle = document.createElement('span');
   headerTitle.className = 'pin-header-title';
-  headerTitle.innerHTML = `${ICO.pushpin} 확정된 약속 (${pins.length})`;
+  headerTitle.innerHTML = onlyUndated ?`${ICO.pushpin} 날짜 미정 약속` : `${ICO.pushpin} 확정된 약속 (${pins.length})`;
   const collapseBtn = document.createElement('button');
   collapseBtn.type = 'button';
   collapseBtn.className = 'pin-collapse-btn';
@@ -25768,14 +25807,18 @@ function renderPinnedSchedule(){
     const places = roomMeetPlaces(room, pinned);
     const multi = places.length > 1;
     const pinPast = isPinPast(pinned); // 지난 약속은 장소 변경/삭제/추가 없이 보기만 가능
+    const undated = !dateObj;
+    // 날짜 미정 약속이 2주 넘게 시간을 못 정했으면 아직 할 건지 물어보고 한 번에 정리할 수 있게 함
+    const undatedStale = undated && places.every(p => Date.now() - placePinTime(p) > UNDATED_PLAN_STALE_DAYS * 86400e3);
 
     const card = document.createElement('div');
-    card.className = 'pin-card';
+    card.className = 'pin-card' + (undatedStale ? ' pin-card-stale' : '');
     card.innerHTML = `
       <div class="pin-top-row">
         <span class="pin-icon">${ICO.pushpin}</span>
         <div class="pin-info">
           ${dateLabel ? `<div class="pin-time">${dateLabel} ${timeLabel}</div>` : ''}
+          ${undated ? `<div class="pin-time">${undatedStale ? '2주 넘게 시간을 못 정했어요. 이 약속 아직 할까요?' : '장소는 정했어요. 시간만 정하면 돼요'}</div>` : ''}
           ${note ? `<div class="pin-note">${escapeHtml(note)}</div>` : ''}
           ${places.length ? `<div class="pin-note">${ICO.pin} ${places.map(p => escapeHtml(p.location)).join(' → ')}</div>` : ''}
         </div>
@@ -25793,8 +25836,9 @@ function renderPinnedSchedule(){
           </div>`;
         }).join('')}</div>` : ''}
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 내 캘린더</button>` : ''}
+        ${undated ? `<button type="button" class="pin-action-btn pin-plan-time">${ICO.calendar} 시간 정하기</button>` : ''}
         ${pinPast ? '' : `<button type="button" class="pin-action-btn pin-add-loc">${places.length ? '+ 장소 추가' : '장소 정하기'}</button>`}
-        ${!dateObj ? `<button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>` : ''}
+        ${undatedStale ? `<button type="button" class="pin-action-btn danger pin-clear-undated">약속 정리</button>` : ''}
       </div>
     `;
 
@@ -25831,12 +25875,14 @@ function renderPinnedSchedule(){
       addLocBtn.addEventListener('click', () => addMeetPlace(room, activeChatRoomId, pinned));
     }
 
-    const deleteItemBtn = card.querySelector('.pin-delete-item');
-    if(deleteItemBtn){
-      deleteItemBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deletePinnedItem(pinned.id);
-      });
+    const planTimeBtn = card.querySelector('.pin-plan-time');
+    if(planTimeBtn){
+      planTimeBtn.addEventListener('click', () => startPlanFromChat());
+    }
+
+    const clearUndatedBtn = card.querySelector('.pin-clear-undated');
+    if(clearUndatedBtn){
+      clearUndatedBtn.addEventListener('click', () => clearUndatedPlan(activeChatRoomId));
     }
 
     listEl.appendChild(card);
@@ -25897,7 +25943,8 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       <div class="appt-detail-label">${ICO.calendar} 날짜 · 시간</div>
       ${pin.dateLabel
         ? `<div class="appt-detail-datetime">${escapeHtml(pin.dateLabel)} ${escapeHtml(pin.timeLabel || '')}</div>`
-        : `<div class="appt-detail-empty">아직 날짜가 정해지지 않았어요.</div>`}
+        : `<div class="appt-detail-empty">아직 날짜가 정해지지 않았어요.</div>
+           <button type="button" class="hotplace-notice-btn" id="apptDetailPlanTimeBtn" style="margin-top:8px;">시간 정하기</button>`}
     </div>
     <div class="appt-detail-section">
       <div class="appt-detail-label">${ICO.pin} 장소${multiPlaces ? ` (${meetPlaces.length}곳)` : ''}</div>
@@ -25949,6 +25996,14 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
     });
   }
 
+  const planTimeBtn = document.getElementById('apptDetailPlanTimeBtn');
+  if(planTimeBtn){
+    planTimeBtn.addEventListener('click', () => {
+      apptDetailFromHome = false; // 약속 잡기는 채팅방에서 이어지므로 채팅방으로 돌아감
+      goBackOrClose(closeAppointmentDetailView);
+      startPlanFromChat();
+    });
+  }
   const addPlaceBtn = document.getElementById('apptDetailAddPlaceBtn');
   if(addPlaceBtn){
     addPlaceBtn.addEventListener('click', () => {
