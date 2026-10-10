@@ -5071,6 +5071,8 @@
     padding:24px;
   }
   .mini-confirm-overlay.show{ display:flex; }
+  /* 오류 신고 창은 어느 화면(사진 크게 보기, 확인 창 등) 위에서 흔들어도 맨 위에 보이게 */
+  #bugReportOverlay{ z-index:9750; }
   .my-sched-quick-list{
     max-height:280px;
     overflow-y:auto;
@@ -23705,51 +23707,64 @@ function setShakeReportEnabled(on){
   try { localStorage.setItem('catchme_shake_report', on ? 'on' : 'off'); } catch(_){}
 }
 
-// 아이폰은 움직임 센서를 쓰려면 사용자가 화면을 탭한 순간에 권한을 요청해야 함 (안드로이드는 권한 필요 없음)
+// 아이폰은 움직임 센서를 쓰려면 사용자가 화면을 탭한 순간에 권한을 요청해야 함 (안드로이드는 권한 필요 없음).
+// 앱(캐피시터)은 요청하면 바로 허용해 줌. 센서 값이 실제로 들어오기 전까지는 탭할 때마다 다시 요청함
+// (예전엔 첫 탭에 한 번만, 한 번 거절되면 영영 안 물어봐서 흔들기가 아예 안 되는 경우가 있었음)
+let shakeMotionReady = false;
 function requestShakePermissionIfNeeded(){
   if(typeof DeviceMotionEvent === 'undefined' || typeof DeviceMotionEvent.requestPermission !== 'function') return;
   DeviceMotionEvent.requestPermission().then(state => {
     try { localStorage.setItem('catchme_shake_perm', state); } catch(_){}
   }).catch(() => {});
 }
-document.addEventListener('touchend', function askShakePermissionOnce(){
-  if(!authToken || !isShakeReportEnabled()) return; // 로그인 전이면 다음 탭에서 다시 시도
-  document.removeEventListener('touchend', askShakePermissionOnce);
-  let asked = null;
-  try { asked = localStorage.getItem('catchme_shake_perm'); } catch(_){}
-  if(asked !== 'denied') requestShakePermissionIfNeeded();
-});
+function askShakePermissionOnTap(){
+  if(shakeMotionReady){
+    document.removeEventListener('touchend', askShakePermissionOnTap, true);
+    document.removeEventListener('click', askShakePermissionOnTap, true);
+    return;
+  }
+  if(!authToken || !isShakeReportEnabled()) return; // 로그인 전이거나 꺼져 있으면 다음 탭에서 다시
+  requestShakePermissionIfNeeded();
+}
+// 캡처 단계에서 받아서, 어느 화면의 버튼이 터치 이벤트를 막아도 권한 요청은 됨
+document.addEventListener('touchend', askShakePermissionOnTap, true);
+document.addEventListener('click', askShakePermissionOnTap, true);
 
-// 흔들기 감지 - 짧은 시간(2.5초) 안에 폰을 5번 흔들어야 열림. 걷거나 폰을 집어드는 정도로는 안 열리게 기준을 높게 잡음
+// 흔들기 감지 - 3초 안에 폰을 5번 이상 흔들면 어느 화면에서든 오류 신고 창이 열림.
+// 직전 측정값과의 차이는 측정 간격이 짧아(약 16ms) 세게 흔들어도 작게 나올 수 있어서, 중력을 뺀 가속도 크기로 봄.
+// 걷거나 폰을 집어드는 정도(대략 5m/s² 이하)로는 안 열리게 기준을 잡음
 (function(){
-  const THRESHOLD = 24;   // 직전 측정값 대비 가속도 변화량(m/s²) 합
+  const THRESHOLD = 13;   // 중력을 뺀 가속도 크기(m/s²)
   const HITS_NEEDED = 5;
-  const WINDOW_MS = 2500;
-  const MIN_GAP_MS = 150; // 한 번 흔들 때 센서 값이 여러 번 튀어서, 이보다 가까운 건 같은 한 번으로 셈
+  const WINDOW_MS = 3000;
+  const MIN_GAP_MS = 120; // 한 번 흔들 때 센서 값이 여러 번 튀어서, 이보다 가까운 건 같은 한 번으로 셈
   const COOLDOWN_MS = 4000;
-  let last = null;
+  const G = 9.81;
   let hits = [];
   let lastTriggered = 0;
   window.addEventListener('devicemotion', (e) => {
-    const a = e.accelerationIncludingGravity;
-    if(!a || a.x === null) return;
+    const lin = e.acceleration;
+    const raw = e.accelerationIncludingGravity;
+    let mag = null;
+    if(lin && lin.x !== null){
+      mag = Math.hypot(lin.x, lin.y, lin.z);
+    } else if(raw && raw.x !== null){
+      mag = Math.abs(Math.hypot(raw.x, raw.y, raw.z) - G); // 중력 뺀 값을 못 주는 기기 - 전체 크기에서 중력만큼 뺌
+    }
+    if(mag === null) return;
+    shakeMotionReady = true;
+    if(mag < THRESHOLD) return;
     const now = Date.now();
-    if(last){
-      const delta = Math.abs(a.x - last.x) + Math.abs(a.y - last.y) + Math.abs(a.z - last.z);
-      if(delta > THRESHOLD && !(hits.length && now - hits[hits.length - 1] < MIN_GAP_MS)){
-        hits = hits.filter(t => now - t < WINDOW_MS);
-        hits.push(now);
-        if(hits.length >= HITS_NEEDED && now - lastTriggered > COOLDOWN_MS){
-          hits = [];
-          lastTriggered = now;
-          if(authToken && isShakeReportEnabled() && document.visibilityState === 'visible'
-             && !document.querySelector('.mini-confirm-overlay.show')){
-            openBugReport('shake');
-          }
-        }
+    if(hits.length && now - hits[hits.length - 1] < MIN_GAP_MS) return;
+    hits = hits.filter(t => now - t < WINDOW_MS);
+    hits.push(now);
+    if(hits.length >= HITS_NEEDED && now - lastTriggered > COOLDOWN_MS){
+      hits = [];
+      lastTriggered = now;
+      if(authToken && isShakeReportEnabled() && document.visibilityState === 'visible'){
+        openBugReport('shake'); // 다른 팝업이 떠 있어도 그 위로 열림 (이미 신고 창이 열려 있으면 그대로)
       }
     }
-    last = { x: a.x, y: a.y, z: a.z };
   });
 })();
 
