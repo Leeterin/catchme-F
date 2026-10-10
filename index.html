@@ -8297,7 +8297,7 @@
       <div class="qa-tabs" id="quickAvailTabs"></div>
       <div class="qa-tab-hint" id="quickAvailTabHint"></div>
       <div class="quick-avail-rows" id="quickAvailRows"></div>
-      <p class="quick-avail-hint">막대 끝을 끌거나 시간 글자를 눌러 5분 단위로 맞출 수 있어요. 빈 곳을 누르면 시간을 더 넣어요.<br/>회색은 내 일정이라 그 시간은 빼고 열고, 점선은 겹쳐도 예약 받는 일정이에요. 눌러보면 무슨 일정인지 보여요.</p>
+      <p class="quick-avail-hint">막대 끝을 끌거나 시간 글자를 눌러 5분 단위로 맞출 수 있어요. 요일 버튼으로 켜고 끄고, +로 시간을 더 넣어요.<br/>회색은 내 일정이라 그 시간은 빼고 열고, 점선은 겹쳐도 예약 받는 일정이에요. 눌러보면 무슨 일정인지 보여요.</p>
       <button type="button" class="profile-chat-btn" id="quickAvailSubmitBtn">열어두기</button>
       <button type="button" class="plan-back-btn quick-avail-close-all" id="quickAvailCloseAllBtn" style="display:none;">앞으로 열어둔 시간 모두 닫기</button>
     </div>
@@ -30544,14 +30544,12 @@ function endQuickDrag(e){
   if(isTap){
     const min = quickMinAt(dr.track, e.clientX);
     const busyHere = quickBusyAt(dow, min);
-    // 겹쳐도 예약 받는 일정 위는 빈 곳처럼 누르면 시간이 들어감 (막대 위면 시간 고르기) - 겹치면 안 되는 일정 위는 설명만 보여줌
-    if(!busyHere.some(b => !b.soft)){
+    // 막대 위면 시간 고르기 (겹쳐도 예약 받는 일정 위라도) - 빈 곳을 눌러도 시간은 안 들어감 (켜기는 요일 버튼, 더 넣기는 +)
+    if(!dr.tap && !busyHere.some(b => !b.soft)){
       quickAvailInfo = null;
-      if(!dr.tap){ quickAvailEdit = { dow, idx: dr.idx }; renderQuickAvail(); return; }
-      if(quickAvailAddRange(dr.row, min)){
-        if(busyHere[0]) showToast(`${busyHere[0].title} · 겹쳐도 예약 받는 일정이라 이 시간도 열려요`);
-        return;
-      }
+      quickAvailEdit = { dow, idx: dr.idx };
+      renderQuickAvail();
+      return;
     }
     if(busyHere.length){
       // 같은 곳을 다시 누르면 설명을 닫음
@@ -30562,7 +30560,7 @@ function endQuickDrag(e){
       return;
     }
     quickAvailInfo = null;
-    if(dr.tap){ quickAvailAddRange(dr.row, min); renderQuickAvail(); return; }
+    if(dr.tap){ renderQuickAvail(); return; }
     quickAvailEdit = { dow, idx: dr.idx };
     renderQuickAvail();
     return;
