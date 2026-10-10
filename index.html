@@ -2869,6 +2869,7 @@
     overflow:hidden;
   }
   .chat-room-view.active{ display:flex; }
+  .chat-room-view.over-friend-cal{ z-index:2850; } /* 물어보기로 들어온 방을 밀어 닫는 동안 뒤에 친구 캘린더가 보이게 */
   /* 밀어서 나가는 중엔 왼쪽 가장자리에 그림자를 줘서 채팅 목록 위에 떠 있는 느낌 */
   .chat-room-view.swiping{ box-shadow:-8px 0 24px rgba(0,0,0,.18); will-change:transform; }
 
@@ -4823,6 +4824,9 @@
   .location-picker-bottom-addr, .location-search-result-addr, .feed-place-info-addr{
     -webkit-user-select:text; user-select:text; -webkit-touch-callout:default;
   }
+  /* 채팅 입력칸은 꾹 눌러 선택·복사·붙여넣기가 확실히 되게 (아이폰은 위쪽 none이 입력칸까지 막는 경우가 있음) */
+  .chat-input-row{ -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+  #chatInput{ -webkit-user-select:auto !important; user-select:auto !important; -webkit-touch-callout:default !important; }
   .inv-share-link{ -webkit-user-select:all; user-select:all; }
   .msg-bubble-image img{ -webkit-touch-callout:default; } /* 채팅 사진은 꾹 눌러 저장 가능 */
   /* ---------------- 일정 추가 폼 ---------------- */
@@ -26860,7 +26864,12 @@ function openCalShare(share, isMine, ownerFriend){
 // 글 메시지를 꾹 누르면 "복사하기 / 선택 복사하기" 메뉴 (말풍선 글자를 바로 드래그 선택하는 건 막아둠 - CSS)
 // 선택 복사하기는 글 전체를 창에 띄워서 원하는 부분만 길게 눌러 골라 복사하게 함
 let chatLongPressFired = false;
-function openMsgCopyMenu(text){
+// 메뉴를 열 때 채팅 입력칸에 키보드가 떠있었는지 - 복사한 뒤에도 키보드를 그대로 두려고
+let msgCopyKbdOpen = false;
+const isChatKbdOpen = () => document.activeElement === document.getElementById('chatInput');
+function keepChatKbd(){ if(msgCopyKbdOpen) document.getElementById('chatInput').focus({ preventScroll: true }); }
+function openMsgCopyMenu(text, kbdOpen){
+  msgCopyKbdOpen = kbdOpen === undefined ? isChatKbdOpen() : kbdOpen;
   let ov = document.getElementById('msgCopyMenuOverlay');
   if(!ov){
     ov = document.createElement('div');
@@ -26876,16 +26885,18 @@ function openMsgCopyMenu(text){
       const btn = e.target.closest('[data-act]');
       if(e.target !== ov && !btn) return;
       ov.classList.remove('show');
-      if(!btn) return;
+      if(!btn){ keepChatKbd(); return; }
       const t = ov._text || '';
       if(btn.dataset.act === 'select'){ openMsgSelectCopy(t); return; }
-      let ok = copyTextNow(t);
+      let ok = copyTextNow(t, msgCopyKbdOpen ? document.getElementById('chatInput') : null);
       if(!ok && navigator.clipboard && navigator.clipboard.writeText){
         try { await navigator.clipboard.writeText(t); ok = true; } catch(err) {}
       }
       if(ok) showToast('복사했어요');
       else openMsgSelectCopy(t);
     });
+    // 컴퓨터에서 메뉴 버튼을 눌러도 입력칸 포커스를 뺏지 않게
+    ov.addEventListener('mousedown', (e) => e.preventDefault());
     document.body.appendChild(ov);
   }
   ov._text = text;
@@ -26903,7 +26914,9 @@ function openMsgSelectCopy(text){
         <textarea class="msg-select-copy-text" readonly></textarea>
         <div class="mini-confirm-actions" style="margin-top:10px;"><button type="button" class="mini-confirm-btn" data-close="1">닫기</button></div>
       </div>`;
-    ov.addEventListener('click', (e) => { if(e.target === ov || e.target.closest('[data-close]')) ov.classList.remove('show'); });
+    ov.addEventListener('click', (e) => {
+      if(e.target === ov || e.target.closest('[data-close]')){ ov.classList.remove('show'); keepChatKbd(); }
+    });
     document.body.appendChild(ov);
   }
   const ta = ov.querySelector('textarea');
@@ -26928,12 +26941,13 @@ function openMsgSelectCopy(text){
     if(!r || !e.target.closest('.msg-bubble') || e.target.closest('button, a, input, textarea')) return;
     const text = textOf(r);
     if(!text) return;
+    const kbdOpen = isChatKbdOpen(); // 꾹 누르는 동안 포커스가 빠질 수 있어서 누르기 시작할 때 기억
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
     timer = setTimeout(() => {
       timer = null;
       chatLongPressFired = true;
       hapticTick();
-      openMsgCopyMenu(text);
+      openMsgCopyMenu(text, kbdOpen);
     }, 450);
   }, { passive: true });
   box.addEventListener('touchmove', (e) => {
@@ -27421,7 +27435,8 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
   const listView = document.getElementById('chatListView');
   const bottomNav = document.querySelector('.bottom-nav');
   let startX = 0, startY = 0, startT = 0, dx = 0;
-  let tracking = false, dragging = false, listShownBySwipe = false;
+  let tracking = false, dragging = false, listShownBySwipe = false, friendCalShownBySwipe = false;
+  const friendCalView = document.getElementById('friendCalendarView');
 
   function isInsideHorizontalScroll(el){
     let node = el;
@@ -27436,7 +27451,7 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
   function clearSwipeStyles(){
     view.style.transition = '';
     view.style.transform = '';
-    view.classList.remove('swiping');
+    view.classList.remove('swiping', 'over-friend-cal');
   }
   function afterTransition(fn){
     let done = false;
@@ -27467,7 +27482,13 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
       view.classList.add('swiping');
       view.style.transition = 'none';
       // 뒤에 돌아갈 채팅 목록을 미리 깔아둠 (캘린더에서 들어온 방은 캘린더로 돌아가니 목록은 안 깜)
-      if(!chatReturnToCalendar && !listView.classList.contains('active')){
+      // 친구 캘린더 "물어보기"로 들어온 방은 숨겨둔 친구 캘린더를 뒤에 깔아둠 - 원래 채팅방보다 위에 있는 화면이라
+      // 밀고 있는 동안만 채팅방을 그 위로 올림 (안 그러면 채팅 목록이 비쳤다가 친구 캘린더로 바뀌어 보였음)
+      if(chatReturnToFriendCalendar){
+        view.classList.add('over-friend-cal');
+        friendCalShownBySwipe = !friendCalView.classList.contains('active');
+        friendCalView.classList.add('active');
+      } else if(!chatReturnToCalendar && !listView.classList.contains('active')){
         listView.classList.add('active');
         listShownBySwipe = true;
       }
@@ -27493,6 +27514,7 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
       afterTransition(() => {
         if(document.activeElement && view.contains(document.activeElement)) document.activeElement.blur();
         listShownBySwipe = false;
+        friendCalShownBySwipe = false;
         goBackOrClose(closeChatRoomView);
         // history.back()으로 닫히는 건 한 박자 늦게 일어나서, 실제로 닫힌 뒤에 위치를 되돌려야 제자리로 번쩍 안 돌아옴
         const until = Date.now() + 600;
@@ -27506,6 +27528,8 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
       afterTransition(() => {
         clearSwipeStyles();
         if(listShownBySwipe && view.classList.contains('active')) listView.classList.remove('active');
+        if(friendCalShownBySwipe && view.classList.contains('active')) friendCalView.classList.remove('active');
+        friendCalShownBySwipe = false;
         if(view.classList.contains('active')) bottomNav.style.display = 'none';
         listShownBySwipe = false;
       });
@@ -31894,7 +31918,8 @@ function inviteShareText(inv){
 
 // 눌린 그 순간(사용자 동작 안)에 바로 복사 - 아이폰 앱 화면(WKWebView)은 readonly 입력칸을 그냥 select()하면
 // 선택이 안 돼서 복사가 실패함. 잠깐 readonly를 풀고 setSelectionRange까지 해줘야 함
-function copyTextNow(text){
+// refocusEl: 복사용 임시 입력칸에서 바로 이 입력칸으로 포커스를 넘김 - 그냥 blur하면 떠있던 키보드가 내려감
+function copyTextNow(text, refocusEl){
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.cssText = 'position:fixed;top:0;left:-9999px;width:1px;height:1px;font-size:16px;border:0;padding:0;margin:0;opacity:0;';
@@ -31909,7 +31934,8 @@ function copyTextNow(text){
     ta.setAttribute('readonly', '');
     ok = document.execCommand('copy');
   } catch(e) { ok = false; }
-  ta.blur();
+  if(refocusEl) refocusEl.focus({ preventScroll: true });
+  else ta.blur();
   ta.remove();
   try { window.getSelection().removeAllRanges(); } catch(e) {}
   return ok;
