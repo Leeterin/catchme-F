@@ -4841,6 +4841,7 @@
   #chatInput{ -webkit-user-select:auto !important; user-select:auto !important; -webkit-touch-callout:default !important; }
   .inv-share-link{ -webkit-user-select:all; user-select:all; }
   .msg-bubble-image img{ -webkit-touch-callout:default; } /* 채팅 사진은 꾹 눌러 저장 가능 */
+  .msg-row.me .msg-bubble-image img{ -webkit-touch-callout:none; } /* 내가 보낸 사진은 꾹 누르면 삭제 메뉴 */
   /* ---------------- 일정 추가 폼 ---------------- */
   .event-form-view{
     display:none;
@@ -5197,6 +5198,7 @@
   /* 채팅 메시지 꾹 누르기 → 복사하기 / 선택 복사하기 */
   .msg-copy-card{ max-width:260px; padding:10px; }
   .msg-copy-card .mini-confirm-btn{ color:var(--text); font-size:14px; }
+  .msg-copy-card .mini-confirm-btn.danger{ color:var(--cta); }
   .msg-select-copy-card{ max-width:360px; text-align:left; }
   .msg-select-copy-text{
     width:100%; box-sizing:border-box; min-height:120px; max-height:50vh;
@@ -10121,6 +10123,11 @@ function connectRealtimeSocket(){
     }
     if(inviteState.token === token) refreshOpenInvite();
     else if(inviteState.mode === 'list') loadMyInvites().then(() => { if(inviteState.mode === 'list') renderInviteOverlay(); });
+  });
+
+  // 다른 멤버가 보낸 메시지를 삭제함
+  realtimeSocket.on('messageDeleted', ({ roomId, messageId }) => {
+    removeChatMessageLocally(roomId, m => m._serverId === messageId);
   });
 
   // 다른 멤버가 채팅방을 삭제함
@@ -27572,12 +27579,13 @@ function openCalShare(share, isMine, ownerFriend){
 
 // 글 메시지를 꾹 누르면 "복사하기 / 선택 복사하기" 메뉴 (말풍선 글자를 바로 드래그 선택하는 건 막아둠 - CSS)
 // 선택 복사하기는 글 전체를 창에 띄워서 원하는 부분만 길게 눌러 골라 복사하게 함
+// 내가 보낸 글·사진이면 "삭제하기"도 붙음 - 한 번 더 확인한 뒤 모두에게서 지움
 let chatLongPressFired = false;
 // 메뉴를 열 때 채팅 입력칸에 키보드가 떠있었는지 - 복사한 뒤에도 키보드를 그대로 두려고
 let msgCopyKbdOpen = false;
 const isChatKbdOpen = () => document.activeElement === document.getElementById('chatInput');
 function keepChatKbd(){ if(msgCopyKbdOpen) document.getElementById('chatInput').focus({ preventScroll: true }); }
-function openMsgCopyMenu(text, kbdOpen){
+function openMsgCopyMenu(text, kbdOpen, msg){
   msgCopyKbdOpen = kbdOpen === undefined ? isChatKbdOpen() : kbdOpen;
   let ov = document.getElementById('msgCopyMenuOverlay');
   if(!ov){
@@ -27585,16 +27593,28 @@ function openMsgCopyMenu(text, kbdOpen){
     ov.className = 'mini-confirm-overlay';
     ov.id = 'msgCopyMenuOverlay';
     ov.innerHTML = `<div class="mini-confirm-card msg-copy-card">
-        <div class="mini-confirm-actions">
+        <div class="mini-confirm-title msg-del-ask" style="display:none;">모두에게서 삭제할까요?</div>
+        <div class="mini-confirm-actions msg-menu-main">
           <button type="button" class="mini-confirm-btn" data-act="copy">복사하기</button>
           <button type="button" class="mini-confirm-btn" data-act="select">선택 복사하기</button>
+          <button type="button" class="mini-confirm-btn danger" data-act="delete">삭제하기</button>
+        </div>
+        <div class="mini-confirm-actions msg-del-ask" style="display:none;">
+          <button type="button" class="mini-confirm-btn danger" data-act="delete-yes">삭제</button>
+          <button type="button" class="mini-confirm-btn" data-act="delete-no">취소</button>
         </div>
       </div>`;
     ov.addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-act]');
       if(e.target !== ov && !btn) return;
+      if(btn && btn.dataset.act === 'delete'){
+        ov.querySelector('.msg-menu-main').style.display = 'none';
+        ov.querySelectorAll('.msg-del-ask').forEach(el => { el.style.display = ''; });
+        return;
+      }
       ov.classList.remove('show');
-      if(!btn){ keepChatKbd(); return; }
+      if(!btn || btn.dataset.act === 'delete-no'){ keepChatKbd(); return; }
+      if(btn.dataset.act === 'delete-yes'){ deleteChatMessage(activeChatRoomId, ov._msg); keepChatKbd(); return; }
       const t = ov._text || '';
       if(btn.dataset.act === 'select'){ openMsgSelectCopy(t); return; }
       let ok = copyTextNow(t, msgCopyKbdOpen ? document.getElementById('chatInput') : null);
@@ -27609,7 +27629,41 @@ function openMsgCopyMenu(text, kbdOpen){
     document.body.appendChild(ov);
   }
   ov._text = text;
+  ov._msg = msg || null;
+  ov.querySelector('.msg-menu-main').style.display = '';
+  ov.querySelectorAll('.msg-del-ask').forEach(el => { el.style.display = 'none'; });
+  ov.querySelector('[data-act="copy"]').style.display = text ? '' : 'none';
+  ov.querySelector('[data-act="select"]').style.display = text ? '' : 'none';
+  ov.querySelector('[data-act="delete"]').style.display = canDeleteChatMessage(msg) ? '' : 'none';
   ov.classList.add('show');
+}
+// 내가 보낸 글·사진만 삭제 가능 (예약·제안 카드는 각자의 취소 버튼으로)
+function canDeleteChatMessage(m){
+  return !!(m && m.who === 'me' && !m._pending && (m.type === 'image' || !m.type || m.type === 'text'));
+}
+async function deleteChatMessage(roomId, m){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !m) return;
+  if(room.isRealRoom && !m._failed){
+    if(!m._serverId){ showToast('아직 보내는 중이에요. 잠시 후 다시 시도해주세요.'); return; }
+    try {
+      await apiRequest(`/chats/messages/${m._serverId}`, { method: 'DELETE' });
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+  }
+  removeChatMessageLocally(roomId, x => x === m);
+  showToast('메시지를 삭제했어요.');
+}
+function removeChatMessageLocally(roomId, match){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !room.messages) return;
+  const before = room.messages.length;
+  room.messages = room.messages.filter(x => !match(x));
+  if(room.messages.length === before) return;
+  if(activeChatRoomId === roomId) refreshChatMessagesQuietly();
+  renderChatList();
 }
 function openMsgSelectCopy(text){
   let ov = document.getElementById('msgSelectCopyOverlay');
@@ -27640,6 +27694,8 @@ function openMsgSelectCopy(text){
     const el = r && r._replyMsg && r.querySelector('.msg-bubble-text');
     return el ? el.textContent : '';
   };
+  // 글이 있거나(복사) 내가 보낸 삭제 가능한 메시지면 메뉴를 띄움
+  const menuMsgOf = (r) => (r && canDeleteChatMessage(r._replyMsg)) ? r._replyMsg : null;
   let timer = null, sx = 0, sy = 0;
   const cancel = () => { clearTimeout(timer); timer = null; };
   box.addEventListener('touchstart', (e) => {
@@ -27649,14 +27705,15 @@ function openMsgSelectCopy(text){
     const r = e.target.closest('.msg-row');
     if(!r || !e.target.closest('.msg-bubble') || e.target.closest('button, a, input, textarea')) return;
     const text = textOf(r);
-    if(!text) return;
+    const msg = menuMsgOf(r);
+    if(!text && !msg) return;
     const kbdOpen = isChatKbdOpen(); // 꾹 누르는 동안 포커스가 빠질 수 있어서 누르기 시작할 때 기억
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
     timer = setTimeout(() => {
       timer = null;
       chatLongPressFired = true;
       hapticTick();
-      openMsgCopyMenu(text, kbdOpen);
+      openMsgCopyMenu(text, kbdOpen, msg);
     }, 450);
   }, { passive: true });
   box.addEventListener('touchmove', (e) => {
@@ -27671,9 +27728,10 @@ function openMsgSelectCopy(text){
     const r = e.target.closest('.msg-row');
     if(!r || !e.target.closest('.msg-bubble')) return;
     const text = textOf(r);
-    if(!text) return;
+    const msg = menuMsgOf(r);
+    if(!text && !msg) return;
     e.preventDefault();
-    if(!chatLongPressFired) openMsgCopyMenu(text);
+    if(!chatLongPressFired) openMsgCopyMenu(text, undefined, msg);
   });
 })();
 
