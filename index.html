@@ -5343,6 +5343,9 @@
   .quick-avail-entry.compact .quick-avail-entry-text b{ display:none; }
   .quick-avail-entry.compact .quick-avail-entry-text small{ margin-top:0; font-size:12.5px; font-weight:600; color:var(--accent); }
   .quick-avail-card{ max-width:380px; max-height:calc(100vh - 48px); overflow-y:auto; padding:22px 14px 16px; }
+  /* 휴대폰 상단 상태바(시계·배터리)와 겹치지 않게 위아래 여유를 두고 그 안에서만 스크롤 */
+  #quickAvailOverlay{ padding-top:calc(env(safe-area-inset-top, 0px) + 36px); padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 24px); }
+  #quickAvailOverlay .quick-avail-card{ max-height:calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 60px); max-height:calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 60px); }
   .quick-avail-desc{ font-size:12.5px; line-height:1.5; color:var(--text-dim); text-align:center; margin:0 0 12px; }
   .quick-avail-desc b{ color:var(--text); }
   /* 요일별 시간 막대 */
