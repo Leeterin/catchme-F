@@ -5380,6 +5380,7 @@
   .qa-day i::after{ content:''; position:absolute; top:2px; left:14px; width:14px; height:14px; border-radius:50%; background:#fff; transition:left .15s; }
   .qa-row.off .qa-day i{ background:var(--line); }
   .qa-row.off .qa-day i::after{ left:2px; }
+  .qa-day:disabled{ cursor:default; opacity:1; }
   .qa-times{ flex:1; min-width:0; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:2px 8px; font-size:13px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
   .qa-time{ display:inline-flex; align-items:center; }
   .qa-time.off{ color:var(--text-dim); font-weight:500; }
@@ -16866,7 +16867,6 @@ function renderVisibilityHint(){
 // 예약 가능 시간 - 날짜마다 막대로 정하는 상태 (빠르게 열기와 같은 막대)
 let availGridWeekStart = null; // 지금 보는 주의 첫날
 let formAvailRanges = {}; // dateKey -> [{ s, e }] 시간순 - 주를 넘겨도 다른 주에 정한 시간은 그대로 남음
-let formAvailStash = {}; // 줄을 껐다 다시 켤 때 되돌릴 시간
 let formAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dk, idx }
 let formAvailAxis = { s: 0, e: 24 * 60 }; // 막대가 보여주는 시간 범위
 let formAvailDrag = null;
@@ -17353,7 +17353,6 @@ function openEventForm(existingEvent){
         ? SCHEDULE_EVENTS.filter(e => e.linkGroupId === existingEvent.linkGroupId)
         : [existingEvent];
       formAvailRanges = {};
-      formAvailStash = {};
       pieces.forEach(piece => {
         if(!piece.dateKey) return;
         formAvailRanges[piece.dateKey] = quickMergeRanges([...(formAvailRanges[piece.dateKey] || []), { s: piece.startMin, e: piece.endMin }]);
@@ -17368,7 +17367,6 @@ function openEventForm(existingEvent){
   } else {
     editingOriginalAvailBlocks = [];
     formAvailRanges = {};
-    formAvailStash = {};
     setEventTypeUI('busy');
     document.getElementById('eventFormTitle').value = '';
     document.getElementById('eventFormStartDate').value = toDateInputValue(scheduleFocusDate);
@@ -17750,10 +17748,6 @@ function formAvailBarStyle(r){
   if(e <= s) return 'display:none';
   return `left:${formAvailPct(s)}%;width:${formAvailPct(e) - formAvailPct(s)}%`;
 }
-function formAvailDefault(dk){
-  const dow = parseDateInputValue(dk).getDay();
-  return { ...QUICK_AVAIL_GROUPS.find(g => g.dows.includes(dow)).def };
-}
 // 막대 시간 고치기 칸: "12:00" 한 칸(누르면 휠) + 옆에 5분씩 빼고 더하는 버튼. p는 'fa'(일정 만들기) 또는 'qa'(빠른 설정)
 function availTimeEditHtml(p, key, r){
   const side = (k, v) => `<span class="qa-tpick"><button type="button" class="qa-tstep" data-${p}-step="${k}|-1" aria-label="5분 빼기">−</button><button type="button" class="qa-tval" data-${p}-wheel="${k}">${minutesToLabel(v)}</button><button type="button" class="qa-tstep" data-${p}-step="${k}|1" aria-label="5분 더하기">+</button></span>`;
@@ -17849,7 +17843,7 @@ function renderFormAvailBars(){
     }).join('');
     return `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
-        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-fa-toggle="${dk}" aria-pressed="${on}"><i></i>${label}</button>
+        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-fa-toggle="${dk}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${label}</button>
         <div class="qa-times" data-fa-times="${dk}">${times}</div>
         ${on ? `<button type="button" class="qa-add" data-fa-add="${dk}" aria-label="${label} 시간 더 넣기">+</button>` : ''}
       </div>
@@ -17886,13 +17880,8 @@ document.getElementById('formAvailRows').addEventListener('click', (e) => {
   if(tg){
     const dk = tg.dataset.faToggle;
     const cur = formAvailRanges[dk] || [];
-    if(cur.length){ formAvailStash[dk] = quickCloneRanges(cur); delete formAvailRanges[dk]; }
-    else {
-      const fit = formAvailFitRanges(dk, quickCloneRanges(formAvailStash[dk] || [formAvailDefault(dk)]));
-      if(fit.length) formAvailRanges[dk] = fit;
-      else if(formAvailAddRange(dk)) return; // 기본 시간이 일정으로 꽉 차 있으면 가장 넓은 빈 곳에
-      else return;
-    }
+    if(!cur.length) return; // 요일 버튼은 끄기만 - 켜는 건 막대 빈 곳을 눌러서
+    delete formAvailRanges[dk];
     if(formAvailEdit && formAvailEdit.dk === dk) formAvailEdit = null;
     renderFormAvailBars();
     return;
@@ -17905,7 +17894,7 @@ document.getElementById('formAvailRows').addEventListener('click', (e) => {
     const left = formAvailRanges[dk].filter((_, i) => i !== Number(idx));
     // 마지막 하나까지 빼면 그 날은 "안 열어요" - 다시 켜면 방금 뺀 시간으로 돌아옴
     if(left.length) formAvailRanges[dk] = left;
-    else { formAvailStash[dk] = quickCloneRanges(formAvailRanges[dk]); delete formAvailRanges[dk]; }
+    else delete formAvailRanges[dk];
     hapticImpact('MEDIUM');
     formAvailEdit = null;
     renderFormAvailBars();
@@ -29422,7 +29411,6 @@ const QUICK_AXIS_PREF_KEY = 'catchme_quick_axis';
 let quickAvailBusy = {}; // 요일 -> 정한 기간 동안 그 요일에 있는 내 일정 [{s, e, soft, items}] - 막대 위에 회색/점선으로 보여줌
 let quickAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dow, min }
 let quickAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dow, idx }
-let quickAvailStash = {}; // '탭|요일' -> 요일 버튼으로 껐던 시간 (다시 켜면 이걸로)
 // 대상별 탭 - 모든 친구 / 그룹마다 / 업무용. 탭마다 { initial, pattern }을 따로 들고 있고,
 // 지금 보는 탭의 것을 quickAvailPattern/quickAvailInitial로 가리킴
 let quickAvailTabs = {};
@@ -29624,7 +29612,6 @@ function openQuickAvail(){
   quickAvailBusy = quickAvailBusyPattern();
   quickAvailInfo = null;
   quickAvailEdit = null;
-  quickAvailStash = {};
   quickAvailRangeOpen = false;
   quickAvailAxisPref = null;
   try {
@@ -30241,7 +30228,7 @@ function renderQuickAvail(){
       .map(r => `<i class="qa-other" style="${quickBarStyle(r)}"></i>`).join('');
     return `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
-        <button type="button" class="qa-day${weekend ? ' weekend' : ''}" data-qa-toggle="${row.key}" aria-pressed="${on}"><i></i>${row.label}</button>
+        <button type="button" class="qa-day${weekend ? ' weekend' : ''}" data-qa-toggle="${row.key}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${row.label}</button>
         <div class="qa-times" data-qa-times="${row.key}">${times}</div>
         ${on ? `<button type="button" class="qa-add" data-qa-add="${row.key}" aria-label="${row.label} 시간 더 넣기">+</button>` : ''}
       </div>
@@ -30353,19 +30340,10 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   }
   const tg = e.target.closest('[data-qa-toggle]');
   if(tg){
-    // 요일 버튼으로 켜고 끔 - 켜면 마지막에 껐던 시간(없으면 평일 18–22시·주말 14–18시)에서 내 일정 빼고 넣음
+    // 요일 버튼은 끄기만 - 켜는 건 막대 빈 곳을 눌러서
     const row = quickAvailRow(tg.dataset.qaToggle);
     const dow = row.dows[0];
-    const stashKey = `${quickAvailTab}|${dow}`;
-    if(!quickAvailPattern[dow].length){
-      const want = quickCloneRanges(quickAvailStash[stashKey] || [row.def]);
-      const fit = subtractMinuteRanges(want, quickWallBusy(dow)).filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN).sort((a, b) => a.s - b.s);
-      quickAvailInfo = null;
-      if(fit.length){ setQuickRowRanges(row, fit); renderQuickAvail(); }
-      else quickAvailAddRange(row); // 그 시간이 일정으로 꽉 차 있으면 가장 넓은 빈 곳에
-      return;
-    }
-    quickAvailStash[stashKey] = quickCloneRanges(quickAvailPattern[dow]);
+    if(!quickAvailPattern[dow].length) return;
     setQuickRowRanges(row, []);
     if(quickAvailEdit && quickAvailEdit.dow === row.dows[0]) quickAvailEdit = null;
     renderQuickAvail();
@@ -30379,7 +30357,6 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     const row = quickAvailRow(key);
     const cur = quickAvailPattern[row.dows[0]];
     const left = cur.filter((_, i) => i !== Number(idx));
-    if(!left.length) quickAvailStash[`${quickAvailTab}|${row.dows[0]}`] = quickCloneRanges(cur); // 다시 켜면 방금 뺀 시간으로
     setQuickRowRanges(row, left);
     hapticImpact('MEDIUM');
     quickAvailEdit = null;
