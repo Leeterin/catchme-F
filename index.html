@@ -30471,7 +30471,6 @@ function checkTimeOptionsConsensus(roomId, msg){
 // 시간이 확정된 뒤에만 링크 화면에서 CATCHME 가입을 권함(가입하면 그 약속이 내 캘린더에 담김).
 // 칸 표기는 서버와 같은 "YYYY-MM-DD|HH"
 // ============================================================
-const INVITE_SITE_URL = 'https://catchme-29rt.onrender.com/';
 const inviteState = {
   mode: null,        // 'list' | 'create' | 'manage' | 'guest' | 'loading' | 'error'
   fromList: false,   // 목록에서 들어온 화면이면 왼쪽 위 버튼이 "목록으로"
@@ -30527,10 +30526,10 @@ function inviteGuestKey(token, create){
   return key;
 }
 
+// 공유 링크는 서버의 미리보기 페이지(/i/토큰)로 - 카톡에 "민지님의 비는 시간: 이번 주 수요일 오후 3시~6시" 카드로 뜨고,
+// 누르면 서버가 바로 이 사이트의 ?invite=토큰 화면으로 넘겨줌 (예전 ?invite= 링크도 그대로 열림)
 function inviteLink(token){
-  const isWebHost = /^https?:$/.test(location.protocol) && location.hostname && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  const base = isWebHost ? location.origin + location.pathname : INVITE_SITE_URL;
-  return base + '?invite=' + encodeURIComponent(token);
+  return API_BASE_URL.replace(/\/api$/, '') + '/i/' + encodeURIComponent(token);
 }
 
 function invitePad(n){ return String(n).padStart(2, '0'); }
