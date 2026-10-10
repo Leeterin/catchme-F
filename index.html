@@ -25610,7 +25610,19 @@ function focusWithoutScrollJump(input){
     if(Date.now() - touchStartAt > 350) return;
     e.preventDefault();
     input.focus({ preventScroll: true });
+    showNativeEditMenu(input);
   });
+}
+// 아이폰은 처음 탭하면 키보드만 뜨고 붙여넣기 메뉴는 한 번 더 눌러야 뜸 - 앱(iOS)이면 키보드가 다 올라온 뒤
+// 입력칸 위에 붙여넣기 메뉴를 바로 띄워 달라고 앱에 요청(복사해 둔 글자가 있을 때만 앱이 띄움)
+function showNativeEditMenu(input){
+  const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.showEditMenu;
+  if(!handler) return;
+  setTimeout(() => {
+    if(document.activeElement !== input) return;
+    const r = input.getBoundingClientRect();
+    handler.postMessage({ x: r.left + window.scrollX + Math.min(40, r.width / 2), y: r.top + window.scrollY });
+  }, 450);
 }
 focusWithoutScrollJump(document.getElementById('chatInput'));
 focusWithoutScrollJump(document.getElementById('chatSearchInput'));
