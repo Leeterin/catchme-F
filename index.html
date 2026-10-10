@@ -20400,9 +20400,19 @@ async function askFriendAboutSchedule(friend, dateObj, block){
     }
   }
   if(!CHAT_ROOMS[roomId]){ showToast('채팅방을 열 수 없어요.'); return; }
-  dismissView(closeFriendCalendar);
+  // 캘린더는 닫지 않고 잠깐 숨겨둠 - 채팅방에서 뒤로가기 하면 보던 친구 캘린더(와 그 밑 화면)로 그대로 돌아오게
+  const chatRoomWasOpen = document.getElementById('chatRoomView').classList.contains('active');
+  const snap = {
+    tab: currentTopTab,
+    roomId: chatRoomWasOpen ? activeChatRoomId : null,
+    chatOpen: document.body.classList.contains('chat-open'),
+    displays: ['.bottom-nav', '.date-header', '#homeDash', '#calendarCard', '#myProfileView', '#settingsView']
+      .map(sel => [sel, document.querySelector(sel).style.display]),
+  };
+  document.getElementById('friendCalendarView').classList.remove('active');
   showTab('chat');
   openChatRoom(roomId);
+  chatReturnToFriendCalendar = snap;
   const input = document.getElementById('chatInput');
   input.value = text.slice(0, Number(input.maxLength) > 0 ? input.maxLength : 200);
   updateChatSendBtnState();
@@ -25762,7 +25772,31 @@ function chatMessagesSignature(messages){
   }
 }
 
-let chatReturnToCalendar = null; // 캘린더의 "채팅에서 확인"으로 들어온 경우, 뒤로가기 시 돌아갈 캘린더 상태(뷰/날짜)를 기억해둠
+let chatReturnToFriendCalendar = null; // 친구 캘린더 "물어보기"로 들어온 경우, 뒤로가기 시 되살릴 원래 화면 상태
+// 물어보기 전 화면으로 되돌림 - showTab은 하위 화면(친구 프로필 등)을 초기화하니까 쓰지 않고 탭 표시만 직접 되돌림
+function restoreScreenBeforeFriendAsk(snap){
+  currentTopTab = snap.tab;
+  Object.values(panels).forEach(p => p.classList.remove('active'));
+  navItems.forEach(n => n.classList.remove('active'));
+  if(snap.tab === null){
+    document.querySelector('.nav-item[data-tab="home"]').classList.add('active');
+  } else {
+    panels[snap.tab].classList.add('active');
+    document.querySelector(`.nav-item[data-tab="${snap.tab}"]`).classList.add('active');
+  }
+  if(snap.tab === 'chat'){
+    if(snap.roomId && CHAT_ROOMS[snap.roomId]){
+      openChatRoom(snap.roomId, { noPush: true }); // 원래 보던 방은 이미 뒤로가기 기록에 있으니 다시 쌓지 않음
+    } else {
+      document.getElementById('chatListView').classList.add('active');
+      renderChatList();
+    }
+  }
+  snap.displays.forEach(([sel, val]) => { document.querySelector(sel).style.display = val; });
+  document.body.classList.toggle('chat-open', snap.chatOpen);
+  document.getElementById('friendCalendarView').classList.add('active');
+}
+let chatReturnToCalendar = null; //캘린더의 "채팅에서 확인"으로 들어온 경우, 뒤로가기 시 돌아갈 캘린더 상태(뷰/날짜)를 기억해둠
 
 function closeChatRoomView(){
   setChatPlusMenu(false); // + 패널은 방을 옮기거나 닫으면 접음
@@ -25773,6 +25807,16 @@ function closeChatRoomView(){
   view.style.top = '';
   document.body.classList.remove('chat-open');
   document.querySelector('.bottom-nav').style.display = 'flex';
+
+  if(chatReturnToFriendCalendar){
+    // 친구 캘린더의 "물어보기"로 들어온 경우 - 채팅 목록 대신 숨겨뒀던 친구 캘린더(와 그 밑 화면)를 그대로 다시 보여줌
+    const snap = chatReturnToFriendCalendar;
+    chatReturnToFriendCalendar = null;
+    if(viewCloseStack.includes(closeFriendCalendar)){
+      restoreScreenBeforeFriendAsk(snap);
+      return;
+    }
+  }
 
   if(chatReturnToCalendar){
     // 캘린더의 일정에서 "채팅에서 확인"으로 들어온 경우 - 채팅 목록 대신 원래 보던 캘린더 화면으로 바로 돌아감
