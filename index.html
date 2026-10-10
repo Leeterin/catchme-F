@@ -19866,6 +19866,7 @@ function openFriendProfile(friendId){
   document.getElementById('profileChatBtn').dataset.friendId = friend.id;
   document.getElementById('friendCalendarBtn').dataset.friendId = friend.id;
   document.getElementById('friendCalendarBtn').textContent = `${friend.name}님 캘린더`;
+  prefetchFriendCalendar(friend);
   document.getElementById('profilePlanBtn').dataset.friendId = friend.id;
   document.getElementById('removeFriendBtn').dataset.friendId = friend.id;
 
@@ -20171,28 +20172,49 @@ const friendRealScheduleCache = {};
 // 이 친구에 대해 캐싱해둔 하루/한달 일정 데이터를 전부 지움 - 캘린더를 새로 열 때뿐 아니라
 // 하루/일주일/한달 탭을 다시 눌러 들어올 때도 호출해서, 그 사이에 상대가 일정을 바꿨어도
 // (다른 탭에서는 새로 받아왔는데 이 탭만 예전 캐시를 계속 보여주는) 탭 간 불일치가 안 생기게 함
+// 지우는 대신 "오래됨" 표시만 해둠 - 화면은 예전 데이터로 바로 그리고(빈 화면으로 2초씩 기다리지 않게),
+// 다음 로드 때 서버에서 새로 받아와 덮어쓰면 각 호출부가 다시 그려줌
+const friendStaleCacheKeys = new Set();
+const friendCacheInflight = {}; // 같은 데이터를 동시에 여러 번 요청하지 않게
 function clearFriendScheduleCache(friend){
   if(!friend || !friend.username) return;
   Object.keys(friendRealScheduleCache).forEach(k => {
-    if(k.startsWith(friend.username + '::')) delete friendRealScheduleCache[k];
+    if(k.startsWith(friend.username + '::')) friendStaleCacheKeys.add('d:' + k);
   });
   Object.keys(friendMonthDataCache).forEach(k => {
-    if(k.startsWith(friend.username + '::')) delete friendMonthDataCache[k];
+    if(k.startsWith(friend.username + '::')) friendStaleCacheKeys.add('m:' + k);
   });
+}
+function fetchFriendCacheOnce(tag, url, cache, key){
+  if(friendCacheInflight[tag]) return friendCacheInflight[tag];
+  friendCacheInflight[tag] = apiRequest(url).then(data => {
+    cache[key] = data;
+    friendStaleCacheKeys.delete(tag);
+    return data;
+  }).finally(() => { delete friendCacheInflight[tag]; });
+  return friendCacheInflight[tag];
+}
+// 프로필을 열 때 미리 이번주 일정을 받아둠 - "캘린더 보기"를 누르면 바로 보이게
+function prefetchFriendCalendar(friend){
+  if(!friend || !friend.username || friend.id === DEMO_FRIEND.id || !authToken) return;
+  const start = getWeekStart(TODAY);
+  for(let i = 0; i < 7; i++){
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    ensureFriendScheduleLoaded(friend, d);
+  }
 }
 
 // 진짜 친구(데모 친구 제외)의 특정 날짜 시간대별 바쁨/가능 여부를 서버에서 불러옴 (일정 제목은 절대 안 옴 - 프라이버시)
 async function ensureFriendScheduleLoaded(friend, dateObj){
   if(!friend || !friend.username || friend.id === DEMO_FRIEND.id || !authToken) return null;
   const key = friend.username + '::' + dateKeyOf(dateObj);
-  if(friendRealScheduleCache[key]) return friendRealScheduleCache[key];
+  if(friendRealScheduleCache[key] && !friendStaleCacheKeys.has('d:' + key)) return friendRealScheduleCache[key];
   try {
-    const data = await apiRequest(`/events/friend/${friend.username}?date=${toDateInputValue(dateObj)}`);
-    friendRealScheduleCache[key] = data;
-    return data;
+    return await fetchFriendCacheOnce('d:' + key, `/events/friend/${friend.username}?date=${toDateInputValue(dateObj)}`, friendRealScheduleCache, key);
   } catch(err){
     console.error('[friend schedule] load failed:', err);
-    return null;
+    return friendRealScheduleCache[key] || null;
   }
 }
 
@@ -20233,8 +20255,8 @@ function openFriendCalendar(friendId, mode){
   friendMonthSelectedDate = new Date(TODAY);
   friendReserveOpenKeys = null;
 
-  // 친구의 이전 조회 결과 캐시를 지워서, 캘린더를 열 때마다 항상 최신 데이터를 새로 받아오게 함
-  // (친구가 방금 "예약 가능" 시간을 바꿨는데 예전 캐시 때문에 안 보이는 문제 방지)
+  // 이전 조회 결과는 바로 보여주고, 뒤에서 최신 데이터를 새로 받아와 다시 그림
+  // (친구가 방금 "예약 가능" 시간을 바꿨어도 곧 반영됨)
   clearFriendScheduleCache(friend);
 
   document.getElementById('friendCalendarTitle').textContent = friendCalendarMode === 'reserve'
@@ -20777,10 +20799,9 @@ function renderFriendWeek(){
 async function loadFriendMonthData(friend, year, month){
   if(!friend.username || friend.id === DEMO_FRIEND.id || !authToken) return;
   const cacheKey = `${friend.username}::${year}-${month}`;
-  if(friendMonthDataCache[cacheKey]) return;
+  if(friendMonthDataCache[cacheKey] && !friendStaleCacheKeys.has('m:' + cacheKey)) return;
   try {
-    const data = await apiRequest(`/events/friend/${friend.username}/month?year=${year}&month=${month}`);
-    friendMonthDataCache[cacheKey] = data;
+    await fetchFriendCacheOnce('m:' + cacheKey, `/events/friend/${friend.username}/month?year=${year}&month=${month}`, friendMonthDataCache, cacheKey);
   } catch(err){
     console.error('[friend month] load failed:', err);
   }
