@@ -1534,6 +1534,7 @@
   .place-review-tag.on{ border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent); color:var(--accent); }
   .place-review-note{ width:100%; box-sizing:border-box; margin-top:10px; padding:9px 11px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); font-size:13px; font-family:inherit; resize:none; }
   #placeReviewOverlay .mini-confirm-card{ max-height:calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 40px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .feed-place-clear-btn{ position:absolute; top:50%; right:8px; transform:translateY(-50%); width:22px; height:22px; border:0; border-radius:50%; background:var(--line); color:var(--text-dim); font-size:15px; line-height:1; align-items:center; justify-content:center; padding:0; cursor:pointer; }
   .place-review-photo-label{ font-size:12.5px; font-weight:700; color:var(--text); margin:12px 0 6px; }
   .place-review-photo-label span{ font-size:11.5px; font-weight:500; color:var(--text-dim); }
   .place-review-dest{ font-size:11.5px; color:var(--text-dim); margin-top:8px; }
@@ -8854,7 +8855,8 @@
         <div class="feed-create-section">
           <div class="feed-create-section-label">장소</div>
           <div class="mp-input-group" style="position:relative;margin-bottom:10px;">
-            <input class="search-input" id="feedPlaceInput" placeholder="상호명을 검색하세요 (예: 빽다방 잠실새내점)" maxlength="30" autocomplete="off" />
+            <input class="search-input" id="feedPlaceInput" placeholder="상호명을 검색하세요 (예: 빽다방 잠실새내점)" maxlength="30" autocomplete="off" style="padding-right:36px;" />
+            <button type="button" class="feed-place-clear-btn" id="feedPlaceClearBtn" aria-label="장소 지우기" style="display:none;">&times;</button>
             <div class="location-search-results" id="feedPlaceResults" style="display:none;"></div>
           </div>
           <div class="feed-place-map" id="feedPlaceMapWrap" style="display:none;">
@@ -14196,6 +14198,23 @@ const FEED_MAX_PHOTOS = 5;
 
 function setFeedPlaceFieldsLocked(locked){
   document.getElementById('feedPlaceInput').disabled = locked;
+  updateFeedPlaceClearBtn();
+}
+// 장소 칸 오른쪽 × - 글자가 있을 때만 보임. 누르면 고른 장소(이름·주소·지도·전화)를 모두 지우고 검색 전으로 돌아감
+function updateFeedPlaceClearBtn(){
+  const input = document.getElementById('feedPlaceInput');
+  document.getElementById('feedPlaceClearBtn').style.display = (input.value && !input.disabled) ? 'flex' : 'none';
+}
+function clearFeedPlace(){
+  clearTimeout(feedPlaceSearchTimer);
+  feedPlaceSearchToken++; // 진행 중이던 검색 결과는 무시
+  feedPlacePicked = null;
+  document.getElementById('feedPlaceInput').value = '';
+  document.getElementById('feedLocationInput').value = '';
+  document.getElementById('feedPlaceResults').style.display = 'none';
+  document.getElementById('feedPlaceMapWrap').style.display = 'none';
+  renderFeedPlaceCreateInfo(null);
+  updateFeedPlaceClearBtn();
 }
 
 function renderFeedRatingPicker(){
@@ -14458,6 +14477,7 @@ function doOpenFeedCreate(){
   renderFeedPlaceCreateInfo(null);
   renderFeedRatingPicker();
   renderFeedPhotoRow();
+  updateFeedPlaceClearBtn();
   showFeedCreateView();
   pushViewState(closeFeedCreate);
 }
@@ -14494,6 +14514,7 @@ function openFeedReviewEdit(post){
   }
   renderFeedRatingPicker();
   renderFeedPhotoRow();
+  updateFeedPlaceClearBtn();
   showFeedCreateView();
   pushViewState(closeFeedCreate);
 }
@@ -14633,8 +14654,10 @@ async function searchFeedPlaces(val){
   });
   return merged.slice(0, 10);
 }
+document.getElementById('feedPlaceClearBtn').addEventListener('click', clearFeedPlace);
 document.getElementById('feedPlaceInput').addEventListener('input', () => {
   feedPlacePicked = null;
+  updateFeedPlaceClearBtn();
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
   renderFeedPlaceCreateInfo(null);
   const val = document.getElementById('feedPlaceInput').value.trim();
@@ -14676,6 +14699,7 @@ document.getElementById('feedPlaceInput').addEventListener('input', () => {
         renderFeedPlaceCreateInfo(feedPlacePicked);
         // 주소 칸은 고른 장소의 주소로 항상 채움 (다른 장소로 다시 고르면 그 주소로 바뀜)
         document.getElementById('feedLocationInput').value = r.address || '';
+        updateFeedPlaceClearBtn();
       });
     });
   }, 300);
