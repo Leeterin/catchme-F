@@ -24368,7 +24368,9 @@ function checkPendingRestoreAvailPrompts(roomId){
   const room = CHAT_ROOMS[roomId];
   if(!room || !room.messages) return;
   const resolvedIds = loadResolvedRestorePromptIds();
-  const m = room.messages.find(msg => msg.type === 'reservation' && msg.status === 'cancelled' && msg._serverId && !msg._restoreAvailHandled && !resolvedIds.has(msg._serverId));
+  const m = room.messages.find(msg => msg.type === 'reservation' && msg.status === 'cancelled' && msg._serverId && !msg._restoreAvailHandled && !resolvedIds.has(msg._serverId)
+    // 이미 시작 시간이 지난 약속은 다시 열어둘 의미가 없으니 묻지 않음
+    && !(msg.startMs && msg.startMs <= Date.now()));
   if(!m) return;
   pendingRestoreAvailMessage = m;
   pendingRestoreAvailRoomId = roomId;
@@ -27590,7 +27592,9 @@ async function deleteChatMessage(roomId, m){
       return;
     }
   }
-  removeChatMessageLocally(roomId, x => x === m);
+  // 방에 들어올 때 저장해둔 대화를 먼저 그리고 서버 것으로 바꿔 끼우면(내용이 같으면 다시 안 그림)
+  // 화면 말풍선이 쥔 메시지와 목록의 메시지가 다른 객체라서, 서버 id로 찾아 지움
+  removeChatMessageLocally(roomId, x => x === m || (m._serverId && x._serverId === m._serverId));
   showToast('메시지를 삭제했어요.');
 }
 function removeChatMessageLocally(roomId, match){
@@ -27599,6 +27603,7 @@ function removeChatMessageLocally(roomId, match){
   const before = room.messages.length;
   room.messages = room.messages.filter(x => !match(x));
   if(room.messages.length === before) return;
+  saveChatCache(roomId, room.messages); // 앱을 다시 켰을 때 지운 메시지가 잠깐 다시 보이지 않게
   if(activeChatRoomId === roomId) refreshChatMessagesQuietly();
   renderChatList();
 }
@@ -30704,7 +30709,7 @@ async function renderMatchEmptyHelp(body, startDate, endDate){
   const actions = [];
   if(mine === 0) actions.push('<button type="button" class="primary" data-match-help="mine">내 예약 가능 시간 열기</button>');
   if(friend && theirs > 0) actions.push(`<button type="button"${mine === 0 ? '' : ' class="primary"'} data-match-help="reserve">${escapeHtml(friend.name)}님이 열어둔 시간에 약속 잡기</button>`);
-  if(friend) actions.push('<button type="button" data-match-help="link">링크로 되는 시간 물어보기</button>');
+  if(friend) actions.push(`<button type="button" data-match-help="view">${escapeHtml(friend.name)}님 예약 가능 일정 보기</button>`);
 
   const help = document.createElement('div');
   help.className = 'match-empty-why';
@@ -30721,7 +30726,7 @@ async function renderMatchEmptyHelp(body, startDate, endDate){
     dismissView(closeCalendarMatchView);
     if(kind === 'mine') openMyAvailabilityForm();
     else if(kind === 'reserve' && friend) openFriendCalendar(friend.id, 'reserve');
-    else if(kind === 'link'){ inviteState.fromList = false; openInviteList(true); }
+    else if(kind === 'view' && friend) openFriendCalendar(friend.id, 'calendar');
   });
 }
 
@@ -31778,17 +31783,22 @@ async function renderPlanStartMethods(friendId){
       : theirs === 0 ? `${name}님이 아직 안 열었어요` : '둘 다 열어둔 시간이 있어요'),
     // 안 열린 상태여도 누를 수 있게 둠 - 들어가면 왜 없는지와 '내 시간 열기' 등 다음 할 일을 안내함
   };
-  const link = { ...PLAN_LINK_OPTION };
+  // 친구랑 잡을 땐 링크 대신 친구가 열어둔 예약 가능 일정을 바로 보게 함
+  const view = {
+    id: 'view',
+    icon: 'reserve',
+    title: `${name}님 예약 가능 일정 보기`,
+    desc: `${name}님 캘린더에서 열어둔 시간을 확인해요`,
+  };
   // '둘 다 되는 시간 찾기'는 항상 보여줌 (한쪽이라도 안 열었을 때 숨겼더니 매칭 기능이 사라진 것처럼 보였음)
   let options, note = '';
   if(known && theirs > 0 && mine > 0){ match.recommended = true; options = [match, reserve]; }
   else if(known && theirs > 0){ reserve.recommended = true; options = [reserve, match]; }
   else if(known){
-    note = `<div class="plan-empty">${name}님이 아직 예약 가능 시간을 안 열었어요.<br/>링크로 되는 시간을 물어보면 ${name}님이 골라줘요.</div>`;
-    link.recommended = true;
-    options = [link, match];
+    note = `<div class="plan-empty">${name}님이 아직 예약 가능 시간을 안 열었어요.</div>`;
+    options = [view, match];
   }
-  else options = [reserve, match, link];
+  else options = [reserve, match, view];
 
   body.innerHTML = note + options.map(planOptionHtml).join('') + `<button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 친구 고르기</button>`;
   body.dataset.friendId = friendId;
@@ -31809,6 +31819,7 @@ document.getElementById('planStartBody').addEventListener('click', (e) => {
     } else if(friendId){
       calendarOpenedFromChat = planStartChatRoomId;
       if(method === 'match') openCalendarMatch(friendId);
+      else if(method === 'view') openFriendCalendar(friendId, 'calendar');
       else openFriendCalendar(friendId, 'reserve');
     }
     return;
