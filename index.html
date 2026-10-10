@@ -7822,6 +7822,10 @@
         </div>
         <div class="mp-input-group">
           <label>예약 가능 시간 <span style="font-weight:400;color:var(--text-dim);">(막대 끝을 끌거나 시간 글자를 눌러 5분 단위로 맞춰요)</span></label>
+          <div class="qa-repeat">
+            <button type="button" class="qa-switch" id="formAvailRepeatSwitch" role="switch" aria-checked="false"><span>4주 반복</span><i></i></button>
+          </div>
+          <p class="quick-avail-hint" id="formAvailRepeatHint" style="display:none;margin:-2px 0 6px;">정한 시간이 그 주부터 4주 동안 매주 같은 요일에 열려요.</p>
           <div class="schedule-nav" style="margin-bottom:8px;">
             <button id="availWeekPrev" type="button">&#8249;</button>
             <div class="schedule-nav-label" id="availWeekLabel">-</div>
@@ -16958,6 +16962,16 @@ let formAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 �
 let formAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dk, min }
 let formAvailAxis = { s: 0, e: 24 * 60 }; // 막대가 보여주는 시간 범위
 let formAvailDrag = null;
+let formAvailRepeat = false; // 켜면 정한 시간을 그 날부터 4주 동안 매주 같은 요일에 염
+function setFormAvailRepeat(on){
+  formAvailRepeat = on;
+  document.getElementById('formAvailRepeatSwitch').setAttribute('aria-checked', on ? 'true' : 'false');
+  document.getElementById('formAvailRepeatHint').style.display = on ? '' : 'none';
+}
+document.getElementById('formAvailRepeatSwitch').addEventListener('click', () => {
+  setFormAvailRepeat(!formAvailRepeat);
+  try { localStorage.setItem(QUICK_REPEAT_KEY, formAvailRepeat ? 'month' : 'once'); } catch(e) {}
+});
 // 저장할 때 등록할 블록들
 let availFineTuneBlocks = []; // [{ dateKey, startMin, endMin }]
 let editingOriginalAvailBlocks = []; // 수정하려고 열었을 때 원래 있던 블록들
@@ -17402,6 +17416,10 @@ function openEventForm(existingEvent){
   pushViewState(closeEventForm);
 
   formAvailableFor = existingEvent ? availableForOf(existingEvent) : 'friends';
+  // 4주 반복은 빠르게 열기와 같은 설정을 기억해서 씀 - 이미 있는 시간을 고칠 땐 늘 꺼진 채로 시작
+  let repeatPref = false;
+  try { repeatPref = localStorage.getItem(QUICK_REPEAT_KEY) === 'month'; } catch(e) {}
+  setFormAvailRepeat(!existingEvent && repeatPref);
   formAllowBooking = existingEvent
     ? !blocksBooking(existingEvent) && existingEvent.type !== 'available'
     : isAllowBookingAlways();
@@ -18381,10 +18399,20 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   if(formEventType === 'available'){
     const todayKey = dateKeyOf(TODAY);
     availFineTuneBlocks = [];
-    Object.keys(formAvailRanges).sort().forEach(dk => {
+    // 4주 반복이면 정한 날짜마다 1·2·3주 뒤 같은 요일에도 같은 시간을 넣음
+    const openRanges = {};
+    Object.keys(formAvailRanges).forEach(dk => {
+      for(let w = 0; w < (formAvailRepeat ? 4 : 1); w++){
+        const d = parseDateInputValue(dk);
+        d.setDate(d.getDate() + w * 7);
+        const k = dateKeyOf(d);
+        openRanges[k] = [...(openRanges[k] || []), ...formAvailRanges[dk]];
+      }
+    });
+    Object.keys(openRanges).sort().forEach(dk => {
       if(dk < todayKey) return;
       const hard = formAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft);
-      subtractMinuteRanges(quickMergeRanges(formAvailRanges[dk]), hard)
+      subtractMinuteRanges(quickMergeRanges(openRanges[dk]), hard)
         .filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN)
         .forEach(r => availFineTuneBlocks.push({ dateKey: dk, startMin: r.s, endMin: r.e }));
     });
@@ -18455,7 +18483,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     editingLinkedPieceIds = [];
     dismissView(closeEventForm);
     refreshActiveScheduleView();
-    showToast((wasEditing ? `예약 가능한 시간을 수정했어요.` : `예약 가능한 시간 ${createdCount}개를 등록했어요.`)
+    showToast((wasEditing ? `예약 가능한 시간을 수정했어요.` : formAvailRepeat ? `예약 가능한 시간을 4주 동안 매주 반복해서 열었어요.` : `예약 가능한 시간 ${createdCount}개를 등록했어요.`)
       + (mergedCount ? ' 이미 열려 있던 시간과 겹치는 부분은 하나로 합쳤어요.' : ''));
     return;
   }
