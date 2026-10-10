@@ -23416,6 +23416,15 @@ function meetPlaceOrderLabel(idx){
   return `${idx + 1}차`;
 }
 
+// 장소 삭제 버튼 - 바로 지우지 않고 한 번 더 물어봄
+function confirmRemovePlace(placePin){
+  return appConfirm({
+    title: '장소 삭제',
+    html: `"${escapeHtml(placePin.location || '')}"을(를) 정말로 삭제하시겠어요?`,
+    yesText: '삭제',
+    noText: '취소',
+  });
+}
 // 장소 목록에서 장소 하나를 지움 - placePin이 일정 카드 자체면 그 카드의 장소만 비우고, "장소만 있는 핀"이면 핀을 지움
 function removePinnedLocation(pinId, placePinId){
   const roomId = activeChatRoomId;
@@ -25999,9 +26008,10 @@ function renderPinnedSchedule(){
     });
 
     card.querySelectorAll('.pin-remove-loc').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
-        if(placePin) removePinnedLocation(pinned.id, placePin.id);
+        if(!placePin || !(await confirmRemovePlace(placePin))) return;
+        removePinnedLocation(pinned.id, placePin.id);
       });
     });
 
@@ -26161,8 +26171,9 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       openHotplaceView(p.location, p.locationLat, p.locationLon);
     });
     const delBtn = row.querySelector('.appt-place-delete');
-    if(delBtn) delBtn.addEventListener('click', (e) => {
+    if(delBtn) delBtn.addEventListener('click', async (e) => {
       e.stopPropagation();
+      if(!(await confirmRemovePlace(p))) return;
       removePinnedLocation(pin.id, p.id);
       openAppointmentDetailView(roomId, pinId, apptDetailReturnViewId);
     });
