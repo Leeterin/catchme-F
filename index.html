@@ -5370,6 +5370,8 @@
   #quickAvailOverlay .quick-avail-card{ -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
   #quickAvailOverlay .qa-track{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   #quickAvailOverlay .qa-bar{ touch-action:pan-y; }
+  #inviteOverlay .qa-track{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  #inviteOverlay .qa-bar{ touch-action:pan-y; }
   .quick-avail-desc{ font-size:12.5px; line-height:1.5; color:var(--text-dim); text-align:center; margin:0 0 12px; }
   .quick-avail-desc b{ color:var(--text); }
   /* 요일별 시간 막대 */
@@ -17775,30 +17777,30 @@ function formAvailBarStyle(r){
   return `left:${formAvailPct(s)}%;width:${formAvailPct(e) - formAvailPct(s)}%`;
 }
 // 막대 시간 고치기 칸: "12:00" 한 칸(누르면 휠) + 옆에 5분씩 빼고 더하는 버튼. p는 'fa'(일정 만들기) 또는 'qa'(빠른 설정)
-function availTimeEditHtml(p, key, r){
-  const side = (k, v) => `<span class="qa-tpick"><button type="button" class="qa-tstep" data-${p}-step="${k}|-1" aria-label="5분 빼기">−</button><button type="button" class="qa-tval" data-${p}-wheel="${k}">${minutesToLabel(v)}</button><button type="button" class="qa-tstep" data-${p}-step="${k}|1" aria-label="5분 더하기">+</button></span>`;
+function availTimeEditHtml(p, key, r, unit = '5분'){
+  const side = (k, v) => `<span class="qa-tpick"><button type="button" class="qa-tstep" data-${p}-step="${k}|-1" aria-label="${unit} 빼기">−</button><button type="button" class="qa-tval" data-${p}-wheel="${k}">${minutesToLabel(v)}</button><button type="button" class="qa-tstep" data-${p}-step="${k}|1" aria-label="${unit} 더하기">+</button></span>`;
   return `<div class="qa-edit" data-${p}-edit="${key}">${side('s', r.s)} – ${side('e', r.e)}<button type="button" data-${p}-edit-done>완료</button></div>`;
 }
 // 한쪽(s/e)을 v로 바꿈 - 바꾼 쪽을 기준으로 30분 이상, 앞뒤 시간과 안 겹치게 맞춤
-function availEditedRange(r, side, v, prevEnd, nextStart){
+function availEditedRange(r, side, v, prevEnd, nextStart, minLen = QUICK_AVAIL_MIN_LEN){
   let s = r.s, en = r.e;
   if(side === 's'){
-    s = Math.max(prevEnd, Math.min(nextStart - QUICK_AVAIL_MIN_LEN, v));
-    en = Math.min(nextStart, Math.max(en, s + QUICK_AVAIL_MIN_LEN));
+    s = Math.max(prevEnd, Math.min(nextStart - minLen, v));
+    en = Math.min(nextStart, Math.max(en, s + minLen));
   } else {
-    en = Math.min(nextStart, Math.max(prevEnd + QUICK_AVAIL_MIN_LEN, Math.min(24 * 60, v)));
-    s = Math.max(prevEnd, Math.min(s, en - QUICK_AVAIL_MIN_LEN));
+    en = Math.min(nextStart, Math.max(prevEnd + minLen, Math.min(24 * 60, v)));
+    s = Math.max(prevEnd, Math.min(s, en - minLen));
   }
   return { s, e: en };
 }
-// 시간 고치기 칸의 −/+ 와 숫자(휠) 누르기를 처리 - 처리했으면 true. apply(side, 새 값)
-function handleAvailTimeEditClick(e, p, r, apply){
-  const step = e.target.closest(`[data-${p}-step]`);
-  if(step){
-    const [side, dir] = step.getAttribute(`data-${p}-step`).split('|');
+// 시간 고치기 칸의 −/+ 와 숫자(휠) 누르기를 처리 - 처리했으면 true. apply(side, 새 값). step은 한 번에 움직이는 분 (약속 링크는 1시간)
+function handleAvailTimeEditClick(e, p, r, apply, step = QUICK_AVAIL_STEP){
+  const stepBtn = e.target.closest(`[data-${p}-step]`);
+  if(stepBtn){
+    const [side, dir] = stepBtn.getAttribute(`data-${p}-step`).split('|');
     const cur = side === 's' ? r.s : r.e;
     // 5분 칸에 안 맞아 있으면 먼저 가까운 5분 칸으로
-    const next = Number(dir) > 0 ? Math.floor(cur / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP + QUICK_AVAIL_STEP : Math.ceil(cur / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP - QUICK_AVAIL_STEP;
+    const next = Number(dir) > 0 ? Math.floor(cur / step) * step + step : Math.ceil(cur / step) * step - step;
     hapticTick();
     apply(side, Math.max(0, Math.min(24 * 60, next)));
     return true;
@@ -17807,7 +17809,7 @@ function handleAvailTimeEditClick(e, p, r, apply){
   if(wheel){
     const side = wheel.getAttribute(`data-${p}-wheel`);
     const values = [];
-    for(let m = side === 's' ? 0 : QUICK_AVAIL_STEP; m <= (side === 's' ? 24 * 60 - QUICK_AVAIL_STEP : 24 * 60); m += QUICK_AVAIL_STEP) values.push(m);
+    for(let m = side === 's' ? 0 : step; m <= (side === 's' ? 24 * 60 - step : 24 * 60); m += step) values.push(m);
     openWheelPicker({ title: side === 's' ? '시작 시간' : '끝 시간', values, value: side === 's' ? r.s : r.e, onPick: v => apply(side, v) });
     return true;
   }
@@ -31456,6 +31458,7 @@ function inviteDatesSummary(inv){
   const first = inviteDateLabel(inv.dates[0]);
   const more = inv.dates.length > 1 ? ` 외 ${inv.dates.length - 1}일` : '';
   if(inv.fromCalendar) return `${first}${more} · 내 캘린더의 예약 가능 시간`;
+  if(Array.isArray(inv.openCells)) return `${first}${more} · 날짜마다 연 시간`;
   return `${first}${more} · ${invitePad(inv.startHour)}:00~${invitePad(inv.endHour % 24)}:00`;
 }
 function inviteCreatorName(inv){ return (inv.creator && inv.creator.name) || '친구'; }
@@ -32018,6 +32021,8 @@ function openInviteCreate(fromList, opts = {}){
   inviteState.draft = {
     source: opts.source || 'calendar',
     dates: new Set([inviteYmd(sat)]), title: opts.title || '', startHour: opts.startHour ?? 10, endHour: opts.endHour ?? 22,
+    // 직접 고르기: 날짜마다 막대로 연 시간 (링크에만 저장되고 캘린더 일정은 안 바뀜)
+    ranges: {}, weekStart: inviteWeekSunday(today), edit: null, info: null, axis: { s: 0, e: 24 * 60 },
     calDays: null,      // [{date, hours}] - 서버에서 불러온 내 예약 가능 시간 (null = 불러오는 중)
     calDates: new Set(),
     calError: '',
@@ -32216,8 +32221,9 @@ function renderInviteOverlay(){
   if(st.mode === 'create'){
     titleEl.textContent = '약속 링크 만들기';
     body.innerHTML = renderInviteCreateHtml();
+    body.scrollTop = keepScroll;
     const d = st.draft;
-    const calBlocked = d.source === 'calendar' && (!d.calDays || d.calDates.size === 0);
+    const calBlocked = d.source === 'calendar' ? (!d.calDays || d.calDates.size === 0) : !Object.keys(d.ranges).length;
     const label = st.busy ? '만드는 중...'
       : d.source === 'calendar' && d.calDates.size ? `예약 가능 시간 ${d.calDates.size}일로 링크 만들기` : '링크 만들기';
     foot.innerHTML = `<button type="button" class="inv-primary" data-act="create"${st.busy || calBlocked ? ' disabled' : ''}>${label}</button>`;
@@ -32259,7 +32265,8 @@ function renderInviteListHtml(){
 }
 
 function inviteAutoTitle(draft){
-  const dates = draft.source === 'calendar' ? draft.calDates : draft.dates;
+  const dates = draft.source === 'calendar' ? draft.calDates : new Set(Object.keys(draft.ranges));
+  if(!dates.size) return draft.place ? `${draft.place.name}에서 언제 만날지 골라줘!` : '언제 만날지 시간 골라줘!';
   const at = draft.place ? `${draft.place.name}에서 ` : '';
   if(dates.size === 1){
     const d = inviteDateObj([...dates][0]);
@@ -32330,24 +32337,312 @@ function renderInviteCreateHtml(){
           : '친구에게 열어둔 시간이 담겨요. 업무용 링크에만 연 시간은 안 보여요.'}</div>
     </div>`;
   if(d.source === 'calendar') return placeHtml + tabs + audienceHtml + titleHtml + renderInviteCalendarPickHtml(d);
+  const days = inviteAvailWeekDays(d);
+  const atFirstWeek = d.weekStart.getTime() <= inviteWeekSunday(new Date()).getTime();
   return placeHtml + tabs + titleHtml + `
     <div class="inv-section">
-      <label class="inv-label">날짜 <small>· 여러 개 고를 수 있어요 (최대 14일)</small></label>
-      <div class="inv-date-chips">${chips}</div>
-    </div>
-    <div class="inv-section">
-      <label class="inv-label">시간 범위 <small>· 친구들은 이 안에서 1시간 단위로 골라요</small></label>
-      <div class="inv-range">
-        <select id="invStartHour">${hourOpts(0, 23, d.startHour)}</select>
-        <span>~</span>
-        <select id="invEndHour">${hourOpts(1, 24, d.endHour)}</select>
+      <label class="inv-label">열어둘 시간 <small>· 날짜마다 따로, 1시간 단위 (최대 14일)</small></label>
+      <div class="schedule-nav" style="margin-bottom:8px;">
+        <button type="button" data-act="iaWeek" data-dir="-1"${atFirstWeek ? ' disabled style="visibility:hidden"' : ''}>&#8249;</button>
+        <div class="schedule-nav-label">${days[0].getMonth() + 1}월 ${days[0].getDate()}일 - ${days[6].getMonth() + 1}월 ${days[6].getDate()}일</div>
+        <button type="button" data-act="iaWeek" data-dir="1">&#8250;</button>
       </div>
+      <div id="invAvailRows">${inviteAvailRowsHtml(d)}</div>
+      <p class="quick-avail-hint">빈 곳을 누르면 시간을 넣어요. 회색은 내 일정이라 그 위로는 막대를 놓을 수 없어요. 이 시간은 링크에만 담기고 캘린더 일정은 그대로예요.</p>
     </div>
     <div class="inv-card accent">
       <div class="inv-card-title">${ICO.sparkle} 친구는 가입 없이 참여해요</div>
-      <div class="inv-card-desc">링크를 받은 친구는 이름만 적고 가능한 시간을 눌러서 보내면 끝이에요. 다 모이면 여기서 가장 많이 되는 시간으로 확정할 수 있어요.</div>
+      <div class="inv-card-desc">링크를 받은 친구는 이름만 적고 열어둔 시간 안에서 되는 시간을 눌러 보내면 끝이에요. 다 모이면 여기서 가장 많이 되는 시간으로 확정할 수 있어요.</div>
     </div>`;
 }
+
+// ---------- 직접 고르기: 날짜마다 막대로 시간 열기 (일정 만들기·빠르게 열기와 같은 막대, 약속 링크라 1시간 단위) ----------
+// 여기서 연 시간은 링크에만 저장됨 - 캘린더 일정은 만들지도 바꾸지도 않음
+const INV_AVAIL_STEP = 60;
+function inviteWeekSunday(date){ const d = new Date(date); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d; }
+function inviteAvailWeekDays(d){
+  return Array.from({ length: 7 }, (_, i) => { const x = new Date(d.weekStart); x.setDate(x.getDate() + i); return x; });
+}
+// 그날 막대 위에 보여줄 내 일정 - 회색(못 엶)/점선(겹쳐도 예약 받는 일정)/이미 연 예약 가능 시간(얇은 줄)
+function inviteAvailBusyFor(day){
+  const busy = [], other = [];
+  getEventsForDate(day).forEach(ev => {
+    const r = getEventDisplayRangeForDate(ev, day);
+    if(r.endMin <= r.startMin) return;
+    if(ev.type === 'available' && isMergeableAvail(ev)){ other.push({ s: r.startMin, e: r.endMin }); return; }
+    busy.push({ s: r.startMin, e: r.endMin, soft: !blocksBooking(ev), title: ev.type === 'available' ? '반복으로 열어둔 예약 가능 시간' : (ev.title || '일정') });
+  });
+  return { busy, other };
+}
+function inviteAvailHardBusy(dk){
+  return quickMergeRanges(inviteAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft).map(b => ({ s: b.s, e: b.e })));
+}
+// 1시간 칸에 맞춰 안쪽으로 줄임
+function inviteHourFit(r){ return { s: Math.ceil(r.s / INV_AVAIL_STEP) * INV_AVAIL_STEP, e: Math.floor(r.e / INV_AVAIL_STEP) * INV_AVAIL_STEP }; }
+function inviteAvailFitRanges(dk, ranges){
+  return subtractMinuteRanges(ranges, inviteAvailHardBusy(dk)).map(inviteHourFit).filter(r => r.e - r.s >= INV_AVAIL_STEP).sort((a, b) => a.s - b.s);
+}
+function inviteAvailBounds(d, dk, ranges, idx, lo, hi){
+  const r = ranges[idx];
+  [...inviteAvailHardBusy(dk), ...ranges.filter((_, i) => i !== idx)].forEach(o => {
+    if(o.e <= r.s) lo = Math.max(lo, o.e);
+    else if(o.s >= r.e) hi = Math.min(hi, o.s);
+  });
+  return { lo: Math.ceil(lo / INV_AVAIL_STEP) * INV_AVAIL_STEP, hi: Math.floor(hi / INV_AVAIL_STEP) * INV_AVAIL_STEP };
+}
+function inviteAvailPct(d, min){ return (min - d.axis.s) / (d.axis.e - d.axis.s) * 100; }
+function inviteAvailBarStyle(d, r){
+  const s = Math.max(r.s, d.axis.s), e = Math.min(r.e, d.axis.e);
+  if(e <= s) return 'display:none';
+  return `left:${inviteAvailPct(d, s)}%;width:${inviteAvailPct(d, e) - inviteAvailPct(d, s)}%`;
+}
+function inviteAvailRowsHtml(d){
+  const days = inviteAvailWeekDays(d);
+  const todayKey = dateKeyOf(TODAY);
+  const info = days.map(day => ({ day, dk: dateKeyOf(day), ...inviteAvailBusyFor(day) }));
+  info.forEach(({ dk }) => {
+    if(!d.ranges[dk]) return;
+    const fit = inviteAvailFitRanges(dk, d.ranges[dk]);
+    if(fit.length) d.ranges[dk] = fit; else delete d.ranges[dk];
+  });
+  // 내 일정·연 시간이 있는 범위에 앞뒤 1시간 여유 (최소 12시간). 아무것도 없으면 0~24시 전부
+  const all = info.flatMap(x => [...x.busy, ...x.other, ...(d.ranges[x.dk] || [])]);
+  if(!all.length) d.axis = { s: 0, e: 24 * 60 };
+  else {
+    let s = Math.max(0, Math.floor((Math.min(...all.map(r => r.s)) - 60) / 60) * 60);
+    let e = Math.min(24 * 60, Math.ceil((Math.max(...all.map(r => r.e)) + 60) / 60) * 60);
+    while(e - s < 12 * 60){
+      if(s > 0) s -= 60;
+      if(e < 24 * 60 && e - s < 12 * 60) e += 60;
+    }
+    d.axis = { s, e };
+  }
+  const ticks = [];
+  for(let h = Math.ceil(d.axis.s / 180) * 3; h * 60 <= d.axis.e; h += 3) ticks.push(h);
+  const grid = ticks.filter(h => h * 60 > d.axis.s && h * 60 < d.axis.e).map(h => `<i class="qa-grid" style="left:${inviteAvailPct(d, h * 60)}%"></i>`).join('');
+  const labelTicks = d.axis.e - d.axis.s > 18 * 60 ? ticks.filter(h => h % 6 === 0) : ticks;
+  let html = info.map(({ day, dk, busy, other }) => {
+    const ranges = d.ranges[dk] || [];
+    const on = ranges.length > 0;
+    const dow = day.getDay();
+    const label = `${day.getMonth() + 1}/${day.getDate()} ${WEEKDAY_KO[dow]}`;
+    if(dk < todayKey){
+      return `<div class="qa-row off"><div class="qa-row-top"><span class="qa-day" style="color:var(--text-dim);cursor:default;">${label}</span><div class="qa-times"><span class="qa-time off">지난 날</span></div></div></div>`;
+    }
+    const editing = d.edit && d.edit.dk === dk && ranges[d.edit.idx] ? d.edit.idx : -1;
+    const times = on
+      ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-ia-edit-open="${dk}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span><button type="button" class="qa-del" data-ia-del="${dk}|${i}" aria-label="이 시간 빼기">&times;</button></span>`).join('')
+      : '<span class="qa-time off">안 열어요</span>';
+    const busyHtml = busy.filter(b => b.e > d.axis.s && b.s < d.axis.e)
+      .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${inviteAvailBarStyle(d, b)}"></i>`).join('');
+    const otherHtml = quickMergeRanges(other).map(r => `<i class="qa-other" style="${inviteAvailBarStyle(d, r)}"></i>`).join('');
+    const bars = ranges.map((r, i) => {
+      const cs = r.s < d.axis.s, ce = r.e > d.axis.e;
+      return `<div class="qa-bar${cs ? ' clip-s' : ''}${ce ? ' clip-e' : ''}" data-ia-bar="${dk}|${i}" style="${inviteAvailBarStyle(d, r)}">`
+        + (cs ? '' : `<span class="qa-handle s" data-ia-handle="${dk}|${i}|s"></span>`)
+        + (ce ? '' : `<span class="qa-handle e" data-ia-handle="${dk}|${i}|e"></span>`) + '</div>';
+    }).join('');
+    return `<div class="qa-row${on ? '' : ' off'}">
+      <div class="qa-row-top">
+        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-ia-toggle="${dk}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${label}</button>
+        <div class="qa-times" data-ia-times="${dk}">${times}</div>
+        ${on ? `<button type="button" class="qa-add" data-ia-add="${dk}" aria-label="${label} 시간 더 넣기">+</button>` : ''}
+      </div>
+      ${editing >= 0 ? availTimeEditHtml('ia', `${dk}|${editing}`, ranges[editing], '1시간') : ''}
+      <div class="qa-track" data-ia-track="${dk}">${grid}${otherHtml}${bars}${busyHtml}</div>
+      ${d.info && d.info.dk === dk ? inviteAvailInfoHtml(dk, d.info.min) : ''}
+    </div>`;
+  }).join('');
+  html += `<div class="qa-axis">${labelTicks.map(h => `<span style="left:${inviteAvailPct(d, h * 60)}%">${h}시</span>`).join('')}</div>`;
+  const anyBusy = info.some(x => x.busy.some(b => !b.soft)), anySoft = info.some(x => x.busy.some(b => b.soft)), anyOther = info.some(x => x.other.length);
+  if(anyBusy || anySoft || anyOther){
+    html += `<div class="qa-legend">${anyBusy ? '<span><i></i>내 일정</span>' : ''}${anySoft ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>캘린더에 연 시간</span>' : ''}</div>`;
+  }
+  return html;
+}
+function inviteAvailInfoHtml(dk, min){
+  const day = parseDateInputValue(dk);
+  const items = inviteAvailBusyFor(day).busy.filter(b => b.s <= min && b.e > min);
+  if(!items.length) return '';
+  return `<div class="qa-info">${items.map(b => {
+    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열 수 있어요' : '일정이 있어서 이 시간은 열 수 없어요';
+    return `<div class="qa-info-item"><b>${escapeHtml(b.title)}</b> ${minutesToLabel(b.s)}–${minutesToLabel(b.e)}<small>${day.getMonth() + 1}/${day.getDate()} · ${note}</small></div>`;
+  }).join('')}${items.every(b => b.soft) ? '<button type="button" class="qa-info-add" data-ia-info-add>이 시간 열기</button>' : ''}</div>`;
+}
+// 한 줄에 시간을 하나 더 넣음 - 누른 곳(centerMin)이 있으면 거기, 없으면 가장 넓은 빈 곳 가운데에 2시간
+function inviteAvailAddRange(d, dk, centerMin){
+  const ranges = d.ranges[dk] || [];
+  if(!ranges.length && Object.keys(d.ranges).length >= 14){ showToast('날짜는 최대 14일까지 고를 수 있어요.'); return false; }
+  const gaps = subtractMinuteRanges([{ s: d.axis.s, e: d.axis.e }], [...ranges, ...inviteAvailHardBusy(dk)]).map(inviteHourFit).filter(g => g.e - g.s >= INV_AVAIL_STEP);
+  const gap = centerMin != null ? gaps.find(g => g.s <= centerMin && g.e >= centerMin) : gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
+  if(!gap){
+    if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
+    return false;
+  }
+  const len = Math.min(120, gap.e - gap.s);
+  const c = centerMin != null ? centerMin : (gap.s + gap.e) / 2;
+  let s = Math.round((c - len / 2) / INV_AVAIL_STEP) * INV_AVAIL_STEP;
+  s = Math.max(gap.s, Math.min(gap.e - len, s));
+  d.ranges[dk] = [...ranges, { s, e: s + len }].sort((a, b) => a.s - b.s);
+  return true;
+}
+// 링크로 보낼 1시간 칸들 "YYYY-MM-DD|HH"
+function inviteDraftCells(d){
+  const cells = [];
+  Object.keys(d.ranges).sort().forEach(dk => d.ranges[dk].forEach(r => {
+    for(let h = r.s / 60; h < r.e / 60; h++) cells.push(inviteCellKey(dk, h));
+  }));
+  return cells;
+}
+function inviteAvailRerender(){
+  renderInviteOverlay();
+  const input = document.getElementById('invTitleInput');
+  if(input) input.placeholder = inviteAutoTitle(inviteState.draft);
+}
+document.getElementById('inviteBody').addEventListener('click', (e) => {
+  const d = inviteState.draft;
+  if(inviteState.mode !== 'create' || !d || d.source !== 'manual') return;
+  const tg = e.target.closest('[data-ia-toggle]');
+  if(tg){
+    if(!(d.ranges[tg.dataset.iaToggle] || []).length) return; // 요일 버튼은 끄기만 - 켜는 건 막대 빈 곳을 눌러서
+    delete d.ranges[tg.dataset.iaToggle];
+    if(d.edit && d.edit.dk === tg.dataset.iaToggle) d.edit = null;
+    inviteAvailRerender();
+    return;
+  }
+  const add = e.target.closest('[data-ia-add]');
+  if(add){ if(inviteAvailAddRange(d, add.dataset.iaAdd)) inviteAvailRerender(); return; }
+  if(e.target.closest('[data-ia-info-add]')){
+    const info = d.info;
+    d.info = null;
+    if(info) inviteAvailAddRange(d, info.dk, info.min);
+    inviteAvailRerender();
+    return;
+  }
+  const del = e.target.closest('[data-ia-del]');
+  if(del){
+    const [dk, idx] = del.dataset.iaDel.split('|');
+    const left = d.ranges[dk].filter((_, i) => i !== Number(idx));
+    if(left.length) d.ranges[dk] = left; else delete d.ranges[dk];
+    hapticImpact('MEDIUM');
+    d.edit = null;
+    inviteAvailRerender();
+    return;
+  }
+  const open = e.target.closest('[data-ia-edit-open]');
+  if(open){
+    const [dk, idx] = open.dataset.iaEditOpen.split('|');
+    const same = d.edit && d.edit.dk === dk && d.edit.idx === Number(idx);
+    d.edit = same ? null : { dk, idx: Number(idx) };
+    inviteAvailRerender();
+    return;
+  }
+  const panel = e.target.closest('[data-ia-edit]');
+  if(panel){
+    const [dk, idxStr] = panel.dataset.iaEdit.split('|');
+    const idx = Number(idxStr);
+    const cur = (d.ranges[dk] || [])[idx];
+    if(cur && handleAvailTimeEditClick(e, 'ia', cur, (side, v) => {
+      const ranges = quickCloneRanges(d.ranges[dk]);
+      if(!ranges[idx]) return;
+      const { lo, hi } = inviteAvailBounds(d, dk, ranges, idx, 0, 24 * 60);
+      ranges[idx] = availEditedRange(ranges[idx], side, Math.round(v / INV_AVAIL_STEP) * INV_AVAIL_STEP, lo, hi, INV_AVAIL_STEP);
+      d.ranges[dk] = ranges;
+      inviteAvailRerender();
+    }, INV_AVAIL_STEP)) return;
+  }
+  if(e.target.closest('[data-ia-edit-done]')){ d.edit = null; inviteAvailRerender(); }
+});
+(function setupInviteAvailDrag(){
+  const body = document.getElementById('inviteBody');
+  let drag = null;
+  const minAt = (d, track, clientX) => {
+    const rect = track.getBoundingClientRect();
+    return d.axis.s + Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * (d.axis.e - d.axis.s);
+  };
+  body.addEventListener('pointerdown', (e) => {
+    const d = inviteState.draft;
+    const track = e.target.closest('[data-ia-track]');
+    if(!track || !d) return;
+    const dk = track.dataset.iaTrack;
+    const handle = e.target.closest('[data-ia-handle]');
+    const bar = e.target.closest('[data-ia-bar]');
+    if(handle || bar){
+      let [, idx, edge] = (handle ? handle.dataset.iaHandle : bar.dataset.iaBar + '|m').split('|');
+      if(edge === 'm' && /clip-/.test(bar.className)) edge = 'x';
+      const ranges = quickCloneRanges(d.ranges[dk]);
+      hapticSelectionStart();
+      drag = { d, dk, track, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, bounds: inviteAvailBounds(d, dk, ranges, Number(idx), d.axis.s, d.axis.e), startMin: minAt(d, track, e.clientX), el: bar || handle.closest('[data-ia-bar]'), x: e.clientX, y: e.clientY, moved: false };
+      try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
+      e.preventDefault();
+      return;
+    }
+    drag = { tap: true, d, dk, track, x: e.clientX, y: e.clientY };
+  });
+  body.addEventListener('pointermove', (e) => {
+    const dr = drag;
+    if(!dr || dr.tap || dr.edge === 'x') return;
+    if(!dr.moved && Math.abs(e.clientX - dr.x) < 6) return;
+    if(!dr.moved) hapticImpact('LIGHT');
+    dr.moved = true;
+    const r = dr.ranges[dr.idx];
+    const { lo, hi } = dr.bounds;
+    const m = minAt(dr.d, dr.track, e.clientX);
+    const snap = v => Math.round(v / INV_AVAIL_STEP) * INV_AVAIL_STEP;
+    const ps = r.s, pe = r.e;
+    let want;
+    if(dr.edge === 's'){ want = snap(m); r.s = Math.max(lo, Math.min(r.e - INV_AVAIL_STEP, want)); }
+    else if(dr.edge === 'e'){ want = snap(m); r.e = Math.min(hi, Math.max(r.s + INV_AVAIL_STEP, want)); }
+    else {
+      const len = dr.orig.e - dr.orig.s;
+      want = snap(dr.orig.s + m - dr.startMin);
+      r.s = Math.max(lo, Math.min(hi - len, want));
+      r.e = r.s + len;
+    }
+    const wall = (dr.edge === 'e' ? r.e : r.s) !== want;
+    const hitWall = wall && !dr.atWall;
+    dr.atWall = wall;
+    if(hitWall) hapticImpact('HEAVY');
+    if(r.s === ps && r.e === pe) return;
+    if(!hitWall) hapticStep(dr.edge === 'e' ? r.e : r.s);
+    // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
+    dr.el.style.cssText = inviteAvailBarStyle(dr.d, r);
+    const label = body.querySelector(`[data-ia-times="${dr.dk}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
+    if(label) label.textContent = `${minutesToLabel(r.s)}–${minutesToLabel(r.e)}`;
+  });
+  const end = (e) => {
+    const dr = drag;
+    drag = null;
+    if(!dr || inviteState.draft !== dr.d) return;
+    const d = dr.d;
+    if(!dr.tap) hapticSelectionEnd();
+    const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
+    if(isTap){
+      const min = minAt(d, dr.track, e.clientX);
+      const busy = inviteAvailBusyFor(parseDateInputValue(dr.dk)).busy;
+      // 회색/점선 위를 누르면 무슨 일정인지 먼저 보여줌 - 점선이면 설명 안의 '이 시간 열기'로 시간을 넣음
+      if(dr.tap && busy.some(b => b.s <= min && b.e > min)){
+        const ids = m => busy.map((b, i) => b.s <= m && b.e > m ? i : -1).filter(i => i >= 0).join();
+        const same = d.info && d.info.dk === dr.dk && ids(d.info.min) === ids(min);
+        d.info = same ? null : { dk: dr.dk, min };
+        inviteAvailRerender();
+        return;
+      }
+      d.info = null;
+      if(dr.tap){ inviteAvailAddRange(d, dr.dk, min); inviteAvailRerender(); return; }
+      d.edit = { dk: dr.dk, idx: dr.idx };
+      inviteAvailRerender();
+      return;
+    }
+    if(dr.tap) return;
+    if(dr.moved) d.ranges[dr.dk] = dr.ranges;
+    inviteAvailRerender();
+  };
+  body.addEventListener('pointerup', end);
+  body.addEventListener('pointercancel', end);
+  // 막대 손잡이를 꾹 눌러도 아이폰 돋보기가 안 뜨게
+  body.addEventListener('touchstart', (e) => { if(e.target.closest('[data-ia-handle]')) e.preventDefault(); }, { passive: false });
+})();
 
 function renderInviteCalendarPickHtml(d){
   if(!d.calDays) return '<div class="inv-empty">내 캘린더에서 예약 가능 시간을 불러오는 중...</div>';
@@ -32798,6 +33093,15 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
   else if(act === 'remake' && inv) remakeInvite(inv);
   else if(act === 'open') openInviteByToken(actEl.dataset.token, { fromList: true });
   else if(act === 'create') createInviteFromDraft();
+  else if(act === 'iaWeek' && st.draft){
+    const ws = new Date(st.draft.weekStart);
+    ws.setDate(ws.getDate() + 7 * Number(actEl.dataset.dir));
+    if(ws < inviteWeekSunday(new Date())) return;
+    st.draft.weekStart = ws;
+    st.draft.edit = null;
+    st.draft.info = null;
+    renderInviteOverlay();
+  }
   else if(act === 'src' && st.draft){
     st.draft.source = actEl.dataset.src;
     renderInviteOverlay();
@@ -32914,7 +33218,7 @@ async function createInviteFromDraft(){
       body: JSON.stringify({
         ...(d.source === 'calendar'
           ? { title, dates: [...d.calDates].sort(), fromCalendar: true, audience: d.audience }
-          : { title, dates: [...d.dates].sort(), startHour: d.startHour, endHour: d.endHour }),
+          : { title, dates: Object.keys(d.ranges).sort(), cells: inviteDraftCells(d) }),
         ...(d.place ? { place: d.place } : {}),
       }),
     });
