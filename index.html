@@ -26806,8 +26806,16 @@ function openCalShare(share, isMine, ownerFriend){
     showToast('친구로 추가된 사람만 캘린더를 볼 수 있어요.');
     return;
   }
-  calendarOpenedFromChat = activeChatRoomId;
-  openFriendCalendar(ownerFriend.id, 'calendar');
+  const backToHiddenCal = chatReturnToFriendCalendar && activeFriendCalendarId === ownerFriend.id
+    && viewCloseStack[viewCloseStack.length - 1] === closeChatRoomView && viewCloseStack.includes(closeFriendCalendar);
+  if(backToHiddenCal){
+    // 이 친구 캘린더에서 "물어보기"로 들어온 채팅방이면, 캘린더를 하나 더 겹쳐 열지 않고 채팅방을 닫아
+    // 숨겨뒀던 그 캘린더로 바로 돌아감 - 안 그러면 뒤로가기가 캘린더→채팅방→캘린더로 한 번 더 돌게 됨
+    dismissView(closeChatRoomView);
+  } else {
+    calendarOpenedFromChat = activeChatRoomId;
+    openFriendCalendar(ownerFriend.id, 'calendar');
+  }
   friendDayFocusDate = new Date(dateObj);
   friendWeekFocusDate = getWeekStart(dateObj);
   friendMonthFocusYear = dateObj.getFullYear();
