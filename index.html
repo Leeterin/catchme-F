@@ -6707,8 +6707,8 @@
     justify-content:space-around;
     align-items:center;
     /* 아래 여백을 "13px + 홈 표시줄 영역"으로 더하면 아이폰에서 바가 너무 높이 떠 보여서, 홈 표시줄 영역 안에 겹치게 줄임
-       (더 내려달라는 요청으로 홈 표시줄 영역과 거의 겹치게 - 아이폰 기준 아래 여백 약 14px) */
-    padding:5px 6px max(6px, calc(env(safe-area-inset-bottom) - 20px));
+       (더 내려달라는 요청으로 홈 표시줄 영역과 거의 겹치게 했다가, 너무 내려가서 살짝 올림 - 아이폰 기준 아래 여백 약 20px) */
+    padding:5px 6px max(8px, calc(env(safe-area-inset-bottom) - 14px));
     /* 늘어나는 탭 카드(flex:1)가 없는 화면(홈 등)에선 남는 높이를 이 위쪽 여백이 가져가 바를 화면 맨 아래로 내림 */
     margin-top:auto;
     border-top:1px solid var(--glass-border);
@@ -31574,8 +31574,7 @@ function renderInviteManageHtml(){
     html += `<div class="inv-card done">
         <div class="inv-card-title">${ICO.check} 약속이 확정됐어요</div>
         <div class="inv-confirmed-big">${escapeHtml(inviteConfirmedLabel(inv))}</div>
-        <div class="inv-card-desc">내 캘린더에 담았어요. 친구들은 같은 링크에서 확정된 시간을 볼 수 있어요.</div>
-        <div class="inv-share-btns" style="margin-top:10px;"><button type="button" data-act="share">확정 소식 다시 보내기</button></div>
+        <div class="inv-card-desc">내 캘린더에 담았어요. 아래 버튼으로 확정 소식을 보내면, 친구들이 같은 링크에서 확정된 시간을 보고 자기 캘린더에도 담을 수 있어요.</div>
       </div>`;
   } else if(expired){
     html += `<div class="inv-card"><div class="inv-card-desc">후보 날짜가 모두 지나서 친구들이 더 이상 응답할 수 없어요. 아래 "새 날짜로 다시 만들기"를 누르면 이름과 장소는 그대로 두고 날짜만 다시 골라 새 링크를 만들 수 있어요.</div></div>`;
@@ -31745,9 +31744,11 @@ function renderInviteFoot(){
     foot.innerHTML = main + `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite">${st.armed === 'cancel' ? '한 번 더 누르면 약속이 취소돼요' : '약속 취소하기'}</button>`;
     return;
   }
-  // 확정된 약속도 시작 전이면 만든 사람이 취소할 수 있음 (모두의 캘린더에서 지워지고 회원 참여자에게 알림)
+  // 확정된 약속도 시작 전이면 만든 사람이 취소할 수 있음 (모두의 캘린더에서 지워지고 회원 참여자에게 알림).
+  // 확정 소식 보내기를 맨 앞에 둠 - 가입 안 한 친구는 알림을 못 받아서, 이 링크를 다시 열어야 확정 화면(가입 권유 포함)을 봄
   if(st.mode === 'manage' && inv.status === 'CONFIRMED' && inv.confirmedStart && new Date(inv.confirmedStart).getTime() > Date.now()){
-    foot.innerHTML = `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite"${st.busy ? ' disabled' : ''}>${st.armed === 'cancel' ? '한 번 더 누르면 모두의 캘린더에서 약속이 취소돼요' : '확정된 약속 취소하기'}</button>`;
+    foot.innerHTML = '<button type="button" class="inv-primary" data-act="share">친구들에게 확정 소식 보내기</button>'
+      + `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite"${st.busy ? ' disabled' : ''}>${st.armed === 'cancel' ? '한 번 더 누르면 모두의 캘린더에서 약속이 취소돼요' : '확정된 약속 취소하기'}</button>`;
     return;
   }
   if(st.mode === 'guest' && inv.status === 'OPEN' && !inviteExpired(inv)){
@@ -32004,7 +32005,7 @@ async function createInviteFromDraft(){
 function inviteShareText(inv){
   const where = inv.place ? `\n장소: ${inv.place.name}${inv.place.address ? ` (${inv.place.address})` : ''}` : '';
   if(inv.status === 'CONFIRMED'){
-    return `[CATCHME] ${inv.title}\n약속 시간이 정해졌어요: ${inviteConfirmedLabel(inv)}${where}`;
+    return `[CATCHME] ${inv.title}\n약속 시간이 정해졌어요: ${inviteConfirmedLabel(inv)}${where}\n링크에서 확정된 시간을 확인하고 내 캘린더에도 담아보세요!`;
   }
   return `[CATCHME] ${inv.title}${where}\n${inviteCreatorName(inv)}님이 약속 시간을 물어보고 있어요. 가입 없이 링크에서 되는 시간만 눌러주세요!`;
 }
@@ -32147,7 +32148,7 @@ async function confirmInviteSelection(){
     st.myInvites = st.myInvites.map(x => x.token === data.invite.token ? data.invite : x);
     renderInviteOverlay();
     document.getElementById('inviteBody').scrollTop = 0;
-    showToast('약속이 확정됐어요! 내 캘린더에 담았어요.', 3000);
+    showToast('약속이 확정됐어요! 친구들에게 확정 소식을 보내주세요.', 3000);
     if(typeof loadScheduleFromServer === 'function') loadScheduleFromServer();
   } catch(err) {
     st.busy = false;
