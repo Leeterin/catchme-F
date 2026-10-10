@@ -25291,6 +25291,7 @@ function renderPinnedSchedule(){
     // 이 약속의 장소들 (1차, 2차...) - 일정 카드에 장소가 없으면 투표/픽스로 정해진 "장소만 있는 핀"들을 보여줌
     const places = roomMeetPlaces(room, pinned);
     const multi = places.length > 1;
+    const pinPast = isPinPast(pinned); // 지난 약속은 장소 변경/삭제/추가 없이 보기만 가능
 
     const card = document.createElement('div');
     card.className = 'pin-card';
@@ -25312,11 +25313,11 @@ function renderPinnedSchedule(){
               ${multi ? `<span class="pin-place-order">${meetPlaceOrderLabel(idx)}</span>` : ''}
               <span class="pin-loc-name">${ICO.pin} ${escapeHtml(p.location)}</span>${addr ? `<span class="pin-loc-addr">${escapeHtml(addr)}</span>` : ''}
             </button>
-            <button type="button" class="pin-action-btn danger pin-remove-loc" data-place-idx="${idx}">삭제</button>
+            ${pinPast ? '' : `<button type="button" class="pin-action-btn danger pin-remove-loc" data-place-idx="${idx}">삭제</button>`}
           </div>`;
         }).join('')}</div>` : ''}
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 내 캘린더</button>` : ''}
-        ${isPinPast(pinned) ? '' : `<button type="button" class="pin-action-btn pin-add-loc">${places.length ? '+ 장소 추가' : '장소 정하기'}</button>`}
+        ${pinPast ? '' : `<button type="button" class="pin-action-btn pin-add-loc">${places.length ? '+ 장소 추가' : '장소 정하기'}</button>`}
         ${!dateObj ? `<button type="button" class="pin-action-btn danger pin-delete-item" title="이 고정 카드를 완전히 지워요">삭제</button>` : ''}
       </div>
     `;
@@ -25337,6 +25338,7 @@ function renderPinnedSchedule(){
       btn.addEventListener('click', () => {
         const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
         if(!placePin) return;
+        if(pinPast){ openApptLocationMap(placePin.location, placePin.locationAddress || placePin.location, placePin.locationLat, placePin.locationLon); return; }
         changePinLocation(room, activeChatRoomId, placePin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId: activeChatRoomId });
       });
     });
@@ -25406,7 +25408,7 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       : null,
   }));
   const multiPlaces = meetPlaces.length > 1;
-  const pinPast = isPinPast(pin); // 지난 약속이면 장소 정하기/추가(2차...) 버튼을 안 띄움
+  const pinPast = isPinPast(pin); // 지난 약속이면 보기만 - 장소 정하기/추가(2차...)/삭제 버튼을 안 띄움
 
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
@@ -25441,7 +25443,7 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
                 ${senderLabel ? `<div class="appt-detail-place-meta">${senderLabel}${timeLabel}</div>` : ''}
                 <div class="appt-detail-place-actions">
                   <button type="button" class="appt-place-action-btn appt-place-hotplace" data-idx="${idx}">주변 핫플</button>
-                  <button type="button" class="appt-place-action-btn danger appt-place-delete" data-idx="${idx}">삭제</button>
+                  ${pinPast ? '' : `<button type="button" class="appt-place-action-btn danger appt-place-delete" data-idx="${idx}">삭제</button>`}
                 </div>
               </div>
             `;
@@ -25492,7 +25494,8 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       e.stopPropagation();
       openHotplaceView(p.location, p.locationLat, p.locationLon);
     });
-    row.querySelector('.appt-place-delete').addEventListener('click', (e) => {
+    const delBtn = row.querySelector('.appt-place-delete');
+    if(delBtn) delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       removePinnedLocation(pin.id, p.id);
       openAppointmentDetailView(roomId, pinId, apptDetailReturnViewId);
