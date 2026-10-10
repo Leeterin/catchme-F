@@ -8275,6 +8275,7 @@
   <div class="chat-row-menu" id="chatRowMenu">
     <div class="chat-row-menu-option" id="chatRowMenuPinOption">채팅방 상단에 고정하기</div>
     <div class="chat-row-menu-option" id="chatRowMenuLeaveOption" style="color:var(--cta);">채팅방 나가기</div>
+    <div class="chat-row-menu-option" id="chatRowMenuDeleteOption" style="color:#e5484d;font-weight:700;">채팅방 삭제하기</div>
   </div>
 
   <!-- 시간표 그리드에서 이미 일정 있는 칸에 마우스 올리면 뜨는 툴팁 -->
@@ -10120,6 +10121,15 @@ function connectRealtimeSocket(){
     }
     if(inviteState.token === token) refreshOpenInvite();
     else if(inviteState.mode === 'list') loadMyInvites().then(() => { if(inviteState.mode === 'list') renderInviteOverlay(); });
+  });
+
+  // 다른 멤버가 채팅방을 삭제함
+  realtimeSocket.on('chatRoomDeleted', ({ roomId }) => {
+    const room = CHAT_ROOMS[roomId];
+    if(!room) return;
+    const wasOpen = activeChatRoomId === roomId;
+    removeChatRoomLocally(roomId);
+    if(wasOpen) showToast(`"${room.name}" 채팅방이 삭제됐어요.`);
   });
 
   realtimeSocket.on('roomRead', ({ roomId, userId, lastReadAt }) => {
@@ -25682,8 +25692,38 @@ function renderChatList(){
       ${unreadBadge}
       <button type="button" class="chat-row-menu-btn" title="더보기">⋮</button>
     `;
-    row.querySelector('.placeholder-avatar').addEventListener('click', () => openChatRoom(id));
-    row.querySelector('.placeholder-text').addEventListener('click', () => openChatRoom(id));
+    // 꾹 누르면 바로 열리지 않고 메뉴(고정/나가기/삭제)가 뜸 - 그 직후 손 뗄 때의 클릭은 무시
+    let longPressTimer = null;
+    let longPressed = false;
+    const openRoomUnlessLongPress = () => {
+      if(longPressed){ longPressed = false; return; }
+      openChatRoom(id);
+    };
+    row.querySelector('.placeholder-avatar').addEventListener('click', openRoomUnlessLongPress);
+    row.querySelector('.placeholder-text').addEventListener('click', openRoomUnlessLongPress);
+    const cancelLongPress = () => { clearTimeout(longPressTimer); longPressTimer = null; };
+    row.addEventListener('touchstart', (e) => {
+      if(e.target.closest('.chat-row-menu-btn')) return;
+      longPressed = false;
+      cancelLongPress();
+      longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        longPressed = true;
+        if(navigator.vibrate) navigator.vibrate(15);
+        chatRowMenuPressOpenedAt = Date.now();
+        openChatRowMenu(id, row.querySelector('.chat-row-menu-btn'), true);
+      }, 500);
+    }, { passive: true });
+    row.addEventListener('touchmove', cancelLongPress, { passive: true });
+    row.addEventListener('touchend', cancelLongPress);
+    row.addEventListener('touchcancel', cancelLongPress);
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      // 안드로이드는 꾹 누르면 이 이벤트가 먼저 올 수 있어서 같은 처리를 해둠
+      if(longPressTimer){ cancelLongPress(); longPressed = true; }
+      chatRowMenuPressOpenedAt = Date.now();
+      openChatRowMenu(id, row.querySelector('.chat-row-menu-btn'), true);
+    });
     row.querySelector('.chat-row-menu-btn').addEventListener('click', (e) => {
       e.stopPropagation();
       openChatRowMenu(id, e.currentTarget);
@@ -25694,18 +25734,19 @@ function renderChatList(){
 
 // ---------- 채팅 목록 각 방의 "⋮" 메뉴 (상단 고정 / 나가기) ----------
 let chatRowMenuRoomId = null;
+let chatRowMenuPressOpenedAt = 0; // 꾹 눌러서 연 시각 - 손 뗄 때 생기는 클릭에 메뉴가 바로 닫히지 않게
 
 function closeChatRowMenu(){
   document.getElementById('chatRowMenu').classList.remove('show');
   chatRowMenuRoomId = null;
 }
 
-function openChatRowMenu(roomId, anchorBtn){
+function openChatRowMenu(roomId, anchorBtn, keepOpen){
   const menu = document.getElementById('chatRowMenu');
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
 
-  if(chatRowMenuRoomId === roomId && menu.classList.contains('show')){
+  if(!keepOpen && chatRowMenuRoomId === roomId && menu.classList.contains('show')){
     closeChatRowMenu();
     return;
   }
@@ -25739,10 +25780,18 @@ document.getElementById('chatRowMenuLeaveOption').addEventListener('click', () =
   openCancelConfirm(() => leaveChatRoom(roomId), `"${room.name}" 채팅방을 나가시겠습니까?`);
 });
 
-// 메뉴 바깥을 누르면 닫힘
+document.getElementById('chatRowMenuDeleteOption').addEventListener('click', () => {
+  const roomId = chatRowMenuRoomId;
+  closeChatRowMenu();
+  const room = roomId ? CHAT_ROOMS[roomId] : null;
+  if(!room) return;
+  openCancelConfirm(() => deleteChatRoom(roomId), `"${room.name}" 채팅방을 삭제할까요? 모든 멤버에게서 대화가 사라져요.`);
+});
+
+// 메뉴 바깥을 누르면 닫힘 (꾹 눌러서 연 직후 손 뗄 때의 클릭은 제외)
 document.addEventListener('click', (e) => {
   const menu = document.getElementById('chatRowMenu');
-  if(menu.classList.contains('show') && !menu.contains(e.target) && !e.target.closest('.chat-row-menu-btn')){
+  if(menu.classList.contains('show') && !menu.contains(e.target) && !e.target.closest('.chat-row-menu-btn') && Date.now() - chatRowMenuPressOpenedAt > 700){
     closeChatRowMenu();
   }
 });
@@ -29113,6 +29162,34 @@ function leaveChatRoom(roomId){
   activeChatRoomId = null;
   renderChatList();
   showToast('채팅방을 나갔어요.');
+}
+
+// 채팅방 삭제 - 나뿐 아니라 방 멤버 모두에게서 사라짐
+function removeChatRoomLocally(roomId){
+  delete CHAT_ROOMS[roomId];
+  if(activeChatRoomId === roomId){
+    document.body.classList.remove('chat-open');
+    document.getElementById('chatRoomView').classList.remove('active');
+    document.getElementById('chatListView').classList.add('active');
+    document.querySelector('.bottom-nav').style.display = 'flex';
+    activeChatRoomId = null;
+  }
+  renderChatList();
+}
+
+async function deleteChatRoom(roomId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  if(room.isRealRoom){
+    try {
+      await apiRequest(`/chats/${roomId}`, { method: 'DELETE' });
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+  }
+  removeChatRoomLocally(roomId);
+  showToast('채팅방을 삭제했어요.');
 }
 
 let activeMatchFriendId = null;
