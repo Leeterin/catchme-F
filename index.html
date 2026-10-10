@@ -6195,9 +6195,19 @@
   .event-place-addr{ display:flex; align-items:center; gap:8px; margin-top:6px; font-size:12px; color:var(--text-dim); }
   .event-place-addr span{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .event-place-addr button{ border:none; background:none; color:var(--text-dim); font-size:12px; text-decoration:underline; cursor:pointer; padding:0; font-family:'Inter',sans-serif; }
-  .day-event-place, .day-event-note{ margin-top:4px; font-size:12px; color:var(--text-dim); }
-  .day-event-place a{ color:inherit; }
-  .day-event-note{ white-space:pre-wrap; word-break:break-word; }
+  /* 하루 보기 카드의 장소(누르면 지도) · 메모 */
+  .day-event-extras{ display:flex; flex-direction:column; gap:6px; margin:2px 0 10px; }
+  .day-event-extras:empty{ display:none; }
+  .day-event-place{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:11px; background:var(--surface); border:1px solid var(--line); color:var(--text); text-decoration:none; }
+  .day-event-place:active{ opacity:.7; }
+  .dep-icon{ width:28px; height:28px; flex-shrink:0; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; }
+  .dep-icon svg{ width:15px; height:15px; }
+  .dep-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .dep-name{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dep-addr{ font-size:11px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dep-map{ flex-shrink:0; font-size:11px; font-weight:700; color:var(--accent); }
+  .day-event-note{ padding:8px 11px; border-radius:11px; background:var(--surface); border:1px solid var(--line); border-left:3px solid #FBBF24; font-size:13px; line-height:1.55; color:var(--text); white-space:pre-wrap; word-break:break-word; }
+  .den-label{ display:block; margin-bottom:2px; font-size:10.5px; font-weight:700; color:var(--text-dim); letter-spacing:.02em; }
   .week-block-sheet-detail:empty{ display:none; }
   .week-block-sheet-detail{ margin:-4px 0 14px; font-size:13px; color:var(--text-dim); line-height:1.5; }
   .week-block-sheet-detail .wbs-place{ display:flex; align-items:center; gap:6px; }
@@ -9291,15 +9301,17 @@ function tryRefreshAccessToken(){
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: refreshTokenValue }),
   })
-    .then(res => res.ok ? res.json() : Promise.reject())
+    .then(res => res.ok ? res.json() : Promise.reject(res.status))
     .then(data => {
       authToken = data.token;
       refreshTokenValue = data.refreshToken;
       persistSession();
       return true;
     })
-    .catch(() => {
-      handleSessionExpired(); // 리프레시도 실패했으면 완전히 로그아웃 처리
+    .catch((status) => {
+      // 서버가 "이 토큰은 무효"라고 답한 경우에만 로그아웃. 인터넷 끊김·서버 깨우는 중(502 등)·시간 초과로
+      // 실패한 건 로그인 문제가 아니라서, 세션은 그대로 두고 다음 요청 때 다시 시도함
+      if(status === 401 || status === 400) handleSessionExpired();
       return false;
     })
     .finally(() => { isRefreshingToken = null; });
@@ -16109,7 +16121,7 @@ function renderDayView(){
       <div class="day-event-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</div>
       <div class="day-event-title">${escapeHtml(ev.title)}</div>
       ${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<div class="day-event-travel">🚇 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${ev.travel.to && ev.travel.to.name ? ` · ${escapeHtml(ev.travel.to.name)}` : ''}</div>` : ''}
-      ${eventPlaceNoteHtml(ev, 'day-event-place', 'day-event-note')}
+      <div class="day-event-extras">${dayEventPlaceNoteHtml(ev)}</div>
       <div class="day-event-tags">
         ${visibilityButtonsHtml(ev.visibility, 'day-event-tag')}
       </div>
@@ -17003,6 +17015,18 @@ function eventPlaceNoteHtml(ev, placeClass, noteClass){
   if(!ev) return '';
   return (ev.place && ev.place.name ? `<div class="${placeClass}">📍 ${escapeHtml(ev.place.name)} <a href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener">지도</a></div>` : '')
     + (ev.note ? `<div class="${noteClass}">${escapeHtml(ev.note)}</div>` : '');
+}
+// 하루 보기 카드용 - 장소는 누르면 지도가 열리는 한 줄 카드, 메모는 노란 줄이 있는 상자
+function dayEventPlaceNoteHtml(ev){
+  const place = ev.place && ev.place.name
+    ? `<a class="day-event-place" href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener">
+        <span class="dep-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+        <span class="dep-text"><span class="dep-name">${escapeHtml(ev.place.name)}</span>${ev.place.address ? `<span class="dep-addr">${escapeHtml(ev.place.address)}</span>` : ''}</span>
+        <span class="dep-map">지도 &#8250;</span>
+      </a>`
+    : '';
+  const note = ev.note ? `<div class="day-event-note"><span class="den-label">메모</span>${escapeHtml(ev.note)}</div>` : '';
+  return place + note;
 }
 // 일정 장소 - 검색해서 고르면 주소·좌표까지, 그냥 적으면 이름만 저장 (나만 보는 정보)
 let formPlace = null; // { name, address, lat, lon } | null
