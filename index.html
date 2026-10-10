@@ -4673,6 +4673,8 @@
   .day-event-card.my-own .day-event-title{ font-size:13px; color:var(--text-dim); }
   .my-own-tag{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:6px; font-size:10.5px; font-weight:700; background:var(--surface-2); color:var(--text-dim); border:1px solid var(--line); vertical-align:1px; }
   .day-event-overlap{ margin-top:5px; font-size:11.5px; font-weight:600; color:#B45309; }
+  /* 친구 캘린더 일정 카드의 "물어보기" - 그 일정 정보를 채팅 입력칸에 미리 넣어줌 */
+  .day-event-ask-btn{ margin-top:7px; padding:5px 10px; border:1px solid var(--accent); border-radius:999px; background:transparent; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; }
   .day-event-card.pending-hold{
     background:#FEF9C3;
     border:1px solid #EAB308;
@@ -20379,6 +20381,35 @@ function closeFriendCalendar(){
   // 독립 오버레이라서 그냥 닫기만 하면, 밑에 있던 화면(친구 프로필이든 채팅방이든)이 그대로 보임 - 따로 다시 열어줄 필요 없음
 }
 
+// 친구 캘린더의 일정 하나를 그 친구와의 1:1 채팅으로 가져가서 "이 일정 뭐야?"를 입력칸에 미리 써줌 (보내기 전에 고칠 수 있음)
+async function askFriendAboutSchedule(friend, dateObj, block){
+  if(!friend) return;
+  const when = `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${WEEKDAY_KO[dateObj.getDay()]}) ${String(block.startHour).padStart(2,'0')}:00-${String(block.endHour).padStart(2,'0')}:00`;
+  const text = block.title ? `${when} '${block.title}' 일정이 뭐야?` : `${when}에 있는 일정 뭐야?`;
+  let roomId = null;
+  if(friend.id === DEMO_FRIEND.id){
+    roomId = 'dm-demo-minji';
+  } else {
+    try {
+      const data = await apiRequest('/chats/direct', { method: 'POST', body: JSON.stringify({ username: friend.username }) });
+      await loadChatRoomsFromServer();
+      roomId = data.roomId;
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+  }
+  if(!CHAT_ROOMS[roomId]){ showToast('채팅방을 열 수 없어요.'); return; }
+  dismissView(closeFriendCalendar);
+  showTab('chat');
+  openChatRoom(roomId);
+  const input = document.getElementById('chatInput');
+  input.value = text.slice(0, Number(input.maxLength) > 0 ? input.maxLength : 200);
+  updateChatSendBtnState();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
 function getFriendTitlesForRender(friend, dateObj){
   const cacheKey = friend.username + '::' + dateKeyOf(dateObj);
   const real = friendRealScheduleCache[cacheKey];
@@ -20548,7 +20579,10 @@ function renderFriendToday(){
       <div class="day-event-time">${String(b.startHour).padStart(2,'0')}:00-${String(b.endHour).padStart(2,'0')}:00</div>
       <div class="day-event-title">${label}</div>
       ${overlap.length ? `<div class="day-event-overlap">내 일정과 겹쳐요 · ${overlap.map(x => escapeHtml(myRangeLabel(x))).join(', ')}</div>` : ''}
+      ${(!b.isBookable && friendCalendarMode !== 'reserve') ? `<button type="button" class="day-event-ask-btn">💬 친구한테 물어보기</button>` : ''}
     `;
+    const askBtn = card.querySelector('.day-event-ask-btn');
+    if(askBtn) askBtn.addEventListener('click', () => askFriendAboutSchedule(friend, new Date(friendDayFocusDate), b));
     if(b.isBookable){
       card.style.cursor = 'pointer';
       if(friendCalendarMode === 'reserve'){
@@ -20638,6 +20672,11 @@ function renderFriendWeek(){
         } else {
           block.addEventListener('click', () => openFriendReserve(new Date(d), b.startHour));
         }
+      } else if(!b.isBookable && friendCalendarMode !== 'reserve'){
+        // 친구 일정 블록을 누르면 그 일정을 채팅으로 물어볼 수 있게
+        block.style.cursor = 'pointer';
+        block.style.opacity = '0.7';
+        block.addEventListener('click', () => askFriendAboutSchedule(friend, new Date(d), b));
       } else {
         block.style.cursor = 'default';
         block.style.opacity = '0.7';
