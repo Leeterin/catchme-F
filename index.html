@@ -6208,6 +6208,28 @@
   .ecs-btn.on{ background:var(--surface); color:var(--text); font-weight:700; box-shadow:0 1px 4px rgba(23,24,29,0.10); }
   .ecs-dot{ width:14px; height:14px; border-radius:50%; flex-shrink:0; box-shadow:0 0 0 1px rgba(0,0,0,0.12); }
   .ecs-hex{ font-family:'Roboto Mono',monospace; font-size:12px; letter-spacing:0.2px; }
+  /* 일정 폼 - 기본 라벨 10개 (색은 고정, 이름은 내가 바꿀 수 있음) */
+  .ecl-head{ display:flex; align-items:center; justify-content:space-between; margin:0 2px 6px; }
+  .ecl-head span{ font-size:11.5px; color:var(--text-dim); }
+  .ecl-edit-btn{ border:none; background:none; padding:2px 0; color:var(--accent); font-size:12px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer; }
+  .event-color-labels{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; margin-bottom:8px; }
+  .ecl-btn{
+    display:flex; align-items:center; gap:7px; min-width:0;
+    height:36px; padding:0 10px;
+    border:1px solid var(--line); border-radius:10px;
+    background:var(--surface); color:var(--text);
+    font-size:13px; font-weight:600; font-family:'Inter',sans-serif; text-align:left;
+    cursor:pointer;
+  }
+  .ecl-btn.on{ border-color:var(--ecl-c); box-shadow:inset 0 0 0 1px var(--ecl-c); background:color-mix(in srgb, var(--ecl-c) 12%, var(--surface)); font-weight:700; }
+  .ecl-name{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ecl-check{ flex-shrink:0; color:var(--ecl-c); font-size:13px; font-weight:800; }
+  .ecl-btn input{
+    flex:1; min-width:0; height:26px; padding:0 6px;
+    border:1px solid var(--line); border-radius:7px;
+    background:var(--surface-2); color:var(--text);
+    font-size:16px; font-family:'Inter',sans-serif; /* 16px 미만이면 아이폰이 화면을 확대함 */
+  }
   /* 일정 폼 - 이동시간 */
   .travel-row{ position:relative; display:flex; align-items:flex-end; gap:6px; margin-top:4px; }
   .travel-half{ flex:1; min-width:0; }
@@ -7735,9 +7757,11 @@
         </div>
         <div class="mp-input-group">
           <label>색상</label>
+          <div class="ecl-head"><span id="eventColorLabelHint">라벨을 고르거나 직접 색을 골라요</span><button type="button" class="ecl-edit-btn" id="eventColorLabelEditBtn">이름 바꾸기</button></div>
+          <div class="event-color-labels" id="eventColorLabels"></div>
           <div class="event-color-picker" id="eventColorPicker"></div>
           <!-- 나만의 색 조제 - 폰 기본 색상 선택창 대신 앱 안에서 바로 고르는 패널 (항상 펼쳐져 있음) -->
-          <div class="event-color-mixer" id="eventColorMixer">
+          <div class="event-color-mixer" id="eventColorMixer" style="display:none;">
             <div class="ecm-sv" id="ecmSv"><div class="ecm-sv-thumb" id="ecmSvThumb"></div></div>
             <div class="ecm-hue" id="ecmHue"><div class="ecm-hue-thumb" id="ecmHueThumb"></div></div>
           </div>
@@ -11136,6 +11160,7 @@ const settingsState = {
   dark_mode: (() => { try { return localStorage.getItem('catchme_dark_mode') === '1'; } catch(_){ return false; } })(), // 서버 설정 오기 전엔 폰에 기억해둔 값
   default_schedule_view: 'month', // 첫 화면/시간표 탭 진입 시 기본으로 보여줄 화면: day/week/month
   work_emoji: '💼', // 업무용 링크에 연 예약 가능 시간에 붙는 이모티콘
+  color_labels: (() => { try { const v = JSON.parse(localStorage.getItem('catchme_color_labels') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; } })(), // 색 라벨 10개 이름 (빈칸 = 기본 이름)
 };
 
 // 프론트 키(snake_case) <-> 서버 키(camelCase) 매핑
@@ -11152,6 +11177,7 @@ const SETTINGS_KEY_MAP = {
   dark_mode: 'darkMode',
   default_schedule_view: 'defaultScheduleView',
   work_emoji: 'workEmoji',
+  color_labels: 'colorLabels',
 };
 
 // 로그인 직후 서버에 저장된 설정을 불러와서 반영
@@ -11161,6 +11187,14 @@ async function loadSettingsFromServer(){
     const data = await apiRequest('/settings');
     Object.keys(SETTINGS_KEY_MAP).forEach(localKey => {
       const serverKey = SETTINGS_KEY_MAP[localKey];
+      if(localKey === 'color_labels'){
+        // 서버에 아직 없으면(예전 계정) 폰에 기억해 둔 이름을 서버로 올림
+        if(Array.isArray(data.settings[serverKey])){
+          settingsState.color_labels = data.settings[serverKey];
+          try { localStorage.setItem('catchme_color_labels', JSON.stringify(settingsState.color_labels)); } catch(_){}
+        } else if(data.settings[serverKey] === null && settingsState.color_labels.some(Boolean)) saveSettingToServer('color_labels');
+        return;
+      }
       if(data.settings[serverKey] !== undefined) settingsState[localKey] = data.settings[serverKey];
     });
     applyDarkMode();
@@ -16741,22 +16775,110 @@ const formSelectedWeekdays = new Set();
 let formVisibility = { groupIds: [], private: false };
 let formColor = null; // 이 일정 하나에만 쓸 색("#RRGGBB") - null이면 자동 색
 
+// ---------- 색 라벨 10개 ----------
+// 색은 정해 둔 10가지로 고정하고 이름만 내가 바꿈 (일정에는 색만 저장 - 라벨 이름을 바꾸면 그 색 일정 모두 새 이름으로 보임)
+const EVENT_COLOR_LABELS = [
+  { color: '#EF4444', name: '빨강' },
+  { color: '#F97316', name: '주황' },
+  { color: '#EAB308', name: '노랑' },
+  { color: '#22C55E', name: '초록' },
+  { color: '#14B8A6', name: '청록' },
+  { color: '#3B82F6', name: '파랑' },
+  { color: '#6366F1', name: '남색' },
+  { color: '#8B5CF6', name: '보라' },
+  { color: '#EC4899', name: '분홍' },
+  { color: '#78716C', name: '갈색' },
+];
+const COLOR_LABEL_NAME_MAX = 12;
+const EVENT_CUSTOM_COLOR_START = '#0EA5E9'; // 직접 선택을 처음 눌렀을 때 판의 시작 색 (라벨 10색과 겹치지 않게)
+// 내가 바꾼 이름 (빈칸이면 기본 이름) - 서버 설정에 저장하고, 폰에도 기억해 둠
+function colorLabelNames(){
+  const names = Array.isArray(settingsState.color_labels) ? settingsState.color_labels : [];
+  return EVENT_COLOR_LABELS.map((l, i) => {
+    const n = typeof names[i] === 'string' ? names[i].trim() : '';
+    return n || l.name;
+  });
+}
+function colorLabelIndex(hex){
+  if(!hex) return -1;
+  const h = String(hex).toUpperCase();
+  return EVENT_COLOR_LABELS.findIndex(l => l.color === h);
+}
+// 이 색이 라벨 색이면 라벨 이름 (아니면 null)
+function colorLabelName(hex){
+  const i = colorLabelIndex(hex);
+  return i < 0 ? null : colorLabelNames()[i];
+}
+let eventColorLabelEditing = false;
+let colorLabelSaveTimer = 0;
+function saveColorLabelNames(names){
+  settingsState.color_labels = names.map((n, i) => (n === EVENT_COLOR_LABELS[i].name ? '' : n));
+  try { localStorage.setItem('catchme_color_labels', JSON.stringify(settingsState.color_labels)); } catch(_){}
+  clearTimeout(colorLabelSaveTimer);
+  colorLabelSaveTimer = setTimeout(() => saveSettingToServer('color_labels'), 600);
+}
+
+function renderEventColorLabels(){
+  const box = document.getElementById('eventColorLabels');
+  const names = colorLabelNames();
+  const sel = colorLabelIndex(formColor);
+  document.getElementById('eventColorLabelEditBtn').textContent = eventColorLabelEditing ? '완료' : '이름 바꾸기';
+  document.getElementById('eventColorLabelHint').textContent = eventColorLabelEditing
+    ? '라벨마다 이름을 적어요 (비우면 기본 이름)'
+    : '라벨을 고르거나 직접 색을 골라요';
+  box.innerHTML = EVENT_COLOR_LABELS.map((l, i) => eventColorLabelEditing
+    ? `<div class="ecl-btn" style="--ecl-c:${l.color}"><span class="ecs-dot" style="background:${l.color}"></span><input type="text" data-ecl-name="${i}" maxlength="${COLOR_LABEL_NAME_MAX}" placeholder="${escapeHtml(l.name)}" value="${escapeHtml(names[i] === l.name ? '' : names[i])}" /></div>`
+    : `<button type="button" class="ecl-btn${sel === i ? ' on' : ''}" style="--ecl-c:${l.color}" data-ecl="${i}"><span class="ecs-dot" style="background:${l.color}"></span><span class="ecl-name">${escapeHtml(names[i])}</span>${sel === i ? '<span class="ecl-check">✓</span>' : ''}</button>`
+  ).join('');
+}
+document.getElementById('eventColorLabels').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-ecl]');
+  if(!btn) return;
+  formColor = EVENT_COLOR_LABELS[+btn.dataset.ecl].color;
+  renderEventColorPicker();
+});
+document.getElementById('eventColorLabels').addEventListener('input', (e) => {
+  const inp = e.target.closest('[data-ecl-name]');
+  if(!inp) return;
+  const names = colorLabelNames();
+  names[+inp.dataset.eclName] = inp.value.trim().slice(0, COLOR_LABEL_NAME_MAX) || EVENT_COLOR_LABELS[+inp.dataset.eclName].name;
+  saveColorLabelNames(names);
+});
+document.getElementById('eventColorLabelEditBtn').addEventListener('click', () => {
+  eventColorLabelEditing = !eventColorLabelEditing;
+  renderEventColorLabels();
+  if(eventColorLabelEditing){
+    const first = document.querySelector('[data-ecl-name]');
+    if(first) first.focus();
+  } else {
+    clearTimeout(colorLabelSaveTimer);
+    saveSettingToServer('color_labels');
+    if(typeof refreshActiveScheduleView === 'function') refreshActiveScheduleView();
+  }
+});
+
 // 일정 폼의 색상 선택 UI를 formColor 상태에 맞게 다시 그림
-// 색은 [자동]과 [무지개(직접 고르기)] 두 개만 - 빨주노초 같은 정해진 색 줄은 뺐음 (원하는 색을 그라데이션에서 바로 고름)
+// 위: 라벨 10개 / 아래: [자동 | 직접 선택] - 직접 선택일 때만 색 판을 펼침
 function renderEventColorPicker(){
-  const isCustom = !!formColor;
+  const isCustom = !!formColor && colorLabelIndex(formColor) < 0;
+  renderEventColorLabels();
   document.getElementById('eventColorPicker').innerHTML = `
-    <button type="button" class="ecs-btn${isCustom ? '' : ' on'}" data-color="">자동</button>
+    <button type="button" class="ecs-btn${formColor ? '' : ' on'}" data-color="">자동</button>
     <button type="button" class="ecs-btn${isCustom ? ' on' : ''}" id="eventColorCustomBtn" title="아래 판에서 원하는 색 고르기">
       <span class="ecs-dot" id="eventColorCustomDot"${isCustom ? ` style="background:${formColor}"` : ''}></span>
       <span class="${isCustom ? 'ecs-hex' : ''}" id="eventColorCustomLabel">${isCustom ? formColor.toUpperCase() : '직접 선택'}</span>
     </button>
   `;
-  showEventColorMixer(); // 판은 항상 펼쳐 둠 - 지금 고른 색 위치로만 맞추고, 자동이면 자동 그대로 둠
+  document.getElementById('eventColorMixer').style.display = isCustom ? '' : 'none';
+  showEventColorMixer(); // 판은 지금 고른 색 위치로만 맞추고, 자동이면 자동 그대로 둠
 }
 document.getElementById('eventColorPicker').addEventListener('click', (e) => {
   if(e.target.closest('#eventColorCustomBtn')){
+    document.getElementById('eventColorMixer').style.display = '';
+    // 라벨을 고른 상태면 판을 라벨 색 그대로 두면 계속 라벨로 보여서, 직접 골랐던 색(없으면 하늘색)에서 시작
+    if(colorLabelIndex(formColor) >= 0) Object.assign(eventColorMixerState, hexToHsv(eventColorLastPicked || EVENT_CUSTOM_COLOR_START));
     applyEventColorMixer(true); // 판에 보이는 색을 이 일정 색으로
+    renderEventColorLabels();
     return;
   }
   const btn = e.target.closest('button[data-color]');
@@ -16794,10 +16916,10 @@ function hexToHsv(hex){
   return { h, s: max ? d / max : 0, v: max };
 }
 
-// 판 위치를 지금 고른 색에 맞춤 (자동이면 일반 일정 기본색 보라 위치) - 표시만 하고 색을 고른 걸로 치지는 않음
+// 판 위치를 지금 고른 색에 맞춤 (라벨·자동이면 직접 골랐던 색이나 하늘색 위치) - 표시만 하고 색을 고른 걸로 치지는 않음
 let eventColorLastPicked = null; // '자동'을 눌렀다가 다시 '직접 선택'을 누르면 방금 고른 색으로 돌아오게
 function showEventColorMixer(){
-  Object.assign(eventColorMixerState, hexToHsv(formColor || eventColorLastPicked || '#8B5CF6'));
+  Object.assign(eventColorMixerState, hexToHsv((colorLabelIndex(formColor) < 0 && formColor) || eventColorLastPicked || EVENT_CUSTOM_COLOR_START));
   applyEventColorMixer(false);
 }
 
@@ -16818,6 +16940,7 @@ function applyEventColorMixer(pick = true){
   if(customDot) customDot.style.background = hex;
 
   if(!pick) return;
+  if(formColor && colorLabelIndex(formColor) >= 0 && document.querySelector('.ecl-btn.on')) document.querySelectorAll('.ecl-btn.on').forEach(el => { el.classList.remove('on'); const c = el.querySelector('.ecl-check'); if(c) c.remove(); });
   formColor = hex;
   eventColorLastPicked = hex;
   const picker = document.getElementById('eventColorPicker');
@@ -17149,7 +17272,10 @@ function eventPlaceNoteHtml(ev){
     ? `<a class="ev-info-line ev-info-place" href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener"><span class="ev-info-icon">📍</span><span class="ev-info-text"><b>${escapeHtml(ev.place.name)}</b>${ev.place.address && ev.place.address !== ev.place.name ? `<span class="ev-info-addr">${escapeHtml(ev.place.address)}</span>` : ''}</span></a>`
     : '';
   const note = ev.note ? `<div class="ev-info-line ev-info-note"><span class="ev-info-icon">📝</span><span class="ev-info-text">${escapeHtml(ev.note)}</span></div>` : '';
-  return place || note ? `<div class="ev-info">${place}${note}</div>` : '';
+  // 라벨 색으로 고른 일정이면 라벨 이름도 한 줄로
+  const labelName = ev.color ? colorLabelName(ev.color) : null;
+  const label = labelName ? `<div class="ev-info-line ev-info-label"><span class="ev-info-icon"><span class="ecs-dot" style="display:inline-block;width:9px;height:9px;background:${ev.color}"></span></span><span class="ev-info-text">${escapeHtml(labelName)}</span></div>` : '';
+  return place || note || label ? `<div class="ev-info">${label}${place}${note}</div>` : '';
 }
 // 일정 장소 - 검색해서 고르면 주소·좌표까지, 그냥 적으면 이름만 저장 (나만 보는 정보)
 let formPlace = null; // { name, address, lat, lon } | null
@@ -17286,6 +17412,7 @@ function openEventForm(existingEvent){
   // 일정을 수정할 땐 메모로 바꿀 수 없게 메모 버튼을 숨김 (메모 수정 땐 openMemoForm이 반대로 숨김)
   document.querySelectorAll('.event-type-btn').forEach(b => { b.style.display = (existingEvent && b.dataset.type === 'memo') ? 'none' : ''; });
   eventColorLastPicked = null;
+  eventColorLabelEditing = false;
   formTravel = existingEvent && existingEvent.travel ? JSON.parse(JSON.stringify(existingEvent.travel)) : null;
   formPlace = existingEvent && existingEvent.place ? { ...existingEvent.place } : null;
   document.getElementById('eventPlaceResults').style.display = 'none';
