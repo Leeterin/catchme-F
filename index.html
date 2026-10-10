@@ -31987,7 +31987,7 @@ async function copyInviteLink(withText){
   // "링크 복사"는 주소만 복사함 - 안내 문장까지 같이 복사하면 브라우저 주소창에 붙여넣었을 때 링크가 안 열림
   // (안내 문장은 "공유하기"로 보낼 때만 같이 붙음)
   const link = inviteLink(inv.token);
-  const full = withText ? `${inviteShareText(inv)}\n\n${link}` : link;
+  const full = withText ? `${inviteShareText(inv)}\n${link}` : link;
   let ok = copyTextNow(full);
   if(!ok && navigator.clipboard && navigator.clipboard.writeText){
     try {
@@ -32031,7 +32031,8 @@ async function shareInviteLink(){
   if(!inv) return;
   if(navigator.share){
     try {
-      await navigator.share({ title: inv.title, text: inviteShareText(inv), url: inviteLink(inv.token) });
+      // 링크를 url로 따로 넘기면 카톡에서 문장 끝에 빈 줄이 하나 더 생김 - 문장 바로 다음 줄에 링크를 붙여 한 덩어리로 보냄
+      await navigator.share({ title: inv.title, text: `${inviteShareText(inv)}\n${inviteLink(inv.token)}` });
       trackEvent('invite_link_shared', { via: 'share' });
       return;
     } catch(e) {
