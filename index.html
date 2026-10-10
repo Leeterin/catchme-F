@@ -1577,7 +1577,11 @@
     text-decoration:none;
   }
   .feed-detail-location:hover{ text-decoration:underline; }
+  .feed-note-textarea{ resize:none; min-height:150px; max-height:360px; overflow-y:auto; line-height:1.55; }
+  .feed-note-count{ text-align:right; font-size:11px; color:var(--text-dim); margin-top:4px; }
   .feed-detail-note{
+    white-space:pre-wrap;
+    word-break:break-word;
     font-size:14px;
     line-height:1.55;
     color:var(--text);
@@ -2512,6 +2516,12 @@
   }
   .feed-place-create-info b{ color:var(--text); }
   .feed-post-note{
+    white-space:pre-wrap;
+    word-break:break-word;
+    display:-webkit-box;
+    -webkit-line-clamp:4;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
     font-size:12px;
     color:var(--text);
     line-height:1.5;
@@ -8722,7 +8732,8 @@
 
         <div class="feed-create-section">
           <div class="feed-create-section-label">리뷰 작성</div>
-          <input class="search-input" id="feedNoteInput" placeholder="추천 이유를 적어주세요" maxlength="60" />
+          <textarea class="search-input feed-note-textarea" id="feedNoteInput" rows="6" maxlength="1000" placeholder="어떤 메뉴가 맛있었는지, 분위기·가격·웨이팅은 어땠는지, 누구랑 가면 좋을지 자유롭게 적어주세요"></textarea>
+          <div class="feed-note-count" id="feedNoteCount">0 / 1000</div>
         </div>
 
         <div class="feed-create-section">
@@ -13050,7 +13061,7 @@ function openPlaceReviewSheet(c, info){
     <div class="place-review-tags">
       ${PLACE_REVIEW_TAGS.map(t => `<button type="button" class="place-review-tag" data-tag="${t.key}"><span class="em">${t.em}</span>${t.label}</button>`).join('')}
     </div>
-    <textarea class="place-review-note" rows="2" maxlength="200" placeholder="한 줄 후기 (선택)"></textarea>
+    <textarea class="place-review-note" rows="4" maxlength="1000" placeholder="어땠는지 자유롭게 남겨주세요 (선택) - 메뉴, 분위기, 또 갈지 등"></textarea>
     <div class="place-review-dest">추천을 남기면 ${dest}에 올라가요.</div>
     <div class="mini-confirm-actions">
       <button type="button" class="mini-confirm-btn" data-act="submit" disabled>추천 남기기</button>
@@ -14181,6 +14192,7 @@ function doOpenFeedCreate(){
   document.getElementById('feedCreateSubmitBtn').textContent = '올리기';
   document.getElementById('feedPlaceInput').value = '';
   document.getElementById('feedNoteInput').value = '';
+  updateFeedNoteCount();
   document.getElementById('feedLocationInput').value = '';
   document.getElementById('feedPlaceMapWrap').style.display = 'none';
   renderFeedPlaceCreateInfo(null);
@@ -14189,6 +14201,13 @@ function doOpenFeedCreate(){
   showFeedCreateView();
   pushViewState(closeFeedCreate);
 }
+// 리뷰 작성칸 글자 수 표시 - 길게 쓸수록 숫자가 올라가서 더 쓰고 싶게
+function updateFeedNoteCount(){
+  const ta = document.getElementById('feedNoteInput');
+  const el = document.getElementById('feedNoteCount');
+  if(ta && el) el.textContent = ta.value.length + ' / 1000';
+}
+document.getElementById('feedNoteInput')?.addEventListener('input', updateFeedNoteCount);
 // 내가 쓴 게시물을 수정할 때 - 목록 카드에서 바로 열림 (제목/위치는 검색으로 다시 바꿀 수 있게 그대로 열어둠, 카테고리는 고정)
 function openFeedReviewEdit(post){
   feedFormMode = 'editReview';
@@ -14204,6 +14223,7 @@ function openFeedReviewEdit(post){
   document.getElementById('feedCreateSubmitBtn').textContent = '수정하기';
   document.getElementById('feedPlaceInput').value = post.title || '';
   document.getElementById('feedNoteInput').value = post.note || '';
+  updateFeedNoteCount();
   document.getElementById('feedLocationInput').value = post.location || '';
   if(feedPlacePicked){
     showFeedPlaceMap(feedPlacePicked.lat, feedPlacePicked.lon);
