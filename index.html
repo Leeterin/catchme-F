@@ -9221,6 +9221,7 @@ async function apiRequest(path, options = {}, _isRetry) {
     const message = data.message || '요청 처리 중 오류가 발생했어요.';
     const err = new Error(message);
     err.data = data;
+    err.status = res.status;
     throw err;
   }
   return data;
@@ -31287,8 +31288,8 @@ setInterval(async () => {
   const st = inviteState;
   if(authToken || document.hidden || st.mode !== 'guest' || !st.invite || st.invite.status !== 'OPEN') return;
   if(!st.invite.myResponse || st.dirty || st.nameDirty || st.busy) return;
+  const token = st.token;
   try {
-    const token = st.token;
     const gk = inviteGuestKey(token, false);
     const data = await apiRequest(`/invites/${encodeURIComponent(token)}${gk ? `?guestKey=${encodeURIComponent(gk)}` : ''}`);
     // 상태가 바뀔 때만 다시 그림 (안 바뀌었는데 다시 그리면 스크롤이 튐)
@@ -31296,7 +31297,14 @@ setInterval(async () => {
     applyInviteData(data.invite, false);
     renderInviteOverlay();
     if(data.invite.status === 'CONFIRMED') showToast('약속 시간이 정해졌어요!', 2500);
-  } catch(err) {}
+  } catch(err) {
+    // 만든 사람이 링크를 삭제했으면(서버가 404로 답함) 바로 "없는 링크" 화면으로
+    if(err.data && err.status === 404 && st.token === token && st.mode === 'guest'){
+      st.mode = 'error';
+      st.error = err.message;
+      renderInviteOverlay();
+    }
+  }
 }, 20 * 1000);
 
 // ---------- 그리기 ----------
@@ -31522,9 +31530,11 @@ function renderInviteGridHtml(inv, mode){
   let dates = inv.dates;
   let hours = [];
   for(let h = inv.startHour; h < inv.endHour; h++) hours.push(h);
-  if(open && open.size){
-    dates = dates.filter(date => hours.some(h => open.has(inviteCellKey(date, h))));
-    hours = hours.filter(h => dates.some(date => open.has(inviteCellKey(date, h))));
+  // 만든 사람 화면에서는 친구가 고른 칸이 있는 줄도 남김 (캘린더에서 닫은 칸은 빗금 + 인원 숫자로 보임)
+  const showCell = key => open.has(key) || (mode === 'manage' && counts[key]);
+  if(open && (open.size || (mode === 'manage' && Object.keys(counts).length))){
+    dates = dates.filter(date => hours.some(h => showCell(inviteCellKey(date, h))));
+    hours = hours.filter(h => dates.some(date => showCell(inviteCellKey(date, h))));
   }
   // 응답 받는 중이면 지난 칸은 빗금으로 막고, 통째로 지난 날짜는 숨김 (마감된 링크는 기록이라 그대로 보여줌)
   const expired = inviteExpired(inv);
@@ -31601,6 +31611,14 @@ function renderInviteManageHtml(){
   const openNow = inviteOpenSet(inv);
   if(!expired && openNow && openNow.size === 0){
     html += '<div class="inv-card"><div class="inv-card-desc">지금은 캘린더에 남은 예약 가능 시간이 없어서 친구들이 고를 칸이 없어요. 캘린더에서 예약 가능 시간을 다시 등록해주세요.</div></div>';
+  }
+  // 친구가 고른 뒤에 캘린더에서 닫은 칸 - 응답은 지우지 않고 남겨둠 (다시 열면 그대로 살아남)
+  if(!expired && openNow && n){
+    const closedPicked = new Set();
+    inv.responses.forEach(r => r.cells.forEach(c => { if(!openNow.has(c) && !invitePastCell(c)) closedPicked.add(c); }));
+    if(closedPicked.size){
+      html += `<div class="inv-card"><div class="inv-card-desc">친구가 고른 시간 중 ${closedPicked.size}칸을 캘린더에서 닫았어요. 빗금 칸으로는 확정할 수 없고 친구들도 더 고를 수 없어요. 친구 응답은 남아 있어서, 캘린더에서 다시 예약 가능으로 열면 그대로 살아나요.</div></div>`;
+    }
   }
   html += renderInviteGridHtml(inv, 'manage');
   if(canPick && n){
@@ -31699,7 +31717,10 @@ function renderInviteGuestHtml(){
   if(openNow && openNow.size === 0){
     return html + `<div class="inv-card"><div class="inv-card-desc">지금은 ${creator}님의 남은 시간이 없어요. ${creator}님에게 다른 시간을 물어봐 주세요.</div></div>`;
   }
-  if(st.submitted || (inv.myResponse && !st.dirty)){
+  const myClosed = inv.myResponse && openNow ? inv.myResponse.cells.filter(c => !openNow.has(c) && !invitePastCell(c)).length : 0;
+  if(myClosed && !st.submitted){
+    html += `<div class="inv-card accent"><div class="inv-card-desc">보낸 시간 중 ${myClosed}칸이 ${creator}님 사정으로 닫혔어요. 남은 시간 중에서 되는 시간을 다시 골라 보내주세요.</div></div>`;
+  } else if(st.submitted || (inv.myResponse && !st.dirty)){
     html += `<div class="inv-card done">
         <div class="inv-card-title">${ICO.check} ${st.submitted ? '보냈어요!' : '이미 보낸 응답이 있어요'}</div>
         <div class="inv-card-desc">${creator}님이 시간을 정하면 이 링크에서 바로 확인할 수 있어요. 바뀐 게 있으면 칸을 고쳐서 다시 보내면 돼요.</div>
@@ -31726,7 +31747,7 @@ function renderInviteFoot(){
   const inv = st.invite;
   if(!inv){ foot.innerHTML = ''; return; }
   if(st.mode === 'manage' && inviteExpired(inv)){
-    foot.innerHTML = '<button type="button" class="inv-primary" data-act="remake">새 날짜로 다시 만들기</button>';
+    foot.innerHTML = '<button type="button" class="inv-primary" data-act="remake">새 날짜로 다시 만들기</button>' + inviteDeleteBtnHtml();
     return;
   }
   if(st.mode === 'manage' && inv.status === 'OPEN'){
@@ -31741,7 +31762,7 @@ function renderInviteFoot(){
         ? `<button type="button" class="inv-primary armed" data-act="confirm">한 번 더 누르면 ${escapeHtml(label)}로 확정돼요</button>`
         : `<button type="button" class="inv-primary" data-act="confirm"${st.busy ? ' disabled' : ''}>${escapeHtml(label)}로 확정 (${ok}/${inv.responses.length}명 가능)</button>`;
     }
-    foot.innerHTML = main + `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite">${st.armed === 'cancel' ? '한 번 더 누르면 약속이 취소돼요' : '약속 취소하기'}</button>`;
+    foot.innerHTML = main + inviteDeleteBtnHtml();
     return;
   }
   // 확정된 약속도 시작 전이면 만든 사람이 취소할 수 있음 (모두의 캘린더에서 지워지고 회원 참여자에게 알림).
@@ -31749,6 +31770,11 @@ function renderInviteFoot(){
   if(st.mode === 'manage' && inv.status === 'CONFIRMED' && inv.confirmedStart && new Date(inv.confirmedStart).getTime() > Date.now()){
     foot.innerHTML = '<button type="button" class="inv-primary" data-act="share">친구들에게 확정 소식 보내기</button>'
       + `<button type="button" class="inv-text-btn danger${st.armed === 'cancel' ? ' armed' : ''}" data-act="cancelInvite"${st.busy ? ' disabled' : ''}>${st.armed === 'cancel' ? '한 번 더 누르면 모두의 캘린더에서 약속이 취소돼요' : '확정된 약속 취소하기'}</button>`;
+    return;
+  }
+  // 취소된 약속, 이미 지난 확정 약속 - 목록에서 지울 수 있음 (지난 약속의 캘린더 일정은 남음)
+  if(st.mode === 'manage'){
+    foot.innerHTML = inviteDeleteBtnHtml();
     return;
   }
   if(st.mode === 'guest' && inv.status === 'OPEN' && !inviteExpired(inv)){
@@ -31761,6 +31787,16 @@ function renderInviteFoot(){
     return;
   }
   foot.innerHTML = '';
+}
+
+// 만든 사람 화면의 "삭제하기" (한 번 더 눌러야 지워짐) - 링크와 친구 응답이 다 지워져서 목록에도 안 남음
+function inviteDeleteBtnHtml(){
+  const st = inviteState;
+  const inv = st.invite;
+  const label = st.armed === 'delete'
+    ? (inv.status === 'OPEN' && !inviteExpired(inv) ? '한 번 더 누르면 링크가 삭제되고 친구들도 더 못 열어요' : '한 번 더 누르면 목록에서 삭제돼요')
+    : '약속 삭제하기';
+  return `<button type="button" class="inv-text-btn danger${st.armed === 'delete' ? ' armed' : ''}" data-act="deleteInvite"${st.busy ? ' disabled' : ''}>${label}</button>`;
 }
 
 // 칸 색만 바꿔서(전체를 다시 그리지 않아서) 스크롤 위치가 튀지 않게 함
@@ -31818,6 +31854,7 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
       renderInviteFoot();
     } else if(st.mode === 'manage'){
       if(!inv.responses.length) return;
+      if(cell.classList.contains('closed')){ showToast('캘린더에서 닫은 시간이라 확정할 수 없어요. 다시 예약 가능으로 열면 고를 수 있어요.', 3000); return; }
       const [date, hh] = key.split('|');
       const h = Number(hh);
       // 칸은 하나만 고름 (길이는 아래 시간 선택에서 늘림)
@@ -31912,6 +31949,10 @@ document.getElementById('inviteOverlay').addEventListener('click', (e) => {
   else if(act === 'cancelInvite'){
     if(st.armed === 'cancel') cancelInviteNow();
     else armInviteButton('cancel');
+  }
+  else if(act === 'deleteInvite'){
+    if(st.armed === 'delete') deleteInviteNow();
+    else armInviteButton('delete');
   }
   else if(act === 'claim') claimInviteNow();
   else if(act === 'signup') goSignupFromInvite();
@@ -32172,6 +32213,33 @@ async function cancelInviteNow(){
     renderInviteOverlay();
     if(wasConfirmed) loadScheduleFromServer(); // 서버에서 지운 약속 일정을 내 캘린더에도 바로 반영
     showToast('약속을 취소했어요.');
+  } catch(err) {
+    st.busy = false;
+    showToast(err.message);
+    renderInviteFoot();
+  }
+}
+
+async function deleteInviteNow(){
+  const st = inviteState;
+  const inv = st.invite;
+  clearInviteArm();
+  if(st.busy || !inv) return;
+  st.busy = true;
+  renderInviteFoot();
+  try {
+    await apiRequest(`/invites/${encodeURIComponent(inv.token)}`, { method: 'DELETE' });
+    st.busy = false;
+    st.myInvites = st.myInvites.filter(x => x.token !== inv.token);
+    showToast('약속을 삭제했어요.');
+    if(st.fromList){
+      st.mode = 'list';
+      st.token = null;
+      st.invite = null;
+      renderInviteOverlay();
+    } else {
+      closeInviteOverlay();
+    }
   } catch(err) {
     st.busy = false;
     showToast(err.message);
