@@ -5384,6 +5384,7 @@
   .qa-row.off .qa-day i{ background:var(--line); }
   .qa-row.off .qa-day i::after{ left:2px; }
   .qa-day:disabled{ cursor:default; opacity:1; }
+  .qa-today{ font-size:10px; font-weight:800; color:#F43F5E; letter-spacing:.02em; margin-left:-2px; }
   .qa-times{ flex:1; min-width:0; display:flex; flex-wrap:wrap; justify-content:flex-end; gap:2px 8px; font-size:13px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
   .qa-time{ display:inline-flex; align-items:center; }
   .qa-time.off{ color:var(--text-dim); font-weight:500; }
@@ -16841,7 +16842,7 @@ function createScheduleEvent({ title, startMin, endMin, visibility, recurringWee
 let formRepeatMode = 'once';
 let formEventType = 'busy';
 let formAllowBooking = false; // 바쁨 일정인데 "이 시간에도 예약 받기"를 켰는지 (서버 blocksBooking=false)
-let formAvailableFor = 'all'; // 예약 가능 시간을 누구에게 열지 (친구 + 업무용 / 친구만 / 업무용만)
+let formAvailableFor = 'friends'; // 예약 가능 시간을 누구에게 열지 (업무용 메뉴는 없앰 - 예전에 연 all/work 값은 그대로 읽음)
 let editingEventId = null;
 let editingMemoId = null; // 수정 중인 메모 id (DAY_MEMOS)
 let absorbedAvailIds = []; // 예약 가능 수정 중 두 번 눌러서 이번 수정에 합친 다른 예약 가능 일정 id들
@@ -17508,7 +17509,7 @@ function openEventForm(existingEvent){
   updateRecurringDeleteUI();
   pushViewState(closeEventForm);
 
-  formAvailableFor = existingEvent ? availableForOf(existingEvent) : 'all';
+  formAvailableFor = existingEvent ? availableForOf(existingEvent) : 'friends';
   formAllowBooking = existingEvent
     ? !blocksBooking(existingEvent) && existingEvent.type !== 'available'
     : isAllowBookingAlways();
@@ -18076,7 +18077,7 @@ function renderFormAvailBars(){
     }).join('');
     return `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
-        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-fa-toggle="${dk}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${label}</button>
+        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-fa-toggle="${dk}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${label}${dk === todayKey ? QA_TODAY_HTML : ''}</button>
         <div class="qa-times" data-fa-times="${dk}">${times}</div>
         ${on ? `<button type="button" class="qa-add" data-fa-add="${dk}" aria-label="${label} 시간 더 넣기">+</button>` : ''}
       </div>
@@ -19251,9 +19252,9 @@ const AVAILABLE_WORK_COLOR = '#818CF8';
 const DEFAULT_GROUP_EMOJI = '👥';
 const DEFAULT_WORK_EMOJI = '💼';
 const AVAILABLE_FOR_META = {
-  all:     { color: AVAILABLE_EVENT_COLOR, hint: '고른 친구와 업무용 링크를 받은 사람이 이 시간에 신청할 수 있어요.' },
-  friends: { color: AVAILABLE_EVENT_COLOR, hint: '고른 친구만 신청할 수 있어요. 업무용 링크에는 안 보여요.' },
-  work:    { color: AVAILABLE_WORK_COLOR,  hint: '업무용 링크를 받은 사람만 신청할 수 있어요. 친구에게는 빈 시간처럼 보이고, 업무용으로 열어둔 시간이라는 것도 드러나지 않아요.' },
+  all:     { color: AVAILABLE_EVENT_COLOR, hint: '고른 친구가 이 시간에 신청할 수 있어요.' },
+  friends: { color: AVAILABLE_EVENT_COLOR, hint: '고른 친구가 이 시간에 신청할 수 있어요.' },
+  work:    { color: AVAILABLE_WORK_COLOR,  hint: '친구에게는 안 보이는 시간이에요. 친구를 고르면 열려요.' },
 };
 // 이 일정이 예약을 막는지 - 바쁨 일정 중 "이 시간에도 예약 받기"를 켠 것(blocksBooking=false)만 안 막음
 function blocksBooking(ev){ return !ev || ev.type === 'available' || ev.blocksBooking !== false; }
@@ -19281,35 +19282,31 @@ function availableTitleFor(f, vis){
   const groupIds = availFriendGroupIds(f, vis);
   if(vis && vis.private) parts.push('🔒나만 보기');
   else shownGroups(groupIds).forEach(g => parts.push(groupEmojiOf(g) + g.name));
-  if(f !== 'friends') parts.push(`${workEmoji()}업무`);
   return parts.join(' · ');
 }
 // 한 달 칸처럼 좁은 곳에 쓰는 짧은 이름 - 모든 친구면 "가능", 그룹이면 그룹 이모티콘들, 업무용 링크도 열렸으면 업무용 이모티콘
 function availableShortFor(f, vis){
   if(f === 'work') return `${workEmoji()}업무`;
   const groupIds = availFriendGroupIds(f, vis);
-  const work = f === 'all' ? workEmoji() : '';
-  if(shownGroups(groupIds).length) return shownGroups(groupIds).map(groupEmojiOf).join('') + work;
-  return work + '가능';
+  if(shownGroups(groupIds).length) return shownGroups(groupIds).map(groupEmojiOf).join('');
+  return '가능';
 }
 // 친구 + 업무용 링크에 함께 열린 시간은 띠 왼쪽에 보라 줄
 function availWorkStripeStyle(ev){
-  return (ev && ev.type === 'available' && availableForOf(ev) === 'all' && !ev.color) ? `box-shadow:inset 3px 0 0 ${AVAILABLE_WORK_COLOR};` : '';
+  return ''; // 업무용 메뉴를 없애서 보라 줄도 안 그림
 }
 // "누구에게 열까요?" 칩 - 모든 친구 / 내 그룹들 / 업무용 링크 (여러 개 고를 수 있음)
 function availAudienceChipsHtml(f, vis){
   const groupIds = availFriendGroupIds(f, vis);
-  const workOn = f !== 'friends';
   const chip = (on, attrs, color, text) => `<button type="button" class="avail-for-btn${on ? ' active' : ''}" ${attrs} style="--af-color:${color}">${text}</button>`;
   return chip(!!groupIds && groupIds.length === 0, 'data-aud-chip="all"', AVAILABLE_EVENT_COLOR, `${DEFAULT_GROUP_EMOJI} 모든 친구`)
-    + MY_GROUPS.map(g => chip(!!groupIds && groupIds.includes(g.id), `data-aud-chip="group" data-group-id="${g.id}"`, AVAILABLE_EVENT_COLOR, `${escapeHtml(groupEmojiOf(g))} ${escapeHtml(g.name)}`)).join('')
-    + chip(workOn, 'data-aud-chip="work"', AVAILABLE_WORK_COLOR, `${escapeHtml(workEmoji())} 업무용 링크`);
+    + MY_GROUPS.map(g => chip(!!groupIds && groupIds.includes(g.id), `data-aud-chip="group" data-group-id="${g.id}"`, AVAILABLE_EVENT_COLOR, `${escapeHtml(groupEmojiOf(g))} ${escapeHtml(g.name)}`)).join('');
 }
 // 칩 하나를 눌렀을 때 다음 상태 { availableFor, visibility } - 아무 데도 안 열리게 되면 막음(null)
 function nextAvailAudience(f, vis, chipEl){
   let groupIds = availFriendGroupIds(f, vis);
   let friendsOn = !!groupIds;
-  let workOn = f !== 'friends';
+  const workOn = false; // 업무용 메뉴는 없앰 - 칩을 누르면 친구 쪽으로만 열림
   groupIds = groupIds ? [...groupIds] : [];
   const kind = chipEl.dataset.audChip;
   if(kind === 'all'){
@@ -19319,8 +19316,6 @@ function nextAvailAudience(f, vis, chipEl){
     if(!friendsOn || groupIds.length === 0){ friendsOn = true; groupIds = [gid]; } // 모든 친구에서 그룹을 누르면 그 그룹만
     else if(groupIds.includes(gid)){ groupIds = groupIds.filter(id => id !== gid); if(!groupIds.length) friendsOn = false; }
     else groupIds.push(gid);
-  } else {
-    workOn = !workOn;
   }
   if(!friendsOn && !workOn){ showToast('적어도 한 곳에는 열어야 해요.'); return null; }
   return {
@@ -19332,7 +19327,6 @@ function availAudienceLabel(f, vis){
   const groupIds = availFriendGroupIds(f, vis);
   const parts = [];
   if(groupIds) parts.push(shownGroups(groupIds).length ? shownGroups(groupIds).map(g => groupEmojiOf(g) + g.name).join(', ') : '모든 친구');
-  if(f !== 'friends') parts.push(`${workEmoji()}업무용 링크`);
   return parts.join(' + ');
 }
 
@@ -29769,7 +29763,7 @@ const QUICK_AXIS_PREF_KEY = 'catchme_quick_axis';
 let quickAvailBusy = {}; // 요일 -> 정한 기간 동안 그 요일에 있는 내 일정 [{s, e, soft, items}] - 막대 위에 회색/점선으로 보여줌
 let quickAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dow, min }
 let quickAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dow, idx }
-// 대상별 탭 - 모든 친구 / 그룹마다 / 업무용. 탭마다 { initial, pattern }을 따로 들고 있고,
+// 대상별 탭 - 모든 친구 / 그룹마다. 탭마다 { initial, pattern }을 따로 들고 있고,
 // 지금 보는 탭의 것을 quickAvailPattern/quickAvailInitial로 가리킴
 let quickAvailTabs = {};
 let quickAvailTab = 'friends';
@@ -29801,7 +29795,6 @@ function quickTabList(){
   return [
     { key: 'friends', label: `${DEFAULT_GROUP_EMOJI} 모든 친구` },
     ...MY_GROUPS.map(g => ({ key: 'g:' + g.id, label: `${groupEmojiOf(g)} ${g.name}`, group: g })),
-    { key: 'work', label: `${workEmoji()} 업무용` },
   ];
 }
 function quickTabKeys(){ return Object.keys(quickAvailTabs); }
@@ -29824,10 +29817,9 @@ function quickTabIncludes(key, ev){
 function quickAudMinus(aud, key){
   let gids = availFriendGroupIds(aud.availableFor, aud.visibility);
   let friendsOn = !!gids;
-  let workOn = aud.availableFor !== 'friends';
+  const workOn = false; // 업무용 메뉴는 없앰 - 친구 쪽을 다 빼면 그 시간은 닫힘
   gids = gids ? [...gids] : [];
-  if(key === 'work') workOn = false;
-  else if(key === 'friends'){ if(!gids.length) friendsOn = false; }
+  if(key === 'friends'){ if(!gids.length) friendsOn = false; }
   else { gids = gids.filter(id => 'g:' + id !== key); if(!gids.length) friendsOn = false; }
   if(!friendsOn && !workOn) return null;
   return { availableFor: friendsOn && workOn ? 'all' : (friendsOn ? 'friends' : 'work'), visibility: { groupIds: friendsOn ? gids : [], private: false } };
@@ -29859,9 +29851,7 @@ function renderQuickTabs(){
     return `<button type="button" class="qa-tab${tb.key === quickAvailTab ? ' active' : ''}" data-qa-tab="${escapeHtml(tb.key)}">${escapeHtml(tb.label)}${on ? '<i></i>' : ''}</button>`;
   }).join('');
   const cur = list.find(tb => tb.key === quickAvailTab);
-  document.getElementById('quickAvailTabHint').textContent = quickAvailTab === 'work'
-    ? '업무용 링크를 받은 사람만 신청할 수 있는 시간이에요. 친구에게는 안 보여요.'
-    : quickAvailTab === 'friends' ? '모든 친구가 신청할 수 있는 시간이에요. 다른 탭에 같은 시간을 열면 그쪽에도 같이 열려요.'
+  document.getElementById('quickAvailTabHint').textContent = quickAvailTab === 'friends' ? '모든 친구가 신청할 수 있는 시간이에요. 다른 탭에 같은 시간을 열면 그쪽에도 같이 열려요.'
     : `${cur ? cur.group.name : '이 그룹'} 친구만 신청할 수 있는 시간이에요.`;
 }
 function quickRangesTotal(ranges){ return (ranges || []).reduce((sum, r) => sum + r.e - r.s, 0); }
@@ -30594,6 +30584,8 @@ function quickAvailPeriodChanged(){
   if(!quickAvailAxisPref) quickAvailAxis = quickAxisFit(); // 바뀐 주의 일정에 맞춰 보이는 시간 범위도 다시 맞춤
   renderQuickAvail();
 }
+// 예약 가능 시간 막대 화면에서 오늘 날짜 옆에 붙이는 표시
+const QA_TODAY_HTML = '<b class="qa-today">Today</b>';
 function renderQuickAvail(){
   // 자동일 땐 정해둔 시간이 다 보이게 넓히고, 직접 고른 범위는 그대로 둠 (밖으로 나간 막대는 잘려 보임)
   quickAvailAxis = quickAvailAxisPref ? { ...quickAvailAxisPref } : quickAxisCover(quickAvailAxis);
@@ -30632,7 +30624,7 @@ function renderQuickAvail(){
       .map(r => `<i class="qa-other" style="${quickBarStyle(r)}"></i>`).join('');
     return `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
-        <button type="button" class="qa-day${weekend ? ' weekend' : ''}" data-qa-toggle="${row.key}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${row.label}</button>
+        <button type="button" class="qa-day${weekend ? ' weekend' : ''}" data-qa-toggle="${row.key}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${row.label}${(quickAvailRepeat === 'once' ? dateKeyOf(d) === todayKey : dow === TODAY.getDay()) ? QA_TODAY_HTML : ''}</button>
         <div class="qa-times" data-qa-times="${row.key}">${times}</div>
         ${on ? `<button type="button" class="qa-add" data-qa-add="${row.key}" aria-label="${row.label} 시간 더 넣기">+</button>` : ''}
       </div>
@@ -32660,8 +32652,8 @@ function renderInviteCreateHtml(){
       <input id="invTitleInput" class="inv-input" maxlength="60" placeholder="${escapeHtml(inviteAutoTitle(d))}" value="${escapeHtml(d.title)}" />
     </div>`;
   const placeHtml = d.place ? `<div class="inv-section"><label class="inv-label">약속 장소</label>${invitePlaceHtml(d.place, true)}</div>` : '';
-  // 친구만/업무용만/그룹에만 열어둔 시간이 하나도 없고 그룹도 없으면 링크 내용이 다 똑같아서 고르는 칸 자체를 안 보여줌
-  const hasSplitAvail = MY_GROUPS.length > 0 || SCHEDULE_EVENTS.some(e => e.type === 'available' && availableForOf(e) !== 'all');
+  // 그룹이 없으면 링크 내용이 다 똑같아서 고르는 칸 자체를 안 보여줌
+  const hasSplitAvail = MY_GROUPS.length > 0;
   const audGroup = d.audience.startsWith('group:') ? MY_GROUPS.find(g => `group:${g.id}` === d.audience) : null;
   const audChip = (aud, color, text) => `<button type="button" class="avail-for-btn${d.audience === aud ? ' active' : ''}" data-act="aud" data-aud="${escapeHtml(aud)}" style="--af-color:${color}">${text}</button>`;
   const audienceHtml = !hasSplitAvail ? '' : `
@@ -32670,13 +32662,10 @@ function renderInviteCreateHtml(){
       <div class="avail-for-row" style="margin-bottom:6px;">
         ${audChip('friends', AVAILABLE_EVENT_COLOR, `${DEFAULT_GROUP_EMOJI} 친구용`)}
         ${MY_GROUPS.map(g => audChip(`group:${g.id}`, AVAILABLE_EVENT_COLOR, `${escapeHtml(groupEmojiOf(g))} ${escapeHtml(g.name)}`)).join('')}
-        ${audChip('work', AVAILABLE_WORK_COLOR, `${escapeHtml(workEmoji())} 업무용`)}
       </div>
-      <div class="avail-for-hint">${d.audience === 'work'
-        ? '업무용 링크에 열어둔 시간이 담겨요. 친구에게만 연 시간은 안 보여요.'
-        : audGroup
-          ? `${escapeHtml(audGroup.name)} 그룹이나 모든 친구에게 열어둔 시간이 담겨요. 다른 그룹에만 연 시간은 안 보여요.`
-          : '친구에게 열어둔 시간이 담겨요. 업무용 링크에만 연 시간은 안 보여요.'}</div>
+      <div class="avail-for-hint">${audGroup
+        ? `${escapeHtml(audGroup.name)} 그룹이나 모든 친구에게 열어둔 시간이 담겨요. 다른 그룹에만 연 시간은 안 보여요.`
+        : '모든 친구에게 열어둔 시간이 담겨요.'}</div>
     </div>`;
   if(d.source === 'calendar') return placeHtml + tabs + audienceHtml + titleHtml + renderInviteCalendarPickHtml(d);
   const days = inviteAvailWeekDays(d);
@@ -32787,7 +32776,7 @@ function inviteAvailRowsHtml(d){
     }).join('');
     return `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
-        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-ia-toggle="${dk}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${label}</button>
+        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-ia-toggle="${dk}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${label}${dk === todayKey ? QA_TODAY_HTML : ''}</button>
         <div class="qa-times" data-ia-times="${dk}">${times}</div>
         ${on ? `<button type="button" class="qa-add" data-ia-add="${dk}" aria-label="${label} 시간 더 넣기">+</button>` : ''}
       </div>
