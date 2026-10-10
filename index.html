@@ -29455,6 +29455,30 @@ let quickAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 �
 // 지금 보는 탭의 것을 quickAvailPattern/quickAvailInitial로 가리킴
 let quickAvailTabs = {};
 let quickAvailTab = 'friends';
+// '이 주만'일 때 주마다 따로 정함 - 주 번호 -> 그 주의 quickAvailTabs. 다른 주로 넘어가도 정한 게 남고, 저장하면 바꾼 주 모두 저장
+let quickAvailWeekTabs = {};
+function quickBuildTabs(){
+  const tabs = {};
+  quickTabList().forEach(tb => {
+    const initial = quickAvailCurrentPattern(tb.key);
+    const pattern = {};
+    QUICK_AVAIL_DOWS.forEach(dow => { pattern[dow] = quickCloneRanges(initial[dow]); });
+    tabs[tb.key] = { initial, pattern };
+  });
+  return tabs;
+}
+function quickTabsChanged(tabs){
+  const cur = quickAvailTabs;
+  quickAvailTabs = tabs;
+  const changed = quickTabKeys().some(quickTabChanged);
+  quickAvailTabs = cur;
+  return changed;
+}
+// 지금 보는 주 말고 바꾼 게 있는 주 번호들
+function quickOtherChangedWeeks(){
+  if(quickAvailRepeat !== 'once') return [];
+  return Object.keys(quickAvailWeekTabs).map(Number).filter(w => w !== quickAvailWeek && quickTabsChanged(quickAvailWeekTabs[w]));
+}
 function quickTabList(){
   return [
     { key: 'friends', label: `${DEFAULT_GROUP_EMOJI} 모든 친구` },
@@ -29644,13 +29668,8 @@ function openQuickAvail(){
   // 지금 열려 있는 시간을 탭(대상)마다 막대로 보여줌 - 여기서 줄이거나 끄면 그 대상에게 닫히고, 늘리면 열림
   try { quickAvailRepeat = localStorage.getItem(QUICK_REPEAT_KEY) === 'month' ? 'month' : 'once'; } catch(e) { quickAvailRepeat = 'once'; }
   quickAvailWeek = 0;
-  quickAvailTabs = {};
-  quickTabList().forEach(tb => {
-    const initial = quickAvailCurrentPattern(tb.key);
-    const pattern = {};
-    QUICK_AVAIL_DOWS.forEach(dow => { pattern[dow] = quickCloneRanges(initial[dow]); });
-    quickAvailTabs[tb.key] = { initial, pattern };
-  });
+  quickAvailTabs = quickBuildTabs();
+  quickAvailWeekTabs = { 0: quickAvailTabs };
   selectQuickTab(quickAvailTabs[quickAvailTab] ? quickAvailTab : 'friends');
   quickAvailBusy = quickAvailBusyPattern();
   quickAvailInfo = null;
@@ -30314,7 +30333,7 @@ function renderQuickAvail(){
   document.getElementById('quickAvailRepeatSwitch').setAttribute('aria-checked', quickAvailRepeat === 'month' ? 'true' : 'false');
   const last = quickAvailEnd(); last.setDate(last.getDate() - 1);
   document.getElementById('quickAvailDesc').innerHTML = `정한 시간이 ${quickAvailRepeat === 'month'
-    ? `<b>4주 동안(~${last.getMonth() + 1}/${last.getDate()}) 매주 반복</b>해서` : `<b>${quickAvailWeek ? `이 주만` : '이번 주만'}(~${last.getMonth() + 1}/${last.getDate()})</b>`} 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.`;
+    ? `<b>4주 동안(~${last.getMonth() + 1}/${last.getDate()}) 매주 반복</b>해서` : `<b>${quickAvailWeek ? `이 주만` : '이번 주만'}(~${last.getMonth() + 1}/${last.getDate()})</b>`} 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.${quickOtherChangedWeeks().length ? ' <b>다른 주에 바꾼 것도 같이 저장돼요.</b>' : ''}`;
   const btn = document.getElementById('quickAvailSubmitBtn');
   // 전체(모든 탭)를 한 번에 저장함. 시간 합계는 탭끼리 겹친 시간을 한 번만 셈
   renderQuickTabs();
@@ -30330,7 +30349,12 @@ function renderQuickAvail(){
       removed += quickRangesTotal(subtractMinuteRanges(tb.initial[dow], tb.pattern[dow]));
     });
   });
-  if(initialTotal && changedTabs.length > 1 && (added || removed)){
+  const otherWeeks = quickOtherChangedWeeks().length;
+  if(otherWeeks){
+    btn.textContent = `${otherWeeks + (changedTabs.length ? 1 : 0)}주 바꾼 대로 저장하기`;
+    btn.disabled = false;
+    added = removed = 0; // 닫기 색 안 씀
+  } else if(initialTotal && changedTabs.length > 1 && (added || removed)){
     btn.textContent = '바꾼 대로 저장하기';
     btn.disabled = false;
   } else if(!initialTotal){
@@ -30385,6 +30409,8 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   if(e.target.closest('#quickAvailRepeatSwitch')){
     quickAvailRepeat = quickAvailRepeat === 'month' ? 'once' : 'month';
     try { localStorage.setItem(QUICK_REPEAT_KEY, quickAvailRepeat); } catch(err) {}
+    // 반복을 켜고 끄면 기간이 겹쳐서 주마다 따로 정한 건 지금 보는 주 것만 이어감
+    quickAvailWeekTabs = { [quickAvailWeek]: quickAvailTabs };
     quickAvailPeriodChanged();
     return;
   }
@@ -30400,7 +30426,18 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     const next = quickAvailWeek + Number(wk.dataset.qaWeek);
     if(next < 0) return;
     quickAvailWeek = next;
-    quickAvailPeriodChanged();
+    if(quickAvailRepeat === 'once'){
+      // 이 주만: 주마다 따로 - 가 본 주는 정한 그대로, 처음 가는 주는 그 주에 열려 있는 시간으로 시작
+      if(!quickAvailWeekTabs[next]) quickAvailWeekTabs[next] = quickBuildTabs();
+      quickAvailTabs = quickAvailWeekTabs[next];
+      selectQuickTab(quickAvailTab);
+      quickAvailBusy = quickAvailBusyPattern();
+      if(!quickAvailAxisPref) quickAvailAxis = quickAxisFit();
+      renderQuickAvail();
+    } else {
+      quickAvailWeekTabs = { [next]: quickAvailTabs };
+      quickAvailPeriodChanged();
+    }
     return;
   }
   if(e.target.closest('[data-qa-range-open]')){ quickAvailRangeOpen = !quickAvailRangeOpen; renderQuickAvail(); return; }
@@ -30708,11 +30745,17 @@ function quickOpenTab(key){
   return out;
 }
 document.getElementById('quickAvailSubmitBtn').addEventListener('click', async () => {
-  const keys = quickTabKeys().filter(quickTabChanged);
-  if(!keys.length) return;
+  // 이 주만일 땐 바꾼 주마다 차례로 저장 (주끼리 날짜가 안 겹침)
+  const viewWeek = quickAvailWeek, viewTabs = quickAvailTabs;
+  const weeks = [...quickOtherChangedWeeks(), ...(quickTabKeys().some(quickTabChanged) ? [viewWeek] : [])].sort((a, b) => a - b);
+  if(!weeks.length) return;
   const created = [];
   const closedDays = new Set(), skippedRecurring = new Set();
   let mergedCount = 0, opened = false, tried = false;
+  weeks.forEach(w => {
+  quickAvailWeek = w;
+  quickAvailTabs = w === viewWeek ? viewTabs : quickAvailWeekTabs[w];
+  const keys = quickTabKeys().filter(quickTabChanged);
   // 1) 줄어든 시간은 먼저 그 대상만 뺌 (다른 대상에도 열린 시간은 그쪽엔 그대로 열림)
   keys.forEach(k => {
     const tb = quickAvailTabs[k];
@@ -30733,6 +30776,9 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
     mergedCount += r.mergedCount;
     if(r.openedDays.size) opened = true;
   });
+  });
+  quickAvailWeek = viewWeek;
+  quickAvailTabs = viewTabs;
   if(!opened && !closedDays.size && !skippedRecurring.size){
     showToast(tried ? '고른 시간엔 이미 다른 일정이 있어서 새로 열 시간이 없어요.' : '바뀐 시간이 없어요.');
     return;
@@ -30744,7 +30790,7 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
   // 열린 날 수(정한 기간 기준)를 그대로 말하면 다른 곳의 "앞으로 2주 중 N일"과 숫자가 달라 헷갈림 -
   // 여기선 "얼마 동안 열렸는지"만 말하고, 지금 열린 정도는 상태 문구(앞으로 2주 중 N일)로 통일
   const msgs = [];
-  if(opened) msgs.push(`예약 가능 시간을 ${quickAvailRepeat === 'month' ? '4주 동안 매주 반복해서' : '이번 주에'} 열었어요.${mergedCount ? ' 다른 대상에 열린 시간과 겹치는 부분은 하나로 합쳤어요.' : ''}`);
+  if(opened) msgs.push(`예약 가능 시간을 ${quickAvailRepeat === 'month' ? '4주 동안 매주 반복해서' : weeks.length > 1 ? `${weeks.length}주에 걸쳐` : viewWeek ? '그 주에' : '이번 주에'} 열었어요.${mergedCount ? ' 다른 대상에 열린 시간과 겹치는 부분은 하나로 합쳤어요.' : ''}`);
   if(closedDays.size) msgs.push(opened ? `줄인 시간은 닫았어요.` : `${closedDays.size}일의 시간을 닫았어요.`);
   if(skippedRecurring.size) msgs.push('반복으로 열어둔 시간은 캘린더에서 직접 지워 주세요.');
   showToast(msgs.join(' '), skippedRecurring.size ? 3600 : undefined);
