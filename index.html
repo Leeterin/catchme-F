@@ -5398,6 +5398,10 @@
   .qa-range-edit{ justify-content:flex-end; margin-bottom:2px; }
   .qa-range-note{ margin:0 8px 4px; font-size:11px; color:var(--text-dim); }
   .qa-quick{ display:flex; gap:6px; margin:4px 0 2px; }
+  /* 빠르게 열기·일정 추가 막대 화면은 꾹 눌러도 돋보기·글자 선택·복사 메뉴가 안 뜨게 (시간 고르기 select는 그대로) */
+  #quickAvailOverlay, #quickAvailOverlay *:not(select):not(option), #formAvailRows, #formAvailRows *:not(select):not(option){
+    -webkit-user-select:none !important; user-select:none !important; -webkit-touch-callout:none !important;
+  }
   .qa-repeat{ display:flex; justify-content:flex-end; margin:-2px 0 4px; }
   .qa-switch{ display:inline-flex; align-items:center; gap:6px; background:none; border:none; padding:2px 0; font-size:12px; font-weight:600; color:var(--text-dim); font-family:inherit; cursor:pointer; }
   .qa-switch i{ position:relative; width:30px; height:18px; border-radius:999px; background:rgba(120,120,128,.32); transition:background .15s; }
@@ -18027,6 +18031,15 @@ function formAvailMinAt(track, clientX){
   rows.addEventListener('pointerup', end);
   rows.addEventListener('pointercancel', end);
 })();
+// 막대 화면에서 꾹 눌렀을 때 아이폰 돋보기·글자 선택·복사 메뉴가 안 뜨게 - 막대 줄은 터치 시작부터 막고(손가락 움직임은 pointer로 받음),
+// 나머지는 선택·꾹 누르기 메뉴만 막음 (시간 고르기 select는 그대로 동작)
+function blockLongPressLoupe(root, trackSel){
+  root.addEventListener('touchstart', (e) => { if(e.target.closest(trackSel)) e.preventDefault(); }, { passive: false });
+  root.addEventListener('contextmenu', (e) => { if(!e.target.closest('select')) e.preventDefault(); });
+  root.addEventListener('selectstart', (e) => { if(!e.target.closest('select')) e.preventDefault(); });
+}
+blockLongPressLoupe(document.getElementById('formAvailRows'), '[data-fa-track]');
+blockLongPressLoupe(document.getElementById('quickAvailOverlay'), '[data-qa-track]');
 
 document.getElementById('availWeekPrev').addEventListener('click', () => {
   availGridWeekStart.setDate(availGridWeekStart.getDate() - 7);
@@ -29719,20 +29732,21 @@ function quickHoursText(min){
   const h = Math.floor(min / 60), m = min % 60;
   return h && m ? `${h}시간 ${m}분` : h ? `${h}시간` : `${m}분`;
 }
-// 기간 내내 그 요일에 있는 내 일정(회색) - 일정 추가 화면처럼 막대를 못 놓음 (이번 주만일 땐 그날 일정이 다 여기에 듦).
-// 그날만 있는 일정(옅은 회색)은 막대는 지나갈 수 있고 저장할 때 그날만 빼고 엶
+// 기간 내내 그 요일에 있는 내 일정(회색), 그날만 있는 일정(옅은 회색) - 둘 다 겹치면 안 되는 일정이라 일정 추가 화면처럼 막대를 못 놓고 못 넘어감.
+// 이미 열려 있던 시간을 잘라낼 땐(quickFitRanges) 매주 일정만 봄 - 그날만 있는 일정까지 자르면 다른 주에 열린 시간까지 닫혀서
 function quickBusyWeekly(b){ return !b.soft && b.dates.length >= quickDowCount(b.dates[0].getDay()); }
 function quickHardBusy(dow){ return quickMergeRanges((quickAvailBusy[dow] || []).filter(quickBusyWeekly).map(b => ({ s: b.s, e: b.e }))); }
+function quickWallBusy(dow){ return quickMergeRanges((quickAvailBusy[dow] || []).filter(b => !b.soft).map(b => ({ s: b.s, e: b.e }))); }
 // 매주 있는 일정과 겹친 부분은 잘라내고 30분 안 되는 조각은 버림
 function quickFitRanges(dow, ranges){
   const hard = quickHardBusy(dow);
   if(!ranges.some(r => hard.some(h => h.s < r.e && h.e > r.s))) return ranges; // 안 겹치면 그대로 (지금 열린 시간과 괜히 달라지지 않게)
   return subtractMinuteRanges(ranges, hard).sort((a, b) => a.s - b.s).filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN);
 }
-// idx번째 막대가 늘어나거나 움직일 수 있는 범위 - 옆 막대와 매주 있는 일정 사이
+// idx번째 막대가 늘어나거나 움직일 수 있는 범위 - 옆 막대와 내 일정(겹쳐도 되는 일정 빼고) 사이
 function quickBounds(dow, ranges, idx, lo, hi){
   const r = ranges[idx];
-  [...quickHardBusy(dow), ...ranges.filter((_, i) => i !== idx)].forEach(o => {
+  [...quickWallBusy(dow), ...ranges.filter((_, i) => i !== idx)].forEach(o => {
     if(o.e <= r.s) lo = Math.max(lo, o.e);
     else if(o.s >= r.e) hi = Math.min(hi, o.s);
   });
@@ -29746,7 +29760,7 @@ function quickAvailInfoHtml(dow, min){
   return `<div class="qa-info">${items.map(b => {
     const weekly = quickAvailRepeat === 'month' && b.dates.length >= quickDowCount(dow);
     const when = weekly ? `매주 ${WEEKDAY_KO[dow]}요일` : b.dates.map(d => `${d.getMonth() + 1}/${d.getDate()}`).join(', ');
-    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : quickBusyWeekly(b) ? (weekly ? '매주 있는 일정이라 이 시간은 열 수 없어요' : '일정이 있어서 이 시간은 열 수 없어요') : '그날만 이 시간은 빼고 열어요';
+    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : quickBusyWeekly(b) ? (weekly ? '매주 있는 일정이라 이 시간은 열 수 없어요' : '일정이 있어서 이 시간은 열 수 없어요') : '그날 일정이 있어서 이 시간은 열 수 없어요';
     return `<div class="qa-info-item"><b>${escapeHtml(b.title)}</b> ${minutesToLabel(b.s)}–${minutesToLabel(b.e)}<small>${when} · ${note}</small></div>`;
   }).join('')}</div>`;
 }
@@ -29886,7 +29900,7 @@ function futureAvailableEvents(){
 // 한 줄에 시간을 하나 더 넣음 - 누른 곳(centerMin)이 있으면 거기, 없으면 가장 넓은 빈 곳 가운데에 2시간
 function quickAvailAddRange(row, centerMin){
   const ranges = quickAvailPattern[row.dows[0]];
-  const gaps = subtractMinuteRanges([{ s: quickAvailAxis.s, e: quickAvailAxis.e }], [...ranges, ...quickHardBusy(row.dows[0])]).filter(g => g.e - g.s >= QUICK_AVAIL_MIN_LEN);
+  const gaps = subtractMinuteRanges([{ s: quickAvailAxis.s, e: quickAvailAxis.e }], [...ranges, ...quickWallBusy(row.dows[0])]).filter(g => g.e - g.s >= QUICK_AVAIL_MIN_LEN);
   let gap;
   if(centerMin != null) gap = gaps.find(g => g.s <= centerMin && g.e >= centerMin);
   else gap = gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
@@ -30145,13 +30159,12 @@ function endQuickDrag(e){
   if(isTap){
     const min = quickMinAt(dr.track, e.clientX);
     const busyHere = quickBusyAt(dow, min);
-    // 겹쳐도 예약 받는 일정·그날만 있는 일정 위는 빈 곳처럼 누르면 시간이 들어감 (막대 위면 시간 고르기) - 매주 일정 위만 설명을 보여줌
-    if(!busyHere.some(quickBusyWeekly)){
+    // 겹쳐도 예약 받는 일정 위는 빈 곳처럼 누르면 시간이 들어감 (막대 위면 시간 고르기) - 겹치면 안 되는 일정 위는 설명만 보여줌
+    if(!busyHere.some(b => !b.soft)){
       quickAvailInfo = null;
       if(!dr.tap){ quickAvailEdit = { dow, idx: dr.idx }; renderQuickAvail(); return; }
       if(quickAvailAddRange(dr.row, min)){
-        const b = busyHere[0];
-        if(b) showToast(`${b.title} · ${b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : '그날만 이 시간은 빼고 열어요'}`);
+        if(busyHere[0]) showToast(`${busyHere[0].title} · 겹쳐도 예약 받는 일정이라 이 시간도 열려요`);
         return;
       }
     }
