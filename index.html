@@ -23707,17 +23707,24 @@ function isOpenLocationSuggest(room, m){
   return m.type === 'location-suggest' && m.status === 'pending' && !isStaleLocationSuggest(room, m);
 }
 // 장소 제안 번호 - 약속마다 올라온 순서대로 1, 2, 3... (누가 제안했든 이어서 매김).
-// 다른 약속 것이거나, 같은 약속에서 장소가 하나 확정된 뒤(2차 장소 등)거나, 채팅 + 버튼으로 새로 시작했으면 다시 1번부터 매김
+// 다른 약속 것이거나, 같은 약속에서 장소가 하나 확정된 뒤(2차 장소 등)거나, 채팅 + 버튼으로 새로 시작했으면 다시 1번부터 매김.
+// 취소한 제안은 번호 없이 빠지고 뒤 번호가 당겨짐 (2번을 취소하면 3번이 2번이 됨)
+function isWithdrawnLocationSuggest(m){
+  return m.status === 'withdrawn' || m.status === 'cancelled';
+}
 function locationSuggestNumbers(room){
   const nums = new Map();
-  const groups = new Map(); // key -> { no, last }
+  const groups = new Map(); // key -> { no, last, reset }
   (room.messages || []).filter(x => x.type === 'location-suggest').forEach(x => {
     const { key } = locationSuggestGroup(room, x);
-    const g = groups.get(key) || { no: 0, last: null };
-    if((g.last && g.last.status === 'confirmed') || x.newRound) g.no = 0;
+    const g = groups.get(key) || { no: 0, last: null, reset: false };
+    groups.set(key, g);
+    if(x.newRound) g.reset = true; // 새로 시작한 첫 제안을 취소해도 다음 제안부터 1번
+    if(isWithdrawnLocationSuggest(x)) return;
+    if((g.last && g.last.status === 'confirmed') || g.reset) g.no = 0;
+    g.reset = false;
     nums.set(x, ++g.no);
     g.last = x;
-    groups.set(key, g);
   });
   return { nums, groups };
 }
@@ -23729,7 +23736,7 @@ function locationSuggestNo(roomId, m){
 // 이 약속에 새로 제안하면 붙을 번호 바로 앞 번호 (새 약속이면 0이라 1번부터 시작)
 function nextLocationSuggestBaseNo(room, pinned, newMeet){
   const g = locationSuggestNumbers(room).groups.get(meetGroupKey(room, pinned, newMeet));
-  if(!g || !g.last || g.last.status === 'confirmed') return 0;
+  if(!g || !g.last || g.reset || g.last.status === 'confirmed') return 0;
   return g.no;
 }
 function locationSuggestTitle(roomId, m){
@@ -24009,15 +24016,29 @@ function cancelLocationSuggest(msg){
   if(msg._timeoutId) clearTimeout(msg._timeoutId);
 
   if(msg._serverId){
+    const roomId = activeChatRoomId;
     apiRequest(`/chats/location-suggestions/${msg._serverId}/withdraw`, { method: 'POST' })
       .then(data => {
-        Object.assign(msg, mapServerLocationSuggestMessage(data.message));
+        // 그 사이 대화를 다시 받아와서 메시지 객체가 바뀌었을 수 있음 - msg만 고치면 화면 카드는 그대로라서
+        // 지금 방에 있는 같은 서버 메시지를 찾아서 고침
+        const mapped = mapServerLocationSuggestMessage(data.message);
+        Object.assign(msg, mapped);
+        const room = CHAT_ROOMS[roomId];
+        const cur = room && room.messages.find(m => m._serverId === msg._serverId);
+        if(cur && cur !== msg) Object.assign(cur, mapped);
+        if(room) saveChatCache(roomId, room.messages);
         renderChatMessages();
         renderChatList();
         refreshHotplaceListsIfOpen();
+        refreshPlaceViewer();
         showToast('장소 제안을 취소했어요.');
       })
-      .catch(err => showToast(err.message));
+      .catch(err => {
+        showToast(err.message);
+        // 이미 처리된 제안이면 화면이 옛날 상태인 것 - 서버에서 다시 받아옴
+        const room = CHAT_ROOMS[roomId];
+        if(room && room.isRealRoom) loadRoomMessagesFromServer(roomId, room);
+      });
     return;
   }
 
