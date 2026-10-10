@@ -6195,24 +6195,25 @@
   .event-place-addr{ display:flex; align-items:center; gap:8px; margin-top:6px; font-size:12px; color:var(--text-dim); }
   .event-place-addr span{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .event-place-addr button{ border:none; background:none; color:var(--text-dim); font-size:12px; text-decoration:underline; cursor:pointer; padding:0; font-family:'Inter',sans-serif; }
-  /* 하루 보기 카드의 장소(누르면 지도) · 메모 */
-  .day-event-extras{ display:flex; flex-direction:column; gap:6px; margin:2px 0 10px; }
+  /* 일정 장소·메모 - 하루·한달·일주일 모두 "📍 장소 / 📝 메모" 작은 줄로 */
+  .ev-info{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .ev-info:empty{ display:none; }
+  .ev-info-line{ display:flex; align-items:flex-start; gap:5px; min-width:0; font-size:12px; line-height:1.45; color:var(--text); text-decoration:none; }
+  .ev-info-icon{ flex-shrink:0; width:15px; text-align:center; font-size:11px; line-height:1.6; }
+  .ev-info-text{ flex:1; min-width:0; }
+  .ev-info-place .ev-info-text{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ev-info-place b{ font-weight:600; }
+  .ev-info-addr{ color:var(--text-dim); margin-left:4px; }
+  .ev-info-place:active{ opacity:.6; }
+  .ev-info-note .ev-info-text{ color:var(--text-dim); white-space:pre-wrap; word-break:break-word; }
+  .day-event-extras{ margin:0 0 8px; }
   .day-event-extras:empty{ display:none; }
-  .day-event-place{ display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:11px; background:var(--surface); border:1px solid var(--line); color:var(--text); text-decoration:none; }
-  .day-event-place:active{ opacity:.7; }
-  .dep-icon{ width:28px; height:28px; flex-shrink:0; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; }
-  .dep-icon svg{ width:15px; height:15px; }
-  .dep-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-  .dep-name{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .dep-addr{ font-size:11px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .dep-map{ flex-shrink:0; font-size:11px; font-weight:700; color:var(--accent); }
-  .day-event-note{ padding:8px 11px; border-radius:11px; background:var(--surface); border:1px solid var(--line); border-left:3px solid #FBBF24; font-size:13px; line-height:1.55; color:var(--text); white-space:pre-wrap; word-break:break-word; }
-  .den-label{ display:block; margin-bottom:2px; font-size:10.5px; font-weight:700; color:var(--text-dim); letter-spacing:.02em; }
+  .month-selected-main .ev-info{ margin-top:3px; }
+  .month-selected-main .ev-info-line{ font-size:11.5px; }
   .week-block-sheet-detail:empty{ display:none; }
-  .week-block-sheet-detail{ margin:-4px 0 14px; font-size:13px; color:var(--text-dim); line-height:1.5; }
-  .week-block-sheet-detail .wbs-place{ display:flex; align-items:center; gap:6px; }
-  .week-block-sheet-detail .wbs-place a{ color:var(--accent); font-weight:600; text-decoration:none; flex-shrink:0; }
-  .week-block-sheet-detail .wbs-note{ margin-top:6px; white-space:pre-wrap; word-break:break-word; color:var(--text); }
+  .week-block-sheet-detail{ margin:-4px 0 14px; }
+  .week-block-sheet-detail .ev-info{ gap:5px; }
+  .week-block-sheet-detail .ev-info-line{ font-size:13px; }
   .event-color-mixer{
     margin-top:10px;
     padding:12px;
@@ -6491,7 +6492,6 @@
     word-break:keep-all;
     overflow-wrap:anywhere;
   }
-  .week-cal-block-extra{ margin-top:1px; font-size:7.5px; font-weight:500; opacity:.9; }
   .week-cal-block.show-actions{ z-index:3; }
   /* 약속 잡기 일주일 보기: 왼쪽은 친구 예약 가능 시간, 오른쪽은 내 일정 - 겹쳐도 둘 다 보이게 나눠 그림 */
   .week-cal-block.fr-half{ right:48%; }
@@ -6742,10 +6742,11 @@
     white-space:nowrap;
     min-width:0;
   }
-  .month-selected-main{ display:flex; flex-direction:column; min-width:0; }
-  .month-selected-place, .month-selected-note{ margin-top:2px; font-size:11px; color:var(--text-dim); word-break:break-word; }
-  .month-selected-place a{ color:var(--accent); font-weight:600; text-decoration:none; }
-  .month-selected-note{ white-space:pre-wrap; }
+  .month-selected-main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  /* 장소·메모 줄이 있으면 점·시간은 제목 줄에 맞춤 */
+  .month-selected-row:has(.ev-info){ align-items:flex-start; }
+  .month-selected-row:has(.ev-info) .month-selected-dot{ margin-top:5px; }
+  .month-selected-row:has(.ev-info) .month-selected-time{ margin-top:1px; }
   .month-selected-empty{
     font-size:12px;
     color:var(--text-dim);
@@ -16170,7 +16171,7 @@ function renderDayView(){
       <div class="day-event-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</div>
       <div class="day-event-title">${escapeHtml(ev.title)}</div>
       ${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<div class="day-event-travel">🚇 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${ev.travel.to && ev.travel.to.name ? ` · ${escapeHtml(ev.travel.to.name)}` : ''}</div>` : ''}
-      <div class="day-event-extras">${dayEventPlaceNoteHtml(ev)}</div>
+      <div class="day-event-extras">${eventPlaceNoteHtml(ev)}</div>
       <div class="day-event-tags">
         ${visibilityButtonsHtml(ev.visibility, 'day-event-tag')}
       </div>
@@ -17059,23 +17060,14 @@ function bindTravelPlaceSearch(inputId, resultsId, onPick){
     }, 300);
   });
 }
-// 일정 칸(하루 보기 카드, 일주일 보기 창)에 붙는 장소·메모 줄
-function eventPlaceNoteHtml(ev, placeClass, noteClass){
+// 일정 칸(하루 카드, 한달 목록, 일주일 창)에 붙는 장소·메모 줄 - "📍 장소 주소" (누르면 지도), "📝 메모"
+function eventPlaceNoteHtml(ev){
   if(!ev) return '';
-  return (ev.place && ev.place.name ? `<div class="${placeClass}">📍 ${escapeHtml(ev.place.name)} <a href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener">지도</a></div>` : '')
-    + (ev.note ? `<div class="${noteClass}">${escapeHtml(ev.note)}</div>` : '');
-}
-// 하루 보기 카드용 - 장소는 누르면 지도가 열리는 한 줄 카드, 메모는 노란 줄이 있는 상자
-function dayEventPlaceNoteHtml(ev){
   const place = ev.place && ev.place.name
-    ? `<a class="day-event-place" href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener">
-        <span class="dep-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
-        <span class="dep-text"><span class="dep-name">${escapeHtml(ev.place.name)}</span>${ev.place.address ? `<span class="dep-addr">${escapeHtml(ev.place.address)}</span>` : ''}</span>
-        <span class="dep-map">지도 &#8250;</span>
-      </a>`
+    ? `<a class="ev-info-line ev-info-place" href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener"><span class="ev-info-icon">📍</span><span class="ev-info-text"><b>${escapeHtml(ev.place.name)}</b>${ev.place.address && ev.place.address !== ev.place.name ? `<span class="ev-info-addr">${escapeHtml(ev.place.address)}</span>` : ''}</span></a>`
     : '';
-  const note = ev.note ? `<div class="day-event-note"><span class="den-label">메모</span>${escapeHtml(ev.note)}</div>` : '';
-  return place + note;
+  const note = ev.note ? `<div class="ev-info-line ev-info-note"><span class="ev-info-icon">📝</span><span class="ev-info-text">${escapeHtml(ev.note)}</span></div>` : '';
+  return place || note ? `<div class="ev-info">${place}${note}</div>` : '';
 }
 // 일정 장소 - 검색해서 고르면 주소·좌표까지, 그냥 적으면 이름만 저장 (나만 보는 정보)
 let formPlace = null; // { name, address, lat, lon } | null
@@ -19405,13 +19397,6 @@ function renderWeekView(){
           ? availableShortFor(availableForOf(matchedEv), matchedEv.visibility)
           : text;
         block.appendChild(label);
-        // 장소·메모는 칸 높이가 되는 만큼만 이름 아래에 (넘치면 잘리고, 눌러서 뜨는 창에 전부 나옴)
-        if(matchedEv && !isPending && !isLinked && (matchedEv.place?.name || matchedEv.note)){
-          const extra = document.createElement('div');
-          extra.className = 'week-cal-block-extra';
-          extra.textContent = [matchedEv.place?.name ? '📍' + matchedEv.place.name : '', matchedEv.note || ''].filter(Boolean).join(' · ');
-          block.appendChild(extra);
-        }
 
         // 칸이 좁아서 시간이 안 보이니, 한 번 누르면 아래에서 창이 올라와 정확한 시간을 보여줌
         const sheetTimeText = `${d.getMonth()+1}월 ${d.getDate()}일 (${WEEKDAY_KO[d.getDay()]}) ${minutesToLabel(blockRange.startMin)} – ${minutesToLabel(blockRange.endMin)}`;
@@ -19517,7 +19502,7 @@ function openWeekBlockSheet(title, timeText, buttons, ev){
   }
   overlay.querySelector('.week-block-sheet-title').textContent = title;
   overlay.querySelector('.week-block-sheet-time').textContent = timeText;
-  overlay.querySelector('.week-block-sheet-detail').innerHTML = eventPlaceNoteHtml(ev, 'wbs-place', 'wbs-note');
+  overlay.querySelector('.week-block-sheet-detail').innerHTML = eventPlaceNoteHtml(ev);
   const btnRow = overlay.querySelector('.week-block-sheet-btns');
   btnRow.innerHTML = '';
   buttons.forEach(b => {
@@ -19675,7 +19660,7 @@ function renderMonthSelectedPanel(){
         <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''}>
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}"></span>
           <span class="month-selected-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</span>
-          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${eventPlaceNoteHtml(ev, 'month-selected-place', 'month-selected-note')}</span>
+          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${eventPlaceNoteHtml(ev)}</span>
           ${goesToChat ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
           ${isSpecial ? '' : `
           <span class="month-selected-row-actions">
