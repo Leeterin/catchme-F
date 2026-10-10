@@ -9219,30 +9219,32 @@ function showToast(message, duration = 2400){
   el._hideTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 
-// 토스트를 손가락으로 아래로 쓸어내리면 따라 내려가다가 사라짐
+// 토스트를 손가락으로 화면 바깥쪽으로 쓸면 따라가다가 사라짐 - 아래 토스트는 아래로, 위에 뜬 토스트(채팅방 안)는 위로
 (function setupToastSwipeDown(){
   const el = document.getElementById('globalToast');
-  let startY = null, dy = 0;
+  let startY = null, dy = 0, dir = 1; // dir: 1=아래로 밀어 닫기, -1=위로 밀어 닫기
   el.addEventListener('touchstart', (e) => {
     if(!el.classList.contains('show') || e.touches.length !== 1) return;
     startY = e.touches[0].clientY; dy = 0;
+    dir = document.body.classList.contains('chat-open') ? -1 : 1;
     clearTimeout(el._hideTimer); // 잡고 있는 동안엔 저절로 안 사라지게
     el.style.transition = 'none';
   }, { passive: true });
   el.addEventListener('touchmove', (e) => {
     if(startY === null) return;
     e.preventDefault();
-    const raw = e.touches[0].clientY - startY;
-    dy = raw > 0 ? raw : raw / 4; // 위로는 살짝만 끌려가게
-    el.style.transform = `translateX(-50%) translateY(${dy}px)`;
-    el.style.opacity = String(Math.max(0.2, 1 - Math.max(0, dy) / 120));
+    const raw = (e.touches[0].clientY - startY) * dir; // 닫히는 방향이 양수
+    const d = raw > 0 ? raw : raw / 4; // 반대쪽으로는 살짝만 끌려가게
+    dy = d;
+    el.style.transform = `translateX(-50%) translateY(${d * dir}px)`;
+    el.style.opacity = String(Math.max(0.2, 1 - Math.max(0, d) / 120));
   }, { passive: false });
   const end = () => {
     if(startY === null) return;
     startY = null;
     el.style.transition = 'opacity .2s ease, transform .2s ease';
     if(dy > 28){
-      el.style.transform = 'translateX(-50%) translateY(80px)';
+      el.style.transform = `translateX(-50%) translateY(${80 * dir}px)`;
       el.style.opacity = '0';
       el.classList.remove('show');
     } else {
