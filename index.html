@@ -9338,11 +9338,25 @@ function tryRefreshAccessToken(){
 // 로그인 세션(액세스+리프레시 토큰, 사용자 정보)을 로컬에 저장
 function persistSession(){
   if(!currentUser) return;
+  const value = JSON.stringify({ token: authToken, refreshToken: refreshTokenValue, user: currentUser });
   try {
-    localStorage.setItem('catchme_session', JSON.stringify({ token: authToken, refreshToken: refreshTokenValue, user: currentUser }));
+    localStorage.setItem('catchme_session', value);
   } catch(e) {
     // localStorage를 못 쓰는 환경(예: 미리보기 샌드박스)이면 그냥 무시
   }
+  // iOS는 앱 안 웹 화면의 localStorage를 예고 없이 비울 때가 있어서, 앱 자체 저장소에도 같이 저장
+  if(nativePrefs()) nativePrefs().set({ key: 'catchme_session', value }).catch(() => {});
+}
+
+// 앱(아이폰/안드로이드)에서만 있는 앱 자체 저장소 - 웹 브라우저에서는 null
+function nativePrefs(){
+  return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Preferences) || null;
+}
+
+// 저장된 로그인 세션을 웹 저장공간·앱 저장소 둘 다에서 지움
+function clearSavedSession(){
+  try { localStorage.removeItem('catchme_session'); } catch(e) {}
+  if(nativePrefs()) nativePrefs().remove({ key: 'catchme_session' }).catch(() => {});
 }
 
 // 리프레시 토큰마저 만료/무효화됐을 때 - 세션을 완전히 정리하고 로그인 화면으로 되돌림
@@ -9351,7 +9365,7 @@ function handleSessionExpired(){
   refreshTokenValue = null;
   currentUser = null;
   try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
-  try { localStorage.removeItem('catchme_session'); } catch(e) {}
+  clearSavedSession();
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
   showToast('로그인이 만료됐어요. 다시 로그인해주세요.');
   document.getElementById('authGateView').style.display = 'flex';
@@ -9365,7 +9379,7 @@ async function performLogout(){
   refreshTokenValue = null;
   currentUser = null;
   try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
-  try { localStorage.removeItem('catchme_session'); } catch(e) {}
+  clearSavedSession();
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
 
   if(refreshTokenToRevoke){
@@ -9417,7 +9431,7 @@ document.getElementById('deleteAccountConfirmBtn').addEventListener('click', asy
     authToken = null;
     refreshTokenValue = null;
     currentUser = null;
-    try { localStorage.removeItem('catchme_session'); } catch(e) {}
+    clearSavedSession();
     document.getElementById('authGateView').style.display = 'flex';
     showTab(null);
     showToast('계정이 삭제됐어요. 그동안 이용해주셔서 감사해요.');
@@ -10193,9 +10207,18 @@ function connectRealtimeSocket(){
 
 
 // 새로고침해도 로그인이 유지되도록, 저장된 세션이 있으면 자동으로 복원
-function tryRestoreSession(){
+async function tryRestoreSession(){
   try {
-    const saved = localStorage.getItem('catchme_session');
+    let saved = null;
+    try { saved = localStorage.getItem('catchme_session'); } catch(e) {}
+    // iOS가 웹 저장공간(localStorage)을 비워버린 경우 - 앱 자체 저장소에 같이 넣어둔 걸로 복원
+    if(!saved && nativePrefs()){
+      saved = (await nativePrefs().get({ key: 'catchme_session' })).value;
+      if(saved) try { localStorage.setItem('catchme_session', saved); } catch(e) {}
+    } else if(saved && nativePrefs()){
+      // 이 기능 전에 로그인해서 웹 저장공간에만 있는 세션도 앱 저장소로 옮겨 둠
+      nativePrefs().set({ key: 'catchme_session', value: saved }).catch(() => {});
+    }
     if(!saved) return;
     const { token, user, refreshToken } = JSON.parse(saved);
     if(token && user) onAuthSuccess(token, user, true, refreshToken);
@@ -32733,8 +32756,8 @@ async function handleSocialLoginRedirect(){
 // 페이지가 열릴 때 저장된 로그인 세션이 있으면 자동으로 복원
 // 약속 링크로 들어왔으면 로그인 복원이 실패하든 말든 무조건 응답 화면을 띄움
 if(STARTUP_INVITE_TOKEN) openInviteFromUrl();
-handleSocialLoginRedirect().catch(() => false).then(handled => {
-  try { if(!handled) tryRestoreSession(); } catch(e) { console.error('[session restore]', e); }
+handleSocialLoginRedirect().catch(() => false).then(async handled => {
+  try { if(!handled) await tryRestoreSession(); } catch(e) { console.error('[session restore]', e); }
   openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
   // 로그인 상태면 일정/친구/채팅/설정을 다 받아서 그린 다음에 로고를 닫음 (너무 오래 걸리면 12초에서 끊음)
   if(startupDataPromise) return Promise.race([startupDataPromise, new Promise(r => setTimeout(r, 12000))]);
