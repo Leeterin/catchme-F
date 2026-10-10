@@ -8783,6 +8783,14 @@
             <button type="button" class="sort-trigger-btn" id="feedSortTriggerBtn" data-sort="recent">최신순 ▾</button>
             <div class="sort-dropdown-menu" id="feedSortDropdown"></div>
           </div>
+          <div class="feed-tag-view-toggle" id="feedMainViewToggle" style="margin-top:0;">
+            <button type="button" class="feed-tag-view-btn active" data-view="card" title="크게 보기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="12" rx="1"/><line x1="4" y1="19" x2="20" y2="19"/></svg>
+            </button>
+            <button type="button" class="feed-tag-view-btn" data-view="grid" title="3열로 보기">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="5"/><rect x="9.5" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="10" width="5" height="5"/><rect x="9.5" y="10" width="5" height="5"/><rect x="16" y="10" width="5" height="5"/><rect x="3" y="17" width="5" height="4"/><rect x="9.5" y="17" width="5" height="4"/><rect x="16" y="17" width="5" height="4"/></svg>
+            </button>
+          </div>
         </div>
         <div id="feedListContainer"></div>
       </div>
@@ -12599,6 +12607,7 @@ function renderReviewerLevelBadgeHtml(authorId){
 // 내 리뷰 레벨이 올랐으면 축하 팝업 (서버에서 리뷰 목록을 한 번이라도 받아온 뒤에만 - 빈 목록 0개로 기준값이 잡히지 않게)
 let feedPostsLoadedOnce = false;
 function checkMyReviewLevelUp(){
+  refreshMyReviewBadge();
   if(!currentUser || !feedPostsLoadedOnce) return;
   const count = getAuthorReviewCount(currentUser.id);
   checkLevelUp('review', count, REVIEWER_LEVEL_TIERS, { sub: `지금까지 리뷰 ${count}개를 남겼어요` });
@@ -12766,8 +12775,29 @@ function renderFeedPosts(){
     container.appendChild(banner);
   }
 
+  if(feedMainViewMode === 'grid'){
+    // 3열 그리드 - 장소 모아보기와 같은 모양, 사진 밑에 장소 이름·별점
+    const grid = document.createElement('div');
+    container.appendChild(grid);
+    renderFeedPostCollection(grid, posts, { showPlace: true, mode: 'grid' });
+    return;
+  }
   posts.forEach(post => renderFeedPostCard(post, container));
 }
+// 추천 목록 보기 방식 - 'card'(큰 카드 한 줄씩) | 'grid'(가로 3개 그리드). 고른 방식은 폰에 기억해둠
+let feedMainViewMode = 'card';
+try { if(localStorage.getItem('feedMainViewMode') === 'grid') feedMainViewMode = 'grid'; } catch(e){}
+document.querySelectorAll('#feedMainViewToggle .feed-tag-view-btn').forEach(btn => {
+  btn.classList.toggle('active', btn.dataset.view === feedMainViewMode);
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.view;
+    if(mode === feedMainViewMode) return;
+    feedMainViewMode = mode;
+    try { localStorage.setItem('feedMainViewMode', mode); } catch(e){}
+    document.querySelectorAll('#feedMainViewToggle .feed-tag-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+    renderFeedPosts();
+  });
+});
 renderFeedPosts();
 
 // 내가 ⭐ 저장한 장소 - 음식점/카페/체험 전부에서 모으고, 검색어·정렬은 목록과 똑같이 적용. 장소마다 대표 글 하나씩.
@@ -13667,7 +13697,8 @@ function renderFeedTagList(){
 // 게시물 여러 개를 그리드(대표사진 3열) / 리스트(사진+한줄평) 중 feedTagViewMode로 골라서 그림 -
 // 장소 모아보기와 작성자 리뷰 모아보기(내 리뷰 포함)가 같이 씀.
 // showPlace: 작성자 화면처럼 글쓴이가 다 같은 경우, 글쓴이 대신 장소 이름을 보여줌
-function renderFeedPostCollection(container, posts, { emptyText, showPlace } = {}){
+function renderFeedPostCollection(container, posts, { emptyText, showPlace, mode } = {}){
+  const viewMode = mode || feedTagViewMode;
   container.innerHTML = '';
   if(posts.length === 0){
     container.className = '';
@@ -13677,7 +13708,7 @@ function renderFeedPostCollection(container, posts, { emptyText, showPlace } = {
     container.appendChild(empty);
     return;
   }
-  if(feedTagViewMode === 'list'){
+  if(viewMode === 'list'){
     container.className = 'feed-tag-list';
     posts.forEach(post => {
       const cover = (post.photos && post.photos[0]) || '';
@@ -14073,6 +14104,7 @@ async function deleteFeedPostItem(post){
   await apiRequest(`/feed/${post.id}`, { method: 'DELETE' });
   Object.keys(FEED_POSTS).forEach(cat => { FEED_POSTS[cat] = (FEED_POSTS[cat] || []).filter(p => p.id !== post.id); });
   renderFeedPosts();
+  refreshMyReviewBadge();
   if(feedTagCurrentPosts.some(p => p.id === post.id)){
     feedTagCurrentPosts = feedTagCurrentPosts.filter(p => p.id !== post.id);
     renderFeedTagList();
@@ -15601,6 +15633,18 @@ function updateFeedReviewProfileMineCount(){
   if(!document.getElementById('feedAuthorView').classList.contains('active')) card.style.display = myCount > 0 ? '' : 'none';
   mineEl.textContent = `내 리뷰 ${myCount}개 ›`;
 }
+// 이름 옆 내 리뷰 등급 뱃지 + "내 리뷰 N개" - 리뷰를 올리거나 지울 때마다 checkMyReviewLevelUp에서 다시 그려서 바로 반영됨
+function refreshMyReviewBadge(){
+  const badgeEl = document.getElementById('feedReviewProfileBadge');
+  if(!badgeEl) return;
+  const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
+  const myTier = getReviewerLevelTier(myCount);
+  updateFeedReviewProfileMineCount();
+  // "등급 보기" 대신 실제 등급을 이름 바로 옆에 보여줌 - 리뷰 0개면 회색 "등급 없음"(눌러서 등급표 확인 가능)
+  badgeEl.innerHTML = myTier
+    ? renderReviewerLevelBadgeHtml(currentUser.id)
+    : '<span class="meet-badge-chip" style="color:var(--text-dim);border-color:var(--line);">등급 없음</span>';
+}
 function renderFeedReviewProfileCard(){
   const nameEl = document.getElementById('feedReviewProfileName');
   const avatarEl = document.getElementById('feedReviewProfileAvatar');
@@ -15609,16 +15653,6 @@ function renderFeedReviewProfileCard(){
   // 리뷰를 아직 한 번도 안 써서 등급이 없으면(1개 미만) renderReviewerLevelBadgeHtml이 빈 문자열을 주는데,
   // 그러면 누를 게 아예 안 보여서 등급표 팝업을 열 방법이 없었음 - 그 경우에도 회색 "등급 보기" 칩을
   // 대신 보여줘서 항상 누를 수 있게 함
-  const badgeEl = document.getElementById('feedReviewProfileBadge');
-  if(badgeEl){
-    const myCount = currentUser ? getAuthorReviewCount(currentUser.id) : 0;
-    const myTier = getReviewerLevelTier(myCount);
-    updateFeedReviewProfileMineCount();
-    // "등급 보기" 대신 실제 등급을 이름 바로 옆에 보여줌 - 리뷰 0개면 회색 "등급 없음"(눌러서 등급표 확인 가능)
-    badgeEl.innerHTML = myTier
-      ? renderReviewerLevelBadgeHtml(currentUser.id)
-      : '<span class="meet-badge-chip" style="color:var(--text-dim);border-color:var(--line);">등급 없음</span>';
-  }
   checkMyReviewLevelUp();
   if(myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl){
     avatarEl.style.background = '';
