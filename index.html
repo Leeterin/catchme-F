@@ -5006,6 +5006,7 @@
     position:relative;
     width:64px;
     height:100%;
+    overflow-x:hidden; /* 가운데 숫자가 커지면서 칸 폭을 넘쳐 옆으로도 밀리던 것 - 위아래로만 */
     overflow-y:auto;
     scroll-snap-type:y mandatory;
     overscroll-behavior:contain;
@@ -5029,7 +5030,8 @@
     -webkit-user-select:none;
   }
   .time-wheel-item.selected{ color:var(--text); font-weight:700; transform:scale(1.08); }
-  .time-wheel.list .time-wheel-col{ width:auto; min-width:140px; }
+  .time-wheel.list .time-wheel-col{ width:220px; max-width:100%; }
+  .time-wheel.list .time-wheel-item{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .time-wheel.list #timeWheelMinCol, .time-wheel.list .time-wheel-unit{ display:none; }
   .time-wheel.list .time-wheel-item{ font-family:inherit; font-size:17px; padding:0 12px; }
   .time-wheel-unit{
@@ -5406,6 +5408,11 @@
   .qa-edit{ display:flex; align-items:center; justify-content:center; gap:4px; margin:0 8px 8px; font-size:13px; }
   .qa-edit select{ padding:4px 2px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--text); font-size:14px; font-variant-numeric:tabular-nums; }
   .qa-edit button{ margin-left:6px; border:none; background:none; color:var(--accent); font-weight:700; font-size:13px; cursor:pointer; }
+  /* 시간 고치기: "12:00" 한 칸 + 옆에 5분씩 빼고 더하는 버튼 (숫자를 누르면 휠) */
+  .qa-edit .qa-tpick{ display:inline-flex; align-items:center; gap:3px; }
+  .qa-edit .qa-tpick button{ margin:0; }
+  .qa-edit .qa-tstep{ width:26px; height:26px; padding:0; border:1px solid var(--line); border-radius:50%; background:var(--surface); color:var(--text); font-size:15px; font-weight:600; line-height:1; display:inline-flex; align-items:center; justify-content:center; }
+  .qa-edit .qa-tval{ min-width:50px; padding:4px 6px; border:1px solid var(--line); border-radius:6px; background:var(--surface); color:var(--text); font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
   .qa-tabs{ display:flex; gap:6px; overflow-x:auto; margin:0 -2px 4px; padding:2px; scrollbar-width:none; }
   .qa-tabs::-webkit-scrollbar{ display:none; }
   .qa-tab{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text-dim); font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer; white-space:nowrap; }
@@ -17747,12 +17754,49 @@ function formAvailDefault(dk){
   const dow = parseDateInputValue(dk).getDay();
   return { ...QUICK_AVAIL_GROUPS.find(g => g.dows.includes(dow)).def };
 }
+// 막대 시간 고치기 칸: "12:00" 한 칸(누르면 휠) + 옆에 5분씩 빼고 더하는 버튼. p는 'fa'(일정 만들기) 또는 'qa'(빠른 설정)
+function availTimeEditHtml(p, key, r){
+  const side = (k, v) => `<span class="qa-tpick"><button type="button" class="qa-tstep" data-${p}-step="${k}|-1" aria-label="5분 빼기">−</button><button type="button" class="qa-tval" data-${p}-wheel="${k}">${minutesToLabel(v)}</button><button type="button" class="qa-tstep" data-${p}-step="${k}|1" aria-label="5분 더하기">+</button></span>`;
+  return `<div class="qa-edit" data-${p}-edit="${key}">${side('s', r.s)} – ${side('e', r.e)}<button type="button" data-${p}-edit-done>완료</button></div>`;
+}
+// 한쪽(s/e)을 v로 바꿈 - 바꾼 쪽을 기준으로 30분 이상, 앞뒤 시간과 안 겹치게 맞춤
+function availEditedRange(r, side, v, prevEnd, nextStart){
+  let s = r.s, en = r.e;
+  if(side === 's'){
+    s = Math.max(prevEnd, Math.min(nextStart - QUICK_AVAIL_MIN_LEN, v));
+    en = Math.min(nextStart, Math.max(en, s + QUICK_AVAIL_MIN_LEN));
+  } else {
+    en = Math.min(nextStart, Math.max(prevEnd + QUICK_AVAIL_MIN_LEN, Math.min(24 * 60, v)));
+    s = Math.max(prevEnd, Math.min(s, en - QUICK_AVAIL_MIN_LEN));
+  }
+  return { s, e: en };
+}
+// 시간 고치기 칸의 −/+ 와 숫자(휠) 누르기를 처리 - 처리했으면 true. apply(side, 새 값)
+function handleAvailTimeEditClick(e, p, r, apply){
+  const step = e.target.closest(`[data-${p}-step]`);
+  if(step){
+    const [side, dir] = step.getAttribute(`data-${p}-step`).split('|');
+    const cur = side === 's' ? r.s : r.e;
+    // 5분 칸에 안 맞아 있으면 먼저 가까운 5분 칸으로
+    const next = Number(dir) > 0 ? Math.floor(cur / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP + QUICK_AVAIL_STEP : Math.ceil(cur / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP - QUICK_AVAIL_STEP;
+    hapticTick();
+    apply(side, Math.max(0, Math.min(24 * 60, next)));
+    return true;
+  }
+  const wheel = e.target.closest(`[data-${p}-wheel]`);
+  if(wheel){
+    const side = wheel.getAttribute(`data-${p}-wheel`);
+    const values = [];
+    for(let m = side === 's' ? 0 : QUICK_AVAIL_STEP; m <= (side === 's' ? 24 * 60 - QUICK_AVAIL_STEP : 24 * 60); m += QUICK_AVAIL_STEP) values.push(m);
+    openWheelPicker({ title: side === 's' ? '시작 시간' : '끝 시간', values, value: side === 's' ? r.s : r.e, onPick: v => apply(side, v) });
+    return true;
+  }
+  return false;
+}
 function formAvailEditHtml(dk, idx){
   const r = (formAvailRanges[dk] || [])[idx];
   if(!r) return '';
-  const hourSel = (f, v, max) => `<select data-fa-edit-f="${f}">${Array.from({ length: max + 1 }, (_, h) => `<option value="${h}"${h === v ? ' selected' : ''}>${String(h).padStart(2, '0')}</option>`).join('')}</select>`;
-  const minSel = (f, v) => `<select data-fa-edit-f="${f}">${Array.from({ length: 60 / QUICK_AVAIL_STEP }, (_, k) => k * QUICK_AVAIL_STEP).map(m => `<option value="${m}"${m === v ? ' selected' : ''}>${String(m).padStart(2, '0')}</option>`).join('')}</select>`;
-  return `<div class="qa-edit" data-fa-edit="${dk}|${idx}">${hourSel('sh', Math.floor(r.s / 60), 23)}:${minSel('sm', r.s % 60)} – ${hourSel('eh', Math.floor(r.e / 60), 24)}:${minSel('em', r.e % 60)}<button type="button" data-fa-edit-done>완료</button></div>`;
+  return availTimeEditHtml('fa', `${dk}|${idx}`, r);
 }
 function renderFormAvailBars(){
   const days = formAvailWeekDays();
@@ -17875,33 +17919,21 @@ document.getElementById('formAvailRows').addEventListener('click', (e) => {
     renderFormAvailBars();
     return;
   }
-  if(e.target.closest('[data-fa-edit-done]')){ formAvailEdit = null; renderFormAvailBars(); }
-});
-// 5분 단위 시간 고르기 - 바꾼 쪽을 기준으로 30분 이상, 앞뒤 시간과 안 겹치게 맞춤
-document.getElementById('formAvailRows').addEventListener('change', (e) => {
-  const f = e.target.dataset && e.target.dataset.faEditF;
-  if(!f) return;
   const panel = e.target.closest('[data-fa-edit]');
-  const [dk, idxStr] = panel.dataset.faEdit.split('|');
-  const idx = Number(idxStr);
-  const val = k => Number(panel.querySelector(`[data-fa-edit-f="${k}"]`).value);
-  const ranges = quickCloneRanges(formAvailRanges[dk]);
-  const r = ranges[idx];
-  if(!r) return;
-  const { lo: prevEnd, hi: nextStart } = formAvailBounds(dk, ranges, idx, 0, 24 * 60);
-  let s = val('sh') * 60 + val('sm');
-  let en = Math.min(24 * 60, val('eh') * 60 + val('em'));
-  if(f === 'sh' || f === 'sm'){
-    s = Math.max(prevEnd, Math.min(nextStart - QUICK_AVAIL_MIN_LEN, s));
-    en = Math.min(nextStart, Math.max(en, s + QUICK_AVAIL_MIN_LEN));
-  } else {
-    en = Math.min(nextStart, Math.max(prevEnd + QUICK_AVAIL_MIN_LEN, en));
-    s = Math.max(prevEnd, Math.min(s, en - QUICK_AVAIL_MIN_LEN));
+  if(panel){
+    const [dk, idxStr] = panel.dataset.faEdit.split('|');
+    const idx = Number(idxStr);
+    const cur = (formAvailRanges[dk] || [])[idx];
+    if(cur && handleAvailTimeEditClick(e, 'fa', cur, (side, v) => {
+      const ranges = quickCloneRanges(formAvailRanges[dk]);
+      if(!ranges[idx]) return;
+      const { lo, hi } = formAvailBounds(dk, ranges, idx, 0, 24 * 60);
+      ranges[idx] = availEditedRange(ranges[idx], side, v, lo, hi);
+      formAvailRanges[dk] = ranges;
+      renderFormAvailBars();
+    })) return;
   }
-  r.s = s;
-  r.e = en;
-  formAvailRanges[dk] = ranges;
-  renderFormAvailBars();
+  if(e.target.closest('[data-fa-edit-done]')){ formAvailEdit = null; renderFormAvailBars(); }
 });
 function formAvailMinAt(track, clientX){
   const rect = track.getBoundingClientRect();
@@ -21631,30 +21663,14 @@ document.getElementById('timeWheelPopup').addEventListener('click', (e) => {
   if(e.target.id === 'timeWheelPopup') closeTimeWheel();
 });
 
-// select 하나를 휠로 고름 - 시·분이 따로 있는 칸(sh/sm, eh/em)은 둘을 묶어 한 휠로, 값이 하루 중 분인 칸은 시·분 휠로, 나머지는 한 줄 휠로
-const TIME_WHEEL_INLINE = '[data-fa-edit-f], [data-qa-edit-f], [data-qa-range-f], .inv-fine-sel, #invStartHour, #invEndHour';
+// select 하나를 휠로 고름 - 값이 하루 중 분인 칸은 시·분 휠로, 나머지는 한 줄 휠로
+const TIME_WHEEL_INLINE = '[data-qa-range-f], .inv-fine-sel, #invStartHour, #invEndHour';
 function openWheelForSelect(select){
   if(!select) return;
-  const pick = (v, changed) => {
-    (changed || select).dispatchEvent(new Event('change', { bubbles: true }));
+  const pick = () => {
+    select.dispatchEvent(new Event('change', { bubbles: true }));
     if(select.id) refreshSelectDisplay(select.id);
   };
-  const pairKey = select.dataset.faEditF ? 'faEditF' : select.dataset.qaEditF ? 'qaEditF' : null;
-  if(pairKey){
-    const attr = pairKey === 'faEditF' ? 'data-fa-edit-f' : 'data-qa-edit-f';
-    const panel = select.parentElement;
-    const side = select.dataset[pairKey][0];
-    const hSel = panel.querySelector(`[${attr}="${side}h"]`), mSel = panel.querySelector(`[${attr}="${side}m"]`);
-    const hours = Array.from(hSel.options).map(o => Number(o.value));
-    const mins = Array.from(mSel.options).map(o => Number(o.value));
-    const values = hours.flatMap(h => mins.map(m => h * 60 + m)).filter(v => v <= 24 * 60);
-    openWheelPicker({ title: side === 's' ? '시작 시간' : '끝 시간', values, value: Number(hSel.value) * 60 + Number(mSel.value), onPick: v => {
-      hSel.value = String(Math.floor(v / 60));
-      mSel.value = String(v % 60);
-      pick(v, select);
-    } });
-    return;
-  }
   const opts = Array.from(select.options);
   const title = TIME_WHEEL_TITLES[select.id] || select.getAttribute('aria-label') || (select.dataset.qaRangeF === 's' ? '보이는 시간 시작' : select.dataset.qaRangeF === 'e' ? '보이는 시간 끝' : '');
   if(select.id === 'friendReserveStartSelect' || select.id === 'friendReserveEndSelect' || select.classList.contains('inv-fine-sel')){
@@ -29406,6 +29422,7 @@ const QUICK_AXIS_PREF_KEY = 'catchme_quick_axis';
 let quickAvailBusy = {}; // 요일 -> 정한 기간 동안 그 요일에 있는 내 일정 [{s, e, soft, items}] - 막대 위에 회색/점선으로 보여줌
 let quickAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dow, min }
 let quickAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dow, idx }
+let quickAvailStash = {}; // '탭|요일' -> 요일 버튼으로 껐던 시간 (다시 켜면 이걸로)
 // 대상별 탭 - 모든 친구 / 그룹마다 / 업무용. 탭마다 { initial, pattern }을 따로 들고 있고,
 // 지금 보는 탭의 것을 quickAvailPattern/quickAvailInitial로 가리킴
 let quickAvailTabs = {};
@@ -29607,6 +29624,7 @@ function openQuickAvail(){
   quickAvailBusy = quickAvailBusyPattern();
   quickAvailInfo = null;
   quickAvailEdit = null;
+  quickAvailStash = {};
   quickAvailRangeOpen = false;
   quickAvailAxisPref = null;
   try {
@@ -30162,9 +30180,7 @@ function quickAvailInfoHtml(dow, min){
 function quickAvailEditHtml(dow, idx){
   const r = quickAvailPattern[dow][idx];
   if(!r) return '';
-  const hourSel = (f, v, max) => `<select data-qa-edit-f="${f}">${Array.from({ length: max + 1 }, (_, h) => `<option value="${h}"${h === v ? ' selected' : ''}>${String(h).padStart(2, '0')}</option>`).join('')}</select>`;
-  const minSel = (f, v) => `<select data-qa-edit-f="${f}">${Array.from({ length: 60 / QUICK_AVAIL_STEP }, (_, k) => k * QUICK_AVAIL_STEP).map(m => `<option value="${m}"${m === v ? ' selected' : ''}>${String(m).padStart(2, '0')}</option>`).join('')}</select>`;
-  return `<div class="qa-edit" data-qa-edit="${dow}|${idx}">${hourSel('sh', Math.floor(r.s / 60), 23)}:${minSel('sm', r.s % 60)} – ${hourSel('eh', Math.floor(r.e / 60), 24)}:${minSel('em', r.e % 60)}<button type="button" data-qa-edit-done>완료</button></div>`;
+  return availTimeEditHtml('qa', `${dow}|${idx}`, r);
 }
 // 내 일정·이미 열어둔 시간이 있는 범위에 앞뒤 1시간 여유를 두고 맞춤 (최소 12시간). 아무것도 없으면 0~24시 전부
 function quickAxisFit(){
@@ -30337,9 +30353,19 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   }
   const tg = e.target.closest('[data-qa-toggle]');
   if(tg){
-    // 요일 버튼은 끄기만 함 - 켜는 건 막대에서 시간을 골라야 (아무 시간이나 저절로 들어가지 않게)
+    // 요일 버튼으로 켜고 끔 - 켜면 마지막에 껐던 시간(없으면 평일 18–22시·주말 14–18시)에서 내 일정 빼고 넣음
     const row = quickAvailRow(tg.dataset.qaToggle);
-    if(!quickAvailPattern[row.dows[0]].length){ showToast('막대에서 열 시간을 눌러 골라 주세요.'); return; }
+    const dow = row.dows[0];
+    const stashKey = `${quickAvailTab}|${dow}`;
+    if(!quickAvailPattern[dow].length){
+      const want = quickCloneRanges(quickAvailStash[stashKey] || [row.def]);
+      const fit = subtractMinuteRanges(want, quickWallBusy(dow)).filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN).sort((a, b) => a.s - b.s);
+      quickAvailInfo = null;
+      if(fit.length){ setQuickRowRanges(row, fit); renderQuickAvail(); }
+      else quickAvailAddRange(row); // 그 시간이 일정으로 꽉 차 있으면 가장 넓은 빈 곳에
+      return;
+    }
+    quickAvailStash[stashKey] = quickCloneRanges(quickAvailPattern[dow]);
     setQuickRowRanges(row, []);
     if(quickAvailEdit && quickAvailEdit.dow === row.dows[0]) quickAvailEdit = null;
     renderQuickAvail();
@@ -30352,7 +30378,9 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     const [key, idx] = del.dataset.qaDel.split('|');
     const row = quickAvailRow(key);
     const cur = quickAvailPattern[row.dows[0]];
-    setQuickRowRanges(row, cur.filter((_, i) => i !== Number(idx)));
+    const left = cur.filter((_, i) => i !== Number(idx));
+    if(!left.length) quickAvailStash[`${quickAvailTab}|${row.dows[0]}`] = quickCloneRanges(cur); // 다시 켜면 방금 뺀 시간으로
+    setQuickRowRanges(row, left);
     hapticImpact('MEDIUM');
     quickAvailEdit = null;
     renderQuickAvail();
@@ -30366,9 +30394,21 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     renderQuickAvail();
     return;
   }
+  const editPanel = e.target.closest('[data-qa-edit]');
+  if(editPanel){
+    const [dow, idx] = editPanel.dataset.qaEdit.split('|').map(Number);
+    const cur = (quickAvailPattern[dow] || [])[idx];
+    if(cur && handleAvailTimeEditClick(e, 'qa', cur, (side, v) => {
+      const ranges = quickCloneRanges(quickAvailPattern[dow]);
+      if(!ranges[idx]) return;
+      const { lo, hi } = quickBounds(dow, ranges, idx, 0, 24 * 60);
+      ranges[idx] = availEditedRange(ranges[idx], side, v, lo, hi);
+      quickAvailPattern[dow] = ranges;
+      renderQuickAvail(); // 보이는 범위 밖 시간을 고르면 renderQuickAvail에서 범위를 넓힘
+    })) return;
+  }
   if(e.target.closest('[data-qa-edit-done]')){ quickAvailEdit = null; renderQuickAvail(); }
 });
-// 5분 단위 시간 고르기 - 바꾼 쪽을 기준으로 30분 이상, 앞뒤 시간과 안 겹치게 맞춤
 document.getElementById('quickAvailRows').addEventListener('change', (e) => {
   // 보이는 시간 범위 - 최소 6시간, 바꾼 쪽을 기준으로 다른 쪽을 맞춤. 다음에 열 때도 이 범위로 보여줌
   const rf = e.target.dataset && e.target.dataset.qaRangeF;
@@ -30384,28 +30424,6 @@ document.getElementById('quickAvailRows').addEventListener('change', (e) => {
     renderQuickAvail();
     return;
   }
-  const f = e.target.dataset && e.target.dataset.qaEditF;
-  if(!f) return;
-  const panel = e.target.closest('[data-qa-edit]');
-  const [dow, idx] = panel.dataset.qaEdit.split('|').map(Number);
-  const val = k => Number(panel.querySelector(`[data-qa-edit-f="${k}"]`).value);
-  const ranges = quickCloneRanges(quickAvailPattern[dow]);
-  const r = ranges[idx];
-  if(!r) return;
-  const { lo: prevEnd, hi: nextStart } = quickBounds(dow, ranges, idx, 0, 24 * 60);
-  let s = val('sh') * 60 + val('sm');
-  let en = Math.min(24 * 60, val('eh') * 60 + val('em'));
-  if(f === 'sh' || f === 'sm'){
-    s = Math.max(prevEnd, Math.min(nextStart - QUICK_AVAIL_MIN_LEN, s));
-    en = Math.min(nextStart, Math.max(en, s + QUICK_AVAIL_MIN_LEN));
-  } else {
-    en = Math.min(nextStart, Math.max(prevEnd + QUICK_AVAIL_MIN_LEN, en));
-    s = Math.max(prevEnd, Math.min(s, en - QUICK_AVAIL_MIN_LEN));
-  }
-  r.s = s;
-  r.e = en;
-  quickAvailPattern[dow] = ranges;
-  renderQuickAvail(); // 보이는 범위 밖 시간을 고르면 renderQuickAvail에서 범위를 넓힘
 });
 // 막대 끌기 - 양 끝을 끌면 시작/끝 시간, 가운데를 끌면 통째로 옮김. 빈 곳을 톡 누르면 거기에 시간을 넣고,
 // 회색/점선(내 일정) 위를 톡 누르면 무슨 일정인지 보여줌. 막대를 톡 누르면 5분 단위로 고르는 칸이 열림
