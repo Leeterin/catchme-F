@@ -14269,9 +14269,11 @@ function renderFeedPlaceCreateInfo(picked){
 // 제목(상호명) 입력창에 타이핑하면 카카오 장소 검색 결과를 보여주고, 고르면 지도에 표시 + 좌표/주소/전화/위치 자동입력
 let feedPlaceSearchTimer = null;
 let feedPlaceSearchToken = 0;
-function searchFeedPlaceKakao(query){
+// near가 있으면 그 좌표 주변(radius m)에서만 찾음
+function searchFeedPlaceKakao(query, near, radius){
   return new Promise(resolve => {
     ensureKakaoMapsLoaded(() => {
+      const opts = near ? { location: new kakao.maps.LatLng(near.lat, near.lon), radius: radius || 500 } : {};
       new kakao.maps.services.Places().keywordSearch(query, (res, status) => {
         if(status !== kakao.maps.services.Status.OK || !res) return resolve([]);
         resolve(res.map(r => ({
@@ -14279,7 +14281,7 @@ function searchFeedPlaceKakao(query){
           phone: r.phone || null, lat: parseFloat(r.y), lon: parseFloat(r.x), source: 'kakao',
           autoCategory: feedCategoryFromKakao(r),
         })));
-      });
+      }, opts);
     });
   });
 }
@@ -14297,14 +14299,39 @@ async function searchFeedPlaceNaver(query){
     return [];
   }
 }
-// 카카오 결과를 먼저 두고, 카카오에 없는 네이버 결과(새로 생긴 가게 등)만 뒤에 붙임
-function mergeFeedPlaceResults(kakaoList, naverList){
-  const norm = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+const normPlaceName = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+function isSameFeedPlace(k, n){
+  if(normPlaceName(k.name) === normPlaceName(n.name)) return true;
+  if(typeof n.lat !== 'number' || typeof k.lat !== 'number') return false;
+  // 지점명 표기가 달라도(예: "위례 중앙점" / "위례중앙점") 상호 첫 단어가 같고 바로 옆이면 같은 가게
+  const brand = normPlaceName(String(n.name).trim().split(/\s+/)[0]);
+  return distanceKm(k.lat, k.lon, n.lat, n.lon) < 0.15 && brand.length >= 2 && normPlaceName(k.name).includes(brand);
+}
+// 카카오 키워드 검색은 카카오맵 앱보다 엄격해서(띄어쓰기/오타) 실제로 있는 가게를 놓칠 때가 있음.
+// 띄어쓰기 뺀 검색어로도 찾고, 네이버에서만 찾은 가게는 그 위치 주변에서 카카오를 다시 찾아 카카오 정보로 바꿔 줌
+async function searchFeedPlaces(val){
+  const compact = val.replace(/\s+/g, '');
+  const [kakaoA, kakaoB, naverList] = await Promise.all([
+    searchFeedPlaceKakao(val),
+    compact !== val ? searchFeedPlaceKakao(compact) : Promise.resolve([]),
+    searchFeedPlaceNaver(val),
+  ]);
+  const kakaoList = [];
+  kakaoA.concat(kakaoB).forEach(k => {
+    if(!kakaoList.some(x => normPlaceName(x.name) === normPlaceName(k.name) && x.address === k.address)) kakaoList.push(k);
+  });
+  const naverOnly = naverList.filter(n => !kakaoList.some(k => isSameFeedPlace(k, n)));
+  const resolved = await Promise.all(naverOnly.map(async n => {
+    if(typeof n.lat !== 'number' || typeof n.lon !== 'number') return n;
+    const near = { lat: n.lat, lon: n.lon };
+    const brand = String(n.name).trim().split(/\s+/)[0];
+    let found = (await searchFeedPlaceKakao(normPlaceName(n.name), near, 300)).find(k => isSameFeedPlace(k, n));
+    if(!found && brand.length >= 2) found = (await searchFeedPlaceKakao(brand, near, 300)).find(k => isSameFeedPlace(k, n));
+    return found || n;
+  }));
   const merged = kakaoList.slice(0, 6);
-  naverList.forEach(n => {
-    const dup = kakaoList.some(k => norm(k.name) === norm(n.name) ||
-      (typeof n.lat === 'number' && distanceKm(k.lat, k.lon, n.lat, n.lon) < 0.05 && (norm(k.name).includes(norm(n.name)) || norm(n.name).includes(norm(k.name)))));
-    if(!dup) merged.push(n);
+  resolved.forEach(r => {
+    if(!merged.some(m => isSameFeedPlace(m, r))) merged.push(r);
   });
   return merged.slice(0, 10);
 }
@@ -14321,10 +14348,9 @@ document.getElementById('feedPlaceInput').addEventListener('input', () => {
     return;
   }
   feedPlaceSearchTimer = setTimeout(async () => {
-    // 카카오에 아직 안 올라온 새로 생긴 가게도 찾을 수 있게, 네이버 지역 검색 결과도 같이 받아서 합침
-    const [kakaoList, naverList] = await Promise.all([searchFeedPlaceKakao(val), searchFeedPlaceNaver(val)]);
+    // 카카오에 아직 안 올라온 새로 생긴 가게도 찾을 수 있게, 네이버 지역 검색 결과도 같이 받아서 합침 (searchFeedPlaces)
+    const results = await searchFeedPlaces(val);
     if(token !== feedPlaceSearchToken) return; // 그 사이 더 타이핑했으면 무시
-    const results = mergeFeedPlaceResults(kakaoList, naverList);
     if(results.length === 0){
       resultsBox.style.display = 'none';
       return;
