@@ -4674,6 +4674,9 @@
   .my-own-tag{ display:inline-block; margin-right:6px; padding:1px 6px; border-radius:6px; font-size:10.5px; font-weight:700; background:var(--surface-2); color:var(--text-dim); border:1px solid var(--line); vertical-align:1px; }
   .day-event-overlap{ margin-top:5px; font-size:11.5px; font-weight:600; color:#B45309; }
   /* 친구 캘린더 일정 카드의 "물어보기" - 그 일정 정보를 채팅 입력칸에 미리 넣어줌 */
+  .friend-block-pop{ position:fixed; z-index:2900; min-width:180px; max-width:260px; padding:10px 12px; border-radius:12px; background:var(--surface); color:var(--text); box-shadow:0 6px 24px rgba(0,0,0,.18); border:1px solid var(--line); }
+  .friend-block-pop .fbp-time{ font-size:12px; opacity:.7; }
+  .friend-block-pop .fbp-title{ font-size:14px; font-weight:700; margin-top:2px; word-break:break-all; }
   .day-event-ask-btn{ margin-top:7px; padding:5px 10px; border:1px solid var(--accent); border-radius:999px; background:transparent; color:var(--accent); font-size:12px; font-weight:700; cursor:pointer; }
   .day-event-card.pending-hold{
     background:#FEF9C3;
@@ -20378,6 +20381,7 @@ let reserveOpenedFromMatching = null; // 캘린더 매칭에서 바로 예약 �
 function closeFriendCalendar(){
   document.getElementById('friendCalendarView').classList.remove('active');
   calendarOpenedFromChat = null;
+  closeFriendBlockAskPopover();
   // 독립 오버레이라서 그냥 닫기만 하면, 밑에 있던 화면(친구 프로필이든 채팅방이든)이 그대로 보임 - 따로 다시 열어줄 필요 없음
 }
 
@@ -20683,10 +20687,10 @@ function renderFriendWeek(){
           block.addEventListener('click', () => openFriendReserve(new Date(d), b.startHour));
         }
       } else if(!b.isBookable && friendCalendarMode !== 'reserve'){
-        // 친구 일정 블록을 누르면 그 일정을 채팅으로 물어볼 수 있게
+        // 친구 일정 블록을 누르면 '친구한테 물어보기' 버튼이 있는 작은 팝업을 띄움
         block.style.cursor = 'pointer';
         block.style.opacity = '0.7';
-        block.addEventListener('click', () => askFriendAboutSchedule(friend, new Date(d), b));
+        block.addEventListener('click', (e) => { e.stopPropagation(); showFriendBlockAskPopover(block, friend, new Date(d), b); });
       } else {
         block.style.cursor = 'default';
         block.style.opacity = '0.7';
@@ -20823,6 +20827,50 @@ function renderFriendMonthView(){
   renderFriendMonthSelectedPanel(monthData);
 }
 
+// 주간 보기에서 친구 일정 블록을 눌렀을 때 뜨는 작은 팝업 (바로 채팅으로 넘어가지 않게)
+let friendBlockPopOutsideHandler = null;
+function closeFriendBlockAskPopover(){
+  const pop = document.getElementById('friendBlockAskPop');
+  if(pop) pop.remove();
+  if(friendBlockPopOutsideHandler){
+    document.removeEventListener('click', friendBlockPopOutsideHandler, true);
+    friendBlockPopOutsideHandler = null;
+  }
+}
+function showFriendBlockAskPopover(anchorEl, friend, dateObj, block){
+  closeFriendBlockAskPopover();
+  const label = block.title || '일정';
+  const pop = document.createElement('div');
+  pop.id = 'friendBlockAskPop';
+  pop.className = 'friend-block-pop';
+  pop.innerHTML = `
+    <div class="fbp-time">${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${WEEKDAY_KO[dateObj.getDay()]}) ${String(block.startHour).padStart(2,'0')}:00-${String(block.endHour).padStart(2,'0')}:00</div>
+    <div class="fbp-title">${escapeHtml(label)}</div>
+    <button type="button" class="day-event-ask-btn">💬 친구한테 물어보기</button>`;
+  document.body.appendChild(pop);
+  pop.querySelector('.day-event-ask-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeFriendBlockAskPopover();
+    askFriendAboutSchedule(friend, dateObj, block);
+  });
+  // 블록 바로 아래(공간이 없으면 위)에, 화면 밖으로 안 나가게 배치
+  const r = anchorEl.getBoundingClientRect();
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = Math.min(Math.max(8, r.left + r.width / 2 - pw / 2), window.innerWidth - pw - 8);
+  let top = r.bottom + 6;
+  if(top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  // 팝업 바깥을 누르거나 스크롤하면 닫힘
+  setTimeout(() => {
+    if(!pop.isConnected) return;
+    friendBlockPopOutsideHandler = (e) => { if(!pop.contains(e.target)) closeFriendBlockAskPopover(); };
+    document.addEventListener('click', friendBlockPopOutsideHandler, true);
+  }, 0);
+  const grid = document.getElementById('friendWeekGrid');
+  if(grid) grid.addEventListener('scroll', closeFriendBlockAskPopover, { once: true, capture: true });
+}
+
 function renderFriendMonthSelectedPanel(monthData){
   const panel = document.getElementById('friendMonthSelectedPanel');
   const dayInfo = monthData.days[friendMonthSelectedDate.getDate() - 1];
@@ -20835,15 +20883,17 @@ function renderFriendMonthSelectedPanel(monthData){
   if(friendCalendarMode === 'reserve'){
     // 예약하기 모드에서는 날짜 전체가 지났든, 오늘이어도 그 시간이 이미 지났든 아예 목록에서 빼버림
     blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(friendMonthSelectedDate, b));
-  } else if(isPast){
-    blocks = blocks.map(b => ({ ...b, isBookable: false })); // 캘린더 구경 모드에서는 지난 날짜 일정도 보여주되 클릭(예약)은 못 하게
+  } else {
+    blocks = blocks.map(b => ({ ...b, askable: !b.isBookable })); // 예약 가능 시간 말고 친구 일정에만 '물어보기' 버튼
+    if(isPast) blocks = blocks.map(b => ({ ...b, isBookable: false })); // 캘린더 구경 모드에서는 지난 날짜 일정도 보여주되 클릭(예약)은 못 하게
   }
 
-  const cardsHtml = blocks.map(b => {
+  const cardsHtml = blocks.map((b, i) => {
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
     return `<div class="day-event-card friend-view${b.isBookable ? ' available clickable' : ''}" data-hour="${b.startHour}">
       <div class="day-event-time">${String(b.startHour).padStart(2,'0')}:00-${String(b.endHour).padStart(2,'0')}:00</div>
       <div class="day-event-title">${label}</div>
+      ${b.askable ? `<button type="button" class="day-event-ask-btn" data-idx="${i}">💬 친구한테 물어보기</button>` : ''}
     </div>`;
   }).join('');
 
@@ -20859,6 +20909,13 @@ function renderFriendMonthSelectedPanel(monthData){
     } else {
       card.addEventListener('click', () => openFriendReserve(new Date(friendMonthSelectedDate), hour));
     }
+  });
+  const friend = FRIENDS.find(f => f.id === activeFriendCalendarId);
+  panel.querySelectorAll('.day-event-ask-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      askFriendAboutSchedule(friend, new Date(friendMonthSelectedDate), blocks[parseInt(btn.dataset.idx, 10)]);
+    });
   });
 }
 
