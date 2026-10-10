@@ -4818,9 +4818,11 @@
   .day-memo-card{
     display:flex; align-items:flex-start; gap:8px;
     background:#FEF3C7; border:1px solid #FCD34D; border-radius:13px;
-    padding:11px 14px; margin-bottom:10px; cursor:pointer;
+    padding:11px 14px; margin-bottom:10px;
     font-size:13px; line-height:1.45; color:#78350F;
   }
+  .day-memo-actions{ display:flex; gap:2px; flex-shrink:0; margin:-4px -6px -4px 0; }
+  .day-memo-actions .day-event-edit, .day-memo-actions .day-event-delete{ color:inherit; opacity:0.7; }
   .day-memo-card .day-memo-text{ flex:1; min-width:0; white-space:pre-wrap; word-break:break-word; }
   body.dark-mode .day-memo-card{ background:rgba(252,211,77,0.14); border-color:rgba(252,211,77,0.45); color:#FDE68A; }
   .memo-textarea{ resize:none; min-height:84px; font-family:inherit; line-height:1.45; }
@@ -6788,8 +6790,7 @@
     width:80px;
   }
   .month-memo-label{ background:#FDE68A; color:#78350F; }
-  .month-memo-row{ cursor:pointer; }
-  .month-memo-icon{ flex-shrink:0; font-size:12px; }
+    .month-memo-icon{ flex-shrink:0; font-size:12px; }
   .memo-check{ color:#111; display:inline-flex; align-items:center; vertical-align:-0.15em; margin-right:3px; flex-shrink:0; }
   .memo-check svg{ width:1.15em; height:1.15em; display:block; }
   body.dark-mode .day-memo-card .memo-check, body.dark-mode .month-memo-row .memo-check{ color:#FDE68A; }
@@ -16278,8 +16279,13 @@ function renderDayView(){
   memos.forEach(memo => {
     const memoCard = document.createElement('div');
     memoCard.className = 'day-memo-card';
-    memoCard.innerHTML = `<span class="memo-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="day-memo-text">${escapeHtml(memo.text)}</span>`;
-    memoCard.addEventListener('click', () => openMemoForm(memo));
+    memoCard.innerHTML = `<span class="memo-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="day-memo-text">${escapeHtml(memo.text)}</span>
+      <span class="day-memo-actions">
+        <button class="day-event-edit" title="메모 수정" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="day-event-delete" title="더블클릭하면 삭제돼요" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+      </span>`;
+    memoCard.querySelector('.day-event-edit').addEventListener('click', () => openMemoForm(memo));
+    memoCard.querySelector('.day-event-delete').addEventListener('dblclick', () => deleteMemo(memo));
     list.appendChild(memoCard);
   });
 
@@ -18354,14 +18360,20 @@ document.getElementById('visibilityPicker').addEventListener('click', (e) => {
   renderVisibilityPicker();
 });
 
+// 메모 지우기 - 폼의 "메모 삭제"와 하루/한달 목록의 휴지통 버튼이 같이 씀
+function deleteMemo(memo){
+  const i = DAY_MEMOS.indexOf(memo);
+  if(i < 0) return;
+  DAY_MEMOS.splice(i, 1);
+  syncMemoDeleteToServer(memo);
+  refreshActiveScheduleView();
+  showToast('메모를 삭제했어요.');
+}
 document.getElementById('eventFormMemoDeleteBtn').addEventListener('click', () => {
   const memo = DAY_MEMOS.find(m => m.id === editingMemoId);
   if(!memo) return;
-  DAY_MEMOS.splice(DAY_MEMOS.indexOf(memo), 1);
-  syncMemoDeleteToServer(memo);
   dismissView(closeEventForm);
-  refreshActiveScheduleView();
-  showToast('메모를 삭제했어요.');
+  deleteMemo(memo);
 });
 document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
   if(formEventType === 'memo'){ submitMemoForm(); return; }
@@ -19785,7 +19797,11 @@ function renderMonthSelectedPanel(){
   const memoRowsHtml = selMemos.map(memo => `
         <div class="month-selected-row month-memo-row" data-memo="${memo.id}">
           <span class="month-memo-icon memo-check"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-          <span class="month-selected-text">${escapeHtml(memo.text)}</span>
+          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(memo.text)}</span></span>
+          <span class="month-selected-row-actions">
+            <button class="month-selected-edit" title="메모 수정" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+            <button class="month-selected-delete" title="더블클릭하면 삭제돼요" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
+          </span>
         </div>`).join('');
   const rowsHtml = memoRowsHtml + (events.length === 0
     ? (selMemos.length ? '' : `<div class="month-selected-empty">등록된 일정이 없어요.</div>`)
@@ -19818,11 +19834,13 @@ function renderMonthSelectedPanel(){
   `;
 
   panel.querySelectorAll('.month-memo-row').forEach(row => {
-    row.addEventListener('click', () => {
-      const memo = DAY_MEMOS.find(m => m.id === row.dataset.memo);
+    const memo = DAY_MEMOS.find(m => m.id === row.dataset.memo);
+    if(!memo) return;
+    row.querySelector('.month-selected-edit').addEventListener('click', () => {
       scheduleFocusDate = new Date(monthSelectedDate);
-      if(memo) openMemoForm(memo);
+      openMemoForm(memo);
     });
+    row.querySelector('.month-selected-delete').addEventListener('dblclick', () => deleteMemo(memo));
   });
   panel.querySelectorAll('.month-selected-row.clickable').forEach(row => {
     row.addEventListener('click', (e) => {
@@ -19831,7 +19849,7 @@ function renderMonthSelectedPanel(){
     });
   });
 
-  panel.querySelectorAll('.month-selected-edit').forEach(btn => {
+  panel.querySelectorAll('.month-selected-row:not(.month-memo-row) .month-selected-edit').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const evId = btn.closest('.month-selected-row').dataset.ev;
@@ -19841,7 +19859,7 @@ function renderMonthSelectedPanel(){
       if(ev) openEventForm(ev);
     });
   });
-  panel.querySelectorAll('.month-selected-delete').forEach(btn => {
+  panel.querySelectorAll('.month-selected-row:not(.month-memo-row) .month-selected-delete').forEach(btn => {
     btn.addEventListener('click', (e) => e.stopPropagation()); // 더블클릭이 완성될 때까지 팝오버/부모 클릭이 끼어들지 않게 함
     btn.addEventListener('dblclick', (e) => {
       e.stopPropagation();
