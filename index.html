@@ -12998,7 +12998,7 @@ function classifyReviewPlace(c, cb){
         const group = r.category_group_code || '';
         const catName = String(r.category_name || '');
         if(NON_STORE_GROUPS.includes(group) || NON_STORE_CATEGORY_PREFIX.some(p => catName.startsWith(p)) || !catName){ finish(null); return; }
-        const category = group === 'CE7' ? 'cafe' : (group === 'FD6' ? 'food' : 'experience');
+        const category = classifyPlaceCategory(group, catName) || 'experience';
         finish({
           category,
           kind: catName.split('>').pop().trim(),
@@ -14104,14 +14104,32 @@ function selectFeedCreateCategory(cat){
   setFeedCreateCategoryChips(cat, false);
   document.getElementById('feedCreateHeaderTitle').textContent = FEED_CATEGORY_LABELS[cat] + ' 추천하기';
 }
-// 카카오 장소의 분류 코드로 카테고리를 정함 (약속 후 리뷰 요청과 같은 규칙: 카페 CE7, 음식점 FD6, 관광명소/문화시설은 체험)
-// 그 밖의 코드(마트, 편의점 등)나 코드가 없으면 null - 이때는 사용자가 고른 걸 그대로 씀
-function feedCategoryFromKakao(r){
-  const group = r && r.category_group_code;
-  if(group === 'CE7') return 'cafe';
-  if(group === 'FD6') return 'food';
-  if(group === 'AT4' || group === 'CT1') return 'experience';
+// 장소 분류(카카오 분류 코드 + 세부 분류 이름, 또는 네이버 분류 문자열)로 음식점/카페/체험을 정함.
+// 카카오는 젤라또·아이스크림·베이커리 같은 디저트 가게도 "음식점 > 간식 > 아이스크림"(FD6)으로 두기 때문에
+// 분류 코드만 보면 음식점이 됨 → 세부 분류 이름을 먼저 보고 디저트/간식류는 카페로, 놀거리는 체험으로 보냄.
+// 어디에도 안 맞으면 null - 이때는 사용자가 고른 걸 그대로 씀
+const PLACE_CAFE_KEYWORDS = ['카페', '커피', '디저트', '간식', '아이스크림', '젤라또', '젤라토', '빙수', '베이커리', '제과', '도넛', '도너츠', '와플', '케이크', '케익', '마카롱', '초콜릿', '떡,한과', '찻집', '티하우스', '주스', '스무디', '버블티', '밀크티', '탕후루', '크레페', '츄러스', '호두과자'];
+const PLACE_EXPERIENCE_KEYWORDS = ['노래방', '노래연습장', '방탈출', '보드게임', '보드카페', '키즈카페', '만화', 'PC방', '피씨방', '볼링', '당구', '오락실', '게임', 'VR', '영화관', '극장', '공연', '전시', '미술관', '박물관', '갤러리', '공방', '원데이', '체험', '클라이밍', '골프', '탁구', '스케이트', '테마파크', '놀이', '동물원', '아쿠아리움', '사진관', '셀프사진', '포토', '찜질방', '관광', '명소', '공원', '문화'];
+const PLACE_CATEGORY_BY_GROUP = { FD6: 'food', CE7: 'cafe', AT4: 'experience', CT1: 'experience' };
+function classifyPlaceCategory(group, catName){
+  const parts = String(catName || '').split('>').map(x => x.trim()).filter(Boolean);
+  const detail = parts.slice(1).join(' '); // 맨 앞 큰 분류("음식점" 등)는 빼고 세부만 봄
+  const has = (list, text) => list.some(k => text.includes(k));
+  if(detail && has(PLACE_EXPERIENCE_KEYWORDS, detail)) return 'experience'; // "만화카페"가 카페로 가지 않게 체험 먼저
+  if(detail && has(PLACE_CAFE_KEYWORDS, detail)) return 'cafe';
+  if(PLACE_CATEGORY_BY_GROUP[group]) return PLACE_CATEGORY_BY_GROUP[group];
+  const top = parts[0] || '';
+  if(top.startsWith('카페')) return 'cafe';
+  if(top.startsWith('음식점')) return 'food';
+  if(has(PLACE_EXPERIENCE_KEYWORDS, top)) return 'experience';
   return null;
+}
+// 화면에 보여줄 세부 분류 (예: "아이스크림", "한식") - 분류 이름의 맨 끝
+function placeKindName(catName){
+  return String(catName || '').split('>').map(x => x.trim()).filter(Boolean).slice(-1)[0] || '';
+}
+function feedCategoryFromKakao(r){
+  return r ? classifyPlaceCategory(r.category_group_code || '', r.category_name || '') : null;
 }
 document.querySelectorAll('#feedCreateCategoryRow .feed-create-category-chip').forEach(chip => {
   chip.addEventListener('click', async () => {
@@ -14279,7 +14297,7 @@ function searchFeedPlaceKakao(query, near, radius){
         resolve(res.map(r => ({
           name: r.place_name, address: r.road_address_name || r.address_name || '',
           phone: r.phone || null, lat: parseFloat(r.y), lon: parseFloat(r.x), source: 'kakao',
-          autoCategory: feedCategoryFromKakao(r),
+          autoCategory: feedCategoryFromKakao(r), kind: placeKindName(r.category_name),
         })));
       }, opts);
     });
@@ -14293,7 +14311,7 @@ async function searchFeedPlaceNaver(query){
       name: p.name, address: p.address || '', phone: p.phone || null,
       lat: typeof p.lat === 'number' ? p.lat : null, lon: typeof p.lon === 'number' ? p.lon : null, source: 'naver',
       // 네이버 분류 예: "음식점>한식", "카페,디저트>카페"
-      autoCategory: /^카페/.test(p.category || '') ? 'cafe' : /^음식점/.test(p.category || '') ? 'food' : null,
+      autoCategory: classifyPlaceCategory('', p.category), kind: placeKindName(p.category),
     }));
   } catch(err){
     return [];
@@ -14358,7 +14376,7 @@ document.getElementById('feedPlaceInput').addEventListener('input', () => {
     resultsBox.innerHTML = results.map((r, i) => `
       <div class="location-search-result-row" data-idx="${i}">
         <div class="location-search-result-name">${escapeHtml(r.name)}${r.source === 'naver' ? ' <span style="font-size:10.5px;font-weight:700;color:#03C75A;">네이버</span>' : ''}</div>
-        <div class="location-search-result-addr">${escapeHtml(r.address || '')}</div>
+        <div class="location-search-result-addr">${r.kind ? `<b style="font-weight:600;">${escapeHtml(r.kind)}</b> · ` : ''}${escapeHtml(r.address || '')}</div>
       </div>
     `).join('');
     resultsBox.style.display = 'block';
@@ -14371,7 +14389,7 @@ document.getElementById('feedPlaceInput').addEventListener('input', () => {
         const autoCat = feedPlacePicked.kakaoCategory;
         if(feedFormMode !== 'editReview' && autoCat && autoCat !== feedCreateSelectedCategory){
           selectFeedCreateCategory(autoCat);
-          showToast(`${r.source === 'naver' ? '네이버' : '카카오'} 분류에 맞춰 '${FEED_CATEGORY_LABELS[autoCat]}'(으)로 바꿨어요.`);
+          showToast(`${r.kind ? `'${r.kind}' 가게라` : '장소 분류에 맞춰'} '${FEED_CATEGORY_LABELS[autoCat]}'(으)로 바꿨어요.`);
         }
         resultsBox.style.display = 'none';
         if(typeof r.lat === 'number' && typeof r.lon === 'number') showFeedPlaceMap(r.lat, r.lon);
@@ -24263,7 +24281,7 @@ function kakaoPlaceExtra(r, category){
   const code = r.category_group_code || '';
   return {
     kakaoPlaceId: String(r.id),
-    placeCategory: category || (code === 'FD6' ? 'food' : code === 'CE7' ? 'cafe' : (code === 'AT4' || code === 'CT1') ? 'experience' : 'etc'),
+    placeCategory: category || classifyPlaceCategory(code, r.category_name) || 'etc',
     placeCategoryDetail: String(r.category_name || '').split('>').map(x => x.trim()).filter(Boolean).slice(-1)[0] || null,
     placePhone: r.phone || null,
   };
