@@ -25997,13 +25997,11 @@ function renderPinnedSchedule(){
       goDayBtn.addEventListener('click', () => viewDayFromChat(new Date(dateObj)));
     }
 
-    // 장소를 누르면 그 장소만 다른 곳으로 변경 (다른 차수의 장소는 그대로)
+    // 장소를 누르면 카카오맵에서 그 장소를 엶 (바꾸고 싶으면 삭제 후 "+ 장소 추가")
     card.querySelectorAll('.pin-set-loc').forEach(btn => {
       btn.addEventListener('click', () => {
         const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
-        if(!placePin) return;
-        if(pinPast){ openApptLocationMap(placePin.location, placePin.locationAddress || placePin.location, placePin.locationLat, placePin.locationLon); return; }
-        changePinLocation(room, activeChatRoomId, placePin, (label, lat, lon) => openHotplaceView(label, lat, lon), { roomId: activeChatRoomId, pinned });
+        if(placePin) openPlaceInKakaoMap(placePin.location, placePin.locationAddress, placePin.locationLat, placePin.locationLon);
       });
     });
 
@@ -26032,6 +26030,15 @@ function renderPinnedSchedule(){
 
     listEl.appendChild(card);
   });
+}
+
+// 약속 장소를 카카오맵(앱이 있으면 앱, 없으면 웹)으로 엶 - 좌표가 있으면 그 위치, 없으면 주소/이름으로 검색
+function openPlaceInKakaoMap(name, address, lat, lon){
+  const label = name || address || '약속 장소';
+  const url = typeof lat === 'number' && typeof lon === 'number'
+    ? kakaoMapLinkUrl(label, lat, lon)
+    : `https://map.kakao.com/link/search/${encodeURIComponent(address || label)}`;
+  openMapUrl(url);
 }
 
 // ---------- 상단 고정 카드를 누르면 열리는 "약속 상세보기" 화면 ----------
@@ -26164,7 +26171,7 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
     const { pin: p, srcMsg } = entry;
     row.addEventListener('click', (e) => {
       if(e.target.closest('button')) return;
-      openApptLocationMap((srcMsg && srcMsg.place) || p.location, (srcMsg && srcMsg.location) || p.locationAddress || p.location, p.locationLat, p.locationLon);
+      openPlaceInKakaoMap((srcMsg && srcMsg.place) || p.location, (srcMsg && srcMsg.location) || p.locationAddress, p.locationLat, p.locationLon);
     });
     row.querySelector('.appt-place-hotplace').addEventListener('click', (e) => {
       e.stopPropagation();
