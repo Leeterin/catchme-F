@@ -16921,6 +16921,14 @@ function liftTravelSearchField(){
   const active = document.activeElement;
   const anchor = active && active.closest ? active.closest('#travelGroup, #eventPlaceGroup') : null;
   if(!scroller || !anchor) return;
+  if(anchor.id === 'eventPlaceGroup'){
+    // 장소 칸은 제자리에 두고, 키보드에 가려질 때만 가려지지 않을 만큼만 올림
+    const kbH = parseInt(view.style.getPropertyValue('--travel-kb-h'), 10) || 0;
+    const visibleBottom = Math.min(scroller.getBoundingClientRect().bottom, window.innerHeight - kbH);
+    const over = active.getBoundingClientRect().bottom + 12 - visibleBottom;
+    if(over > 0) scroller.scrollTop = scroller.scrollTop + over;
+    return;
+  }
   const delta = anchor.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 4;
   if(Math.abs(delta) > 2) scroller.scrollTop = scroller.scrollTop + delta;
 }
