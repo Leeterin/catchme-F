@@ -5346,6 +5346,10 @@
   /* 휴대폰 상단 상태바(시계·배터리)와 겹치지 않게 위아래 여유를 두고 그 안에서만 스크롤 */
   #quickAvailOverlay{ padding-top:calc(env(safe-area-inset-top, 0px) + 36px); padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 24px); }
   #quickAvailOverlay .quick-avail-card{ max-height:calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 60px); max-height:calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 60px); }
+  /* 막대 위에서 위아래로 밀면 창이 스크롤되고, 옆으로 밀 때만 막대가 움직임 */
+  #quickAvailOverlay .quick-avail-card{ -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+  #quickAvailOverlay .qa-track{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  #quickAvailOverlay .qa-bar{ touch-action:pan-y; }
   .quick-avail-desc{ font-size:12.5px; line-height:1.5; color:var(--text-dim); text-align:center; margin:0 0 12px; }
   .quick-avail-desc b{ color:var(--text); }
   /* 요일별 시간 막대 */
@@ -18042,7 +18046,8 @@ function blockLongPressLoupe(root, trackSel){
   root.addEventListener('selectstart', (e) => { if(!e.target.closest('select')) e.preventDefault(); });
 }
 blockLongPressLoupe(document.getElementById('formAvailRows'), '[data-fa-track]');
-blockLongPressLoupe(document.getElementById('quickAvailOverlay'), '[data-qa-track]');
+// 막대 줄 전체에서 막으면 창이 거의 줄로 차 있어서 위아래 스크롤이 안 됐음 - 작은 손잡이에서만 막고, 돋보기는 CSS(user-select)로 막음
+blockLongPressLoupe(document.getElementById('quickAvailOverlay'), '[data-qa-handle]');
 
 document.getElementById('availWeekPrev').addEventListener('click', () => {
   availGridWeekStart.setDate(availGridWeekStart.getDate() - 7);
