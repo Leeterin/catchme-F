@@ -31439,6 +31439,28 @@ function inviteHoursLabel(hours){
 function inviteOpenSet(inv){
   return inv && inv.status === 'OPEN' && Array.isArray(inv.openCells) ? new Set(inv.openCells) : null;
 }
+// 직접 고르기 링크에서 만든 사람이 5분 단위로 연 시간 {날짜: [{s, e}]} - 없으면 null (칸 그대로 정각~정각)
+function inviteOpenMinutes(inv){
+  if(!inv || !Array.isArray(inv.openRanges) || !inv.openRanges.length) return null;
+  const map = {};
+  inv.openRanges.forEach(x => {
+    const [date, a, b] = String(x).split('|');
+    (map[date] = map[date] || []).push({ s: inviteParseHm(a), e: inviteParseHm(b) });
+  });
+  Object.values(map).forEach(list => list.sort((a, b) => a.s - b.s));
+  return map;
+}
+// 그날 s~e분 중 열린 시간 안에 드는 부분만 [{s, e}]
+function inviteClipOpen(inv, date, s, e){
+  const om = inviteOpenMinutes(inv);
+  if(!om) return s < e ? [{ s, e }] : [];
+  return (om[date] || []).map(r => ({ s: Math.max(s, r.s), e: Math.min(e, r.e) })).filter(r => r.e > r.s);
+}
+function inviteIsOpenMin(inv, date, m, asEnd){
+  const om = inviteOpenMinutes(inv);
+  if(!om) return true;
+  return (om[date] || []).some(r => asEnd ? m > r.s && m <= r.e : m >= r.s && m < r.e);
+}
 // 응답 받는 중인데 후보 날짜가 다 지난 링크 = 마감 (서버가 계산해 주고, 예전 응답이면 여기서 계산)
 function inviteExpired(inv){
   if(!inv || inv.status !== 'OPEN') return false;
@@ -31491,15 +31513,17 @@ function inviteCellBlocks(cells){
 }
 
 // 한 사람이 되는 시간 (분 단위) [{date, s, e}] - 분 단위로 맞춘 값이 없으면 칸 그대로(정각~정각)
+// (5분 단위로 연 링크는 이어진 칸 안에 시간이 여러 조각일 수 있음)
 function inviteResponseRanges(r){
-  const blocks = inviteCellBlocks(r.cells || []).map(b => ({ date: b.date, s: b.first * 60, e: (b.last + 1) * 60 }));
-  (r.ranges || []).forEach(x => {
+  const fine = (r.ranges || []).map(x => {
     const [date, a, b] = String(x).split('|');
-    const s = inviteParseHm(a), e = inviteParseHm(b);
-    const blk = blocks.find(k => k.date === date && s >= k.s && e <= k.e);
-    if(blk && s < e){ blk.s = s; blk.e = e; }
+    return { date, s: inviteParseHm(a), e: inviteParseHm(b) };
+  }).filter(x => x.s < x.e);
+  return inviteCellBlocks(r.cells || []).flatMap(b => {
+    const s = b.first * 60, e = (b.last + 1) * 60;
+    const inside = fine.filter(x => x.date === b.date && x.s >= s && x.e <= e).sort((x, y) => x.s - y.s);
+    return inside.length ? inside : [{ date: b.date, s, e }];
   });
-  return blocks;
 }
 
 // 고른 범위(같은 날짜 sMin~eMin분) 전체가 가능한 사람들
@@ -31519,7 +31543,13 @@ function inviteFitSel(inv, sel){
     e = Math.min(e, x.e);
   });
   if(s >= e){ s = sel.start * 60; e = sel.end * 60; }
-  return { ...sel, sMin: s, eMin: e };
+  // 만든 사람이 5분 단위로 연 시간 안으로 (여러 조각이면 가장 긴 것)
+  const segs = inviteClipOpen(inv, sel.date, s, e);
+  if(segs.length){
+    const best = segs.reduce((a, b) => b.e - b.s > a.e - a.s ? b : a);
+    s = best.s; e = best.e;
+  }
+  return { ...sel, sMin: s, eMin: e, start: Math.floor(s / 60), end: Math.ceil(e / 60) };
 }
 
 // 비회원 화면: 내가 고른 칸 묶음 + 분 단위로 맞춘 시작/끝
@@ -31532,39 +31562,53 @@ function inviteMyBlocks(){
     return { ...b, s, e };
   });
 }
+// 실제로 보낼 내 시간 - 칸 묶음을 만든 사람이 연 시간 안으로 자름 [{date, s, e}]
+function inviteMySegments(){
+  const inv = inviteState.invite;
+  return inviteMyBlocks().flatMap(b => inviteClipOpen(inv, b.date, b.s, b.e).map(r => ({ date: b.date, s: r.s, e: r.e })));
+}
 function inviteSetMyRanges(ranges){
   const st = inviteState;
   st.myStartOff = {};
   st.myEndOff = {};
-  (ranges || []).forEach(x => {
-    const [date, a, b] = String(x).split('|');
-    const s = inviteParseHm(a), e = inviteParseHm(b);
-    if(!(s < e)) return;
-    const fh = Math.floor(s / 60), lh = Math.ceil(e / 60) - 1;
-    if(s % 60) st.myStartOff[inviteCellKey(date, fh)] = s % 60;
-    if(e - lh * 60 !== 60) st.myEndOff[inviteCellKey(date, lh)] = e - lh * 60;
+  // 이어진 칸 묶음마다 첫 칸의 시작 분, 마지막 칸의 끝 분만 기억 (가운데 빈 곳은 연 시간으로 다시 잘림)
+  inviteResponseRanges({ cells: [...st.myCells], ranges }).forEach(x => {
+    const fh = Math.floor(x.s / 60), lh = Math.ceil(x.e / 60) - 1;
+    if(x.s % 60 && !st.myCells.has(inviteCellKey(x.date, fh - 1))) st.myStartOff[inviteCellKey(x.date, fh)] = x.s % 60;
+    if(x.e - lh * 60 !== 60 && !st.myCells.has(inviteCellKey(x.date, lh + 1))) st.myEndOff[inviteCellKey(x.date, lh)] = x.e - lh * 60;
   });
 }
 // 시작/끝이 정각이 아닌 칸은 되는 부분만 칠함 (칸은 위->아래가 시간 순서)
-function inviteMinePartialBg(key, blocks){
+function inviteMinePartialBg(key, segs){
   const [date, hh] = key.split('|');
   const h = Number(hh);
-  const b = blocks.find(b => b.date === date && h >= b.first && h <= b.last);
-  if(!b) return '';
-  const a = Math.max(0, b.s - h * 60), z = Math.min(60, b.e - h * 60);
-  if(a === 0 && z === 60) return '';
-  const pa = (a / 60 * 100).toFixed(1), pz = (z / 60 * 100).toFixed(1);
-  return `linear-gradient(to bottom, var(--surface-2) 0 ${pa}%, var(--cta) ${pa}% ${pz}%, var(--surface-2) ${pz}% 100%)`;
+  const parts = segs.filter(x => x.date === date && x.s < h * 60 + 60 && x.e > h * 60)
+    .map(x => [Math.max(0, x.s - h * 60), Math.min(60, x.e - h * 60)]);
+  if(parts.length === 1 && parts[0][0] === 0 && parts[0][1] === 60) return '';
+  const pct = v => (v / 60 * 100).toFixed(1);
+  let at = 0;
+  const stops = [];
+  parts.forEach(([a, z]) => {
+    stops.push(`var(--surface-2) ${pct(at)}% ${pct(a)}%`, `var(--cta) ${pct(a)}% ${pct(z)}%`);
+    at = z;
+  });
+  stops.push(`var(--surface-2) ${pct(at)}% 100%`);
+  return `linear-gradient(to bottom, ${stops.join(', ')})`;
 }
 
 function renderInviteFineHtml(){
+  const inv = inviteState.invite;
   const blocks = inviteMyBlocks();
   if(!blocks.length) return '';
-  let html = '<div class="inv-sub-head"><b>분 단위로 맞추기</b><span>정각이 아니면 여기서 고쳐요</span></div><div class="inv-fine">';
+  let html = '<div class="inv-sub-head"><b>5분 단위로 맞추기</b><span>정각이 아니면 여기서 고쳐요</span></div><div class="inv-fine">';
   blocks.forEach(b => {
+    // 만든 사람이 연 시간 안에서만 고름
+    const segs = inviteClipOpen(inv, b.date, b.s, b.e);
+    if(!segs.length) return;
+    const bs = segs[0].s, be = segs[segs.length - 1].e;
     let so = '', eo = '';
-    for(let m = b.first * 60; m < b.first * 60 + 60 && m < b.e; m += 5) so += `<option value="${m}"${m === b.s ? ' selected' : ''}>${inviteHm(m)}</option>`;
-    for(let m = b.last * 60 + 5; m <= b.last * 60 + 60; m += 5) if(m > b.s) eo += `<option value="${m}"${m === b.e ? ' selected' : ''}>${inviteHm(m)}</option>`;
+    for(let m = b.first * 60; m < b.first * 60 + 60 && m < be; m += 5) if(inviteIsOpenMin(inv, b.date, m, false)) so += `<option value="${m}"${m === bs ? ' selected' : ''}>${inviteHm(m)}</option>`;
+    for(let m = b.last * 60 + 5; m <= b.last * 60 + 60; m += 5) if(m > bs && inviteIsOpenMin(inv, b.date, m, true)) eo += `<option value="${m}"${m === be ? ' selected' : ''}>${inviteHm(m)}</option>`;
     html += `<div class="inv-fine-row"><span class="d">${inviteDateLabel(b.date)}</span>`
       + `<select class="inv-fine-sel" data-fine="s" data-key="${inviteCellKey(b.date, b.first)}" aria-label="시작 시간">${so}</select><span class="t">부터</span>`
       + `<select class="inv-fine-sel" data-fine="e" data-key="${inviteCellKey(b.date, b.last)}" aria-label="끝 시간">${eo}</select><span class="t">까지</span></div>`;
@@ -32341,7 +32385,7 @@ function renderInviteCreateHtml(){
   const atFirstWeek = d.weekStart.getTime() <= inviteWeekSunday(new Date()).getTime();
   return placeHtml + tabs + titleHtml + `
     <div class="inv-section">
-      <label class="inv-label">열어둘 시간 <small>· 날짜마다 따로, 1시간 단위 (최대 14일)</small></label>
+      <label class="inv-label">열어둘 시간 <small>· 날짜마다 따로, 5분 단위 (최대 14일)</small></label>
       <div class="schedule-nav" style="margin-bottom:8px;">
         <button type="button" data-act="iaWeek" data-dir="-1"${atFirstWeek ? ' disabled style="visibility:hidden"' : ''}>&#8249;</button>
         <div class="schedule-nav-label">${days[0].getMonth() + 1}월 ${days[0].getDate()}일 - ${days[6].getMonth() + 1}월 ${days[6].getDate()}일</div>
@@ -32356,9 +32400,10 @@ function renderInviteCreateHtml(){
     </div>`;
 }
 
-// ---------- 직접 고르기: 날짜마다 막대로 시간 열기 (일정 만들기·빠르게 열기와 같은 막대, 약속 링크라 1시간 단위) ----------
+// ---------- 직접 고르기: 날짜마다 막대로 시간 열기 (일정 만들기·빠르게 열기와 같은 막대, 5분 단위) ----------
 // 여기서 연 시간은 링크에만 저장됨 - 캘린더 일정은 만들지도 바꾸지도 않음
-const INV_AVAIL_STEP = 60;
+const INV_AVAIL_STEP = QUICK_AVAIL_STEP;
+const INV_AVAIL_MIN_LEN = QUICK_AVAIL_MIN_LEN;
 function inviteWeekSunday(date){ const d = new Date(date); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - d.getDay()); return d; }
 function inviteAvailWeekDays(d){
   return Array.from({ length: 7 }, (_, i) => { const x = new Date(d.weekStart); x.setDate(x.getDate() + i); return x; });
@@ -32377,10 +32422,10 @@ function inviteAvailBusyFor(day){
 function inviteAvailHardBusy(dk){
   return quickMergeRanges(inviteAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft).map(b => ({ s: b.s, e: b.e })));
 }
-// 1시간 칸에 맞춰 안쪽으로 줄임
+// 5분 칸에 맞춰 안쪽으로 줄임
 function inviteHourFit(r){ return { s: Math.ceil(r.s / INV_AVAIL_STEP) * INV_AVAIL_STEP, e: Math.floor(r.e / INV_AVAIL_STEP) * INV_AVAIL_STEP }; }
 function inviteAvailFitRanges(dk, ranges){
-  return subtractMinuteRanges(ranges, inviteAvailHardBusy(dk)).map(inviteHourFit).filter(r => r.e - r.s >= INV_AVAIL_STEP).sort((a, b) => a.s - b.s);
+  return subtractMinuteRanges(ranges, inviteAvailHardBusy(dk)).map(inviteHourFit).filter(r => r.e - r.s >= INV_AVAIL_MIN_LEN).sort((a, b) => a.s - b.s);
 }
 function inviteAvailBounds(d, dk, ranges, idx, lo, hi){
   const r = ranges[idx];
@@ -32448,7 +32493,7 @@ function inviteAvailRowsHtml(d){
         <div class="qa-times" data-ia-times="${dk}">${times}</div>
         ${on ? `<button type="button" class="qa-add" data-ia-add="${dk}" aria-label="${label} 시간 더 넣기">+</button>` : ''}
       </div>
-      ${editing >= 0 ? availTimeEditHtml('ia', `${dk}|${editing}`, ranges[editing], '1시간') : ''}
+      ${editing >= 0 ? availTimeEditHtml('ia', `${dk}|${editing}`, ranges[editing]) : ''}
       <div class="qa-track" data-ia-track="${dk}">${grid}${otherHtml}${bars}${busyHtml}</div>
       ${d.info && d.info.dk === dk ? inviteAvailInfoHtml(dk, d.info.min) : ''}
     </div>`;
@@ -32473,7 +32518,7 @@ function inviteAvailInfoHtml(dk, min){
 function inviteAvailAddRange(d, dk, centerMin){
   const ranges = d.ranges[dk] || [];
   if(!ranges.length && Object.keys(d.ranges).length >= 14){ showToast('날짜는 최대 14일까지 고를 수 있어요.'); return false; }
-  const gaps = subtractMinuteRanges([{ s: d.axis.s, e: d.axis.e }], [...ranges, ...inviteAvailHardBusy(dk)]).map(inviteHourFit).filter(g => g.e - g.s >= INV_AVAIL_STEP);
+  const gaps = subtractMinuteRanges([{ s: d.axis.s, e: d.axis.e }], [...ranges, ...inviteAvailHardBusy(dk)]).map(inviteHourFit).filter(g => g.e - g.s >= INV_AVAIL_MIN_LEN);
   const gap = centerMin != null ? gaps.find(g => g.s <= centerMin && g.e >= centerMin) : gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
   if(!gap){
     if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
@@ -32486,13 +32531,9 @@ function inviteAvailAddRange(d, dk, centerMin){
   d.ranges[dk] = [...ranges, { s, e: s + len }].sort((a, b) => a.s - b.s);
   return true;
 }
-// 링크로 보낼 1시간 칸들 "YYYY-MM-DD|HH"
-function inviteDraftCells(d){
-  const cells = [];
-  Object.keys(d.ranges).sort().forEach(dk => d.ranges[dk].forEach(r => {
-    for(let h = r.s / 60; h < r.e / 60; h++) cells.push(inviteCellKey(dk, h));
-  }));
-  return cells;
+// 링크로 보낼 연 시간들 "YYYY-MM-DD|HH:MM|HH:MM" (5분 단위)
+function inviteDraftRanges(d){
+  return Object.keys(d.ranges).sort().flatMap(dk => d.ranges[dk].map(r => `${dk}|${inviteHmRaw(r.s)}|${inviteHmRaw(r.e)}`));
 }
 function inviteAvailRerender(){
   renderInviteOverlay();
@@ -32546,7 +32587,7 @@ document.getElementById('inviteBody').addEventListener('click', (e) => {
       const ranges = quickCloneRanges(d.ranges[dk]);
       if(!ranges[idx]) return;
       const { lo, hi } = inviteAvailBounds(d, dk, ranges, idx, 0, 24 * 60);
-      ranges[idx] = availEditedRange(ranges[idx], side, Math.round(v / INV_AVAIL_STEP) * INV_AVAIL_STEP, lo, hi, INV_AVAIL_STEP);
+      ranges[idx] = availEditedRange(ranges[idx], side, Math.round(v / INV_AVAIL_STEP) * INV_AVAIL_STEP, lo, hi, INV_AVAIL_MIN_LEN);
       d.ranges[dk] = ranges;
       inviteAvailRerender();
     }, INV_AVAIL_STEP)) return;
@@ -32591,8 +32632,8 @@ document.getElementById('inviteBody').addEventListener('click', (e) => {
     const snap = v => Math.round(v / INV_AVAIL_STEP) * INV_AVAIL_STEP;
     const ps = r.s, pe = r.e;
     let want;
-    if(dr.edge === 's'){ want = snap(m); r.s = Math.max(lo, Math.min(r.e - INV_AVAIL_STEP, want)); }
-    else if(dr.edge === 'e'){ want = snap(m); r.e = Math.min(hi, Math.max(r.s + INV_AVAIL_STEP, want)); }
+    if(dr.edge === 's'){ want = snap(m); r.s = Math.max(lo, Math.min(r.e - INV_AVAIL_MIN_LEN, want)); }
+    else if(dr.edge === 'e'){ want = snap(m); r.e = Math.min(hi, Math.max(r.s + INV_AVAIL_MIN_LEN, want)); }
     else {
       const len = dr.orig.e - dr.orig.s;
       want = snap(dr.orig.s + m - dr.startMin);
@@ -32683,7 +32724,7 @@ function renderInviteGridHtml(inv, mode){
   const st = inviteState;
   const counts = inviteCounts(inv, mode === 'guest');
   const max = Math.max(1, ...Object.values(counts));
-  const myBlocks = mode === 'guest' && inv.status === 'OPEN' ? inviteMyBlocks() : [];
+  const myBlocks = mode === 'guest' && inv.status === 'OPEN' ? inviteMySegments() : [];
   const isOpen = inv.status === 'OPEN';
   let confirmedCells = new Set();
   if(inv.status === 'CONFIRMED' && inv.confirmedStart){
@@ -32800,9 +32841,13 @@ function renderInviteManageHtml(){
       let lo = sel.start, hi = sel.end;
       while(canUse(lo - 1)) lo--;
       while(canUse(hi)) hi++;
+      let loM = lo * 60, hiM = hi * 60;
+      const om = inviteOpenMinutes(inv);
+      const span = om && (om[sel.date] || []).find(r => r.s <= sel.sMin && r.e >= sel.eMin);
+      if(span){ loM = Math.max(loM, span.s); hiM = Math.min(hiM, span.e); }
       let so = '', eo = '';
-      for(let m = lo * 60; m < sel.eMin; m += 5) so += `<option value="${m}"${m === sel.sMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
-      for(let m = sel.sMin + 5; m <= hi * 60; m += 5) eo += `<option value="${m}"${m === sel.eMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
+      for(let m = loM; m < sel.eMin; m += 5) so += `<option value="${m}"${m === sel.sMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
+      for(let m = sel.sMin + 5; m <= hiM; m += 5) eo += `<option value="${m}"${m === sel.eMin ? ' selected' : ''}>${inviteHm(m)}</option>`;
       html += `<div class="inv-fine"><div class="inv-fine-row"><span class="d">${inviteDateLabel(sel.date)}</span>`
         + `<select class="inv-fine-sel" data-fine="cs" aria-label="확정 시작 시간">${so}</select><span class="t">~</span>`
         + `<select class="inv-fine-sel" data-fine="ce" aria-label="확정 끝 시간">${eo}</select><span class="t">분 단위로 맞추기</span></div></div>`;
@@ -32819,6 +32864,15 @@ function renderInviteManageHtml(){
       }).join('') + '</div>';
   }
   return html;
+}
+
+// 직접 고르기 링크: 만든 사람이 5분 단위로 연 시간을 날짜별로 적어줌 (칸은 1시간이라 정각이 아닌 끝은 여기서 봄)
+function inviteOpenTimesHtml(inv){
+  const om = inviteOpenMinutes(inv);
+  if(!om) return '';
+  const rows = Object.keys(om).sort().filter(date => om[date].some(r => !invitePastCell(inviteCellKey(date, Math.ceil(r.e / 60) - 1))))
+    .map(date => `<div class="inv-fine-row"><span class="d">${inviteDateLabel(date)}</span><span>${om[date].map(r => `${inviteHm(r.s)}~${inviteHm(r.e)}`).join(', ')}</span></div>`);
+  return rows.length ? `<div class="inv-label">${escapeHtml(inviteCreatorName(inv))}님이 연 시간</div><div class="inv-fine">${rows.join('')}</div>` : '';
 }
 
 function renderInviteGuestHtml(){
@@ -32915,6 +32969,7 @@ function renderInviteGuestHtml(){
       <input id="invGuestName" class="inv-input" maxlength="20" placeholder="친구들이 알아볼 수 있는 이름" value="${escapeHtml(st.guestName)}" />
     </div>
     <div class="inv-sub-head"><b>되는 시간 고르기</b><span>날짜/시간 이름을 누르면 한 줄 전체</span></div>
+    ${inviteOpenTimesHtml(inv)}
     ${renderInviteGridHtml(inv, 'guest')}
     <div class="inv-legend"><span><i style="background:var(--cta)"></i>내가 고른 시간</span><span><i style="background:rgba(56,189,248,0.6)"></i>숫자 = 다른 친구들이 되는 인원</span>${openNow ? `<span><i style="background:repeating-linear-gradient(-45deg, transparent 0 3px, var(--line) 3px 4px);box-shadow:inset 0 0 0 1px var(--line)"></i>${creator}님이 안 되는 시간</span>` : ''}</div>
     <div id="invFineBox">${renderInviteFineHtml()}</div>`;
@@ -32987,7 +33042,7 @@ function inviteDeleteBtnHtml(){
 function updateInviteGridClasses(){
   const st = inviteState;
   const inv = st.invite;
-  const myBlocks = st.mode === 'guest' ? inviteMyBlocks() : [];
+  const myBlocks = st.mode === 'guest' ? inviteMySegments() : [];
   document.querySelectorAll('#inviteBody .inv-cell').forEach(td => {
     const key = td.dataset.cell;
     const [date, hh] = key.split('|');
@@ -33218,7 +33273,7 @@ async function createInviteFromDraft(){
       body: JSON.stringify({
         ...(d.source === 'calendar'
           ? { title, dates: [...d.calDates].sort(), fromCalendar: true, audience: d.audience }
-          : { title, dates: Object.keys(d.ranges).sort(), cells: inviteDraftCells(d) }),
+          : { title, dates: Object.keys(d.ranges).sort(), ranges: inviteDraftRanges(d) }),
         ...(d.place ? { place: d.place } : {}),
       }),
     });
@@ -33348,7 +33403,7 @@ async function submitInviteResponse(){
     if(!authToken) inviteStoreSet('catchme_guest_name', name);
     const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/respond`, {
       method: 'POST',
-      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, true), name, cells: [...st.myCells], ranges: inviteMyBlocks().map(b => `${b.date}|${inviteHmRaw(b.s)}|${inviteHmRaw(b.e)}`) }),
+      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, true), name, cells: [...st.myCells], ranges: inviteMySegments().map(b => `${b.date}|${inviteHmRaw(b.s)}|${inviteHmRaw(b.e)}`) }),
     });
     st.busy = false;
     st.submitted = true;
