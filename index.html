@@ -4819,8 +4819,7 @@
 
   /* 꾹 눌러도 글자 선택·복사 메뉴가 뜨지 않게 - 입력칸, 채팅 말풍선, 주소·링크처럼 복사가 필요한 곳만 예외 */
   html, body{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; overscroll-behavior:none; }
-  input, textarea, [contenteditable="true"],
-  .msg-bubble-text, .inv-share-link,
+  input, textarea, [contenteditable="true"], .inv-share-link,
   .location-picker-bottom-addr, .location-search-result-addr, .feed-place-info-addr{
     -webkit-user-select:text; user-select:text; -webkit-touch-callout:default;
   }
@@ -5177,6 +5176,16 @@
   /* 다음으로 진행하는 주 버튼 - 회색 보조 버튼(취소)과 확실히 구분되게 채워진 강조색 */
   .mini-confirm-btn.primary{ background:var(--accent); color:#FFFFFF; }
   .mini-confirm-btn.primary:hover{ background:var(--accent); opacity:0.9; }
+  /* 채팅 메시지 꾹 누르기 → 복사하기 / 선택 복사하기 */
+  .msg-copy-card{ max-width:260px; padding:10px; }
+  .msg-copy-card .mini-confirm-btn{ color:var(--text); font-size:14px; }
+  .msg-select-copy-card{ max-width:360px; text-align:left; }
+  .msg-select-copy-text{
+    width:100%; box-sizing:border-box; min-height:120px; max-height:50vh;
+    padding:10px; border:1px solid var(--line); border-radius:10px;
+    background:var(--surface); color:var(--text);
+    font-size:16px; font-family:inherit; line-height:1.45; resize:none;
+  }
 
   /* ---------------- 약속 잡기 - 방법 고르기 / 친구 고르기 ---------------- */
   .plan-start-card{ max-width:360px; }
@@ -26827,6 +26836,103 @@ function openCalShare(share, isMine, ownerFriend){
   loadFriendScheduleForFocusWindow();
 }
 
+// 글 메시지를 꾹 누르면 "복사하기 / 선택 복사하기" 메뉴 (말풍선 글자를 바로 드래그 선택하는 건 막아둠 - CSS)
+// 선택 복사하기는 글 전체를 창에 띄워서 원하는 부분만 길게 눌러 골라 복사하게 함
+let chatLongPressFired = false;
+function openMsgCopyMenu(text){
+  let ov = document.getElementById('msgCopyMenuOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'mini-confirm-overlay';
+    ov.id = 'msgCopyMenuOverlay';
+    ov.innerHTML = `<div class="mini-confirm-card msg-copy-card">
+        <div class="mini-confirm-actions">
+          <button type="button" class="mini-confirm-btn" data-act="copy">복사하기</button>
+          <button type="button" class="mini-confirm-btn" data-act="select">선택 복사하기</button>
+        </div>
+      </div>`;
+    ov.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-act]');
+      if(e.target !== ov && !btn) return;
+      ov.classList.remove('show');
+      if(!btn) return;
+      const t = ov._text || '';
+      if(btn.dataset.act === 'select'){ openMsgSelectCopy(t); return; }
+      let ok = copyTextNow(t);
+      if(!ok && navigator.clipboard && navigator.clipboard.writeText){
+        try { await navigator.clipboard.writeText(t); ok = true; } catch(err) {}
+      }
+      if(ok) showToast('복사했어요');
+      else openMsgSelectCopy(t);
+    });
+    document.body.appendChild(ov);
+  }
+  ov._text = text;
+  ov.classList.add('show');
+}
+function openMsgSelectCopy(text){
+  let ov = document.getElementById('msgSelectCopyOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.className = 'mini-confirm-overlay';
+    ov.id = 'msgSelectCopyOverlay';
+    ov.innerHTML = `<div class="mini-confirm-card msg-select-copy-card">
+        <div class="mini-confirm-title" style="margin-bottom:6px;">선택 복사하기</div>
+        <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:10px;text-align:center;">복사할 부분을 길게 눌러 골라주세요</div>
+        <textarea class="msg-select-copy-text" readonly></textarea>
+        <div class="mini-confirm-actions" style="margin-top:10px;"><button type="button" class="mini-confirm-btn" data-close="1">닫기</button></div>
+      </div>`;
+    ov.addEventListener('click', (e) => { if(e.target === ov || e.target.closest('[data-close]')) ov.classList.remove('show'); });
+    document.body.appendChild(ov);
+  }
+  const ta = ov.querySelector('textarea');
+  ta.value = text;
+  ov.classList.add('show');
+  ta.scrollTop = 0;
+}
+(function setupChatLongPressCopy(){
+  const box = document.getElementById('chatMessages');
+  if(!box) return;
+  const textOf = (r) => {
+    const el = r && r._replyMsg && r.querySelector('.msg-bubble-text');
+    return el ? el.textContent : '';
+  };
+  let timer = null, sx = 0, sy = 0;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  box.addEventListener('touchstart', (e) => {
+    chatLongPressFired = false;
+    cancel();
+    if(e.touches.length !== 1) return;
+    const r = e.target.closest('.msg-row');
+    if(!r || !e.target.closest('.msg-bubble') || e.target.closest('button, a, input, textarea')) return;
+    const text = textOf(r);
+    if(!text) return;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    timer = setTimeout(() => {
+      timer = null;
+      chatLongPressFired = true;
+      hapticTick();
+      openMsgCopyMenu(text);
+    }, 450);
+  }, { passive: true });
+  box.addEventListener('touchmove', (e) => {
+    if(!timer) return;
+    if(Math.abs(e.touches[0].clientX - sx) > 10 || Math.abs(e.touches[0].clientY - sy) > 10) cancel();
+  }, { passive: true });
+  // 메뉴가 뜬 뒤 손을 뗄 때 생기는 클릭이 메뉴 바깥(배경)을 눌러 바로 닫히거나 카드가 열리지 않게 막음
+  box.addEventListener('touchend', (e) => { cancel(); if(chatLongPressFired) e.preventDefault(); }, { passive: false });
+  box.addEventListener('touchcancel', cancel);
+  // 컴퓨터에서는 오른쪽 클릭으로 같은 메뉴 (안드로이드는 꾹 누르면 이 이벤트도 와서 이미 떴으면 무시)
+  box.addEventListener('contextmenu', (e) => {
+    const r = e.target.closest('.msg-row');
+    if(!r || !e.target.closest('.msg-bubble')) return;
+    const text = textOf(r);
+    if(!text) return;
+    e.preventDefault();
+    if(!chatLongPressFired) openMsgCopyMenu(text);
+  });
+})();
+
 // 메시지를 왼쪽으로 밀면 답장 (카톡처럼). 오른쪽으로 미는 건 채팅방 나가기라 방향을 반대로 둠.
 // 행이 다시 그려져도 계속 동작하게 메시지 목록에 한 번만 걸어둠 - 답장 가능한 행에는 row._replyMsg가 있음
 let chatSwipeReplyAt = 0;
@@ -26852,6 +26958,7 @@ let chatSwipeReplyAt = 0;
   }, { passive: true });
   box.addEventListener('touchmove', (e) => {
     if(!row) return;
+    if(chatLongPressFired){ row = null; return; } // 꾹 눌러 복사 메뉴가 뜬 뒤엔 밀어서 답장 안 함
     const mx = e.touches[0].clientX - startX, my = e.touches[0].clientY - startY;
     if(!dragging){
       if(Math.abs(mx) < 10 && Math.abs(my) < 10) return;
