@@ -4585,6 +4585,7 @@
     flex-shrink:0;
   }
   .schedule-nav button:hover{ color:var(--text); border-color:#c7c8cc; }
+  .schedule-nav button:disabled{ opacity:.35; cursor:default; }
 
   .week-color-settings-row{
     display:flex;
@@ -8297,6 +8298,11 @@
       <!-- 누구에게 열지는 대상마다 탭으로 나눠 정함 - 두 탭에 같은 시간을 열면 그 시간은 둘 다에게 열림 -->
       <div class="qa-tabs" id="quickAvailTabs"></div>
       <div class="qa-tab-hint" id="quickAvailTabHint"></div>
+      <div class="schedule-nav" style="margin-bottom:8px;">
+        <button id="quickAvailWeekPrev" type="button" data-qa-week="-1">&#8249;</button>
+        <div class="schedule-nav-label" id="quickAvailWeekLabel">-</div>
+        <button id="quickAvailWeekNext" type="button" data-qa-week="1">&#8250;</button>
+      </div>
       <div class="quick-avail-rows" id="quickAvailRows"></div>
       <p class="quick-avail-hint">막대 끝을 끌거나 시간 글자를 눌러 5분 단위로 맞출 수 있어요. 빈 곳을 누르면 시간을 더 넣어요.<br/>회색은 내 일정이라 그 시간은 빼고 열고, 점선은 겹쳐도 예약 받는 일정이에요. 눌러보면 무슨 일정인지 보여요.</p>
       <button type="button" class="profile-chat-btn" id="quickAvailSubmitBtn">열어두기</button>
@@ -29377,24 +29383,35 @@ function openMyAvailabilityForm(){
 // 이번 주만 또는 4주 동안 매주 반복해서 만듦. 처음엔 평일/주말 두 줄만 보여주고, 원하면 요일별로 펼침.
 // 반복 일정 대신 날짜별 하루짜리 일정으로 만드는 이유: 예약이 확정되면 서버가
 // 겹치는 "예약 가능"을 잘라내는데(clearAvailabilityInRange) 반복 일정은 그 처리를 못 해서 패턴 전체가 깨짐
-// 'once' = 오늘부터 7일(이번 주만), 'month' = 오늘부터 4주(28일) 동안 매주 반복
+// 주는 일정 만들기의 예약 가능 시간과 똑같이 일요일부터 - ‹ ›로 다음 주로 넘김 (지난 날은 빼고)
+// 'once' = 보고 있는 주만, 'month' = 보고 있는 주부터 4주 동안 매주 반복
 let quickAvailRepeat = 'once';
+let quickAvailWeek = 0; // 이번 주부터 몇 주 뒤를 보는지
 const QUICK_REPEAT_KEY = 'catchme_quick_repeat';
+function quickAvailWeekStart(){
+  const d = getWeekStart(TODAY);
+  d.setDate(d.getDate() + quickAvailWeek * 7);
+  return d;
+}
+function quickAvailStartDate(){
+  const ws = quickAvailWeekStart();
+  return ws < TODAY ? new Date(TODAY) : ws;
+}
 function quickAvailEnd(){
-  const end = new Date(TODAY);
+  const end = quickAvailWeekStart();
   end.setDate(end.getDate() + (quickAvailRepeat === 'month' ? 28 : 7));
   return end;
 }
-function quickAvailDays(){ return Math.round((quickAvailEnd() - new Date(TODAY)) / 86400000); }
+function quickAvailDays(){ return Math.round((quickAvailEnd() - quickAvailStartDate()) / 86400000); }
 // 기간 안에 그 요일이 몇 번 있는지
 function quickDowCount(dow){
   let n = 0;
-  for(let i = 0; i < quickAvailDays(); i++){ const d = new Date(TODAY); d.setDate(d.getDate() + i); if(d.getDay() === dow) n++; }
+  for(let i = 0; i < quickAvailDays(); i++){ const d = quickAvailStartDate(); d.setDate(d.getDate() + i); if(d.getDay() === dow) n++; }
   return n;
 }
 const QUICK_AVAIL_STEP = 5; // 막대는 5분 단위로 움직임
 const QUICK_AVAIL_MIN_LEN = 30; // 30분보다 짧은 예약 가능 시간은 안 만들어서, 막대도 그보다 짧아지지 않게
-const QUICK_AVAIL_DOWS = [1, 2, 3, 4, 5, 6, 0]; // 월요일부터
+const QUICK_AVAIL_DOWS = [0, 1, 2, 3, 4, 5, 6]; // 일정 만들기와 같이 일요일부터
 const QUICK_AVAIL_GROUPS = [
   { key: 'weekday', label: '평일', dows: [1, 2, 3, 4, 5], def: { s: 18 * 60, e: 22 * 60 } },
   { key: 'weekend', label: '주말', dows: [6, 0], def: { s: 14 * 60, e: 18 * 60 } },
@@ -29495,7 +29512,7 @@ function quickAvailBusyPattern(){
   const out = {};
   QUICK_AVAIL_DOWS.forEach(dow => { out[dow] = []; });
   for(let i = 0; i < quickAvailDays(); i++){
-    const d = new Date(TODAY);
+    const d = quickAvailStartDate();
     d.setDate(d.getDate() + i);
     getEventsForDate(d).filter(ev => ev.type !== 'available').forEach(ev => {
       const r = getEventDisplayRangeForDate(ev, d);
@@ -29516,10 +29533,12 @@ function quickAvailCurrentPattern(tabKey){
   const slots = 1440 / QUICK_AVAIL_STEP;
   const open = {}, votes = {};
   QUICK_AVAIL_DOWS.forEach(dow => { open[dow] = new Array(slots).fill(0); votes[dow] = new Array(slots).fill(0); });
-  // 오늘은 지난 시간이 잘려 있어서 뺌 - 이번 주만일 땐 요일마다 하루뿐이라 오늘도 넣음
-  for(let i = quickAvailRepeat === 'once' ? 0 : 1; i < quickAvailDays(); i++){
-    const d = new Date(TODAY);
+  // 오늘은 지난 시간이 잘려 있어서 뺌 - 한 주만일 땐 요일마다 하루뿐이라 오늘도 넣음
+  const todayKey = dateKeyOf(TODAY);
+  for(let i = 0; i < quickAvailDays(); i++){
+    const d = quickAvailStartDate();
     d.setDate(d.getDate() + i);
+    if(quickAvailRepeat !== 'once' && dateKeyOf(d) === todayKey) continue;
     const evs = getEventsForDate(d);
     const toRange = ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; };
     const avail = evs.filter(ev => ev.type === 'available' && quickTabIncludes(tabKey, ev)).map(toRange);
@@ -29551,7 +29570,7 @@ function quickAvailCurrentPattern(tabKey){
 function closeQuickAvailCuts(cutsByDow, tabKey){
   const result = { closedDays: new Set(), skippedRecurring: new Set(), created: [] };
   for(let i = 0; i < quickAvailDays(); i++){
-    const d = new Date(TODAY);
+    const d = quickAvailStartDate();
     d.setDate(d.getDate() + i);
     const cuts = cutsByDow[d.getDay()] || [];
     if(!cuts.length) continue;
@@ -29601,6 +29620,7 @@ function closeQuickAvailCuts(cutsByDow, tabKey){
 function openQuickAvail(){
   // 지금 열려 있는 시간을 탭(대상)마다 막대로 보여줌 - 여기서 줄이거나 끄면 그 대상에게 닫히고, 늘리면 열림
   try { quickAvailRepeat = localStorage.getItem(QUICK_REPEAT_KEY) === 'month' ? 'month' : 'once'; } catch(e) { quickAvailRepeat = 'once'; }
+  quickAvailWeek = 0;
   quickAvailTabs = {};
   quickTabList().forEach(tb => {
     const initial = quickAvailCurrentPattern(tb.key);
@@ -30201,6 +30221,19 @@ function quickAxisRangeHtml(){
     ` : ''}${outside ? '<div class="qa-range-note">보이는 시간 밖에도 정해둔 시간이 있어요. 시간 글자를 눌러 고칠 수 있어요.</div>' : ''}
   </div>`;
 }
+// 기간(주·반복)이 바뀌면 "지금 열려 있는 시간"도 그 기간 기준으로 다시 봄 - 안 고친 탭은 새 기준으로 맞추고, 고친 탭은 고친 시간 그대로 둠
+function quickAvailPeriodChanged(){
+  quickTabKeys().forEach(k => {
+    const tb = quickAvailTabs[k];
+    const changed = quickTabChanged(k);
+    tb.initial = quickAvailCurrentPattern(k);
+    if(!changed) QUICK_AVAIL_DOWS.forEach(dow => { tb.pattern[dow] = quickCloneRanges(tb.initial[dow]); });
+  });
+  selectQuickTab(quickAvailTab);
+  quickAvailBusy = quickAvailBusyPattern();
+  if(!quickAvailAxisPref) quickAvailAxis = quickAxisFit(); // 바뀐 주의 일정에 맞춰 보이는 시간 범위도 다시 맞춤
+  renderQuickAvail();
+}
 function renderQuickAvail(){
   // 자동일 땐 정해둔 시간이 다 보이게 넓히고, 직접 고른 범위는 그대로 둠 (밖으로 나간 막대는 잘려 보임)
   quickAvailAxis = quickAvailAxisPref ? { ...quickAvailAxisPref } : quickAxisCover(quickAvailAxis);
@@ -30213,8 +30246,19 @@ function renderQuickAvail(){
   for(let h = Math.ceil(quickAvailAxis.s / 180) * 3; h * 60 <= quickAvailAxis.e; h += 3) ticks.push(h);
   const grid = ticks.filter(h => h * 60 > quickAvailAxis.s && h * 60 < quickAvailAxis.e).map(h => `<i class="qa-grid" style="left:${quickPct(h * 60)}%"></i>`).join('');
   const labelTicks = quickAvailAxis.e - quickAvailAxis.s > 18 * 60 ? ticks.filter(h => h % 6 === 0) : ticks;
+  const ws = quickAvailWeekStart();
+  const we = new Date(ws); we.setDate(we.getDate() + 6);
+  document.getElementById('quickAvailWeekLabel').textContent = `${ws.getMonth()+1}월 ${ws.getDate()}일 - ${we.getMonth()+1}월 ${we.getDate()}일`;
+  document.getElementById('quickAvailWeekPrev').disabled = quickAvailWeek <= 0;
+  const todayKey = dateKeyOf(TODAY);
   let html = quickAxisRangeHtml() + quickAvailRows().map(row => {
     const dow = row.dows[0];
+    // 일정 만들기와 같이 그 주 날짜를 붙이고, 지난 날은 "지난 날"로 (4주 반복이면 요일만)
+    const d = new Date(ws); d.setDate(d.getDate() + QUICK_AVAIL_DOWS.indexOf(dow));
+    if(quickAvailRepeat === 'once') row = { ...row, label: `${d.getMonth() + 1}/${d.getDate()} ${row.label}` };
+    if(quickAvailRepeat === 'once' && dateKeyOf(d) < todayKey){
+      return `<div class="qa-row off"><div class="qa-row-top"><span class="qa-day" style="color:var(--text-dim);cursor:default;">${row.label}</span><div class="qa-times"><span class="qa-time off">지난 날</span></div></div></div>`;
+    }
     const ranges = quickAvailPattern[dow];
     const on = ranges.length > 0;
     const weekend = dow === 0 || dow === 6;
@@ -30247,7 +30291,7 @@ function renderQuickAvail(){
   document.getElementById('quickAvailRepeatSwitch').setAttribute('aria-checked', quickAvailRepeat === 'month' ? 'true' : 'false');
   const last = quickAvailEnd(); last.setDate(last.getDate() - 1);
   document.getElementById('quickAvailDesc').innerHTML = `정한 시간이 ${quickAvailRepeat === 'month'
-    ? `<b>4주 동안(~${last.getMonth() + 1}/${last.getDate()}) 매주 반복</b>해서` : `<b>이번 주만(~${last.getMonth() + 1}/${last.getDate()})</b>`} 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.`;
+    ? `<b>4주 동안(~${last.getMonth() + 1}/${last.getDate()}) 매주 반복</b>해서` : `<b>${quickAvailWeek ? `이 주만` : '이번 주만'}(~${last.getMonth() + 1}/${last.getDate()})</b>`} 예약 가능 시간으로 열려요. 지금 열려 있는 시간을 줄이거나 끄면 그만큼 닫혀요.`;
   const btn = document.getElementById('quickAvailSubmitBtn');
   // 전체(모든 탭)를 한 번에 저장함. 시간 합계는 탭끼리 겹친 시간을 한 번만 셈
   renderQuickTabs();
@@ -30318,16 +30362,15 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
   if(e.target.closest('#quickAvailRepeatSwitch')){
     quickAvailRepeat = quickAvailRepeat === 'month' ? 'once' : 'month';
     try { localStorage.setItem(QUICK_REPEAT_KEY, quickAvailRepeat); } catch(err) {}
-    // 기간이 바뀌면 "지금 열려 있는 시간"도 그 기간 기준으로 다시 봄 - 안 고친 탭은 새 기준으로 맞추고, 고친 탭은 고친 시간 그대로 둠
-    quickTabKeys().forEach(k => {
-      const tb = quickAvailTabs[k];
-      const changed = quickTabChanged(k);
-      tb.initial = quickAvailCurrentPattern(k);
-      if(!changed) QUICK_AVAIL_DOWS.forEach(dow => { tb.pattern[dow] = quickCloneRanges(tb.initial[dow]); });
-    });
-    selectQuickTab(quickAvailTab);
-    quickAvailBusy = quickAvailBusyPattern();
-    renderQuickAvail();
+    quickAvailPeriodChanged();
+    return;
+  }
+  const wk = e.target.closest('[data-qa-week]');
+  if(wk){
+    const next = quickAvailWeek + Number(wk.dataset.qaWeek);
+    if(next < 0) return;
+    quickAvailWeek = next;
+    quickAvailPeriodChanged();
     return;
   }
   if(e.target.closest('[data-qa-range-open]')){ quickAvailRangeOpen = !quickAvailRangeOpen; renderQuickAvail(); return; }
@@ -30597,7 +30640,7 @@ function quickOpenTab(key){
   const now = new Date();
   const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30; // 오늘은 지금 이후 30분 단위부터
   for(let i = 0; i < quickAvailDays(); i++){
-    const d = new Date(TODAY);
+    const d = quickAvailStartDate();
     d.setDate(d.getDate() + i);
     const ranges = quickCloneRanges(tb.pattern[d.getDay()]);
     if(!ranges.length) continue;
@@ -30605,11 +30648,12 @@ function quickOpenTab(key){
     // 이미 있는 일정(바쁨/예약 가능/예약중 다 포함)과 겹치는 부분은 뺌 - "이 시간에도 예약 받기" 켠 일정 위엔 그대로 엶
     const dayEvents = getEventsForDate(d).filter(blocksBooking);
     const cuts = dayEvents.map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
-    if(i === 0) cuts.push({ s: 0, e: nowMin });
+    const isToday = dateKey === dateKeyOf(TODAY);
+    if(isToday) cuts.push({ s: 0, e: nowMin });
     const addedBands = subtractMinuteRanges(ranges, tb.initial[d.getDay()]);
     if(addedBands.length){
       const nonMergeCuts = dayEvents.filter(ev => !isMergeableAvail(ev)).map(ev => { const r = getEventDisplayRangeForDate(ev, d); return { s: r.startMin, e: r.endMin }; });
-      if(i === 0) nonMergeCuts.push({ s: 0, e: nowMin });
+      if(isToday) nonMergeCuts.push({ s: 0, e: nowMin });
       const addedRanges = subtractMinuteRanges(addedBands, nonMergeCuts);
       dayEvents.filter(isMergeableAvail).forEach(ev => {
         addedRanges.forEach(r => {
