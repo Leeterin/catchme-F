@@ -9630,6 +9630,55 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   if(kb && kb.setAccessoryBarVisible) kb.setAccessoryBarVisible({ isVisible: false }).catch(() => {});
 })();
 
+// ---------- 카카오맵 링크를 앱에서 열기 ----------
+// 설치한 앱에서 map.kakao.com 웹 링크를 누르면 사파리로 열려서, 카카오맵 앱 주소(kakaomap://)로 바꿔서 엶.
+// 카카오맵 앱이 없으면(1.5초 뒤에도 화면이 그대로면) 원래 웹 링크로 엶. 웹 브라우저에서는 그대로 웹 링크.
+function kakaoMapAppUrl(webUrl){
+  let u;
+  try { u = new URL(webUrl); } catch(e){ return null; }
+  if(u.hostname === 'place.map.kakao.com'){
+    const id = u.pathname.replace(/\D/g, '');
+    return id ? `kakaomap://place?id=${id}` : null;
+  }
+  if(u.hostname !== 'map.kakao.com') return null;
+  const m = u.pathname.match(/^\/link\/(map|to|search)\/(.+)$/);
+  if(!m) return null;
+  const rest = decodeURIComponent(m[2]);
+  if(m[1] === 'search') return `kakaomap://search?q=${encodeURIComponent(rest)}`;
+  // map/to 는 "이름,위도,경도" 형태 - 이름에 쉼표가 있을 수 있어 뒤에서부터 자름
+  const parts = rest.split(',');
+  const lon = parseFloat(parts.pop()), lat = parseFloat(parts.pop());
+  const name = parts.join(',');
+  if(isNaN(lat) || isNaN(lon)) return null;
+  if(m[1] === 'to') return `kakaomap://route?ep=${lat},${lon}&by=PUBLICTRANSIT`;
+  return name
+    ? `kakaomap://search?q=${encodeURIComponent(name)}&p=${lat},${lon}`
+    : `kakaomap://look?p=${lat},${lon}`;
+}
+function openMapUrl(webUrl){
+  const cap = window.Capacitor;
+  const isNative = cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform();
+  const appUrl = isNative ? kakaoMapAppUrl(webUrl) : null;
+  if(!appUrl){ window.open(webUrl, '_blank', 'noopener'); return; }
+  let left = false;
+  const onHide = () => { if(document.hidden) left = true; };
+  document.addEventListener('visibilitychange', onHide);
+  window.location.href = appUrl;
+  setTimeout(() => {
+    document.removeEventListener('visibilitychange', onHide);
+    if(!left && !document.hidden) window.open(webUrl, '_blank', 'noopener');
+  }, 1500);
+}
+document.addEventListener('click', (e) => {
+  const a = e.target.closest && e.target.closest('a[href]');
+  if(!a) return;
+  const cap = window.Capacitor;
+  if(!cap || typeof cap.isNativePlatform !== 'function' || !cap.isNativePlatform()) return;
+  if(!kakaoMapAppUrl(a.href)) return;
+  e.preventDefault();
+  openMapUrl(a.href);
+}, true);
+
 // ---------- 휴대폰 푸시 알림 (설치한 앱에서만 동작, 웹에서는 아무것도 안 함) ----------
 let pushToken = null;
 let pushListenersReady = false;
@@ -22586,7 +22635,7 @@ function wirePlaceInfoRow(root, post){
   if(dirBtn) dirBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const url = getPlaceDirectionsUrl(post);
-    if(url) window.open(url, '_blank');
+    if(url) openMapUrl(url);
     else showToast('위치 정보가 없어 길찾기를 열 수 없어요.');
   });
   const shareBtn = root.querySelector('.place-share-btn');
@@ -24975,7 +25024,7 @@ function openPlaceDetailMap(post){
 
   if(!hasAppt && !hasPlace){
     // 좌표가 하나도 없으면 지도를 그릴 수 없으니, 카카오맵 검색 결과로라도 보여줌
-    window.open(feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon), '_blank', 'noopener');
+    openMapUrl(feedPlaceMapLinkUrl(post.title, post.location, post.lat, post.lon));
     return;
   }
 
