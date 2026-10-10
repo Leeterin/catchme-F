@@ -19931,6 +19931,52 @@ document.getElementById('monthSchedNext').addEventListener('click', () => {
   renderMonthSchedView();
 });
 
+// 캘린더를 손가락으로 옆으로 밀면 이전/다음으로 넘김 - 오른쪽→왼쪽으로 밀면 다음, 반대면 이전.
+// 화살표 버튼을 대신 눌러주는 방식이라 버튼이 비활성(오늘 이전 못 감 등)이면 밀어도 안 넘어감.
+// 위아래 스크롤은 막지 않고 손을 뗄 때만 판단 + 가로 스크롤되는 칸(일주일 표)이 실제로 움직였으면 그쪽 스크롤로 봄
+function attachCalendarSwipe(el, getButtons){
+  if(!el) return;
+  let startX = 0, startY = 0, startT = 0, tracking = false, scrollers = [];
+  el.addEventListener('touchstart', (e) => {
+    tracking = false;
+    if(e.touches.length !== 1) return;
+    if(e.target.closest('input, textarea, select, .avail-select-grid')) return;
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY; startT = Date.now();
+    scrollers = [];
+    for(let node = e.target; node && node !== el; node = node.parentElement){
+      if(node.scrollWidth > node.clientWidth + 1){
+        const ox = window.getComputedStyle(node).overflowX;
+        if(ox === 'auto' || ox === 'scroll') scrollers.push([node, node.scrollLeft]);
+      }
+    }
+    tracking = true;
+  }, { passive: true });
+  el.addEventListener('touchend', (e) => {
+    if(!tracking) return;
+    tracking = false;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - startX, dy = t.clientY - startY;
+    if(Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - startT > 700) return;
+    if(scrollers.some(([node, left]) => Math.abs(node.scrollLeft - left) > 2)) return;
+    const [prevBtn, nextBtn] = getButtons();
+    const btn = dx < 0 ? nextBtn : prevBtn;
+    if(btn && !btn.disabled) btn.click();
+  }, { passive: true });
+  el.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+}
+[
+  ['calendarCard', 'prevMonth', 'nextMonth'],
+  ['scheduleView-day', 'dayPrev', 'dayNext'],
+  ['scheduleView-week', 'weekPrev', 'weekNext'],
+  ['scheduleView-month', 'monthSchedPrev', 'monthSchedNext'],
+  ['friendCalView-today', 'friendCalDatePrevBtn', 'friendCalDateNextBtn'],
+  ['friendCalView-week', 'friendCalDatePrevBtn', 'friendCalDateNextBtn'],
+  ['friendCalView-month', 'friendMonthPrevBtn', 'friendMonthNextBtn'],
+].forEach(([viewId, prevId, nextId]) => {
+  attachCalendarSwipe(document.getElementById(viewId), () => [document.getElementById(prevId), document.getElementById(nextId)]);
+});
+
 renderDayView(); // 초기 렌더
 // ============================================================
 // 친구 탭: 목록 -> 프로필 -> 채팅 이동
