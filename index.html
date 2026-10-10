@@ -473,7 +473,7 @@
     /* 하단 탭바(.bottom-nav)가 position:sticky로 화면 맨 아래에 항상 떠있어서, 내용이 길어지면
        (예: 종일(00~24시) 예약 가능 막대처럼 키가 큰 블록) 탭바 뒤로 겹쳐 보일 수 있었음.
        탭바 높이만큼 아래쪽에 여유 공간을 둬서 스크롤해도 내용이 탭바에 가려지지 않게 함 */
-    padding-bottom:calc(20px + 86px);
+    padding-bottom:calc(20px + 70px);
     flex:1;
     display:none;
     box-shadow:0 2px 14px rgba(23,24,29,0.05);
@@ -6706,8 +6706,9 @@
     display:flex;
     justify-content:space-around;
     align-items:center;
-    /* 아래 여백을 "13px + 홈 표시줄 영역"으로 더하면 아이폰에서 바가 너무 높이 떠 보여서, 홈 표시줄 영역 안에 겹치게 줄임 */
-    padding:9px 6px max(10px, calc(env(safe-area-inset-bottom) - 10px));
+    /* 아래 여백을 "13px + 홈 표시줄 영역"으로 더하면 아이폰에서 바가 너무 높이 떠 보여서, 홈 표시줄 영역 안에 겹치게 줄임
+       (더 내려달라는 요청으로 홈 표시줄 영역과 거의 겹치게 - 아이폰 기준 아래 여백 약 14px) */
+    padding:5px 6px max(6px, calc(env(safe-area-inset-bottom) - 20px));
     /* 늘어나는 탭 카드(flex:1)가 없는 화면(홈 등)에선 남는 높이를 이 위쪽 여백이 가져가 바를 화면 맨 아래로 내림 */
     margin-top:auto;
     border-top:1px solid var(--glass-border);
@@ -6725,17 +6726,17 @@
     display:flex;
     flex-direction:column;
     align-items:center;
-    gap:5px;
+    gap:3px;
     color:var(--text-dim);
     cursor:pointer;
-    padding:7px 11px;
-    border-radius:12px;
+    padding:5px 10px;
+    border-radius:11px;
     transition:color .15s ease, transform .15s ease;
   }
   .nav-item:active{ transform:scale(0.93); }
-  .nav-item svg{ width:25px;height:25px; }
+  .nav-item svg{ width:21px;height:21px; }
   .nav-item span{
-    font-size:11.5px;
+    font-size:10.5px;
     font-family:'Inter',sans-serif;
     font-weight:600;
   }
@@ -7070,6 +7071,8 @@
     margin-bottom:14px;
   }
   .inv-signup-card ul{ margin:8px 0 14px; padding-left:18px; font-size:12.5px; line-height:1.7; color:var(--text); }
+  .inv-signup-card .inv-card-desc{ margin-top:4px; }
+  .inv-signup-hint{ text-align:center; font-size:11.5px; color:var(--text-dim); margin:8px 0 2px; }
   .inv-empty{ text-align:center; color:var(--text-dim); font-size:12.5px; padding:20px 0; }
   .inv-empty small{ font-size:11.5px; }
   .inv-retry-btn{ border:1px solid var(--accent); background:var(--surface); color:var(--accent); border-radius:999px; padding:8px 18px; font-size:13px; font-weight:700; cursor:pointer; }
@@ -31250,6 +31253,24 @@ async function refreshOpenInvite(){
   } catch(err) {}
 }
 
+// 가입 안 한 사람은 실시간 알림(소켓)을 못 받아서, 응답을 보내 두고 화면을 열어 둔 동안 20초마다 확인함.
+// 그 사이 확정되면 바로 확정 화면(가입 권유 카드 포함)으로 바뀜
+setInterval(async () => {
+  const st = inviteState;
+  if(authToken || document.hidden || st.mode !== 'guest' || !st.invite || st.invite.status !== 'OPEN') return;
+  if(!st.invite.myResponse || st.dirty || st.nameDirty || st.busy) return;
+  try {
+    const token = st.token;
+    const gk = inviteGuestKey(token, false);
+    const data = await apiRequest(`/invites/${encodeURIComponent(token)}${gk ? `?guestKey=${encodeURIComponent(gk)}` : ''}`);
+    // 상태가 바뀔 때만 다시 그림 (안 바뀌었는데 다시 그리면 스크롤이 튐)
+    if(st.token !== token || st.mode !== 'guest' || data.invite.status === 'OPEN') return;
+    applyInviteData(data.invite, false);
+    renderInviteOverlay();
+    if(data.invite.status === 'CONFIRMED') showToast('약속 시간이 정해졌어요!', 2500);
+  } catch(err) {}
+}, 20 * 1000);
+
 // ---------- 그리기 ----------
 function renderInviteOverlay(){
   const body = document.getElementById('inviteBody');
@@ -31603,15 +31624,17 @@ function renderInviteGuestHtml(){
           </div>`;
       }
     } else {
-      // 확정된 다음에만 가입을 권함
+      // 확정된 다음에만 가입을 권함 - 방금 겪은 "링크 하나로 시간 정하기"를 나도 해보자는 흐름으로
       html += `<div class="inv-signup-card">
-          <div class="inv-card-title">이 약속, 잊지 않게 담아둘까요?</div>
+          <div class="inv-card-title">다음 약속은 내가 링크로 잡아볼까요?</div>
+          <div class="inv-card-desc">방금처럼 ${creator}님은 링크 하나로 시간을 정했어요. 내 캘린더를 만들어 두면 나도 "언제 돼?" 없이 약속을 잡을 수 있어요.</div>
           <ul>
-            ${mine ? '<li>가입하면 이 약속이 <b>내 캘린더에 자동으로</b> 담겨요</li>' : '<li>약속을 캘린더에 모아 관리할 수 있어요</li>'}
-            <li>다음엔 친구 일정에서 <b>비는 시간을 바로</b> 보고 약속을 잡을 수 있어요</li>
+            ${mine ? '<li>이 약속이 <b>내 캘린더에 바로</b> 담겨요</li>' : '<li>약속을 캘린더 하나에 모아 볼 수 있어요</li>'}
+            <li>친구 일정에서 <b>비는 시간을 바로</b> 보고 약속을 잡아요</li>
             <li>장소 정하기, 투표까지 채팅방 하나로 끝나요</li>
           </ul>
-          <button type="button" class="inv-primary cta" data-act="signup">${mine ? 'CATCHME 가입하고 캘린더에 담기' : 'CATCHME 시작하기'}</button>
+          <button type="button" class="inv-primary cta" data-act="signup">${mine ? '나도 내 캘린더 만들고 이 약속 담기' : '나도 내 캘린더 만들고 편하게 약속 잡기'}</button>
+          <div class="inv-signup-hint">카카오·네이버로 바로 시작할 수 있어요</div>
           <button type="button" class="inv-text-btn" data-act="close">괜찮아요</button>
         </div>`;
     }
