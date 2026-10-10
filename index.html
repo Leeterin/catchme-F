@@ -6802,6 +6802,7 @@
     min-width:0;
   }
   .month-selected-main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .month-selected-travel{ margin-top:3px; font-size:11.5px; color:var(--text-dim); }
   /* 장소·메모 줄이 있으면 점·시간은 제목 줄에 맞춤 */
   .month-selected-row:has(.ev-info){ align-items:flex-start; }
   .month-selected-row:has(.ev-info) .month-selected-dot{ margin-top:5px; }
@@ -17229,10 +17230,7 @@ function eventPlaceNoteHtml(ev){
     ? `<a class="ev-info-line ev-info-place" href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener"><span class="ev-info-icon">📍</span><span class="ev-info-text"><b>${escapeHtml(ev.place.name)}</b>${ev.place.address && ev.place.address !== ev.place.name ? `<span class="ev-info-addr">${escapeHtml(ev.place.address)}</span>` : ''}</span></a>`
     : '';
   const note = ev.note ? `<div class="ev-info-line ev-info-note"><span class="ev-info-icon">📝</span><span class="ev-info-text">${escapeHtml(ev.note)}</span></div>` : '';
-  // 라벨 색으로 고른 일정이면 라벨 이름도 한 줄로
-  const labelName = ev.color ? colorLabelName(ev.color) : null;
-  const label = labelName ? `<div class="ev-info-line ev-info-label"><span class="ev-info-icon"><span class="ecs-dot" style="display:inline-block;width:9px;height:9px;background:${ev.color}"></span></span><span class="ev-info-text">${escapeHtml(labelName)}</span></div>` : '';
-  return place || note || label ? `<div class="ev-info">${label}${place}${note}</div>` : '';
+  return place || note ? `<div class="ev-info">${place}${note}</div>` : '';
 }
 // 일정 장소 - 검색해서 고르면 주소·좌표까지, 그냥 적으면 이름만 저장 (나만 보는 정보)
 let formPlace = null; // { name, address, lat, lon } | null
@@ -19800,7 +19798,7 @@ function renderMonthSelectedPanel(){
         <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''}>
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}"></span>
           <span class="month-selected-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</span>
-          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${eventPlaceNoteHtml(ev)}</span>
+          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<span class="month-selected-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발</span>` : ''}${eventPlaceNoteHtml(ev)}</span>
           ${goesToChat ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
           ${isSpecial ? '' : `
           <span class="month-selected-row-actions">
