@@ -12909,18 +12909,7 @@ function feedPostCardHtml(post){
       ` : ''}
     </div>
     <div class="feed-review-social-row">
-      <button type="button" class="feed-social-btn feed-comment-toggle-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-        <span class="feed-comment-count">댓글 ${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span>
-      </button>
       <button type="button" class="feed-social-btn feed-card-share-btn">${ICO.send}<span>채팅방에 보내기</span></button>
-    </div>
-    <div class="feed-comment-section" style="display:none;">
-      <div class="feed-comment-list"></div>
-      <div class="feed-comment-input-row">
-        <input type="text" class="feed-comment-input" placeholder="댓글을 입력하세요" maxlength="200" />
-        <button type="button" class="feed-comment-submit-btn">등록</button>
-      </div>
     </div>
   `;
 }
@@ -13003,20 +12992,11 @@ function feedPostDetailHtml(post){
         <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="이 장소 저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
         <button type="button" class="feed-detail-mini-btn feed-share-btn" title="채팅방에 보내기">${ICO.send}</button>
       </div>
-
-      <div class="feed-detail-review-section">
-        <div class="feed-detail-review-title">댓글 <span class="feed-comment-count">${typeof post.commentCount === 'number' ? post.commentCount : 0}개</span></div>
-        <div class="feed-comment-list"></div>
-        <div class="feed-comment-input-row">
-          <input type="text" class="feed-comment-input" placeholder="댓글을 남겨보세요" maxlength="200" />
-          <button type="button" class="feed-comment-submit-btn">댓글 등록</button>
-        </div>
-      </div>
     </div>
   `;
 }
 
-// 상세보기 화면의 리뷰(댓글)/수정/삭제/신고/저장/공유 동작을 전부 연결함
+// 상세보기 화면의 수정/삭제/신고/저장/공유 동작을 전부 연결함
 function wireFeedPostDetail(container, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   const titleBtn = container.querySelector('.feed-detail-title');
@@ -13070,79 +13050,6 @@ function wireFeedPostDetail(container, post){
   // 친구한테 메시지로 전송
   const shareBtn = container.querySelector('.feed-share-btn');
   shareBtn.addEventListener('click', () => openFeedShareFriendPicker(post));
-
-  // 리뷰(댓글) 목록은 상세보기에서는 항상 펼쳐진 채로 바로 불러옴
-  const commentList = container.querySelector('.feed-comment-list');
-  function renderCommentList(comments){
-    if(comments.length === 0){
-      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</div>`;
-      return;
-    }
-    commentList.innerHTML = comments.map(c => `
-      <div class="feed-comment-row" data-comment-id="${c.id}" data-rating="${typeof c.rating === 'number' ? c.rating : ''}">
-        <b>${escapeHtml(feedAuthorDisplayName(c.author))}</b>
-        <span style="flex:1;">${typeof c.rating === 'number' ? `<span class="feed-comment-rating-badge">${renderStarsHtml(c.rating)}</span>` : ''}${escapeHtml(c.text)}</span>
-        ${currentUser && c.author && c.author.id === currentUser.id ? '<button type="button" class="feed-comment-delete-btn" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:0;">삭제</button>' : ''}
-      </div>
-    `).join('');
-    commentList.querySelectorAll('.feed-comment-delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const row = btn.closest('.feed-comment-row');
-        const commentId = row.dataset.commentId;
-        const deletedRating = row.dataset.rating ? parseInt(row.dataset.rating, 10) : null;
-        try {
-          await apiRequest(`/feed/comments/${commentId}`, { method: 'DELETE' });
-          row.remove();
-          const countEl = container.querySelector('.feed-comment-count');
-          const n = Math.max(0, parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) - 1);
-          countEl.textContent = `${n}개`;
-          post.commentCount = n;
-          if(deletedRating){
-            const total = (post.avgRating || 0) * post.ratingCount - deletedRating;
-            post.ratingCount = Math.max(0, post.ratingCount - 1);
-            post.avgRating = post.ratingCount > 0 ? Math.round((total / post.ratingCount) * 10) / 10 : null;
-            updateFeedDetailRatingDisplay(container, post);
-          }
-          if(!commentList.querySelector('.feed-comment-row')){
-            commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</div>`;
-          }
-        } catch(err){
-          showToast(err.message);
-        }
-      });
-    });
-  }
-  async function loadAndRenderComments(){
-    commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">불러오는 중...</div>`;
-    try {
-      const data = await apiRequest(`/feed/${post.id}/comments`);
-      renderCommentList(data.comments || []);
-    } catch(err){
-      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">댓글을 불러오지 못했어요.</div>`;
-    }
-  }
-  loadAndRenderComments();
-
-  // 댓글에는 더 이상 별점을 붙이지 않음 (장소 자체의 별점은 게시물을 쓸 때만 매김) - 예전에 별점과 함께
-  // 남겨진 댓글은 renderCommentList/삭제 로직에서 그대로 표시·정산되도록 남겨둠
-  const commentInput = container.querySelector('.feed-comment-input');
-  const submitComment = async () => {
-    const text = commentInput.value.trim();
-    if(!text) return;
-    try {
-      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
-      commentInput.value = '';
-      const countEl = container.querySelector('.feed-comment-count');
-      const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
-      countEl.textContent = `${n}개`;
-      post.commentCount = n;
-      await loadAndRenderComments();
-    } catch(err){
-      showToast(err.message);
-    }
-  };
-  container.querySelector('.feed-comment-submit-btn').addEventListener('click', submitComment);
-  commentInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.isComposing) submitComment(); });
 }
 
 // ---------- 추천 게시물 -> 약속 장소로 선택 ----------
@@ -14099,7 +14006,7 @@ document.querySelectorAll('#feedTagViewToggle .feed-tag-view-btn, #feedAuthorVie
 // 게시물 삭제 공통 처리 - 한 번 더 물어보고, 지운 글은 목록·장소 모아보기·작성자 리뷰 화면에서도 같이 빠짐.
 // 취소하면 false를 돌려줌
 async function deleteFeedPostItem(post){
-  const ok = await appConfirm({ title: '게시물을 삭제할까요?', html: '삭제하면 댓글도 함께 사라지고 되돌릴 수 없어요.', yesText: '삭제', noText: '취소' });
+  const ok = await appConfirm({ title: '게시물을 삭제할까요?', html: '삭제하면 되돌릴 수 없어요.', yesText: '삭제', noText: '취소' });
   if(!ok) return false;
   await apiRequest(`/feed/${post.id}`, { method: 'DELETE' });
   Object.keys(FEED_POSTS).forEach(cat => { FEED_POSTS[cat] = (FEED_POSTS[cat] || []).filter(p => p.id !== post.id); });
@@ -14117,7 +14024,7 @@ async function deleteFeedPostItem(post){
   return true;
 }
 
-// 게시물 카드의 동작(좋아요·댓글·수정·삭제·신고) 연결
+// 게시물 카드의 동작(수정·삭제·신고) 연결
 function wireFeedPostCard(card, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
   // 장소 태그(#상호명)를 누르면 해시태그처럼 같은 장소로 올라온 다른 글들을 모아서 보여줌
@@ -14147,78 +14054,6 @@ function wireFeedPostCard(card, post){
       }
     });
   }
-
-  // 댓글 펼치기/접기 - 처음 펼칠 때만 서버에서 불러옴
-  const commentSection = card.querySelector('.feed-comment-section');
-  const commentList = card.querySelector('.feed-comment-list');
-  let commentsLoaded = false;
-  async function loadAndRenderComments(){
-    commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">불러오는 중...</div>`;
-    try {
-      const data = await apiRequest(`/feed/${post.id}/comments`);
-      renderCommentList(data.comments || []);
-    } catch(err){
-      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">댓글을 불러오지 못했어요.</div>`;
-    }
-  }
-  function renderCommentList(comments){
-    if(comments.length === 0){
-      commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
-      return;
-    }
-    commentList.innerHTML = comments.map(c => `
-      <div class="feed-comment-row" data-comment-id="${c.id}">
-        <b>${escapeHtml(feedAuthorDisplayName(c.author))}</b>
-        <span style="flex:1;">${typeof c.rating === 'number' ? `<span class="feed-comment-rating-badge">${renderStarsHtml(c.rating)}</span>` : ''}${escapeHtml(c.text)}</span>
-        ${currentUser && c.author && c.author.id === currentUser.id ? '<button type="button" class="feed-comment-delete-btn" style="background:none;border:none;color:var(--text-dim);font-size:11px;cursor:pointer;padding:0;">삭제</button>' : ''}
-      </div>
-    `).join('');
-    commentList.querySelectorAll('.feed-comment-delete-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const row = btn.closest('.feed-comment-row');
-        const commentId = row.dataset.commentId;
-        try {
-          await apiRequest(`/feed/comments/${commentId}`, { method: 'DELETE' });
-          row.remove();
-          const countEl = card.querySelector('.feed-comment-count');
-          const n = Math.max(0, parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) - 1);
-          countEl.textContent = `댓글 ${n}개`;
-          post.commentCount = n;
-          if(!commentList.querySelector('.feed-comment-row')){
-            commentList.innerHTML = `<div style="font-size:12px;color:var(--text-dim);">아직 댓글이 없어요.</div>`;
-          }
-        } catch(err){
-          showToast(err.message);
-        }
-      });
-    });
-  }
-  card.querySelector('.feed-comment-toggle-btn').addEventListener('click', () => {
-    const nowHidden = commentSection.style.display === 'none';
-    commentSection.style.display = nowHidden ? 'block' : 'none';
-    if(nowHidden && !commentsLoaded){
-      commentsLoaded = true;
-      loadAndRenderComments();
-    }
-  });
-  const commentInput = card.querySelector('.feed-comment-input');
-  const submitComment = async () => {
-    const text = commentInput.value.trim();
-    if(!text) return;
-    try {
-      await apiRequest(`/feed/${post.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
-      commentInput.value = '';
-      const countEl = card.querySelector('.feed-comment-count');
-      const n = parseInt(countEl.textContent.replace(/[^0-9]/g, ''), 10) + 1;
-      countEl.textContent = `댓글 ${n}개`;
-      post.commentCount = n;
-      await loadAndRenderComments();
-    } catch(err){
-      showToast(err.message);
-    }
-  };
-  card.querySelector('.feed-comment-submit-btn').addEventListener('click', submitComment);
-  commentInput.addEventListener('keydown', (e) => { if(e.key === 'Enter' && !e.isComposing) submitComment(); });
 }
 
 // 서버에 저장된 게시물 목록을 불러와서 로컬 목록에 합침
