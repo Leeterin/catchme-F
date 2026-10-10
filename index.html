@@ -5405,6 +5405,7 @@
   .qa-info b{ font-weight:700; }
   .qa-info small{ display:block; color:var(--text-dim); font-size:11px; }
   .qa-info-item + .qa-info-item{ margin-top:5px; }
+  .qa-info-add{ display:block; width:100%; margin-top:7px; padding:7px 0; border:1px solid var(--accent); border-radius:8px; background:var(--accent-soft); color:var(--accent); font-size:12.5px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer; }
   .qa-time > span{ cursor:pointer; border-bottom:1px dashed var(--line); }
   .qa-time.editing > span{ color:var(--accent); border-bottom-color:var(--accent); }
   .qa-edit{ display:flex; align-items:center; justify-content:center; gap:4px; margin:0 8px 8px; font-size:13px; }
@@ -16874,6 +16875,7 @@ function renderVisibilityHint(){
 let availGridWeekStart = null; // 지금 보는 주의 첫날
 let formAvailRanges = {}; // dateKey -> [{ s, e }] 시간순 - 주를 넘겨도 다른 주에 정한 시간은 그대로 남음
 let formAvailEdit = null; // 시간 글자를 눌러 5분 단위로 고치는 중인 막대 { dk, idx }
+let formAvailInfo = null; // 회색/점선을 눌렀을 때 보여주는 일정 설명 { dk, min }
 let formAvailAxis = { s: 0, e: 24 * 60 }; // 막대가 보여주는 시간 범위
 let formAvailDrag = null;
 // 저장할 때 등록할 블록들
@@ -17238,6 +17240,7 @@ function setEventTypeUI(type){
     syncAvailFirstTip();
     availGridWeekStart = getWeekStart(scheduleFocusDate);
     formAvailEdit = null;
+    formAvailInfo = null;
     renderFormAvailBars();
   }
 
@@ -17855,6 +17858,7 @@ function renderFormAvailBars(){
       </div>
       ${editing >= 0 ? formAvailEditHtml(dk, editing) : ''}
       <div class="qa-track" data-fa-track="${dk}">${grid}${otherHtml}${bars}${busyHtml}</div>
+      ${formAvailInfo && formAvailInfo.dk === dk ? formAvailInfoHtml(dk, formAvailInfo.min) : ''}
     </div>`;
   }).join('');
   html += `<div class="qa-axis">${labelTicks.map(h => `<span style="left:${formAvailPct(h * 60)}%">${h}시</span>`).join('')}</div>`;
@@ -17863,6 +17867,16 @@ function renderFormAvailBars(){
     html += `<div class="qa-legend">${anyBusy ? '<span><i></i>내 일정</span>' : ''}${anySoft ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>이미 연 시간</span>' : ''}</div>`;
   }
   document.getElementById('formAvailRows').innerHTML = html;
+}
+// 회색/점선을 눌렀을 때 그 시간에 있는 일정 설명 (빠르게 열기와 같은 모양)
+function formAvailInfoHtml(dk, min){
+  const d = parseDateInputValue(dk);
+  const items = formAvailBusyFor(d).busy.filter(b => b.s <= min && b.e > min);
+  if(!items.length) return '';
+  return `<div class="qa-info">${items.map(b => {
+    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열 수 있어요' : '일정이 있어서 이 시간은 열 수 없어요';
+    return `<div class="qa-info-item"><b>${escapeHtml(b.title)}</b> ${minutesToLabel(b.s)}–${minutesToLabel(b.e)}<small>${d.getMonth() + 1}/${d.getDate()} · ${note}</small></div>`;
+  }).join('')}${items.every(b => b.soft) ? '<button type="button" class="qa-info-add" data-fa-info-add>이 시간 열기</button>' : ''}</div>`;
 }
 // 한 줄에 시간을 하나 더 넣음 - 누른 곳(centerMin)이 있으면 거기, 없으면 가장 넓은 빈 곳 가운데에 2시간
 function formAvailAddRange(dk, centerMin){
@@ -17894,6 +17908,12 @@ document.getElementById('formAvailRows').addEventListener('click', (e) => {
   }
   const add = e.target.closest('[data-fa-add]');
   if(add){ formAvailAddRange(add.dataset.faAdd); return; }
+  if(e.target.closest('[data-fa-info-add]')){
+    const info = formAvailInfo;
+    formAvailInfo = null;
+    if(!info || !formAvailAddRange(info.dk, info.min)) renderFormAvailBars();
+    return;
+  }
   const del = e.target.closest('[data-fa-del]');
   if(del){
     const [dk, idx] = del.dataset.faDel.split('|');
@@ -17994,16 +18014,17 @@ function formAvailMinAt(track, clientX){
     const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
     if(isTap){
       const min = formAvailMinAt(dr.track, e.clientX);
-      const hit = formAvailBusyFor(parseDateInputValue(dr.dk)).busy.find(b => b.s <= min && b.e > min);
-      if(hit && !hit.soft && dr.tap){
-        showToast(`${hit.title} ${minutesToLabel(hit.s)}–${minutesToLabel(hit.e)} · 일정이 있어 이 시간은 열 수 없어요`);
+      const hits = formAvailBusyFor(parseDateInputValue(dr.dk)).busy.filter(b => b.s <= min && b.e > min);
+      // 회색/점선 위를 누르면 무슨 일정인지 먼저 보여줌 - 점선(겹쳐도 예약 받는 일정)이면 설명 안의 '이 시간 열기'로 시간을 넣음 (막대 위면 시간 고르기)
+      if(dr.tap && hits.length){
+        const ids = m => formAvailBusyFor(parseDateInputValue(dr.dk)).busy.map((b, i) => b.s <= m && b.e > m ? i : -1).filter(i => i >= 0).join();
+        const same = formAvailInfo && formAvailInfo.dk === dr.dk && ids(formAvailInfo.min) === ids(min);
+        formAvailInfo = same ? null : { dk: dr.dk, min };
+        renderFormAvailBars();
         return;
       }
-      if(hit){
-        showToast(`${hit.title} ${minutesToLabel(hit.s)}–${minutesToLabel(hit.e)} · ${hit.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : '이 시간은 빼고 열어요'}`);
-        return;
-      }
-      if(dr.tap){ formAvailAddRange(dr.dk, min); return; }
+      formAvailInfo = null;
+      if(dr.tap){ formAvailAddRange(dr.dk, min); renderFormAvailBars(); return; }
       formAvailEdit = { dk: dr.dk, idx: dr.idx };
       renderFormAvailBars();
       return;
@@ -18029,11 +18050,13 @@ blockLongPressLoupe(document.getElementById('quickAvailOverlay'), '[data-qa-hand
 document.getElementById('availWeekPrev').addEventListener('click', () => {
   availGridWeekStart.setDate(availGridWeekStart.getDate() - 7);
   formAvailEdit = null;
+  formAvailInfo = null;
   renderFormAvailBars();
 });
 document.getElementById('availWeekNext').addEventListener('click', () => {
   availGridWeekStart.setDate(availGridWeekStart.getDate() + 7);
   formAvailEdit = null;
+  formAvailInfo = null;
   renderFormAvailBars();
 });
 
@@ -30179,9 +30202,9 @@ function quickAvailInfoHtml(dow, min){
   return `<div class="qa-info">${items.map(b => {
     const weekly = quickAvailRepeat === 'month' && b.dates.length >= quickDowCount(dow);
     const when = weekly ? `매주 ${WEEKDAY_KO[dow]}요일` : b.dates.map(d => `${d.getMonth() + 1}/${d.getDate()}`).join(', ');
-    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열려요' : quickBusyWeekly(b) ? (weekly ? '매주 있는 일정이라 이 시간은 열 수 없어요' : '일정이 있어서 이 시간은 열 수 없어요') : '그날 일정이 있어서 이 시간은 열 수 없어요';
+    const note = b.soft ? '겹쳐도 예약 받는 일정이라 이 시간도 열 수 있어요' : quickBusyWeekly(b) ? (weekly ? '매주 있는 일정이라 이 시간은 열 수 없어요' : '일정이 있어서 이 시간은 열 수 없어요') : '그날 일정이 있어서 이 시간은 열 수 없어요';
     return `<div class="qa-info-item"><b>${escapeHtml(b.title)}</b> ${minutesToLabel(b.s)}–${minutesToLabel(b.e)}<small>${when} · ${note}</small></div>`;
-  }).join('')}</div>`;
+  }).join('')}${items.every(b => b.soft) ? '<button type="button" class="qa-info-add" data-qa-info-add>이 시간 열기</button>' : ''}</div>`;
 }
 // 시간 글자를 누르면 나오는 5분 단위 시간 고르기
 function quickAvailEditHtml(dow, idx){
@@ -30363,6 +30386,13 @@ document.getElementById('quickAvailOverlay').addEventListener('click', (e) => {
     quickAvailRepeat = quickAvailRepeat === 'month' ? 'once' : 'month';
     try { localStorage.setItem(QUICK_REPEAT_KEY, quickAvailRepeat); } catch(err) {}
     quickAvailPeriodChanged();
+    return;
+  }
+  if(e.target.closest('[data-qa-info-add]')){
+    const info = quickAvailInfo;
+    quickAvailInfo = null;
+    const row = info && quickAvailRows().find(r => r.dows.includes(info.dow));
+    if(!row || !quickAvailAddRange(row, info.min)) renderQuickAvail();
     return;
   }
   const wk = e.target.closest('[data-qa-week]');
@@ -30564,16 +30594,8 @@ function endQuickDrag(e){
   if(isTap){
     const min = quickMinAt(dr.track, e.clientX);
     const busyHere = quickBusyAt(dow, min);
-    // 겹쳐도 예약 받는 일정 위는 빈 곳처럼 누르면 시간이 들어감 (막대 위면 시간 고르기) - 겹치면 안 되는 일정 위는 설명만 보여줌
-    if(!busyHere.some(b => !b.soft)){
-      quickAvailInfo = null;
-      if(!dr.tap){ quickAvailEdit = { dow, idx: dr.idx }; renderQuickAvail(); return; }
-      if(quickAvailAddRange(dr.row, min)){
-        if(busyHere[0]) showToast(`${busyHere[0].title} · 겹쳐도 예약 받는 일정이라 이 시간도 열려요`);
-        return;
-      }
-    }
-    if(busyHere.length){
+    // 회색/점선 위를 누르면 무슨 일정인지 먼저 보여줌 - 점선(겹쳐도 예약 받는 일정)이면 설명 안의 '이 시간 열기'로 시간을 넣음 (막대 위면 시간 고르기)
+    if(dr.tap && busyHere.length){
       // 같은 곳을 다시 누르면 설명을 닫음
       const ids = m => quickBusyAt(dow, m).map(b => quickAvailBusy[dow].indexOf(b)).join();
       const same = quickAvailInfo && quickAvailInfo.dow === dow && ids(quickAvailInfo.min) === ids(min);
