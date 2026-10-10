@@ -22728,7 +22728,7 @@ function getRoomPlaceStatus(room, placeName){
   if(!name) return null;
   const confirmedPin = (room.pinnedSchedules || []).find(p => !p.dateObj && (p.location || '').trim().toLowerCase() === name);
   if(confirmedPin) return 'confirmed';
-  const pendingMsg = (room.messages || []).find(m => m.type === 'location-suggest' && m.status === 'pending' && (m.place || '').trim().toLowerCase() === name);
+  const pendingMsg = (room.messages || []).find(m => isOpenLocationSuggest(room, m) && (m.place || '').trim().toLowerCase() === name);
   if(pendingMsg) return 'pending';
   return null;
 }
@@ -23530,11 +23530,48 @@ async function acceptLocationSuggestMsg(m, room){
 let placeViewerMap = null;
 let placeViewerOverlays = [];
 let placeViewerState = null; // { roomId, ids:Set, selectedId, pinned }
-// 장소 제안 번호 - 이 방에서 올라온 순서대로 1, 2, 3... (누가 제안했든 이어서 매김)
+function locationSuggestTime(m){
+  const t = new Date(m.time).getTime();
+  return isNaN(t) ? 0 : t;
+}
+// 이 방에서 이미 끝난 약속들의 끝난 시각 - 그 전에 올라온 장소 제안은 지난 약속 것으로 봄
+function pastPinEndTimes(room){
+  return (room.pinnedSchedules || []).filter(p => p.dateObj && isPinPast(p)).map(p => pinEndDate(p).getTime());
+}
+function isStaleLocationSuggest(room, m){
+  const t = locationSuggestTime(m);
+  return pastPinEndTimes(room).some(end => t < end);
+}
+// 지금 약속을 위해 투표 중인 제안 (지난 약속 때 올라와서 아직 대기 중인 건 뺌)
+function isOpenLocationSuggest(room, m){
+  return m.type === 'location-suggest' && m.status === 'pending' && !isStaleLocationSuggest(room, m);
+}
+// 장소 제안 번호 - 이 방에서 올라온 순서대로 1, 2, 3... (누가 제안했든 이어서 매김).
+// 장소가 확정됐거나 그 사이 약속이 끝났으면 새 약속으로 보고 다시 1번부터 매김
+function locationSuggestNumbers(room){
+  const ends = pastPinEndTimes(room);
+  const nums = new Map();
+  let no = 0, prev = null;
+  (room.messages || []).filter(x => x.type === 'location-suggest').forEach(x => {
+    if(prev){
+      const a = locationSuggestTime(prev), b = locationSuggestTime(x);
+      if(prev.status === 'confirmed' || ends.some(end => a < end && end <= b)) no = 0;
+    }
+    nums.set(x, ++no);
+    prev = x;
+  });
+  return { nums, last: prev, ends };
+}
 function locationSuggestNo(roomId, m){
   const room = CHAT_ROOMS[roomId];
   if(!room) return 0;
-  return (room.messages || []).filter(x => x.type === 'location-suggest').indexOf(m) + 1;
+  return locationSuggestNumbers(room).nums.get(m) || 0;
+}
+// 지금 새로 제안하면 붙을 번호 바로 앞 번호 (새 약속이면 0이라 1번부터 시작)
+function nextLocationSuggestBaseNo(room){
+  const { nums, last, ends } = locationSuggestNumbers(room);
+  if(!last || last.status === 'confirmed' || ends.some(end => locationSuggestTime(last) < end)) return 0;
+  return nums.get(last);
 }
 function locationSuggestTitle(roomId, m){
   const no = locationSuggestNo(roomId, m);
@@ -23544,7 +23581,7 @@ function myLocationVoterId(){
   return currentUser ? currentUser.id : 'me';
 }
 function hasPendingLocationSuggests(room){
-  return !!(room && (room.messages || []).some(m => m.type === 'location-suggest' && m.status === 'pending'));
+  return !!(room && (room.messages || []).some(m => isOpenLocationSuggest(room, m)));
 }
 
 // ---------- 장소 정하기(투표) - 제안된 후보들을 지도 + 목록으로 쫙 띄우고, 다 같이 투표하거나 투표 없이 바로 픽스 ----------
@@ -23553,12 +23590,12 @@ function placeViewerItems(){
   if(!placeViewerState) return [];
   const room = CHAT_ROOMS[placeViewerState.roomId];
   if(!room) return [];
-  return (room.messages || []).filter(m => m.type === 'location-suggest' && (m.status === 'pending' || placeViewerState.ids.has(m.id)));
+  return (room.messages || []).filter(m => isOpenLocationSuggest(room, m) || (m.type === 'location-suggest' && placeViewerState.ids.has(m.id)));
 }
 function openPlaceSuggestionMap(roomId, focusMsgId, pinned){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
-  const ids = new Set((room.messages || []).filter(m => m.type === 'location-suggest' && (m.status === 'pending' || m.id === focusMsgId)).map(m => m.id));
+  const ids = new Set((room.messages || []).filter(m => isOpenLocationSuggest(room, m) || (m.type === 'location-suggest' && m.id === focusMsgId)).map(m => m.id));
   if(!ids.size) return;
   placeViewerState = { roomId, ids, selectedId: focusMsgId || null, pinned: pinned || null };
   const items = placeViewerItems();
@@ -24471,9 +24508,9 @@ function setLocationPickerSelected(label, lat, lon, addr, kakao){
 function renderLocationPickerCandidates(){
   const wrap = document.getElementById('locationPickerCandidates');
   wrap.hidden = !locationPickerCandidates.length;
-  // 번호는 이 방에 이미 올라온 제안 다음부터 이어서 (보내면 채팅 카드에 같은 번호로 붙음)
+  // 번호는 이번 약속에 이미 올라온 제안 다음부터 이어서 (보내면 채팅 카드에 같은 번호로 붙음)
   const room = locationPickerOpts && CHAT_ROOMS[locationPickerOpts.roomId];
-  const baseNo = room ? (room.messages || []).filter(x => x.type === 'location-suggest').length : 0;
+  const baseNo = room ? nextLocationSuggestBaseNo(room) : 0;
   document.getElementById('locationPickerCandidateRow').innerHTML = locationPickerCandidates.map((c, idx) => `
     <div class="location-picker-candidate"><span>${baseNo + idx + 1}. ${escapeHtml(c.label)}</span><button type="button" data-idx="${idx}" aria-label="빼기">&times;</button></div>
   `).join('');
@@ -26747,11 +26784,13 @@ function renderChatMessages(){
     } else if(m.type === 'location-suggest'){
       const voteCount = (m.voterIds || []).length;
       const votedByMe = (m.voterIds || []).includes(myLocationVoterId());
+      const isStale = m.status === 'pending' && isStaleLocationSuggest(room, m);
       const statusLabel = m.status === 'confirmed' ? '장소로 확정됨'
         : (m.status === 'cancelled' || m.status === 'withdrawn') ? '제안 취소됨'
         : m.status === 'declined' ? '다른 장소로 정해져 마감됨'
+        : isStale ? '지난 약속이라 마감됨'
         : (voteCount ? `투표 중 · ${voteCount}표` : '투표 중');
-      const isPending = m.status === 'pending';
+      const isPending = m.status === 'pending' && !isStale;
       const showCancel = m.who === 'me' && isPending;
       const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
       const cardHtml = `
