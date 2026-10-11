@@ -5390,8 +5390,10 @@
   #inviteOverlay .qa-bar{ touch-action:pan-y; }
   /* 약속 링크 막대 - 만든 사람이 안 되는 시간(빗금), 다른 친구 시간, 인원 막대, 사람별 막대 */
   .inv-bars{ margin:4px 0 6px; }
-  .inv-bar-closed{ position:absolute; top:0; bottom:0; background:repeating-linear-gradient(-45deg, transparent 0 4px, var(--line) 4px 5px); pointer-events:none; z-index:2; }
-  .inv-legend-closed{ background:repeating-linear-gradient(-45deg, transparent 0 3px, var(--line) 3px 4px); box-shadow:inset 0 0 0 1px var(--line); }
+  /* 안 되는 시간은 진한 빗금 + 넓으면 가운데 "안 됨" - 연한 빗금은 빈 곳과 잘 구분이 안 됐음 */
+  .inv-bar-closed{ position:absolute; top:0; bottom:0; background:repeating-linear-gradient(-45deg, rgba(120,120,128,.55) 0 2px, rgba(120,120,128,.16) 2px 7px); pointer-events:none; z-index:2; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .inv-bar-closed span{ font-size:10px; font-weight:700; color:var(--text-dim); background:var(--surface); padding:0 4px; border-radius:4px; white-space:nowrap; }
+  .inv-legend-closed{ background:repeating-linear-gradient(-45deg, rgba(120,120,128,.6) 0 2px, rgba(120,120,128,.16) 2px 5px) !important; }
   .inv-bar-other{ position:absolute; bottom:2px; height:4px; border-radius:2px; background:rgba(56,189,248,.45); pointer-events:none; z-index:2; }
   .inv-bar-heat{ position:absolute; top:0; bottom:0; background:rgba(56,189,248,var(--heat)); pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .inv-bar-heat b{ font-size:11px; font-weight:700; color:var(--text); }
@@ -33438,8 +33440,21 @@ function inviteBarAxisHtml(axis){
 }
 // 만든 사람이 안 되는 시간 (빗금) - 보이는 범위에서 고를 수 있는 시간을 뺀 나머지
 function inviteClosedHtml(axis, allowed){
-  return subtractMinuteRanges([{ s: axis.s, e: axis.e }], allowed).map(r => `<i class="inv-bar-closed" style="${inviteBarStyle(axis, r)}"></i>`).join('');
+  return subtractMinuteRanges([{ s: axis.s, e: axis.e }], allowed).map(r => {
+    const w = inviteBarPct(axis, Math.min(r.e, axis.e)) - inviteBarPct(axis, Math.max(r.s, axis.s));
+    return `<i class="inv-bar-closed" style="${inviteBarStyle(axis, r)}">${w >= 14 ? '<span>안 됨</span>' : ''}</i>`;
+  }).join('');
 }
+// 링크 받은 친구가 CATCHME에 로그인해 있으면 그날 내 일정 - 회색(그 시간엔 막대를 못 놓음)/점선(겹쳐도 예약 받는 일정)
+function inviteGuestMyBusy(date){
+  if(!authToken || inviteState.mode !== 'guest') return [];
+  const day = inviteDateObj(date);
+  return getEventsForDate(day).filter(ev => ev.type !== 'available').map(ev => {
+    const r = getEventDisplayRangeForDate(ev, day);
+    return { s: r.startMin, e: r.endMin, soft: !blocksBooking(ev), title: ev.title || '일정' };
+  }).filter(b => b.e > b.s);
+}
+function inviteGuestHardBusy(date){ return quickMergeRanges(inviteGuestMyBusy(date).filter(b => !b.soft).map(b => ({ s: b.s, e: b.e }))); }
 
 // 링크 받은 친구 화면 - 날짜마다 막대 (빈 곳을 누르면 시간이 생기고, 양 끝을 끌어 늘리고 줄임)
 function renderInviteGuestBarsHtml(inv){
@@ -33462,7 +33477,9 @@ function renderInviteGuestBarsHtml(inv){
       ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-ig-edit-open="${date}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span><button type="button" class="qa-del" data-ig-del="${date}|${i}" aria-label="이 시간 빼기">&times;</button></span>`).join('')
       : '<span class="qa-time off">빈 곳을 눌러 넣어요</span>';
     const otherHtml = others.flatMap(m => m[date] || []).map(r => `<i class="inv-bar-other" style="${inviteBarStyle(axis, r)}"></i>`).join('');
-    const bars = ranges.map((r, i) => `<div class="qa-bar" data-ig-bar="${date}|${i}" style="${inviteBarStyle(axis, r)}"><span class="qa-handle s" data-ig-handle="${date}|${i}|s"></span><span class="qa-handle e" data-ig-handle="${date}|${i}|e"></span></div>`).join('');
+    const busyHtml = inviteGuestMyBusy(date).filter(b => b.e > axis.s && b.s < axis.e)
+      .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${inviteBarStyle(axis, b)}"></i>`).join('');
+    const bars = ranges.map((r, i) => `<div class="qa-bar" data-ig-bar=""${date}|${i}" style="${inviteBarStyle(axis, r)}"><span class="qa-handle s" data-ig-handle="${date}|${i}|s"></span><span class="qa-handle e" data-ig-handle="${date}|${i}|e"></span></div>`).join('');
     html += `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
         <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-ig-toggle="${date}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${escapeHtml(inviteDateLabel(date))}${date === todayKey ? QA_TODAY_HTML : ''}</button>
@@ -33470,7 +33487,7 @@ function renderInviteGuestBarsHtml(inv){
         ${on ? `<button type="button" class="qa-add" data-ig-add="${date}" aria-label="시간 더 넣기">+</button>` : ''}
       </div>
       ${editing >= 0 ? availTimeEditHtml('ig', `${date}|${editing}`, ranges[editing]) : ''}
-      <div class="qa-track" data-ig-track="${date}">${grid}${inviteClosedHtml(axis, inviteAllowedRanges(inv, date, true))}${otherHtml}${bars}</div>
+      <div class="qa-track" data-ig-track="${date}">${grid}${inviteClosedHtml(axis, inviteAllowedRanges(inv, date, true))}${otherHtml}${bars}${busyHtml}</div>
     </div>`;
   });
   return html + inviteBarAxisHtml(axis) + '</div>';
@@ -33479,7 +33496,7 @@ function renderInviteGuestBarsHtml(inv){
 function inviteGuestBounds(inv, date, ranges, idx){
   const r = ranges[idx];
   let lo = 0, hi = 24 * 60;
-  [...subtractMinuteRanges([{ s: 0, e: 24 * 60 }], inviteAllowedRanges(inv, date, true)), ...ranges.filter((_, i) => i !== idx)].forEach(o => {
+  [...subtractMinuteRanges([{ s: 0, e: 24 * 60 }], inviteAllowedRanges(inv, date, true)), ...inviteGuestHardBusy(date), ...ranges.filter((_, i) => i !== idx)].forEach(o => {
     if(o.e <= r.s) lo = Math.max(lo, o.e);
     else if(o.s >= r.e) hi = Math.min(hi, o.s);
   });
@@ -33490,7 +33507,11 @@ function inviteGuestAddRange(date, centerMin){
   const st = inviteState;
   const inv = st.invite;
   const ranges = st.myRanges[date] || [];
-  const gaps = subtractMinuteRanges(inviteAllowedRanges(inv, date, true), ranges).filter(g => g.e - g.s >= INV_AVAIL_STEP);
+  if(centerMin != null){
+    const hit = inviteGuestMyBusy(date).find(b => !b.soft && b.s <= centerMin && b.e > centerMin);
+    if(hit){ showToast(`내 일정 "${hit.title}" ${minutesToLabel(hit.s)}–${minutesToLabel(hit.e)}이 있는 시간이에요.`); return false; }
+  }
+  const gaps = subtractMinuteRanges(inviteAllowedRanges(inv, date, true), [...ranges, ...inviteGuestHardBusy(date)]).filter(g => g.e - g.s >= INV_AVAIL_STEP);
   const gap = centerMin != null ? gaps.find(g => g.s <= centerMin && g.e >= centerMin) : gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
   if(!gap){
     if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
@@ -33908,7 +33929,7 @@ function renderInviteGuestHtml(){
     </div>
     <div class="inv-sub-head"><b>되는 시간 고르기</b><span>빈 곳을 누르고, 양 끝을 끌어 맞춰요</span></div>
     ${renderInviteGuestBarsHtml(inv)}
-    <div class="inv-legend"><span><i style="background:var(--accent)"></i>내가 고른 시간</span>${others.length ? '<span><i style="background:rgba(56,189,248,0.7)"></i>다른 친구가 되는 시간</span>' : ''}<span><i class="inv-legend-closed"></i>${creator}님이 안 되는 시간</span><span>시간 글자를 누르면 5분 단위로 고쳐요</span></div>`;
+    <div class="inv-legend"><span><i style="background:var(--accent)"></i>내가 고른 시간</span>${others.length ? '<span><i style="background:rgba(56,189,248,0.7)"></i>다른 친구가 되는 시간</span>' : ''}<span><i class="inv-legend-closed"></i>${creator}님이 안 되는 시간</span>${inv.dates.some(date => inviteGuestMyBusy(date).length) ? '<span><i style="background:rgba(120,120,128,.38)"></i>내 일정</span>' : ''}<span>시간 글자를 누르면 5분 단위로 고쳐요</span></div>`;
   if(others.length){
     html += `<div class="inv-label">먼저 응답한 친구 ${others.length}명</div><div class="inv-people">`
       + others.map(r => `<span class="inv-person">${escapeHtml(r.name)}</span>`).join('') + '</div>';
