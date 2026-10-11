@@ -5433,7 +5433,7 @@
   .qa-handle.s{ left:-12px; }
   .qa-handle.e{ right:-12px; }
   .qa-handle::after{ content:''; position:absolute; left:50%; top:50%; width:6px; height:20px; margin:-10px 0 0 -3px; border-radius:3px; background:#fff; box-shadow:0 0 0 1.5px var(--accent); }
-  .qa-busy{ position:absolute; top:3px; bottom:3px; border-radius:5px; background:rgba(120,120,128,.38); pointer-events:none; z-index:2; }
+  .qa-busy{ position:absolute; top:3px; bottom:3px; min-width:10px; box-sizing:border-box; border-radius:5px; background:rgba(120,120,128,.38); pointer-events:none; z-index:2; }
   .qa-busy.soft{ background:none; border:1.5px dashed rgba(120,120,128,.8); }
   .qa-busy.once{ background:rgba(120,120,128,.18); }
   .qa-bar{ z-index:1; }
