@@ -18248,6 +18248,23 @@ document.getElementById('formAvailRows').addEventListener('change', (e) => {
   try { localStorage.setItem(QUICK_AXIS_PREF_KEY, JSON.stringify(axis)); } catch(err) {}
   renderFormAvailBars();
 });
+// 누른 곳(min)이 일정 위가 아니어도, 화면에 보이는 회색/점선 상자(최소 10px) 근처면 그 일정 가운데로 맞춤 - 몇 분짜리 짧은 일정도 눌리게
+function availSnapToBusy(busy, min, track, axis){
+  if(busy.some(b => b.s <= min && b.e > min)) return min;
+  const w = track.getBoundingClientRect().width;
+  if(!w) return min;
+  const px = m => (m - axis.s) / (axis.e - axis.s) * w;
+  const tap = px(min);
+  let best = null, bestD = 8;
+  busy.forEach(b => {
+    const s = Math.max(b.s, axis.s), e = Math.min(b.e, axis.e);
+    if(e <= s) return;
+    const l = px(s), r = Math.max(px(e), l + 10);
+    const d = tap < l ? l - tap : tap > r ? tap - r : 0;
+    if(d <= bestD){ bestD = d; best = b; }
+  });
+  return best ? (best.s + best.e) / 2 : min;
+}
 function formAvailMinAt(track, clientX){
   const rect = track.getBoundingClientRect();
   const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
@@ -18311,7 +18328,7 @@ function formAvailMinAt(track, clientX){
     if(!dr.tap) hapticSelectionEnd();
     const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
     if(isTap){
-      const min = formAvailMinAt(dr.track, e.clientX);
+      const min = availSnapToBusy(formAvailBusyFor(parseDateInputValue(dr.dk)).busy, formAvailMinAt(dr.track, e.clientX), dr.track, formAvailAxis);
       const hits = formAvailBusyFor(parseDateInputValue(dr.dk)).busy.filter(b => b.s <= min && b.e > min);
       // 회색/점선 위를 누르면 무슨 일정인지 먼저 보여줌 - 점선(겹쳐도 예약 받는 일정)이면 설명 안의 '이 시간 열기'로 시간을 넣음 (막대 위면 시간 고르기)
       if(dr.tap && hits.length){
@@ -31248,7 +31265,7 @@ function endQuickDrag(e){
   const dow = dr.row.dows[0];
   const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
   if(isTap){
-    const min = quickMinAt(dr.track, e.clientX);
+    const min = availSnapToBusy(quickAvailBusy[dow] || [], quickMinAt(dr.track, e.clientX), dr.track, quickAvailAxis);
     const busyHere = quickBusyAt(dow, min);
     // 회색/점선 위를 누르면 무슨 일정인지 먼저 보여줌 - 점선(겹쳐도 예약 받는 일정)이면 설명 안의 '이 시간 열기'로 시간을 넣음 (막대 위면 시간 고르기)
     if(dr.tap && busyHere.length){
