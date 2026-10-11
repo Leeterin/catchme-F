@@ -5388,6 +5388,22 @@
   #quickAvailOverlay .qa-bar{ touch-action:pan-y; }
   #inviteOverlay .qa-track{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   #inviteOverlay .qa-bar{ touch-action:pan-y; }
+  /* 약속 링크 막대 - 만든 사람이 안 되는 시간(빗금), 다른 친구 시간, 인원 막대, 사람별 막대 */
+  .inv-bars{ margin:4px 0 6px; }
+  .inv-bar-closed{ position:absolute; top:0; bottom:0; background:repeating-linear-gradient(-45deg, transparent 0 4px, var(--line) 4px 5px); pointer-events:none; z-index:2; }
+  .inv-legend-closed{ background:repeating-linear-gradient(-45deg, transparent 0 3px, var(--line) 3px 4px); box-shadow:inset 0 0 0 1px var(--line); }
+  .inv-bar-other{ position:absolute; bottom:2px; height:4px; border-radius:2px; background:rgba(56,189,248,.45); pointer-events:none; z-index:2; }
+  .inv-bar-heat{ position:absolute; top:0; bottom:0; background:rgba(56,189,248,var(--heat)); pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .inv-bar-heat b{ font-size:11px; font-weight:700; color:var(--text); }
+  .inv-bar-sel{ position:absolute; top:-2px; bottom:-2px; border-radius:6px; box-shadow:inset 0 0 0 2px var(--cta); pointer-events:none; z-index:3; }
+  .inv-bar-sel.done{ box-shadow:inset 0 0 0 2px #22C55E; }
+  .inv-res-day{ cursor:default; }
+  .inv-res-sum{ font-size:12px; font-weight:600; color:var(--text-dim); }
+  .inv-res-track{ overflow:hidden; }
+  /* 사람별 막대 - 위 인원 막대와 같은 폭이라 시간이 위아래로 맞음. 이름은 막대 안 왼쪽에 */
+  .inv-person-bar{ position:relative; height:18px; margin:4px 8px 0; border-radius:5px; background:var(--surface-2); overflow:hidden; }
+  .inv-person-bar i{ position:absolute; top:0; bottom:0; border-radius:5px; background:var(--accent); opacity:.55; }
+  .inv-person-bar .nm{ position:absolute; left:6px; top:0; bottom:0; display:flex; align-items:center; max-width:60%; font-size:11px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; z-index:1; pointer-events:none; }
   .quick-avail-desc{ font-size:12.5px; line-height:1.5; color:var(--text-dim); text-align:center; margin:0 0 12px; }
   .quick-avail-desc b{ color:var(--text); }
   /* 요일별 시간 막대 */
@@ -32189,26 +32205,22 @@ function renderInviteFineHtml(){
   return html + '</div>';
 }
 
-// 가장 많은 사람이 되는 시간 - 최대 인원 칸이 이어지는 가장 긴 구간 (동점이면 앞 날짜/이른 시간)
+// 가장 많은 사람이 되는 시간 - 분 단위로 인원이 가장 많은 구간 중 가장 긴 것 (동점이면 앞 날짜/이른 시간). 연 시간·지난 시간은 뺌
 function inviteBestBlock(inv){
   if(!inv.responses.length) return null;
-  const counts = inviteCounts(inv, false);
-  const max = Math.max(0, ...Object.values(counts));
-  if(max === 0) return null;
+  const people = inv.responses.map(inviteRangesByDate);
   let best = null;
   inv.dates.forEach(date => {
-    let runStart = null;
-    for(let h = inv.startHour; h <= inv.endHour; h++){
-      const hit = h < inv.endHour && (counts[inviteCellKey(date, h)] || 0) === max;
-      if(hit && runStart === null) runStart = h;
-      if(!hit && runStart !== null){
-        if(!best || h - runStart > best.end - best.start) best = { date, start: runStart, end: h, extended: true };
-        runStart = null;
-      }
-    }
+    const allowed = inviteAllowedRanges(inv, date, true);
+    inviteCountSegments(people.map(p => p[date] || [])).forEach(x => {
+      allowed.forEach(a => {
+        const s = Math.max(x.s, a.s), e = Math.min(x.e, a.e);
+        if(e <= s) return;
+        if(!best || x.n > best.count || (x.n === best.count && e - s > best.eMin - best.sMin)) best = { date, sMin: s, eMin: e, count: x.n };
+      });
+    });
   });
-  if(best) best.count = max;
-  return best ? inviteFitSel(inv, best) : null;
+  return best ? { ...best, start: Math.floor(best.sMin / 60), end: Math.ceil(best.eMin / 60), extended: true } : null;
 }
 
 // ---------- 화면 열기/닫기 ----------
@@ -32750,13 +32762,12 @@ function applyInviteData(inv, resetMine){
   inviteState.mode = inv.isCreator ? 'manage' : 'guest';
   if(inviteState.mode === 'guest'){
     if(resetMine || !inviteState.dirty){
-      inviteState.myCells = new Set(inv.myResponse ? inv.myResponse.cells : []);
-      inviteSetMyRanges(inv.myResponse ? inv.myResponse.ranges : []);
+      inviteState.myRanges = inv.myResponse ? inviteRangesByDate(inv.myResponse) : {};
+      inviteState.barEdit = null;
       inviteState.dirty = false;
     }
-    // 만든 사람이 캘린더에서 지운 시간은 내 선택에서도 뺌
-    const open = inviteOpenSet(inv);
-    if(open) [...inviteState.myCells].forEach(k => { if(!open.has(k)) inviteState.myCells.delete(k); });
+    // 만든 사람이 캘린더에서 지운 시간·지난 시간은 내 선택에서도 뺌 (보낼 1시간 칸도 같이 맞춤)
+    inviteGuestSync();
     if(!inviteState.guestName){
       inviteState.guestName = (inv.myResponse && inv.myResponse.name)
         || (currentUser && currentUser.name)
@@ -33348,6 +33359,361 @@ function renderInviteGridHtml(inv, mode){
   return html;
 }
 
+// ---------- 막대로 시간 고르기/보기 - 링크 받은 친구는 막대로 되는 시간을 고르고, 만든 사람은 응답을 막대로 봄 ----------
+const INV_GUEST_MIN_LEN = 15; // 친구가 고르는 시간은 15분보다 짧아지지 않게 (만든 사람이 연 시간이 짧을 수 있어서 30분보다 작게)
+// 그날 고를 수 있는 시간 [{s, e}] - 만든 사람이 연 시간. cutPast면 지난 시간은 뺌
+function inviteAllowedRanges(inv, date, cutPast){
+  let list;
+  const om = inviteOpenMinutes(inv);
+  const open = inviteOpenSet(inv);
+  if(om) list = (om[date] || []).map(r => ({ s: r.s, e: r.e }));
+  else if(open) list = quickMergeRanges([...open].filter(k => k.split('|')[0] === date).map(k => { const h = Number(k.split('|')[1]); return { s: h * 60, e: h * 60 + 60 }; }));
+  else list = inv.dates.includes(date) ? [{ s: inv.startHour * 60, e: inv.endHour * 60 }] : [];
+  if(cutPast){
+    const today = inviteYmd(new Date());
+    if(date < today) return [];
+    if(date === today){
+      const now = new Date();
+      const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / INV_AVAIL_STEP) * INV_AVAIL_STEP;
+      list = list.map(r => ({ s: Math.max(r.s, nowMin), e: r.e })).filter(r => r.e > r.s);
+    }
+  }
+  return list;
+}
+// 내가 고른 시간을 고를 수 있는 시간 안으로 자르고, 서버에 보낼 1시간 칸(myCells)도 맞춤
+function inviteGuestSync(){
+  const st = inviteState;
+  const inv = st.invite;
+  const out = {};
+  Object.keys(st.myRanges || {}).forEach(date => {
+    const allowed = inviteAllowedRanges(inv, date, true);
+    const list = quickMergeRanges(st.myRanges[date].flatMap(r => allowed.map(a => ({ s: Math.max(r.s, a.s), e: Math.min(r.e, a.e) }))).filter(r => r.e - r.s >= INV_AVAIL_STEP));
+    if(list.length) out[date] = list;
+  });
+  st.myRanges = out;
+  st.myCells = new Set();
+  Object.keys(out).forEach(date => out[date].forEach(r => {
+    for(let h = Math.floor(r.s / 60); h < Math.ceil(r.e / 60); h++) st.myCells.add(inviteCellKey(date, h));
+  }));
+}
+function inviteGuestRangeCount(){ return Object.values(inviteState.myRanges || {}).reduce((n, l) => n + l.length, 0); }
+// 보낼 시간 "YYYY-MM-DD|HH:MM|HH:MM"
+function inviteGuestRangeStrings(){
+  const m = inviteState.myRanges || {};
+  return Object.keys(m).sort().flatMap(date => m[date].map(r => `${date}|${inviteHmRaw(r.s)}|${inviteHmRaw(r.e)}`));
+}
+function inviteRangesByDate(r){
+  const out = {};
+  inviteResponseRanges(r).forEach(x => { (out[x.date] = out[x.date] || []).push({ s: x.s, e: x.e }); });
+  return out;
+}
+// 보여줄 시간 범위 - 고를 수 있는 시간·고른 시간이 다 들어가게 정각으로 (최소 6시간)
+function inviteBarAxis(lists){
+  const all = lists.flat();
+  if(!all.length) return { s: 9 * 60, e: 21 * 60 };
+  let s = Math.floor(Math.min(...all.map(r => r.s)) / 60) * 60;
+  let e = Math.ceil(Math.max(...all.map(r => r.e)) / 60) * 60;
+  while(e - s < 6 * 60){
+    if(s > 0) s -= 60;
+    if(e < 24 * 60 && e - s < 6 * 60) e += 60;
+  }
+  return { s, e };
+}
+function inviteBarPct(axis, m){ return (m - axis.s) / (axis.e - axis.s) * 100; }
+function inviteBarStyle(axis, r){
+  const s = Math.max(r.s, axis.s), e = Math.min(r.e, axis.e);
+  if(e <= s) return 'display:none';
+  return `left:${inviteBarPct(axis, s)}%;width:${inviteBarPct(axis, e) - inviteBarPct(axis, s)}%`;
+}
+function inviteBarGridHtml(axis){
+  const ticks = [];
+  for(let h = Math.ceil(axis.s / 180) * 3; h * 60 <= axis.e; h += 3) ticks.push(h);
+  return ticks.filter(h => h * 60 > axis.s && h * 60 < axis.e).map(h => `<i class="qa-grid" style="left:${inviteBarPct(axis, h * 60)}%"></i>`).join('');
+}
+function inviteBarAxisHtml(axis){
+  const ticks = [];
+  for(let h = Math.ceil(axis.s / 180) * 3; h * 60 <= axis.e; h += 3) ticks.push(h);
+  const labels = axis.e - axis.s > 18 * 60 ? ticks.filter(h => h % 6 === 0) : ticks;
+  return `<div class="qa-axis">${labels.map(h => `<span style="left:${inviteBarPct(axis, h * 60)}%">${h}시</span>`).join('')}</div>`;
+}
+// 만든 사람이 안 되는 시간 (빗금) - 보이는 범위에서 고를 수 있는 시간을 뺀 나머지
+function inviteClosedHtml(axis, allowed){
+  return subtractMinuteRanges([{ s: axis.s, e: axis.e }], allowed).map(r => `<i class="inv-bar-closed" style="${inviteBarStyle(axis, r)}"></i>`).join('');
+}
+
+// 링크 받은 친구 화면 - 날짜마다 막대 (빈 곳을 누르면 시간이 생기고, 양 끝을 끌어 늘리고 줄임)
+function renderInviteGuestBarsHtml(inv){
+  const st = inviteState;
+  inviteGuestSync();
+  const dates = inv.dates.filter(date => inviteAllowedRanges(inv, date, true).length);
+  if(!dates.length) return '';
+  const others = inv.responses.filter(r => !r.mine).map(inviteRangesByDate);
+  const axis = inviteBarAxis(dates.map(date => [...inviteAllowedRanges(inv, date, true), ...(st.myRanges[date] || [])]));
+  st.barAxis = axis;
+  const grid = inviteBarGridHtml(axis);
+  const todayKey = inviteYmd(new Date());
+  let html = '<div class="inv-bars">';
+  dates.forEach(date => {
+    const ranges = st.myRanges[date] || [];
+    const on = ranges.length > 0;
+    const dow = inviteDateObj(date).getDay();
+    const editing = st.barEdit && st.barEdit.date === date && ranges[st.barEdit.idx] ? st.barEdit.idx : -1;
+    const times = on
+      ? ranges.map((r, i) => `<span class="qa-time${i === editing ? ' editing' : ''}"><span data-ig-edit-open="${date}|${i}">${minutesToLabel(r.s)}–${minutesToLabel(r.e)}</span><button type="button" class="qa-del" data-ig-del="${date}|${i}" aria-label="이 시간 빼기">&times;</button></span>`).join('')
+      : '<span class="qa-time off">빈 곳을 눌러 넣어요</span>';
+    const otherHtml = others.flatMap(m => m[date] || []).map(r => `<i class="inv-bar-other" style="${inviteBarStyle(axis, r)}"></i>`).join('');
+    const bars = ranges.map((r, i) => `<div class="qa-bar" data-ig-bar="${date}|${i}" style="${inviteBarStyle(axis, r)}"><span class="qa-handle s" data-ig-handle="${date}|${i}|s"></span><span class="qa-handle e" data-ig-handle="${date}|${i}|e"></span></div>`).join('');
+    html += `<div class="qa-row${on ? '' : ' off'}">
+      <div class="qa-row-top">
+        <button type="button" class="qa-day${dow === 0 || dow === 6 ? ' weekend' : ''}" data-ig-toggle="${date}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${escapeHtml(inviteDateLabel(date))}${date === todayKey ? QA_TODAY_HTML : ''}</button>
+        <div class="qa-times" data-ig-times="${date}">${times}</div>
+        ${on ? `<button type="button" class="qa-add" data-ig-add="${date}" aria-label="시간 더 넣기">+</button>` : ''}
+      </div>
+      ${editing >= 0 ? availTimeEditHtml('ig', `${date}|${editing}`, ranges[editing]) : ''}
+      <div class="qa-track" data-ig-track="${date}">${grid}${inviteClosedHtml(axis, inviteAllowedRanges(inv, date, true))}${otherHtml}${bars}</div>
+    </div>`;
+  });
+  return html + inviteBarAxisHtml(axis) + '</div>';
+}
+// 친구 막대 한쪽 끝이 움직일 수 있는 범위 - 만든 사람이 안 되는 시간, 내 다른 시간과 안 겹치게
+function inviteGuestBounds(inv, date, ranges, idx){
+  const r = ranges[idx];
+  let lo = 0, hi = 24 * 60;
+  [...subtractMinuteRanges([{ s: 0, e: 24 * 60 }], inviteAllowedRanges(inv, date, true)), ...ranges.filter((_, i) => i !== idx)].forEach(o => {
+    if(o.e <= r.s) lo = Math.max(lo, o.e);
+    else if(o.s >= r.e) hi = Math.min(hi, o.s);
+  });
+  return { lo, hi };
+}
+// 누른 곳(centerMin)에 1시간 넣음 - 없으면 가장 넓은 빈 곳 가운데에
+function inviteGuestAddRange(date, centerMin){
+  const st = inviteState;
+  const inv = st.invite;
+  const ranges = st.myRanges[date] || [];
+  const gaps = subtractMinuteRanges(inviteAllowedRanges(inv, date, true), ranges).filter(g => g.e - g.s >= INV_AVAIL_STEP);
+  const gap = centerMin != null ? gaps.find(g => g.s <= centerMin && g.e >= centerMin) : gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
+  if(!gap){
+    if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
+    else showToast(`${inviteCreatorName(inv)}님이 안 되는 시간이에요.`);
+    return false;
+  }
+  const len = Math.min(60, gap.e - gap.s);
+  const c = centerMin != null ? centerMin : (gap.s + gap.e) / 2;
+  let s = Math.round((c - len / 2) / INV_AVAIL_STEP) * INV_AVAIL_STEP;
+  s = Math.max(gap.s, Math.min(gap.e - len, s));
+  st.myRanges[date] = [...ranges, { s, e: s + len }].sort((a, b) => a.s - b.s);
+  return true;
+}
+function inviteGuestChanged(){
+  const st = inviteState;
+  st.dirty = true;
+  inviteGuestSync();
+  renderInviteOverlay();
+}
+document.getElementById('inviteBody').addEventListener('click', (e) => {
+  const st = inviteState;
+  if(st.mode !== 'guest' || !st.invite || st.invite.status !== 'OPEN') return;
+  const tg = e.target.closest('[data-ig-toggle]');
+  if(tg){
+    if(!(st.myRanges[tg.dataset.igToggle] || []).length) return; // 날짜 버튼은 끄기만 - 켜는 건 막대 빈 곳을 눌러서
+    delete st.myRanges[tg.dataset.igToggle];
+    st.barEdit = null;
+    inviteGuestChanged();
+    return;
+  }
+  const add = e.target.closest('[data-ig-add]');
+  if(add){ if(inviteGuestAddRange(add.dataset.igAdd)) inviteGuestChanged(); return; }
+  const del = e.target.closest('[data-ig-del]');
+  if(del){
+    const [date, idx] = del.dataset.igDel.split('|');
+    st.myRanges[date] = (st.myRanges[date] || []).filter((_, i) => i !== Number(idx));
+    hapticImpact('MEDIUM');
+    st.barEdit = null;
+    inviteGuestChanged();
+    return;
+  }
+  const open = e.target.closest('[data-ig-edit-open]');
+  if(open){
+    const [date, idx] = open.dataset.igEditOpen.split('|');
+    const same = st.barEdit && st.barEdit.date === date && st.barEdit.idx === Number(idx);
+    st.barEdit = same ? null : { date, idx: Number(idx) };
+    renderInviteOverlay();
+    return;
+  }
+  const panel = e.target.closest('[data-ig-edit]');
+  if(panel){
+    const [date, idxStr] = panel.dataset.igEdit.split('|');
+    const idx = Number(idxStr);
+    const cur = (st.myRanges[date] || [])[idx];
+    if(cur && handleAvailTimeEditClick(e, 'ig', cur, (side, v) => {
+      const ranges = quickCloneRanges(st.myRanges[date]);
+      if(!ranges[idx]) return;
+      const { lo, hi } = inviteGuestBounds(st.invite, date, ranges, idx);
+      ranges[idx] = availEditedRange(ranges[idx], side, v, lo, hi, Math.min(INV_GUEST_MIN_LEN, hi - lo));
+      st.myRanges[date] = ranges;
+      inviteGuestChanged();
+    }, INV_AVAIL_STEP)) return;
+  }
+  if(e.target.closest('[data-ig-edit-done]')){ st.barEdit = null; renderInviteOverlay(); }
+});
+(function setupInviteGuestDrag(){
+  const body = document.getElementById('inviteBody');
+  let drag = null;
+  const minAt = (axis, track, clientX) => {
+    const rect = track.getBoundingClientRect();
+    return axis.s + Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * (axis.e - axis.s);
+  };
+  body.addEventListener('pointerdown', (e) => {
+    const st = inviteState;
+    const track = e.target.closest('[data-ig-track]');
+    if(!track || st.mode !== 'guest' || !st.barAxis) return;
+    const date = track.dataset.igTrack;
+    const handle = e.target.closest('[data-ig-handle]');
+    const bar = e.target.closest('[data-ig-bar]');
+    if(handle || bar){
+      const [, idx, edge] = (handle ? handle.dataset.igHandle : bar.dataset.igBar + '|m').split('|');
+      const ranges = quickCloneRanges(st.myRanges[date]);
+      hapticSelectionStart();
+      drag = { date, track, axis: st.barAxis, idx: Number(idx), edge, ranges, orig: { ...ranges[Number(idx)] }, bounds: inviteGuestBounds(st.invite, date, ranges, Number(idx)), startMin: minAt(st.barAxis, track, e.clientX), el: bar || handle.closest('[data-ig-bar]'), x: e.clientX, y: e.clientY, moved: false };
+      try { (handle || bar).setPointerCapture(e.pointerId); } catch(err){}
+      e.preventDefault();
+      return;
+    }
+    drag = { tap: true, date, track, axis: st.barAxis, x: e.clientX, y: e.clientY };
+  });
+  body.addEventListener('pointermove', (e) => {
+    const dr = drag;
+    if(!dr || dr.tap) return;
+    if(!dr.moved && Math.abs(e.clientX - dr.x) < 6) return;
+    if(!dr.moved) hapticImpact('LIGHT');
+    dr.moved = true;
+    const r = dr.ranges[dr.idx];
+    const { lo, hi } = dr.bounds;
+    const minLen = Math.min(INV_GUEST_MIN_LEN, hi - lo);
+    const m = minAt(dr.axis, dr.track, e.clientX);
+    const snap = v => Math.round(v / INV_AVAIL_STEP) * INV_AVAIL_STEP;
+    const ps = r.s, pe = r.e;
+    if(dr.edge === 's') r.s = Math.max(lo, Math.min(r.e - minLen, snap(m)));
+    else if(dr.edge === 'e') r.e = Math.min(hi, Math.max(r.s + minLen, snap(m)));
+    else {
+      const len = dr.orig.e - dr.orig.s;
+      r.s = Math.max(lo, Math.min(hi - len, snap(dr.orig.s + m - dr.startMin)));
+      r.e = r.s + len;
+    }
+    if(r.s === ps && r.e === pe) return;
+    hapticStep(dr.edge === 'e' ? r.e : r.s);
+    // 끄는 중엔 다시 그리지 않고 막대와 시간 글자만 바꿈 (다시 그리면 손가락을 놓침)
+    dr.el.style.cssText = inviteBarStyle(dr.axis, r);
+    const label = body.querySelector(`[data-ig-times="${dr.date}"] .qa-time:nth-child(${dr.idx + 1}) > span`);
+    if(label) label.textContent = `${minutesToLabel(r.s)}–${minutesToLabel(r.e)}`;
+  });
+  const end = (e) => {
+    const dr = drag;
+    drag = null;
+    const st = inviteState;
+    if(!dr || st.mode !== 'guest') return;
+    if(!dr.tap) hapticSelectionEnd();
+    const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
+    if(isTap){
+      if(dr.tap){ if(inviteGuestAddRange(dr.date, minAt(dr.axis, dr.track, e.clientX))) inviteGuestChanged(); return; }
+      st.barEdit = { date: dr.date, idx: dr.idx };
+      renderInviteOverlay();
+      return;
+    }
+    if(dr.tap || !dr.moved) return;
+    st.myRanges[dr.date] = dr.ranges;
+    inviteGuestChanged();
+  };
+  body.addEventListener('pointerup', end);
+  body.addEventListener('pointercancel', end);
+  body.addEventListener('touchstart', (e) => { if(e.target.closest('[data-ig-handle]')) e.preventDefault(); }, { passive: false });
+})();
+
+// 응답을 막대로 보기 - 날짜마다 "몇 명 되는지" 막대 + 사람마다 되는 시간 막대.
+// 만든 사람(manage)은 위 막대를 눌러 확정할 시간을 고름. 친구(guest)는 확정된 뒤 보는 기록용 (사람별 막대 없이)
+function renderInviteResultBarsHtml(inv, mode){
+  const st = inviteState;
+  const isOpen = inv.status === 'OPEN' && !inviteExpired(inv);
+  const people = inv.responses.map(r => ({ r, by: inviteRangesByDate(r) }));
+  let dates = inv.dates.filter(date => inviteAllowedRanges(inv, date, isOpen).length || people.some(p => (p.by[date] || []).length));
+  if(isOpen){ const today = inviteYmd(new Date()); dates = dates.filter(date => date >= today); }
+  if(!dates.length) return '';
+  let confirmed = null;
+  if(inv.status === 'CONFIRMED' && inv.confirmedStart){
+    const s = new Date(inv.confirmedStart), e = new Date(inv.confirmedEnd);
+    const sm = s.getHours() * 60 + s.getMinutes();
+    confirmed = { date: inviteYmd(s), s: sm, e: inviteYmd(e) === inviteYmd(s) ? e.getHours() * 60 + e.getMinutes() : 24 * 60 };
+  }
+  const axis = inviteBarAxis(dates.map(date => [...inviteAllowedRanges(inv, date, false), ...people.flatMap(p => p.by[date] || [])]));
+  st.resultAxis = axis;
+  const grid = inviteBarGridHtml(axis);
+  const sel = mode === 'manage' && isOpen ? st.confirmSel : null;
+  let html = '<div class="inv-bars">';
+  dates.forEach(date => {
+    const segs = inviteCountSegments(people.map(p => p.by[date] || []));
+    const max = Math.max(1, ...segs.map(x => x.n));
+    const heat = segs.map(x => {
+      const w = inviteBarPct(axis, Math.min(x.e, axis.e)) - inviteBarPct(axis, Math.max(x.s, axis.s));
+      return `<i class="inv-bar-heat" style="${inviteBarStyle(axis, x)};--heat:${(0.2 + 0.65 * x.n / max).toFixed(2)}">${w >= 7 ? `<b>${x.n}</b>` : ''}</i>`;
+    }).join('');
+    const mark = sel && sel.date === date ? `<i class="inv-bar-sel" style="${inviteBarStyle(axis, { s: sel.sMin, e: sel.eMin })}"></i>`
+      : confirmed && confirmed.date === date ? `<i class="inv-bar-sel done" style="${inviteBarStyle(axis, confirmed)}"></i>` : '';
+    const best = segs.length ? segs.reduce((a, b) => b.n > a.n || (b.n === a.n && b.e - b.s > a.e - a.s) ? b : a) : null;
+    html += `<div class="qa-row inv-res-row">
+      <div class="qa-row-top"><span class="qa-day inv-res-day">${escapeHtml(inviteDateLabel(date))}</span><div class="qa-times inv-res-sum">${best ? `최대 ${best.n}명 · ${inviteHm(best.s)}~${inviteHm(best.e)}` : '<span class="qa-time off">아직 되는 사람이 없어요</span>'}</div></div>
+      <div class="qa-track inv-res-track" data-im-track="${date}">${grid}${inviteClosedHtml(axis, inviteAllowedRanges(inv, date, isOpen))}${heat}${mark}</div>
+      ${mode === 'manage' ? people.map(p => `<div class="inv-person-bar">${(p.by[date] || []).map(r => `<i style="${inviteBarStyle(axis, r)}"></i>`).join('')}<span class="nm">${escapeHtml(p.r.name)}</span></div>`).join('') : ''}
+    </div>`;
+  });
+  return html + inviteBarAxisHtml(axis) + '</div>';
+}
+// 여러 사람의 시간 -> 인원이 같은 구간들 [{s, e, n}] (0명 구간은 뺌)
+function inviteCountSegments(lists){
+  const pts = new Set();
+  lists.flat().forEach(r => { pts.add(r.s); pts.add(r.e); });
+  const xs = [...pts].sort((a, b) => a - b);
+  const out = [];
+  for(let i = 0; i < xs.length - 1; i++){
+    const s = xs[i], e = xs[i + 1];
+    const n = lists.filter(l => l.some(r => r.s <= s && r.e >= e)).length;
+    if(!n) continue;
+    const last = out[out.length - 1];
+    if(last && last.e === s && last.n === n) last.e = e; else out.push({ s, e, n });
+  }
+  return out;
+}
+// 만든 사람: 인원 막대를 누르면 그 시간 앞뒤로 그만큼 이상 되는 시간 전체를 확정 후보로 (연 시간 안으로)
+document.getElementById('inviteBody').addEventListener('click', (e) => {
+  const st = inviteState;
+  const inv = st.invite;
+  const track = e.target.closest('[data-im-track]');
+  if(!track || st.mode !== 'manage' || !inv || inv.status !== 'OPEN' || inviteExpired(inv) || !st.resultAxis) return;
+  if(!inv.responses.length) return;
+  const date = track.dataset.imTrack;
+  const rect = track.getBoundingClientRect();
+  const axis = st.resultAxis;
+  const m = axis.s + Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * (axis.e - axis.s);
+  const allowed = inviteAllowedRanges(inv, date, true).find(r => r.s <= m && r.e > m);
+  if(!allowed){ showToast(inv.fromCalendar ? '캘린더에서 닫았거나 지난 시간이라 확정할 수 없어요.' : '안 연 시간이거나 지난 시간이라 확정할 수 없어요.', 2500); return; }
+  const segs = inviteCountSegments(inv.responses.map(r => inviteRangesByDate(r)[date] || []));
+  const at = segs.find(x => x.s <= m && x.e > m);
+  if(!at){ showToast('이 시간엔 되는 친구가 없어요.'); return; }
+  let s = at.s, en = at.e;
+  segs.forEach(() => {
+    const prev = segs.find(x => x.e === s && x.n >= at.n);
+    const next = segs.find(x => x.s === en && x.n >= at.n);
+    if(prev) s = prev.s;
+    if(next) en = next.e;
+  });
+  s = Math.max(s, allowed.s);
+  en = Math.min(en, allowed.e);
+  if(en <= s) return;
+  st.confirmSel = { date, sMin: s, eMin: en, start: Math.floor(s / 60), end: Math.ceil(en / 60), extended: false };
+  clearInviteArm();
+  hapticTick();
+  renderInviteOverlay();
+});
+
 function renderInviteManageHtml(){
   const inv = inviteState.invite;
   const link = inviteLink(inv.token);
@@ -33384,7 +33750,7 @@ function renderInviteManageHtml(){
     html += '<div class="inv-card"><div class="inv-card-desc">이 약속은 취소됐어요. 링크를 열어도 더 이상 응답할 수 없어요.</div></div>';
   }
 
-  html += `<div class="inv-sub-head"><b>응답 ${n}명</b><span>${canPick && n ? '칸을 눌러 확정할 시간을 골라요' : '칸의 숫자 = 가능한 인원'}</span></div>`;
+  html += `<div class="inv-sub-head"><b>응답 ${n}명</b><span>${canPick && n ? '위 막대를 눌러 확정할 시간을 골라요' : '막대의 숫자 = 되는 인원'}</span></div>`;
   if(n === 0){
     html += `<div class="inv-card"><div class="inv-card-desc">${expired ? '응답한 친구가 없었어요.' : '아직 응답한 친구가 없어요. 링크를 보내면 응답이 올 때마다 알려드릴게요.'}</div></div>`;
   }
@@ -33400,9 +33766,11 @@ function renderInviteManageHtml(){
       html += `<div class="inv-card"><div class="inv-card-desc">친구가 고른 시간 중 ${closedPicked.size}칸을 캘린더에서 닫았어요. 빗금 칸으로는 확정할 수 없고 친구들도 더 고를 수 없어요. 친구 응답은 남아 있어서, 캘린더에서 다시 예약 가능으로 열면 그대로 살아나요.</div></div>`;
     }
   }
-  html += renderInviteGridHtml(inv, 'manage');
+  html += renderInviteResultBarsHtml(inv, 'manage');
+  if(n){
+    html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i class="inv-legend-closed"></i>${inv.fromCalendar ? '캘린더에서 닫은 시간' : '안 연 시간'}</span>${canPick ? '<span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>시작·끝은 아래에서 5분 단위로 고쳐요</span>' : ''}</div>`;
+  }
   if(canPick && n){
-    html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>칸을 눌러 고르고, 끝나는 시간은 아래에서 늘릴 수 있어요</span></div>`;
     const sel = inviteState.confirmSel;
     if(sel){
       // 고른 칸에서 앞뒤로 이어지는 고를 수 있는 칸까지 시작/끝을 옮길 수 있음
@@ -33488,7 +33856,7 @@ function renderInviteGuestHtml(){
           <button type="button" class="inv-text-btn" data-act="close">괜찮아요</button>
         </div>`;
     }
-    html += renderInviteGridHtml(inv, 'guest');
+    html += renderInviteResultBarsHtml(inv, 'guest');
     return html;
   }
 
@@ -33538,11 +33906,9 @@ function renderInviteGuestHtml(){
       <label class="inv-label" for="invGuestName">내 이름</label>
       <input id="invGuestName" class="inv-input" maxlength="20" placeholder="친구들이 알아볼 수 있는 이름" value="${escapeHtml(st.guestName)}" />
     </div>
-    <div class="inv-sub-head"><b>되는 시간 고르기</b><span>날짜/시간 이름을 누르면 한 줄 전체</span></div>
-    ${inviteOpenTimesHtml(inv)}
-    ${renderInviteGridHtml(inv, 'guest')}
-    <div class="inv-legend"><span><i style="background:var(--cta)"></i>내가 고른 시간</span><span><i style="background:rgba(56,189,248,0.6)"></i>숫자 = 다른 친구들이 되는 인원</span>${openNow ? `<span><i style="background:repeating-linear-gradient(-45deg, transparent 0 3px, var(--line) 3px 4px);box-shadow:inset 0 0 0 1px var(--line)"></i>${creator}님이 안 되는 시간</span>` : ''}</div>
-    <div id="invFineBox">${renderInviteFineHtml()}</div>`;
+    <div class="inv-sub-head"><b>되는 시간 고르기</b><span>빈 곳을 누르고, 양 끝을 끌어 맞춰요</span></div>
+    ${renderInviteGuestBarsHtml(inv)}
+    <div class="inv-legend"><span><i style="background:var(--accent)"></i>내가 고른 시간</span>${others.length ? '<span><i style="background:rgba(56,189,248,0.7)"></i>다른 친구가 되는 시간</span>' : ''}<span><i class="inv-legend-closed"></i>${creator}님이 안 되는 시간</span><span>시간 글자를 누르면 5분 단위로 고쳐요</span></div>`;
   if(others.length){
     html += `<div class="inv-label">먼저 응답한 친구 ${others.length}명</div><div class="inv-people">`
       + others.map(r => `<span class="inv-person">${escapeHtml(r.name)}</span>`).join('') + '</div>';
@@ -33587,10 +33953,10 @@ function renderInviteFoot(){
     return;
   }
   if(st.mode === 'guest' && inv.status === 'OPEN' && !inviteExpired(inv)){
-    const n = st.myCells.size;
+    const n = inviteGuestRangeCount();
     const label = st.busy ? '보내는 중...'
-      : n === 0 ? '되는 시간을 눌러 골라주세요'
-      : (inv.myResponse ? `고친 시간 ${n}칸 다시 보내기` : `되는 시간 ${n}칸 보내기`);
+      : n === 0 ? '막대 빈 곳을 눌러 되는 시간을 골라주세요'
+      : (inv.myResponse ? `고친 시간 ${n}개 다시 보내기` : `되는 시간 ${n}개 보내기`);
     const disabled = st.busy || n === 0 || (inv.myResponse && !st.dirty && !st.nameDirty);
     foot.innerHTML = `<button type="button" class="inv-primary" data-act="submit"${disabled ? ' disabled' : ''}>${escapeHtml(label)}</button>`;
     return;
@@ -33966,6 +34332,7 @@ async function submitInviteResponse(){
     if(input) input.focus();
     return;
   }
+  inviteGuestSync();
   if(st.myCells.size === 0){ showToast('되는 시간을 하나 이상 골라주세요.'); return; }
   st.busy = true;
   renderInviteFoot();
@@ -33973,7 +34340,7 @@ async function submitInviteResponse(){
     if(!authToken) inviteStoreSet('catchme_guest_name', name);
     const data = await apiRequest(`/invites/${encodeURIComponent(inv.token)}/respond`, {
       method: 'POST',
-      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, true), name, cells: [...st.myCells], ranges: inviteMySegments().map(b => `${b.date}|${inviteHmRaw(b.s)}|${inviteHmRaw(b.e)}`) }),
+      body: JSON.stringify({ guestKey: inviteGuestKey(inv.token, true), name, cells: [...st.myCells], ranges: inviteGuestRangeStrings() }),
     });
     st.busy = false;
     st.submitted = true;
