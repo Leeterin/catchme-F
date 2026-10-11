@@ -4065,6 +4065,46 @@
   .cal-share-card .csc-when{ font-size:13px; font-weight:700; }
   .cal-share-card .csc-title{ font-size:13px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cal-share-card .csc-go{ font-size:11px; color:var(--text-dim); margin-top:5px; }
+  /* 날짜 먼저 물어보기("20일 어때요?") 카드 - 좋아요 하면 같은 카드에서 바로 시간·장소 정하기 */
+  .date-ask-card{
+    min-width:200px;
+    text-align:left;
+    border:1px solid var(--line);
+    background:var(--surface);
+    color:var(--text);
+    border-radius:12px;
+    padding:10px 12px;
+  }
+  .date-ask-card .dac-head{ font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
+  .date-ask-card .dac-date{ font-size:15px; font-weight:700; cursor:pointer; }
+  .date-ask-card .dac-desc{ font-size:12px; color:var(--text-dim); margin-top:3px; }
+  .date-ask-card .dac-actions{ display:flex; gap:6px; margin-top:9px; }
+  .date-ask-card .dac-btn{
+    flex:1; padding:8px 6px; border:none; border-radius:9px;
+    background:var(--surface-2); color:var(--text);
+    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+  }
+  .date-ask-card .dac-btn.primary{ background:var(--accent); color:#FFFFFF; }
+  .date-ask-card.done .dac-head{ color:#16A34A; }
+  .date-ask-card.off .dac-date{ color:var(--text-dim); text-decoration:line-through; }
+  /* 날짜 고르기 창 - 한 달 달력에서 하루 고르기 */
+  .date-ask-sub{ font-size:12px; color:var(--text-dim); text-align:center; margin:-8px 0 12px; }
+  .date-ask-nav{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .date-ask-nav b{ font-size:14px; }
+  .date-ask-nav button{ width:32px; height:32px; border:none; border-radius:9px; background:var(--surface-2); color:var(--text); font-size:17px; cursor:pointer; }
+  .date-ask-nav button:disabled{ opacity:.3; cursor:default; }
+  .date-ask-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:3px; margin-bottom:14px; }
+  .date-ask-grid .dag-wd{ font-size:11px; color:var(--text-dim); text-align:center; padding:3px 0; }
+  .date-ask-grid .dag-wd.sun, .date-ask-grid .dag-day.sun{ color:#E5484D; }
+  .date-ask-grid .dag-wd.sat, .date-ask-grid .dag-day.sat{ color:#3B82F6; }
+  .date-ask-grid .dag-day{
+    aspect-ratio:1; border:none; border-radius:50%; background:none; color:var(--text);
+    font-family:'Inter',sans-serif; font-size:13px; font-weight:600; cursor:pointer; padding:0;
+  }
+  .date-ask-grid .dag-day.today{ box-shadow:inset 0 0 0 1.5px var(--line); }
+  .date-ask-grid .dag-day:disabled{ opacity:.25; cursor:default; }
+  .date-ask-grid .dag-day.on{ background:var(--accent); color:#FFFFFF; }
+  #dateAskSendBtn:disabled{ opacity:.45; }
 
   .reservation-card{
     max-width:78%;
@@ -8470,6 +8510,24 @@
     </div>
   </div>
 
+  <!-- 날짜 먼저 물어보기 - 하루를 고르면 채팅에 "10월 20일(화) 어때요?" 카드를 보냄 -->
+  <div class="mini-confirm-overlay" id="dateAskOverlay">
+    <div class="mini-confirm-card">
+      <div class="mini-confirm-title">며칠에 만날까요?</div>
+      <div class="date-ask-sub">날짜를 먼저 물어보고, 좋다고 하면 시간·장소를 정해요</div>
+      <div class="date-ask-nav">
+        <button type="button" id="dateAskPrevBtn" aria-label="이전 달">&lsaquo;</button>
+        <b id="dateAskMonthLabel"></b>
+        <button type="button" id="dateAskNextBtn" aria-label="다음 달">&rsaquo;</button>
+      </div>
+      <div class="date-ask-grid" id="dateAskGrid"></div>
+      <div class="mini-confirm-actions">
+        <button type="button" id="dateAskSendBtn" class="mini-confirm-btn primary" disabled>날짜를 골라주세요</button>
+        <button type="button" id="dateAskCancelBtn" class="mini-confirm-btn">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 다중 모임 장소 추천 - 기준(모드) 선택 팝업 -->
   <div class="mini-confirm-overlay" id="recommendModeOverlay">
     <div class="mini-confirm-card" style="text-align:left;">
@@ -8728,6 +8786,7 @@
         <div class="chat-plus-menu" id="chatPlusMenu" hidden>
           <button type="button" class="chat-plus-item" id="chatPlusPhotoBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 5l1.5-2h4l1.5 2"/></svg>사진</button>
           <button type="button" class="chat-plus-item" id="chatPlusPlanBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 14v5M9.5 16.5h5"/></svg>약속 잡기</button>
+          <button type="button" class="chat-plus-item" id="chatPlusDateAskBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M10 14.5a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9V18"/><path d="M12 20.5h.01"/></svg>날짜 묻기</button>
           <button type="button" class="chat-plus-item" id="chatPlusPlaceBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>장소</button>
         </div>
         <div class="chat-input-row">
@@ -10189,6 +10248,21 @@ function connectRealtimeSocket(){
     }
     if(message.type !== 'TEXT') return;
 
+    // 날짜 물어보기 카드에 누가 답했으면(좋아요/다른 날/취소) 새 메시지가 아니라 그 카드만 바꿈
+    const askCard = message.dateAsk && room.messages.find(m => m._serverId === message.id);
+    if(askCard){
+      const wasStatus = askCard.dateAsk && askCard.dateAsk.status;
+      askCard.dateAsk = message.dateAsk;
+      scheduleChatCacheSave(roomId);
+      if(activeChatRoomId === roomId) renderChatMessages();
+      else if(wasStatus !== message.dateAsk.status && settingsState.notif_message && !room.muted){
+        const label = dateAskLabel(message.dateAsk.date);
+        if(message.dateAsk.status === 'CONFIRMED') showToast(`${room.name}: ${label} 좋대요! 시간이랑 장소를 정해봐요`);
+        else if(message.dateAsk.status === 'DECLINED') showToast(`${room.name}: ${label}은 어렵대요`);
+      }
+      return;
+    }
+
     const mapped = {
       who: (currentUser && message.senderId === currentUser.id) ? 'me' : 'other',
       senderId: message.senderId,
@@ -10196,6 +10270,7 @@ function connectRealtimeSocket(){
       time: message.createdAt,
       read: false,
       replyTo: message.replyTo ? { msgId: message.replyTo.msgId, preview: message.replyTo.preview } : null,
+      dateAsk: message.dateAsk || null,
     };
     // 이미 내가 보내서 화면에 반영된 메시지(같은 id)라면 중복으로 또 넣지 않음
     if(room.messages.some(m => m._serverId === message.id)) return;
@@ -15395,6 +15470,10 @@ document.getElementById('chatHeaderPlanBtn').addEventListener('click', () => {
 document.getElementById('chatPlusPlaceBtn').addEventListener('click', () => {
   setChatPlusMenu(false);
   startPlaceFromChat();
+});
+document.getElementById('chatPlusDateAskBtn').addEventListener('click', () => {
+  setChatPlusMenu(false);
+  if(activeChatRoomId) openDateAsk(activeChatRoomId);
 });
 document.getElementById('chatInput').addEventListener('focus', () => setChatPlusMenu(false));
 // 키보드가 떠 있는 채로 메뉴를 열었다가 입력창을 다시 누르면(이미 포커스 상태라 focus가 안 생김) 메뉴를 닫음
@@ -27006,6 +27085,7 @@ function mapServerMessageToLocal(m, room){
     id: m.id,
     _serverId: m.id,
     replyTo: m.replyTo ? { msgId: m.replyTo.msgId, preview: m.replyTo.preview } : null,
+    dateAsk: m.dateAsk || null,
   };
 }
 
@@ -27692,7 +27772,10 @@ function renderChatMessages(){
       row.innerHTML = m.who === 'me' ? (metaHtml + bubbleHtml) : (bubbleHtml + metaHtml);
       const calShare = parseCalShare(m.text);
       const textEl = row.querySelector('.msg-bubble-text');
-      if(calShare){
+      if(m.dateAsk && m.dateAsk.date){
+        textEl.parentNode.insertBefore(buildDateAskCardEl(m, room), textEl);
+        textEl.remove();
+      } else if(calShare){
         textEl.parentNode.insertBefore(buildCalShareCardEl(calShare.share, room), textEl);
         if(calShare.rest.trim()) fillChatTextWithSearchHits(textEl, calShare.rest, q);
         else textEl.remove();
@@ -29681,6 +29764,212 @@ function startPlaceFromChat(){
   addMeetPlace(room, roomId, null, true);
 }
 
+// ---------- 날짜 먼저 물어보기 ("20일 어때요?") ----------
+// 시간까지 한 번에 고르기 전에 날짜만 먼저 물어봄. 상대가 "좋아요" 하면 같은 카드에 시간 정하기·장소 정하기가 생김.
+// 시간 정하기는 기존 흐름 그대로(1:1은 친구가 열어둔 그날 시간에 요청, 모임은 그날 모두 되는 시간 찾기) - 열어둔 시간 안에서만 잡힘
+let dateAskState = null; // { roomId, year, month(1-12), selected: 'YYYY-MM-DD' | null }
+const DATE_ASK_MAX_MONTHS = 12;
+function dateAskLabel(dateKey){
+  const d = parseDateInputValue(dateKey);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일(${WEEKDAY_KO[d.getDay()]})`;
+}
+function openDateAsk(roomId){
+  if(!CHAT_ROOMS[roomId]) return;
+  dateAskState = { roomId, year: TODAY.getFullYear(), month: TODAY.getMonth() + 1, selected: null };
+  renderDateAsk();
+  document.getElementById('dateAskOverlay').classList.add('show');
+}
+function closeDateAsk(){
+  dateAskState = null;
+  document.getElementById('dateAskOverlay').classList.remove('show');
+}
+function renderDateAsk(){
+  const st = dateAskState;
+  if(!st) return;
+  const todayKey = toDateInputValue(TODAY);
+  const monthIdx = (st.year - TODAY.getFullYear()) * 12 + (st.month - 1 - TODAY.getMonth());
+  document.getElementById('dateAskMonthLabel').textContent = `${st.year}년 ${st.month}월`;
+  document.getElementById('dateAskPrevBtn').disabled = monthIdx <= 0;
+  document.getElementById('dateAskNextBtn').disabled = monthIdx >= DATE_ASK_MAX_MONTHS - 1;
+  const first = new Date(st.year, st.month - 1, 1);
+  const days = new Date(st.year, st.month, 0).getDate();
+  let html = WEEKDAY_KO.map((w, i) => `<div class="dag-wd${i === 0 ? ' sun' : i === 6 ? ' sat' : ''}">${w}</div>`).join('');
+  for(let i = 0; i < first.getDay(); i++) html += '<div></div>';
+  for(let day = 1; day <= days; day++){
+    const d = new Date(st.year, st.month - 1, day);
+    const key = toDateInputValue(d);
+    const cls = ['dag-day', d.getDay() === 0 ? 'sun' : d.getDay() === 6 ? 'sat' : '', key === todayKey ? 'today' : '', key === st.selected ? 'on' : ''].filter(Boolean).join(' ');
+    html += `<button type="button" class="${cls}" data-date="${key}"${key < todayKey ? ' disabled' : ''}>${day}</button>`;
+  }
+  document.getElementById('dateAskGrid').innerHTML = html;
+  const sendBtn = document.getElementById('dateAskSendBtn');
+  sendBtn.disabled = !st.selected;
+  sendBtn.textContent = st.selected ? `${dateAskLabel(st.selected)} 어때요? 보내기` : '날짜를 골라주세요';
+}
+function moveDateAskMonth(delta){
+  const st = dateAskState;
+  if(!st) return;
+  const d = new Date(st.year, st.month - 1 + delta, 1);
+  st.year = d.getFullYear();
+  st.month = d.getMonth() + 1;
+  renderDateAsk();
+}
+document.getElementById('dateAskPrevBtn').addEventListener('click', () => moveDateAskMonth(-1));
+document.getElementById('dateAskNextBtn').addEventListener('click', () => moveDateAskMonth(1));
+document.getElementById('dateAskGrid').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-date]');
+  if(!btn || btn.disabled || !dateAskState) return;
+  dateAskState.selected = btn.dataset.date;
+  renderDateAsk();
+});
+document.getElementById('dateAskSendBtn').addEventListener('click', () => {
+  const st = dateAskState;
+  if(!st || !st.selected) return;
+  closeDateAsk();
+  sendDateAsk(st.roomId, st.selected);
+});
+document.getElementById('dateAskCancelBtn').addEventListener('click', closeDateAsk);
+document.getElementById('dateAskOverlay').addEventListener('click', (e) => {
+  if(e.target.id === 'dateAskOverlay') closeDateAsk();
+});
+
+async function sendDateAsk(roomId, dateKey){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  if(room.isRealRoom){
+    try {
+      const data = await apiRequest(`/chats/${roomId}/date-asks`, { method: 'POST', body: JSON.stringify({ date: dateKey }) });
+      const mapped = mapServerMessageToLocal(data.message, room);
+      mapped.id = 'msg' + (locationMsgIdCounter++);
+      room.messages.push(mapped);
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+  } else {
+    // 데모방 - 잠시 뒤 상대가 좋다고 한 것처럼
+    const msg = { who: 'me', text: `📅 ${dateAskLabel(dateKey)} 어때요?`, time: new Date(), id: 'msg' + (locationMsgIdCounter++), dateAsk: { date: dateKey, status: 'PENDING' } };
+    room.messages.push(msg);
+    setTimeout(() => {
+      if(msg.dateAsk.status !== 'PENDING') return;
+      msg.dateAsk.status = 'CONFIRMED';
+      if(activeChatRoomId === roomId) renderChatMessages();
+    }, 1500);
+  }
+  touchRoom(roomId);
+  if(activeChatRoomId === roomId) renderChatMessages();
+  renderChatList();
+}
+
+// action: 'accept'(좋아요) | 'decline'(다른 날) | 'withdraw'(보낸 사람이 취소)
+async function respondDateAsk(roomId, msg, action){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !msg.dateAsk || msg.dateAsk.status !== 'PENDING') return;
+  if(msg._serverId){
+    try {
+      const data = await apiRequest(`/chats/date-asks/${msg._serverId}/respond`, { method: 'POST', body: JSON.stringify({ action }) });
+      if(data.message && data.message.dateAsk) msg.dateAsk = data.message.dateAsk;
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+  } else {
+    msg.dateAsk.status = { accept: 'CONFIRMED', decline: 'DECLINED', withdraw: 'WITHDRAWN' }[action];
+  }
+  scheduleChatCacheSave(roomId);
+  touchRoom(roomId);
+  if(activeChatRoomId === roomId) renderChatMessages();
+  renderChatList();
+  if(action === 'accept') showToast(`${dateAskLabel(msg.dateAsk.date)}로 정했어요. 이제 시간이랑 장소를 정해봐요!`);
+  else if(action === 'decline') openDateAsk(roomId); // 다른 날 - 바로 내가 되는 날을 골라 다시 물어봄
+}
+
+// 좋다고 한 날의 시간 정하기 - 장소부터 정해둔 날짜 미정 약속이 있으면, 시간이 정해질 때 그 장소들이 같이 붙게 함
+function setTimeForDateAsk(roomId, dateKey){
+  const room = CHAT_ROOMS[roomId];
+  if(!room) return;
+  const meet = undatedMeetPins(room).filter(p => p.serverId).sort((a, b) => placePinTime(b) - placePinTime(a))[0];
+  planMeetTarget = meet ? { roomId, pinId: meet.serverId, at: Date.now() } : null;
+  if(room.isGroup){
+    if(!room.members || room.members.length <= 1){
+      showToast('매칭할 멤버가 없어요.');
+      return;
+    }
+    openGroupCalendarMatch(roomId, dateKey);
+    return;
+  }
+  const friendId = roomId.startsWith('dm-')
+    ? roomId.replace('dm-', '')
+    : (FRIENDS.find(f => f.username === room.counterpartUsername) || {}).id;
+  if(!friendId || !FRIENDS.some(f => f.id === friendId)){
+    showToast('친구로 추가된 사람만 약속을 잡을 수 있어요.');
+    return;
+  }
+  calendarOpenedFromChat = roomId;
+  openHomeMatchSlot(friendId, dateKey);
+}
+
+function buildDateAskCardEl(m, room){
+  const da = m.dateAsk;
+  const label = dateAskLabel(da.date);
+  const past = da.date < toDateInputValue(TODAY);
+  const mine = m.who === 'me';
+  const other = room && !room.isGroup ? `${room.name}님` : '';
+  // 그날 시간까지 정해진 약속이 이미 있으면 "시간 정하기" 대신 잡혔다고 알려줌
+  const booked = (room.pinnedSchedules || []).some(p => p.dateObj && toDateInputValue(new Date(p.dateObj)) === da.date);
+  let cls = '', title = `${label} 어때요?`, desc = '', btns = [];
+  if(da.status === 'CONFIRMED'){
+    cls = 'done';
+    title = `${label}에 만나요`;
+    if(booked) desc = '이 날 약속이 잡혔어요. 위 고정 카드에서 확인할 수 있어요.';
+    else if(past) desc = '지난 날짜예요.';
+    else {
+      desc = '좋대요! 이제 시간이랑 장소를 정해요.';
+      btns = [['time', '시간 정하기', true], ['place', '장소 정하기', false]];
+    }
+  } else if(da.status === 'DECLINED'){
+    cls = 'off';
+    desc = mine ? `${other || '상대'}${other ? '이' : '가'} 이 날은 어렵대요.` : '이 날은 어렵다고 답했어요.';
+    if(mine) btns = [['again', '다른 날 물어보기', true]];
+  } else if(da.status === 'WITHDRAWN'){
+    cls = 'off';
+    desc = '물어보기를 취소했어요.';
+  } else if(past){
+    desc = '지난 날짜예요.';
+  } else if(mine){
+    desc = `${other || '모두'}의 답을 기다리는 중이에요.`;
+    btns = [['withdraw', '취소', false]];
+  } else {
+    btns = [['accept', '좋아요', true], [room.isGroup ? 'again' : 'decline', '다른 날', false]];
+  }
+  const card = document.createElement('div');
+  card.className = `date-ask-card${cls ? ' ' + cls : ''}`;
+  card.innerHTML = `
+    <div class="dac-head">${da.status === 'CONFIRMED' ? '✓ 날짜 정해짐' : '📅 날짜 물어보기'}</div>
+    <div class="dac-date"></div>
+    ${desc ? '<div class="dac-desc"></div>' : ''}
+    ${btns.length ? `<div class="dac-actions">${btns.map(([k, t, primary]) => `<button type="button" class="dac-btn${primary ? ' primary' : ''}" data-act="${k}">${t}</button>`).join('')}</div>` : ''}`;
+  card.querySelector('.dac-date').textContent = title;
+  if(desc) card.querySelector('.dac-desc').textContent = desc;
+  // 날짜를 누르면 그날 내 캘린더 - 되는 날인지 바로 확인
+  card.querySelector('.dac-date').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if(Date.now() - chatSwipeReplyAt < 400) return;
+    viewDayFromChat(parseDateInputValue(da.date));
+  });
+  card.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if(Date.now() - chatSwipeReplyAt < 400) return;
+    const roomId = activeChatRoomId;
+    const act = btn.dataset.act;
+    if(act === 'time') setTimeForDateAsk(roomId, da.date);
+    else if(act === 'place') startPlaceFromChat();
+    else if(act === 'again') openDateAsk(roomId);
+    else respondDateAsk(roomId, m, act);
+  }));
+  return card;
+}
+
 // 상단 고정 카드의 "장소 정하기"를 누르면, 항상 "모임 장소 추천받기"를 먼저 추천하고 직접 고르기도 고를 수 있게 함
 let placeChoiceAction = null;
 function openPlaceChoice(roomId, onPickDirect){
@@ -29936,15 +30225,16 @@ function openCalendarMatch(friendId){
 }
 
 // 그룹 채팅방 멤버 전체(나 포함)의 겹치는 시간을 찾는 매칭 화면 열기
-function openGroupCalendarMatch(roomId){
+// dateKey('YYYY-MM-DD')를 주면 그날 하루만 찾음 (날짜 물어보기에서 좋다고 한 날의 시간 정하기)
+function openGroupCalendarMatch(roomId, dateKey){
   activeMatchGroupRoomId = roomId;
   activeMatchFriendId = null;
   const room = CHAT_ROOMS[roomId];
   document.getElementById('matchViewTitle').textContent = room ? `${room.name} 모두 되는 시간` : '모두 되는 시간 찾기';
 
-  const start = new Date(TODAY);
-  const end = new Date(TODAY);
-  end.setDate(end.getDate() + PLAN_LOOKAHEAD_DAYS - 1);
+  const start = dateKey ? parseDateInputValue(dateKey) : new Date(TODAY);
+  const end = new Date(start);
+  if(!dateKey) end.setDate(end.getDate() + PLAN_LOOKAHEAD_DAYS - 1);
   document.getElementById('matchStartDate').value = toDateInputValue(start);
   document.getElementById('matchEndDate').value = toDateInputValue(end);
   document.getElementById('matchMinHours').value = '1';
@@ -32286,6 +32576,7 @@ const PLAN_ICONS = {
   match: '<path d="M17 2.1l4 4-4 4"/><path d="M3 12.2v-2a4 4 0 0 1 4-4h12.8"/><path d="M7 21.9l-4-4 4-4"/><path d="M21 11.8v2a4 4 0 0 1-4 4H4.2"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
   mine: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  askdate: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M10 14.5a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9V18"/><path d="M12 20.5h.01"/>',
 };
 let planFriendSeq = 0;
 // 채팅방 메뉴에서 열었으면 그 방 id - 예약/매칭 화면을 닫을 때 채팅방이 밑에 그대로 보이게 표시용으로 넘김
@@ -32582,6 +32873,12 @@ async function renderPlanStartMethods(friendId){
     options = [view, match];
   }
   else options = [reserve, match, view];
+  // 채팅방에서 열었으면 시간 고르기 전에 날짜만 먼저 물어볼 수도 있게
+  if(planStartChatRoomId && CHAT_ROOMS[planStartChatRoomId]) options.push({
+    id: 'askdate',
+    title: '날짜만 먼저 물어보기',
+    desc: `"20일 어때요?"처럼 날짜를 먼저 묻고, ${name}님이 좋다고 하면 시간·장소를 정해요`,
+  });
 
   body.innerHTML = note + options.map(planOptionHtml).join('') + `<button type="button" class="plan-back-btn" data-plan-back>&lsaquo; 다른 친구 고르기</button>`;
   body.dataset.friendId = friendId;
@@ -32597,6 +32894,8 @@ document.getElementById('planStartBody').addEventListener('click', (e) => {
     if(method === 'link'){
       inviteState.fromList = false;
       openInviteList(true);
+    } else if(method === 'askdate'){
+      if(planStartChatRoomId) openDateAsk(planStartChatRoomId);
     } else if(method === 'mine'){
       openMyAvailabilityForm();
     } else if(friendId){
