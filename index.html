@@ -15939,6 +15939,10 @@ function applyLocationSuggestUpdates(room, data){
     else room.messages.push(mapped);
     if(mapped.status === 'confirmed' && !wasConfirmed) supersedeHotplaceNotices(room);
   });
+  // 확정되면 서버가 "OO 근처에서 만나요"(주변 핫플 보기) 알림도 같이 만들어 줌 - 위에서 예전 알림을 접은 뒤에 붙임
+  if(data && data.notice && !room.messages.some(m => m._serverId === data.notice.id)){
+    replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(data.notice));
+  }
 }
 // 장소 제안이 확정되면 서버는 예전 "근처에서 만나요" 카드들을 "변경됐어요"로 접는데, 새 알림 메시지는 안 보내줌.
 // 그래서 화면에도 바로 똑같이 접어둠 - 안 그러면 방에 다시 들어갈 때 큰 카드가 먼저 떴다가 "변경됐어요"로 바뀜
@@ -15983,7 +15987,8 @@ function mapServerLocationNoticeMessage(m){
     type: 'hotplace',
     id: m.id,
     _serverId: m.id,
-    location: l.location || l.place,
+    location: l.place || l.location, // 카드에는 장소 이름("OO 근처에서 만나요") - 주소는 핀의 장소 이름과 안 맞아서 "삭제됐어요"로 잘못 접혔음
+    address: l.location || null,
     locationLat: l.locationLat,
     locationLon: l.locationLon,
     pinId: l.pinId || null,
@@ -23074,8 +23079,9 @@ function addHotplaceNoticeMessage(roomId, location, lat, lon, pinId){
 function isHotplaceNoticeRemoved(room, m){
   if(m.superseded || !m.location) return false;
   if(room.isRealRoom && !room._pinsLoaded) return false;
-  const name = String(m.location).trim();
-  return !(room.pinnedSchedules || []).some(p => p.location && String(p.location).trim() === name);
+  const names = [m.location, m.address].filter(Boolean).map(x => String(x).trim());
+  return !(room.pinnedSchedules || []).some(p => p.location && (names.includes(String(p.location).trim())
+    || (p.locationAddress && names.includes(String(p.locationAddress).trim()))));
 }
 
 function replaceHotplaceNoticeForPin(room, newMsg){
