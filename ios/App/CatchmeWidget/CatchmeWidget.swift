@@ -103,7 +103,7 @@ struct NoAppointmentView: View {
     let loggedIn: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("CATCHME").font(.system(size: 11, weight: .heavy)).foregroundColor(accent)
+            Text("MEETZIP").font(.system(size: 11, weight: .heavy)).foregroundColor(accent)
             Spacer(minLength: 0)
             Text(loggedIn ? "잡힌 약속이 없어요" : "로그인하면\n약속이 보여요")
                 .font(.system(size: 15, weight: .bold))

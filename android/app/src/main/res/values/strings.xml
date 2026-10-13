@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">캐치미</string>
-    <string name="title_activity_main">캐치미</string>
+    <string name="app_name">MEETZIP</string>
+    <string name="title_activity_main">MEETZIP</string>
     <string name="package_name">com.catchme.app</string>
     <string name="custom_url_scheme">com.catchme.app</string>
     <string name="widget_desc_small">바로 다음 약속을 보여줘요</string>

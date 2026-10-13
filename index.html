@@ -2,7 +2,8 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<title>CATCHME - 메인 화면</title>
+<title>MEETZIP</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content, viewport-fit=cover" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -194,9 +195,9 @@
     border-radius:8px; background:var(--surface-2); border:1px solid var(--line);
     font-size:12px; font-weight:600; color:var(--text-dim);
   }
-  .home-avail-day.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .home-avail-day.on{ background:var(--accent-soft); border-color:transparent; color:var(--accent); font-weight:700; }
   .home-avail-day.today{ border:2px solid var(--accent); color:var(--accent); font-weight:800; }
-  .home-avail-day.today.on{ border-color:var(--text); color:#fff; }
+  .home-avail-day.today.on{ border-color:var(--accent); color:var(--accent); }
   /* 홈: 이번 주 시간 맞는 친구 */
   .home-match-row{ display:flex; align-items:flex-start; gap:10px; padding:10px 2px; border-top:1px solid var(--line); }
   .home-match-row:first-child{ border-top:none; }
@@ -7484,6 +7485,34 @@
   body.dark-mode .chat-search-popup{ background:#2C2C2E; border-color:#3A3A3C; box-shadow:0 8px 28px rgba(0,0,0,0.55); }
   body.dark-mode input::placeholder,
   body.dark-mode textarea::placeholder{ color:#6E6E73; }
+
+  /* ===================== 디자인 정리 (MEETZIP) =====================
+     - 글꼴을 Pretendard 하나로 통일 (예전엔 Inter/Space Grotesk/Roboto Mono가 섞여 있었음). 시간 숫자는 폭이 일정한 숫자로
+     - 탭마다 감싸던 큰 흰 카드 틀을 없애고, 탭 제목을 크게 (아이폰 기본 앱의 큰 제목처럼). 탭 설명 문구는 숨김
+     - 진한 하늘색은 주요 버튼에만, 칩·표시는 연한 톤으로 */
+  :root{ --app-font:'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; }
+  body, body *:not(svg):not(svg *){ font-family:var(--app-font) !important; }
+  body{ letter-spacing:-0.01em; }
+  .day-event-time, .week-cal-hour, .home-match-slot, .ecs-hex, .travel-min, .time-picker-btn, .date-picker-btn,
+  .reservation-card-time, .month-date-num, .home-avail-day{ font-variant-numeric:tabular-nums; }
+
+  .tab-panel{
+    margin:6px 0 0;
+    background:transparent;
+    border:none;
+    border-radius:0;
+    box-shadow:none;
+    padding:6px 18px calc(20px + 70px);
+  }
+  .tab-panel h2{ font-size:26px; font-weight:800; letter-spacing:-0.03em; margin:0 0 14px; }
+  .tab-panel h2 + .desc{ display:none; }
+  /* 홈이 아닌 탭에선 위쪽 로고를 숨기고 탭 제목이 그 자리 역할 (프로필·설정 아이콘은 그대로) */
+  body.tab-not-home .topbar .brand{ visibility:hidden; }
+  .brand-name{ font-weight:800; letter-spacing:0.02em; }
+  .today-date{ letter-spacing:-0.03em; }
+
+  /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
+  .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
 </style>
 </head>
 <body class="app-booting">
@@ -7493,12 +7522,12 @@
 </script>
 <!-- 앱 시작 로딩 화면 -->
 <div class="app-splash" id="appSplash">
-  <svg class="app-splash-logo" viewBox="220 220 584 584" aria-label="CATCHME">
+  <svg class="app-splash-logo" viewBox="220 220 584 584" aria-label="MEETZIP">
     <defs><linearGradient id="appSplashGrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#84D2FF"/><stop offset="1" stop-color="#4DABFF"/></linearGradient></defs>
     <polygon fill="url(#appSplashGrad)" points="440,235 580,374 721,235 789,302 649,442 789,582 721,650 373,302"/>
     <polygon fill="url(#appSplashGrad)" points="302,373 651,721 583,789 443,650 302,789 235,721 374,581 235,440"/>
   </svg>
-  <div class="app-splash-name">CATCHME</div>
+  <div class="app-splash-name">MEETZIP</div>
 </div>
 
 <div class="app">
@@ -7508,7 +7537,7 @@
     <div class="auth-card">
       <div class="auth-logo">
         <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <span>CATCHME</span>
+        <span>MEETZIP</span>
       </div>
       <!-- 스토어에서 받고 처음 보는 화면이라, 가입 전에 이 앱이 뭘 해주는지 한 줄로 -->
       <p class="auth-tagline">친구가 열어둔 시간에, 거절 걱정 없이 약속 잡기</p>
@@ -7576,7 +7605,7 @@
   <div class="topbar">
     <div class="brand" id="homeBtn">
       <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-      <span class="brand-name">CATCHME</span>
+      <span class="brand-name">MEETZIP</span>
     </div>
     <div class="top-actions">
       <button class="icon-btn" id="myProfileBtn" title="내 프로필">
@@ -8109,7 +8138,7 @@
       </button>
       <input class="location-picker-search-input" id="locationPickerInput" placeholder="장소명으로 검색" maxlength="60" autocomplete="off" />
       <div class="location-picker-recommend-row" id="locationPickerRecommendRow">
-        <button type="button" class="location-picker-recommend-chip" data-rec="catchme">캐치미 추천</button>
+        <button type="button" class="location-picker-recommend-chip" data-rec="catchme">MEETZIP 추천</button>
         <button type="button" class="location-picker-recommend-chip" data-rec="food">맛집</button>
         <button type="button" class="location-picker-recommend-chip" data-rec="cafe">카페</button>
         <button type="button" class="location-picker-recommend-chip" data-rec="bar">술집</button>
@@ -8430,7 +8459,7 @@
     <div class="mini-confirm-card cal-import-card">
       <button type="button" class="mini-confirm-close" id="calImportCloseBtn" aria-label="닫기">&times;</button>
       <div class="mini-confirm-title" style="margin-bottom:6px;">캘린더 불러오기</div>
-      <p class="cal-import-desc">앞으로 3개월 일정을 캐치미로 가져와요.<br>가져온 일정은 <b>나만 보기</b>라, 친구에게는 제목 없이 '일정 있음'으로만 보여요.</p>
+      <p class="cal-import-desc">앞으로 3개월 일정을 MEETZIP으로 가져와요.<br>가져온 일정은 <b>나만 보기</b>라, 친구에게는 제목 없이 '일정 있음'으로만 보여요.</p>
       <div id="calImportBody"></div>
     </div>
   </div>
@@ -9974,7 +10003,7 @@ async function initPushNotifications(){
       });
     }
     if(window.Capacitor.getPlatform() === 'android'){
-      await push.createChannel({ id: 'catchme_default', name: 'CATCHME 알림', importance: 5, visibility: 1 }).catch(() => {});
+      await push.createChannel({ id: 'catchme_default', name: 'MEETZIP 알림', importance: 5, visibility: 1 }).catch(() => {});
     }
     let perm = await push.checkPermissions();
     if(perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') perm = await push.requestPermissions();
@@ -10741,6 +10770,7 @@ function showTab(tabKey){
   document.querySelector('.bottom-nav').style.display = 'flex';
   // "TODAY 날짜" 헤더는 홈에서만 - 다른 탭에서는 화면 제목부터 바로 보이게 (캘린더 탭에선 날짜가 두 번 나왔음)
   document.querySelector('.date-header').style.display = tabKey === null ? '' : 'none';
+  document.body.classList.toggle('tab-not-home', tabKey !== null);
   Object.values(panels).forEach(p => p.classList.remove('active'));
   navItems.forEach(n => n.classList.remove('active'));
 
@@ -11442,7 +11472,7 @@ const LEGAL_PAGES = {
   terms: {
     title: '이용약관',
     body: `제1조 (목적)
-이 약관은 CATCHME(이하 "서비스")의 이용조건 및 절차, 회원과 서비스 운영자의 권리·의무 및 책임사항을 규정함을 목적으로 합니다.
+이 약관은 MEETZIP(이하 "서비스")의 이용조건 및 절차, 회원과 서비스 운영자의 권리·의무 및 책임사항을 규정함을 목적으로 합니다.
 
 제2조 (서비스의 내용)
 서비스는 회원 간 일정 공유, 캘린더 매칭, 채팅, 모임 개설 등의 기능을 제공합니다.
@@ -11679,7 +11709,7 @@ function openSettingsDetail(id){
   } else if(id === 'notifications'){
     body.innerHTML = `
       <div class="settings-detail-desc">받고 싶은 알림만 골라서 켜두세요.</div>
-      ${toggleRowHTML('notif_message', 'CATCHME 푸시 알림 받기', '새 메시지, 친구 요청, 약속 확정 알림을 받아요', false)}
+      ${toggleRowHTML('notif_message', 'MEETZIP 푸시 알림 받기', '새 메시지, 친구 요청, 약속 확정 알림을 받아요', false)}
       <div id="engagementPrefRows"></div>
       ${toggleRowHTML('notif_marketing', '마케팅/이벤트 알림', '이벤트와 혜택 소식을 받아요', false)}
     `;
@@ -11724,7 +11754,7 @@ function openSettingsDetail(id){
 
   } else if(id === 'notice'){
     body.innerHTML = `
-      <div class="settings-detail-desc">CATCHME의 새로운 소식이에요.</div>
+      <div class="settings-detail-desc">MEETZIP의 새로운 소식이에요.</div>
       <div class="search-empty">아직 공지사항이 없어요.</div>
     `;
 
@@ -20080,15 +20110,19 @@ function renderMonthSchedView(){
     // 여러 날짜에 걸치는 일정도 칸마다 따로, 그 칸 안에서만 띠를 그리고 이름도 칸마다 보여줌
     // (예전엔 옆 칸까지 폭을 넓혀 하나로 이어진 막대처럼 그렸는데, 띠가 옆 칸을 침범해 보였음).
     // 같은 일정은 위의 레인 배정 덕분에 그 주 안에서 같은 줄에 나와서, 칸이 나뉘어도 이어지는 게 보임
-    const labelsHtml = shownEvents.map(ev => {
+    // 예약 가능 시간은 칩 대신 날짜 아래 작은 점으로 - 날마다 "가능" 칩이 박혀 있어서 약속·일정이 묻혔음
+    const hasAvail = events.some(ev => ev.type === 'available' && !ev.isPendingHold);
+    const labelEvents = shownEvents.filter(ev => ev.type !== 'available' || ev.isPendingHold);
+    const labelsHtml = labelEvents.map(ev => {
       const bg = ev.isPendingHold ? '#F59E0B' : colorForEvent(ev);
       // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 짧게 보여줌
       // (누구에게 열린 시간인지 알 수 있게 "가능"/"💼가능"/그룹 이모티콘들/"💼업무")
       const label = ev.type === 'available' ? availableShortFor(availableForOf(ev), ev.visibility) : ev.title;
       return `<div class="month-event-label" style="background:${bg};${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
-    const moreHtml = events.length > shownEvents.length
-      ? `<div class="month-event-more">+${events.length - shownEvents.length}개</div>`
+    const hiddenCount = events.filter(ev => ev.type !== 'available' || ev.isPendingHold).length - labelEvents.length;
+    const moreHtml = hiddenCount > 0
+      ? `<div class="month-event-more">+${hiddenCount}개</div>`
       : '';
 
     // 메모가 있으면 날짜 바로 아래 맨 위에 메모마다 한 줄씩 (체크 표시는 아래 목록에서만)
@@ -20097,7 +20131,7 @@ function renderMonthSchedView(){
       `<div class="month-event-label month-memo-label">${escapeHtml(truncateForMonthLabel(memo.text.split('\n')[0]))}</div>`
     ).join('');
 
-    cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${memoHtml}${labelsHtml}${moreHtml}`;
+    cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${hasAvail ? '<span class="month-avail-dot" title="예약 가능 시간 있음"></span>' : ''}${memoHtml}${labelsHtml}${moreHtml}`;
     cell.addEventListener('click', () => {
       monthSelectedDate = cellDate;
       renderMonthSchedView();
@@ -22599,7 +22633,7 @@ function friendInviteBoxHtml(){
   const myId = myProfileData && myProfileData.id ? `@${escapeHtml(myProfileData.id)}` : '';
   return `
     <div class="friend-invite-box">
-      <div class="friend-invite-title">주변에 캐치미를 쓰는 친구가 없나요?</div>
+      <div class="friend-invite-title">주변에 MEETZIP을 쓰는 친구가 없나요?</div>
       <div class="friend-invite-desc">내 아이디${myId ? `(<b>${myId}</b>)` : ''}를 보내서 친구가 나를 추가하게 하거나, 가입 안 한 친구에게도 약속 링크를 보낼 수 있어요.</div>
       <div class="friend-invite-actions">
         <button type="button" data-friend-invite="share">내 아이디 보내기</button>
@@ -22611,9 +22645,9 @@ function shareMyFriendId(){
   const id = myProfileData && myProfileData.id;
   if(!id){ showToast('로그인 후에 아이디를 보낼 수 있어요.'); return; }
   const url = /^https?:/.test(location.origin) ? location.origin : '';
-  const text = `캐치미에서 나를 친구로 추가해줘! 아이디: @${id}`;
+  const text = `MEETZIP에서 나를 친구로 추가해줘! 아이디: @${id}`;
   if(navigator.share){
-    navigator.share({ title: '캐치미 친구 추가', text, url: url || undefined }).catch(() => {});
+    navigator.share({ title: 'MEETZIP 친구 추가', text, url: url || undefined }).catch(() => {});
     return;
   }
   const shareText = url ? `${text}\n${url}` : text;
@@ -25394,7 +25428,7 @@ async function showLocationPickerRecommend(key){
     });
     items.sort((a, b) => b._score - a._score);
     if(document.querySelector('#locationPickerRecommendRow .active')?.dataset.rec !== key) return;
-    renderLocationPickerRecommendList(items.slice(0, 10), '이 근처 3km 안에는 캐치미 유저 추천이 아직 없어요. 다른 칩을 눌러보세요.');
+    renderLocationPickerRecommendList(items.slice(0, 10), '이 근처 3km 안에는 MEETZIP 유저 추천이 아직 없어요. 다른 칩을 눌러보세요.');
     return;
   }
 
@@ -25786,7 +25820,7 @@ function renderHotplaceKakaoSection(category){
     if(cs && (cs.reviewCount || cs.confirmCount)){
       const badge = document.createElement('div');
       badge.className = 'kakao-place-catchme';
-      badge.textContent = ['캐치미', cs.avgRating != null ? `★${cs.avgRating.toFixed(1)}` : '', cs.reviewCount ? `리뷰 ${cs.reviewCount}` : '', cs.confirmCount ? `약속 ${cs.confirmCount}번` : ''].filter(Boolean).join(' · ');
+      badge.textContent = ['MEETZIP', cs.avgRating != null ? `★${cs.avgRating.toFixed(1)}` : '', cs.reviewCount ? `리뷰 ${cs.reviewCount}` : '', cs.confirmCount ? `약속 ${cs.confirmCount}번` : ''].filter(Boolean).join(' · ');
       card.querySelector('.kakao-place-head').after(badge);
     }
     const sBtn = card.querySelector('.feed-post-btn.suggest');
@@ -30695,7 +30729,7 @@ function renderCalImport(){
     const n = st.events.length;
     body.innerHTML = n ? `
       <div class="cal-import-result"><b>${n}개</b>일정을 찾았어요</div>
-      <p class="cal-import-help" style="text-align:center;margin:0 0 12px;">이미 캐치미에 있는 같은 일정은 건너뛰어요.</p>
+      <p class="cal-import-help" style="text-align:center;margin:0 0 12px;">이미 MEETZIP에 있는 같은 일정은 건너뛰어요.</p>
       ${err}
       <button type="button" class="profile-chat-btn" id="calImportSaveBtn" ${st.busy ? 'disabled' : ''}>${st.busy ? '불러오는 중...' : `${n}개 일정 불러오기`}</button>
       <button type="button" class="plan-back-btn" id="calImportBackBtn">처음으로</button>` : `
@@ -30756,7 +30790,7 @@ async function startDeviceImport(){
     const isAndroid = window.Capacitor.getPlatform() === 'android';
     const perm = isAndroid ? await plugin.requestReadOnlyCalendarAccess() : await plugin.requestFullCalendarAccess();
     if(!perm || perm.result !== 'granted'){
-      calImportFail('캘린더 접근이 허용되지 않았어요. 휴대폰 설정 → 캐치미 → 캘린더에서 허용해 주세요.');
+      calImportFail('캘린더 접근이 허용되지 않았어요. 휴대폰 설정 → MEETZIP → 캘린더에서 허용해 주세요.');
       return;
     }
     const { result } = await plugin.listCalendars();
@@ -31747,7 +31781,7 @@ async function renderMatchEmptyHelp(body, startDate, endDate){
   const help = document.createElement('div');
   help.className = 'match-empty-why';
   help.innerHTML = `
-    캐치미는 <b>모두가 '예약 가능 시간'으로 열어둔 시간</b> 중에서 겹치는 시간을 찾아요. 일반 일정이 없다고 비는 시간으로 치진 않아요.
+    MEETZIP은 <b>모두가 '예약 가능 시간'으로 열어둔 시간</b> 중에서 겹치는 시간을 찾아요. 일반 일정이 없다고 비는 시간으로 치진 않아요.
     <div class="match-empty-who">${who.join('')}</div>
     ${actions.length ? `<div class="match-empty-actions">${actions.join('')}</div>` : ''}`;
   body.appendChild(help);
@@ -32622,7 +32656,7 @@ function renderPlanStartFriends(){
     body.innerHTML = `
       <div class="plan-empty">아직 친구가 없어요.<br/>링크로 먼저 물어보면, 받은 사람이 가입하면서 친구가 될 수 있어요.</div>
       ${planOptionHtml({ ...PLAN_LINK_OPTION, recommended: true })}
-      <button type="button" class="plan-option" data-plan-go="friends"><span><b>아이디로 친구 추가하기</b><small>이미 캐치미를 쓰는 친구라면 찾아서 추가해요</small></span></button>`;
+      <button type="button" class="plan-option" data-plan-go="friends"><span><b>아이디로 친구 추가하기</b><small>이미 MEETZIP을 쓰는 친구라면 찾아서 추가해요</small></span></button>`;
     return;
   }
   body.innerHTML = `
@@ -33187,7 +33221,7 @@ function renderInviteOverlay(){
     titleEl.textContent = '약속 응답 현황';
     body.innerHTML = renderInviteManageHtml();
   } else if(st.mode === 'guest'){
-    titleEl.textContent = 'CATCHME 약속';
+    titleEl.textContent = 'MEETZIP 약속';
     body.innerHTML = renderInviteGuestHtml();
   }
   renderInviteFoot();
@@ -33200,7 +33234,7 @@ function renderInviteListHtml(){
   const list = inviteState.myInvites;
   const intro = `<div class="inv-hero">
       <div class="inv-hero-title">링크 하나로 약속 시간 잡기</div>
-      <div class="inv-hero-sub">날짜만 골라 링크를 보내면, CATCHME에 가입 안 한 친구도 링크를 열어 가능한 시간을 바로 골라줄 수 있어요.</div>
+      <div class="inv-hero-sub">날짜만 골라 링크를 보내면, MEETZIP에 가입 안 한 친구도 링크를 열어 가능한 시간을 바로 골라줄 수 있어요.</div>
     </div>`;
   if(!list.length) return intro + '<div class="inv-empty">아직 만든 약속 링크가 없어요.</div>';
   // 마감된 링크는 아래로 (나머지 순서는 그대로)
@@ -34182,7 +34216,7 @@ function renderInviteGuestHtml(){
         html += `<div class="inv-card"><div class="inv-card-desc">${ICO.calendar} 이 약속은 내 캘린더에 담겨 있어요.</div></div>`;
       } else if(mine){
         html += `<div class="inv-card accent">
-            <div class="inv-card-desc" style="margin-bottom:10px;">이 약속을 내 CATCHME 캘린더에 담을 수 있어요.</div>
+            <div class="inv-card-desc" style="margin-bottom:10px;">이 약속을 내 MEETZIP 캘린더에 담을 수 있어요.</div>
             <button type="button" class="inv-primary" data-act="claim">내 캘린더에 담기</button>
           </div>`;
       }
@@ -34235,13 +34269,13 @@ function renderInviteGuestHtml(){
     if(!authToken && inv.myResponse && !st.signupHidden){
       html += `<div class="inv-signup-card">
           <div class="inv-card-title">시간이 정해지면 알림 받을까요?</div>
-          <div class="inv-card-desc">지금은 이 링크를 다시 열어야 확정 소식을 볼 수 있어요. CATCHME를 쓰면 ${creator}님이 시간을 정하는 순간 알려드려요.</div>
+          <div class="inv-card-desc">지금은 이 링크를 다시 열어야 확정 소식을 볼 수 있어요. MEETZIP을 쓰면 ${creator}님이 시간을 정하는 순간 알려드려요.</div>
           <ul>
             <li>확정되면 <b>알림</b>이 오고, 약속이 <b>내 캘린더에 바로</b> 담겨요</li>
             <li>나도 링크 하나로 "언제 돼?" 없이 약속을 잡을 수 있어요</li>
             <li>친구 일정에서 <b>비는 시간을 바로</b> 보고 약속을 잡아요</li>
           </ul>
-          <button type="button" class="inv-primary cta" data-act="signup">CATCHME 시작하고 확정 알림 받기</button>
+          <button type="button" class="inv-primary cta" data-act="signup">MEETZIP 시작하고 확정 알림 받기</button>
           <div class="inv-signup-hint">카카오·네이버로 바로 시작할 수 있어요</div>
           <button type="button" class="inv-text-btn" data-act="hideSignup">괜찮아요</button>
         </div>`;
@@ -34576,9 +34610,9 @@ async function createInviteFromDraft(){
 function inviteShareText(inv){
   const where = inv.place ? `\n장소: ${inv.place.name}${inv.place.address ? ` (${inv.place.address})` : ''}` : '';
   if(inv.status === 'CONFIRMED'){
-    return `[CATCHME] ${inv.title}\n약속 시간이 정해졌어요: ${inviteConfirmedLabel(inv)}${where}\n링크에서 확정된 시간을 확인하고 내 캘린더에도 담아보세요!`;
+    return `[MEETZIP] ${inv.title}\n약속 시간이 정해졌어요: ${inviteConfirmedLabel(inv)}${where}\n링크에서 확정된 시간을 확인하고 내 캘린더에도 담아보세요!`;
   }
-  return `[CATCHME] ${inv.title}${where}\n${inviteCreatorName(inv)}님이 약속 시간을 물어보고 있어요. 가입 없이 링크에서 되는 시간만 눌러주세요!`;
+  return `[MEETZIP] ${inv.title}${where}\n${inviteCreatorName(inv)}님이 약속 시간을 물어보고 있어요. 가입 없이 링크에서 되는 시간만 눌러주세요!`;
 }
 
 // 눌린 그 순간(사용자 동작 안)에 바로 복사 - 아이폰 앱 화면(WKWebView)은 readonly 입력칸을 그냥 select()하면
@@ -34808,7 +34842,7 @@ function goSignupFromInvite(){
   const notice = document.getElementById('authInviteNotice');
   // 아직 확정 전이면 가입 후 응답만 계정에 연결해 두고, 확정될 때 알림 + 캘린더 담기는 서버가 해줌
   notice.textContent = !inv.myResponse
-    ? 'CATCHME에 오신 걸 환영해요! 가입하고 다음 약속은 더 쉽게 잡아보세요.'
+    ? 'MEETZIP에 오신 걸 환영해요! 가입하고 다음 약속은 더 쉽게 잡아보세요.'
     : inv.status === 'CONFIRMED'
       ? `가입하면 '${inv.title}' 약속(${inviteConfirmedLabel(inv)})이 내 캘린더에 바로 담겨요.`
       : `가입하면 '${inv.title}' 시간이 정해질 때 알림이 오고, 내 캘린더에 바로 담겨요.`;
