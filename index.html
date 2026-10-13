@@ -18,7 +18,8 @@
     --text:#17181D;
     --text-dim:#8A8C96;
     --accent:#38BDF8;
-    --sky-rgb:56,189,248; /* 하늘색(--accent)을 rgba(var(--sky-rgb), 투명도)로 쓰기 위한 숫자 - 다크 모드에선 미드나잇 */
+    --sky-rgb:56,189,248; /* 하늘색(--accent)을 rgba(var(--sky-rgb), 투명도)로 쓰기 위한 숫자 - 다크 모드에선 밝은 회색 */
+    --on-accent:#FFFFFF; /* 강조색 바탕 위 글씨 (다크 모드는 바탕이 밝은 회색이라 어두운 글씨) */
     --accent-soft:rgba(56,189,248,0.14);
     --cta:#FF6B4A;
     --mask:#E3E3E0;
@@ -35,10 +36,11 @@
     --line:#3A3A3C;
     --text:#F2F2F2;
     --text-dim:#9B9B9E;
-    /* 다크 모드는 하늘색 대신 미드나잇 블루 (글씨로 써도 읽히게 너무 어둡지 않은 톤) */
-    --accent:#5B6FD8;
-    --sky-rgb:91,111,216;
-    --accent-soft:rgba(91,111,216,0.22);
+    /* 다크 모드는 하늘색 대신 밝은 회색 */
+    --accent:#D4D6DC;
+    --sky-rgb:212,214,220;
+    --accent-soft:rgba(212,214,220,0.16);
+    --on-accent:#1C1D21;
     --mask:#3A3A3C;
     --glass-bg:rgba(255,255,255,0.06);
     --glass-bg-strong:rgba(255,255,255,0.045);
@@ -135,7 +137,7 @@
   .icon-btn.login{
     background:var(--accent);
     border-color:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
   }
 
   /* ---------------- Date header ---------------- */
@@ -162,7 +164,7 @@
   .home-plan-cta{
     display:flex; align-items:center; gap:12px; width:100%;
     padding:16px; border:none; border-radius:18px;
-    background:var(--accent); color:#fff;
+    background:var(--accent); color:var(--on-accent);
     text-align:left; font-family:'Inter',sans-serif; cursor:pointer;
     box-shadow:0 6px 18px rgba(23,24,29,0.12);
   }
@@ -217,7 +219,7 @@
   .home-avail-status.warn{ color:#e5484d; font-weight:600; }
   .home-avail-actions{ display:flex; gap:6px; margin-top:10px; }
   .home-avail-actions button{ flex:1; padding:9px 6px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); color:var(--text); font-size:12.5px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
-  .home-avail-actions button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .home-avail-actions button.primary{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .home-pending-card{ border-color:var(--accent); }
   .reserve-window-hint{ margin-top:4px; font-size:12px; color:var(--text-dim); }
   .auth-tagline{ margin:-6px 0 18px; text-align:center; font-size:13px; color:var(--text-dim); line-height:1.5; }
@@ -231,7 +233,7 @@
     flex:1; padding:10px 8px; border:1px solid var(--line); border-radius:10px; background:var(--surface);
     color:var(--text); font-size:12.5px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
   }
-  .friend-invite-actions button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .friend-invite-actions button.primary{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .home-pending-row{
     display:flex; align-items:center; gap:10px; width:100%;
     padding:10px 4px; border:none; border-top:1px solid var(--line); background:none;
@@ -250,7 +252,7 @@
   .first-event-text{ flex:1; min-width:0; }
   .first-event-text b{ display:block; font-size:14.5px; }
   .first-event-text small{ display:block; font-size:12px; color:var(--text-dim); margin-top:3px; }
-  .first-event-go{ flex-shrink:0; padding:8px 12px; border-radius:10px; background:var(--accent); color:#fff; font-size:13px; font-weight:700; white-space:nowrap; }
+  .first-event-go{ flex-shrink:0; padding:8px 12px; border-radius:10px; background:var(--accent); color:var(--on-accent); font-size:13px; font-weight:700; white-space:nowrap; }
   /* 예약 가능 시간을 처음 만들 때만 보이는 안내 */
   .avail-first-tip{
     margin:0 0 12px; padding:10px 12px; border-radius:10px;
@@ -364,7 +366,7 @@
   .day-cell.other-month{ color:#CFD0D4; }
   .day-cell.today{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-weight:700;
   }
   .day-cell.selected:not(.today){
@@ -461,7 +463,7 @@
     border:none;
     border-radius:10px;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-size:18px;
     font-weight:600;
     cursor:pointer;
@@ -581,7 +583,7 @@
     border:none;
     border-radius:13px;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
     font-size:14.5px;
@@ -617,7 +619,7 @@
     border-radius:10px;
     border:none;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-size:20px;
     font-weight:600;
     line-height:1;
@@ -791,7 +793,7 @@
     border:none;
     border-radius:12px;
     background:var(--accent);
-    color:#fff;
+    color:var(--on-accent);
     font-size:12.5px;
     font-weight:700;
     text-align:left;
@@ -852,7 +854,7 @@
     transform:translateY(-44px);
     cursor:pointer;
   }
-  .place-viewer-label.on{ background:var(--accent); color:#fff; }
+  .place-viewer-label.on{ background:var(--accent); color:var(--on-accent); }
   .place-viewer-label.closed{ opacity:0.55; }
   .place-vote-add-btn{ flex-shrink:0; height:32px; }
   /* 장소 투표 - 지도 아래 후보 목록 */
@@ -894,7 +896,7 @@
     font-size:12.5px; font-weight:700;
     cursor:pointer;
   }
-  .place-vote-btn.voted{ background:var(--accent); color:#fff; }
+  .place-vote-btn.voted{ background:var(--accent); color:var(--on-accent); }
   .place-vote-btn:disabled{ opacity:0.5; cursor:default; }
   .place-vote-status{ flex-shrink:0; font-size:12px; font-weight:700; color:var(--text-dim); }
   .place-vote-status.confirmed{ color:var(--accent); }
@@ -1004,7 +1006,7 @@
   .frd-day small{ font-size:10.5px; }
   .frd-day b{ font-size:14px; }
   .frd-day.open{ opacity:1; border-color:var(--accent); color:var(--text); cursor:pointer; }
-  .frd-day.open.on{ background:var(--accent); color:#fff; }
+  .frd-day.open.on{ background:var(--accent); color:var(--on-accent); }
   .search-result-row{
     display:flex;
     align-items:center;
@@ -1035,7 +1037,7 @@
   }
   .search-add-btn.added{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     cursor:default;
   }
   .search-empty{
@@ -1083,7 +1085,7 @@
   .person-action-btn.chat{
     background:var(--accent);
     border:none;
-    color:#FFFFFF;
+    color:var(--on-accent);
   }
   .person-action-btn:active{ opacity:0.85; }
   #removeFriendBtn:hover{ color:var(--cta); }
@@ -1329,7 +1331,7 @@
     min-width:18px;height:18px;
     border-radius:9px;
     background:var(--accent);
-    color:#fff;
+    color:var(--on-accent);
     font-size:11px;
     font-weight:800;
     display:flex;align-items:center;justify-content:center;
@@ -1411,7 +1413,7 @@
     border-radius:8px;
     border:none;
     background:var(--accent);
-    color:#fff;
+    color:var(--on-accent);
     font-size:12px;
     font-weight:700;
     cursor:pointer;
@@ -1517,7 +1519,7 @@
   .feed-meet-place-btn{
     width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
     margin:4px 0 12px; padding:12px; border:none; border-radius:14px;
-    background:var(--accent); color:#fff; font-size:14px; font-weight:700; cursor:pointer;
+    background:var(--accent); color:var(--on-accent); font-size:14px; font-weight:700; cursor:pointer;
   }
   .feed-meet-place-btn svg{ width:16px; height:16px; }
   .meet-place-sub{ font-size:12.5px; color:var(--text-dim); margin:-6px 0 12px; line-height:1.45; }
@@ -1527,7 +1529,7 @@
   .meet-place-room .nm{ flex:1; min-width:0; font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .meet-place-room .nm small{ display:block; font-weight:500; font-size:11px; color:var(--accent); }
   .meet-place-room button{ flex-shrink:0; border:1px solid var(--line); background:var(--surface); color:var(--text); border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer; }
-  .meet-place-room button.fill{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .meet-place-room button.fill{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .meet-place-room .done{ font-size:11.5px; color:var(--text-dim); flex-shrink:0; }
   /* 약속 끝난 뒤 장소 후기 */
   .place-review-eyebrow{ font-size:12px; font-weight:700; color:var(--accent); margin-bottom:4px; }
@@ -1744,7 +1746,7 @@
     cursor:pointer;
   }
   .feed-tag-view-btn svg{ width:15px; height:15px; }
-  .feed-tag-view-btn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .feed-tag-view-btn.active{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .feed-tag-view-btn:hover:not(.active){ background:var(--surface-2); }
   /* 장소 모아보기 - 인스타그램 프로필 그리드처럼 게시물마다 대표사진 한 장씩 3열로 모아서 보여줌 */
   .feed-tag-grid{
@@ -2155,7 +2157,7 @@
     border:none;
     border-radius:8px;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-size:11.5px;
     font-weight:600;
     cursor:pointer;
@@ -2239,7 +2241,7 @@
     border-radius:13px;
     border:none;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
     font-size:13px;
@@ -2599,7 +2601,7 @@
   .feed-post-btn.fix{
     background:var(--accent);
     border-color:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
   }
   .feed-post-btn.fix:hover{ opacity:0.9; color:#FFFFFF; }
   .feed-post-btn.star{
@@ -2713,7 +2715,7 @@
   }
   .meetup-sort-btn.active{
     background:var(--accent);
-    color:#fff;
+    color:var(--on-accent);
   }
   .sort-trigger-btn{
     flex:none;
@@ -2857,7 +2859,7 @@
     cursor:pointer;
     border:none;
   }
-  .meetup-request-approve-btn{ background:var(--accent); color:#fff; }
+  .meetup-request-approve-btn{ background:var(--accent); color:var(--on-accent); }
   .meetup-request-decline-btn{ background:var(--surface-2); color:var(--text-dim); }
   .meetup-pending-banner{
     display:flex;
@@ -2985,7 +2987,7 @@
   /* 채팅방 상단에 바로 보이는 약속 잡기 버튼 (+ 메뉴 안에만 있으면 잘 못 찾음) */
   .chat-header-plan-btn{
     height:30px; padding:0 10px; border-radius:9px; border:none;
-    background:var(--accent); color:#fff;
+    background:var(--accent); color:var(--on-accent);
     font-size:12px; font-weight:700; white-space:nowrap;
     display:inline-flex; align-items:center; gap:4px;
     cursor:pointer; flex-shrink:0; -webkit-tap-highlight-color:transparent;
@@ -3114,7 +3116,7 @@
   }
   .chat-search-cal-day:disabled{ color:var(--text-dim); opacity:.35; font-weight:400; cursor:default; }
   .chat-search-cal-day.today{ box-shadow:inset 0 0 0 1.5px var(--line); }
-  .chat-search-cal-day:not(:disabled):active{ background:var(--accent); color:#fff; }
+  .chat-search-cal-day:not(:disabled):active{ background:var(--accent); color:var(--on-accent); }
   .chat-search-cal-loading{ font-size:11.5px; color:var(--text-dim); text-align:center; margin-top:6px; }
   /* 날짜로 이동했을 때 그 날 구분선이 살짝 반짝 */
   .chat-date-divider.date-jump-flash span{ animation:chatDateJumpFlash 1.4s ease; }
@@ -3328,12 +3330,12 @@
   .match-fine-head button{ border:0; background:none; color:var(--text-dim); font-size:12px; cursor:pointer; padding:0 2px; }
   .match-fine-mins{ display:grid; grid-template-columns:repeat(6, 1fr); gap:4px; }
   .match-fine-min{ padding:6px 0; border-radius:7px; border:1px solid var(--line); background:var(--surface); color:var(--text); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
-  .match-fine-min.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .match-fine-min.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .match-fine-min:disabled{ opacity:.35; cursor:default; }
   .match-fine-sub{ font-size:11.5px; font-weight:700; color:var(--text-dim); margin:8px 0 4px; }
   .match-fine-hours{ display:flex; flex-wrap:wrap; gap:4px; margin-bottom:4px; }
   .match-fine-hour{ padding:5px 10px; border-radius:7px; border:1px solid var(--line); background:var(--surface); color:var(--text); font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
-  .match-fine-hour.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .match-fine-hour.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 
   .time-option-list{
     display:flex;
@@ -3371,7 +3373,7 @@
   }
   .time-option-vote-btn.voted{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
   }
   .time-option-vote-count{
     flex-shrink:0;
@@ -3594,7 +3596,7 @@
   /* 친구 프로필의 뱃지 등급표 (단골 → 친밀 → 각별) */
   .profile-plan-btn{
     width:100%; margin-top:16px; padding:14px; border:none; border-radius:12px;
-    background:var(--accent); color:#fff; font-size:15px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
+    background:var(--accent); color:var(--on-accent); font-size:15px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
   }
   .profile-plan-btn + .person-profile-actions{ margin-top:8px; }
   details.profile-badge-tiers > summary{ cursor:pointer; list-style:none; margin-bottom:0; }
@@ -3862,7 +3864,7 @@
   }
   .msg-row.me .msg-bubble{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     border-bottom-right-radius:4px;
   }
   /* 보낸 메시지가 아래에서 살짝 튀어오르며 나타나는 모션 (카톡/인스타 느낌) */
@@ -4106,7 +4108,7 @@
     background:var(--surface-2); color:var(--text);
     font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
   }
-  .date-ask-card .dac-btn.primary{ background:var(--accent); color:#FFFFFF; }
+  .date-ask-card .dac-btn.primary{ background:var(--accent); color:var(--on-accent); }
   .date-ask-card.done .dac-head{ color:#16A34A; }
   .date-ask-card.off .dac-date{ color:var(--text-dim); text-decoration:line-through; }
   /* 날짜 고르기 창 - 한 달 달력에서 하루 고르기 */
@@ -4125,7 +4127,7 @@
   }
   .date-ask-grid .dag-day.today{ box-shadow:inset 0 0 0 1.5px var(--line); }
   .date-ask-grid .dag-day:disabled{ opacity:.25; cursor:default; }
-  .date-ask-grid .dag-day.on{ background:var(--accent); color:#FFFFFF; }
+  .date-ask-grid .dag-day.on{ background:var(--accent); color:var(--on-accent); }
   #dateAskSendBtn:disabled{ opacity:.45; }
 
   .reservation-card{
@@ -4195,7 +4197,7 @@
   .reservation-btn.accept{
     background:var(--accent);
     border:none;
-    color:#FFFFFF;
+    color:var(--on-accent);
   }
   .reservation-btn.cancel{
     background:var(--surface-2);
@@ -4271,7 +4273,7 @@
     display:inline-block;
     font-size:10.5px;
     font-weight:700;
-    color:#FFFFFF;
+    color:var(--on-accent);
     background:var(--accent);
     border-radius:999px;
     padding:1px 7px;
@@ -4349,7 +4351,7 @@
     border:none;
     border-radius:50%;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     display:flex;
     align-items:center;
     justify-content:center;
@@ -4391,7 +4393,7 @@
   .kb-mode-btn.active{
     background:var(--accent);
     border-color:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
   }
   .kb-keys{
     display:flex;
@@ -4428,11 +4430,11 @@
   }
   .kb-key.special.active{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
   }
   .kb-key.enter{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-weight:600;
     font-size:12px;
   }
@@ -4614,7 +4616,7 @@
   .meetup-chip.active{
     background:var(--accent);
     border-color:var(--accent);
-    color:#fff;
+    color:var(--on-accent);
   }
   .meetup-chip-mine{
     border-style:dashed;
@@ -4677,7 +4679,7 @@
     border-radius:9px;
     border:1px solid var(--accent);
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-size:17px;
     font-weight:700;
     display:flex;
@@ -4728,7 +4730,7 @@
     background:var(--surface-2); color:var(--text-dim);
   }
   .day-today-chip:empty{ display:none; }
-  .day-today-chip.today{ background:var(--accent); color:#FFFFFF; }
+  .day-today-chip.today{ background:var(--accent); color:var(--on-accent); }
   .day-goto-today-btn{
     border:1px solid var(--accent); background:transparent; color:var(--accent);
     font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:999px; cursor:pointer;
@@ -4768,7 +4770,7 @@
   .day-add-btn{
     background:var(--accent) !important;
     border-color:var(--accent) !important;
-    color:#FFFFFF !important;
+    color:var(--on-accent) !important;
     font-size:17px !important;
     font-weight:700;
   }
@@ -4821,7 +4823,7 @@
     gap:5px;
     border:none;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-family:'Inter',sans-serif;
     font-size:11.5px;
     font-weight:700;
@@ -5133,7 +5135,7 @@
   .custom-select-opt:hover{ background:var(--surface-2); }
   .custom-select-opt.selected{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-weight:700;
   }
 
@@ -5277,7 +5279,7 @@
   .mini-confirm-btn:hover{ background:var(--mask); }
   .mini-confirm-btn.danger{ color:var(--cta); }
   /* 다음으로 진행하는 주 버튼 - 회색 보조 버튼(취소)과 확실히 구분되게 채워진 강조색 */
-  .mini-confirm-btn.primary{ background:var(--accent); color:#FFFFFF; }
+  .mini-confirm-btn.primary{ background:var(--accent); color:var(--on-accent); }
   .mini-confirm-btn.primary:hover{ background:var(--accent); opacity:0.9; }
   /* 채팅 메시지 꾹 누르기 → 복사하기 / 선택 복사하기 */
   .msg-copy-card{ max-width:260px; padding:10px; }
@@ -5327,7 +5329,7 @@
   .plan-back-btn{ width:100%; padding:10px 0 0; border:none; background:none; color:var(--text-dim); font-size:12.5px; cursor:pointer; font-family:'Inter',sans-serif; }
   .plan-option.recommended{ border-color:var(--accent); border-width:1.5px; }
   .plan-option.unavailable{ opacity:.55; }
-  .plan-option-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:var(--accent); color:#fff; font-size:10.5px; font-weight:700; vertical-align:1px; }
+  .plan-option-badge{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px; background:var(--accent); color:var(--on-accent); font-size:10.5px; font-weight:700; vertical-align:1px; }
   .plan-option .plan-option-status{ color:var(--accent); font-weight:600; }
   .plan-option.unavailable .plan-option-status{ color:var(--text-dim); }
   .plan-link-row{ margin-top:12px; }
@@ -5397,7 +5399,7 @@
     transition:all .15s ease;
   }
   .plan-earliest-card:hover .plan-earliest-action{
-    background:var(--accent); color:#fff;
+    background:var(--accent); color:var(--on-accent);
   }
   .plan-earliest-loading{
     display:flex; align-items:center; justify-content:center; gap:7px;
@@ -5427,7 +5429,7 @@
     padding:11px 12px; border:1px solid var(--accent); border-radius:12px;
     background:var(--accent-soft); color:var(--text); text-align:left; font-family:'Inter',sans-serif; cursor:pointer;
   }
-  .quick-avail-entry-ico{ flex-shrink:0; width:32px; height:32px; border-radius:10px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; }
+  .quick-avail-entry-ico{ flex-shrink:0; width:32px; height:32px; border-radius:10px; background:var(--accent); color:var(--on-accent); display:flex; align-items:center; justify-content:center; }
   .quick-avail-entry-ico svg{ width:17px; height:17px; }
   .quick-avail-entry-text{ flex:1; min-width:0; }
   .quick-avail-entry-text b{ display:block; font-size:13.5px; }
@@ -5518,7 +5520,7 @@
   .qa-tabs{ display:flex; gap:6px; overflow-x:auto; margin:0 -2px 4px; padding:2px; scrollbar-width:none; }
   .qa-tabs::-webkit-scrollbar{ display:none; }
   .qa-tab{ flex:none; display:inline-flex; align-items:center; gap:5px; padding:7px 12px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text-dim); font-size:12.5px; font-weight:600; font-family:inherit; cursor:pointer; white-space:nowrap; }
-  .qa-tab.active{ border-color:var(--accent); background:var(--accent); color:#fff; }
+  .qa-tab.active{ border-color:var(--accent); background:var(--accent); color:var(--on-accent); }
   .qa-tab i{ width:6px; height:6px; border-radius:50%; background:var(--accent); }
   .qa-tab.active i{ background:#fff; }
   .qa-tab-hint{ margin:0 4px 6px; font-size:11.5px; color:var(--text-dim); line-height:1.45; }
@@ -5556,7 +5558,7 @@
   .match-empty-who span.no{ color:#e5484d; font-weight:600; }
   .match-empty-actions{ display:flex; flex-direction:column; gap:6px; margin-top:10px; }
   .match-empty-actions button{ width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); color:var(--text); font-size:13px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
-  .match-empty-actions button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .match-empty-actions button.primary{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
 
   /* ---------------- 서버 깨우는 중 안내 ---------------- */
   .server-waking-banner{
@@ -5667,7 +5669,7 @@
     border:none;
     border-radius:13px;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-family:'Space Grotesk',sans-serif;
     font-size:12.5px;
     font-weight:700;
@@ -5750,7 +5752,7 @@
     cursor:pointer;
     white-space:nowrap;
   }
-  .hotplace-tab.active{ background:var(--accent); border-color:var(--accent); color:#FFFFFF; }
+  .hotplace-tab.active{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .hotplace-pane{ display:none; flex:1; min-height:0; flex-direction:column; }
   .hotplace-pane.active{ display:flex; }
   .hotplace-pane#hotplacePane-food,
@@ -5796,7 +5798,7 @@
     flex-shrink:0; border:1px solid var(--line); background:var(--surface-2); color:var(--text);
     border-radius:999px; padding:5px 11px; font:inherit; font-size:11.5px; font-weight:600; cursor:pointer;
   }
-  .hotplace-kakao-filter button.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .hotplace-kakao-filter button.active{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .kakao-place-card{
     padding:12px 12px 10px; border:1px solid var(--line); border-radius:14px;
     background:var(--surface); margin-bottom:8px;
@@ -5830,7 +5832,7 @@
     border:none;
     border-radius:12px;
     background:var(--accent);
-    color:#fff;
+    color:var(--on-accent);
     font-size:13px;
     font-weight:700;
     font-family:'Space Grotesk',sans-serif;
@@ -5994,7 +5996,7 @@
     flex:1; padding:11px 0; border-radius:12px; border:1px solid var(--line);
     background:var(--surface-2); color:var(--text); font-size:14px; font-weight:700; cursor:pointer;
   }
-  .app-confirm-btns button.yes{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .app-confirm-btns button.yes{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   /* 일주일 보기에서 일정 칸을 한 번 누르면 아래에서 올라오는 창 - 정확한 시간 + 수정/삭제 */
   .week-block-sheet-overlay{
     position:fixed; inset:0; z-index:9600; background:rgba(15,16,20,0.35);
@@ -6012,7 +6014,7 @@
     flex:1; padding:12px 0; border-radius:12px; border:1px solid var(--line);
     background:var(--surface-2); color:var(--text); font-size:14px; font-weight:700; cursor:pointer;
   }
-  .week-block-sheet-btns button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .week-block-sheet-btns button.primary{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .week-block-sheet-btns button.danger{ color:var(--cta); }
   .week-block-sheet-btns button.danger.armed{ background:var(--cta); border-color:var(--cta); color:#fff; }
   .custom-picker-overlay{
@@ -6084,7 +6086,7 @@
   .custom-picker-day:hover{ background:var(--surface-2); }
   .custom-picker-day.other-month{ visibility:hidden; cursor:default; }
   .custom-picker-day.today{ color:var(--accent); font-weight:700; }
-  .custom-picker-day.selected{ background:var(--accent); color:#FFFFFF; font-weight:700; }
+  .custom-picker-day.selected{ background:var(--accent); color:var(--on-accent); font-weight:700; }
   .custom-picker-today{
     width:100%;
     margin-top:12px;
@@ -6092,7 +6094,7 @@
     border:none;
     border-radius:13px;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-family:'Space Grotesk',sans-serif;
     font-size:12.5px;
     font-weight:700;
@@ -6141,7 +6143,7 @@
   .custom-picker-time-opt:hover{ background:var(--surface-2); }
   .custom-picker-time-opt.selected{
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-weight:700;
   }
   .custom-picker-confirm{
@@ -6151,7 +6153,7 @@
     border:none;
     border-radius:13px;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-size:13px;
     font-weight:700;
     font-family:'Space Grotesk',sans-serif;
@@ -6422,7 +6424,7 @@
   .group-create-sub span{ font-weight:400; color:var(--text-dim); }
   .group-create-btn{
     width:100%; margin-top:14px; padding:12px; border:none; border-radius:12px;
-    background:var(--accent); color:#fff; font-size:14px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
+    background:var(--accent); color:var(--on-accent); font-size:14px; font-weight:700; font-family:'Inter',sans-serif; cursor:pointer;
   }
   .group-create-btn:disabled{ opacity:0.6; }
   .group-emoji-field{ width:52px; flex-shrink:0; text-align:center; padding-left:0 !important; padding-right:0 !important; font-size:18px; }
@@ -6781,7 +6783,7 @@
     width:22px;height:22px;
     border-radius:50%;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-weight:800;
     box-shadow:0 2px 6px rgba(var(--sky-rgb),0.45);
     align-items:center;
@@ -7044,7 +7046,7 @@
     border:none;
     border-radius:14px;
     background:var(--accent);
-    color:#fff;
+    color:var(--on-accent);
     font-size:14.5px;
     font-weight:700;
     cursor:pointer;
@@ -7103,7 +7105,7 @@
   .inv-date-chip .wd{ display:block; font-size:10.5px; color:var(--text-dim); }
   .inv-date-chip.sat .wd{ color:#3B82F6; }
   .inv-date-chip.sun .wd{ color:#E5484D; }
-  .inv-date-chip.on{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .inv-date-chip.on{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .inv-date-chip.on .wd{ color:rgba(255,255,255,0.85); }
   .inv-range{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); }
   .inv-range select{
@@ -7160,7 +7162,7 @@
     font-weight:700;
     cursor:pointer;
   }
-  .inv-share-btns button.fill{ background:var(--accent); color:#fff; }
+  .inv-share-btns button.fill{ background:var(--accent); color:var(--on-accent); }
   .inv-sub-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:4px 0 8px; }
   .inv-sub-head b{ font-size:13.5px; }
   .inv-sub-head span{ font-size:11.5px; color:var(--text-dim); text-align:right; }
@@ -7410,7 +7412,7 @@
     border:none;
     border-radius:13px;
     background:var(--accent);
-    color:#FFFFFF;
+    color:var(--on-accent);
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
     font-size:14px;
@@ -7648,8 +7650,8 @@
   }
   body.dark-mode .topbar .brand .mark{ --neu-bg:#25262A; --neu-hi:rgba(255,255,255,0.05); --neu-lo:rgba(0,0,0,0.6); }
   .topbar .brand .mark svg{ width:26px; height:26px; }
-  body.dark-mode .topbar .brand .brand-sky{ fill:#5B6FD8; }
-  body.dark-mode .topbar .brand .brand-lens{ fill:#3B4BB0; }
+  body.dark-mode .topbar .brand .brand-sky{ fill:#D4D6DC; }
+  body.dark-mode .topbar .brand .brand-lens{ fill:#A4A8B2; }
   .topbar .brand{ gap:11px; }
   body:not(.tab-not-home) .topbar .icon-btn:active{ box-shadow:inset 4px 4px 9px var(--neu-lo), inset -4px -4px 9px var(--neu-hi); }
   #homeDash .home-card{
@@ -7716,12 +7718,12 @@
     box-shadow:4px 4px 9px var(--neu-lo), -4px -4px 9px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.7);
   }
   body.dark-mode #homeDash .home-avail-day.on{
-    color:#D5DBFF; background:linear-gradient(145deg, #34418F, #252F6B);
+    color:#1C1D21; background:linear-gradient(145deg, #DCDEE3, #B9BCC4);
     box-shadow:4px 4px 9px var(--neu-lo), -4px -4px 9px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.12);
   }
   #homeDash .home-avail-day.today{ outline:1.5px solid var(--accent); outline-offset:-1.5px; color:var(--accent); }
   #homeDash .home-avail-day.today.on{ outline:2px solid #0EA5E9; outline-offset:-2px; color:#0369A1; }
-  body.dark-mode #homeDash .home-avail-day.today.on{ color:#EEF0FF; outline-color:#7D8FF0; }
+  body.dark-mode #homeDash .home-avail-day.today.on{ color:#1C1D21; outline-color:#FFFFFF; }
   #homeDash .home-avail-status{ color:var(--neu-dim); }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
@@ -20012,7 +20014,7 @@ function getScheduleTextOrderIndex(text){
 
 // 일정마다 등장 순서에 따라 같은 색 계열에서 점점 어두워지는 단색을 배정
 function colorForScheduleText(text){
-  if(text === '예약 가능') return AVAILABLE_EVENT_COLOR; // 예약 가능 시간은 테마와 상관없이 항상 하늘색 (다크 모드는 미드나잇)
+  if(text === '예약 가능') return AVAILABLE_EVENT_COLOR; // 예약 가능 시간은 테마와 상관없이 항상 하늘색 (다크 모드는 밝은 회색)
   if(text && text.endsWith(' 업무용 예약 가능')) return AVAILABLE_WORK_COLOR;
   if(text && text.startsWith('예약 가능 · ')) return AVAILABLE_EVENT_COLOR;
   const idx = getScheduleTextOrderIndex(text);
@@ -20023,7 +20025,9 @@ function colorForScheduleText(text){
 }
 
 // 종류별 기본색 - 예약 가능은 하늘색 그대로, 채팅으로 확정된 약속은 눈에 띄게 빨강, 일반 일정은 테마(기본 보라) 색
-const AVAILABLE_EVENT_COLOR = 'var(--accent)'; // 다크 모드에선 미드나잇으로 바뀌게 색 변수로
+const AVAILABLE_EVENT_COLOR = 'var(--accent)'; // 다크 모드에선 밝은 회색으로 바뀌게 색 변수로
+// 강조색(예약 가능) 바탕 위 글씨색 - 다크 모드는 바탕이 밝은 회색이라 흰 글씨 대신 어두운 글씨 (그 외 색은 원래대로 흰 글씨)
+function textColorOnEventBg(bg){ return bg === AVAILABLE_EVENT_COLOR ? 'color:var(--on-accent);' : ''; }
 const APPOINTMENT_EVENT_COLOR = '#F43F5E';
 
 // 예약 가능 시간을 누구에게 열지 - "모든 친구 / 내 그룹들 / 업무용 링크" 칩을 여러 개 고름
@@ -20448,7 +20452,10 @@ function renderWeekView(){
           + (matchedEv && matchedEv.type === 'available' && !isPending && !isLinked && !matchedEv.color ? ' avail' : '');
         block.style.top = (blockTopPx + 1) + 'px';
         block.style.height = (blockHeightPx - 2) + 'px';
-        if(!isPending && !isLinked) block.style.background = matchedEv ? colorForEvent(matchedEv) : colorForScheduleText(text);
+        if(!isPending && !isLinked){
+          block.style.background = matchedEv ? colorForEvent(matchedEv) : colorForScheduleText(text);
+          if(block.style.background === AVAILABLE_EVENT_COLOR) block.style.color = 'var(--on-accent)';
+        }
         if(!isPending && !isLinked && availWorkStripeStyle(matchedEv)) block.style.boxShadow = `inset 3px 0 0 ${AVAILABLE_WORK_COLOR}`;
         if(isPending && matchedEv.sourceChatRoomId) block.classList.add('has-chat');
         block.title = `${d.getMonth()+1}/${d.getDate()} ${minutesToLabel(blockRange.startMin)}-${minutesToLabel(blockRange.endMin)} - ${text}`;
@@ -20685,7 +20692,7 @@ function renderMonthSchedView(){
       // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 짧게 보여줌
       // (누구에게 열린 시간인지 알 수 있게 "가능"/"💼가능"/그룹 이모티콘들/"💼업무")
       const label = ev.type === 'available' ? availableShortFor(availableForOf(ev), ev.visibility) : ev.title;
-      return `<div class="month-event-label" style="background:${bg};${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
+      return `<div class="month-event-label" style="background:${bg};${textColorOnEventBg(bg)}${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
     const hiddenCount = events.filter(ev => ev.type !== 'available' || ev.isPendingHold).length - labelEvents.length;
     const moreHtml = hiddenCount > 0
@@ -22276,6 +22283,7 @@ function renderFriendWeek(){
       block.style.height = ((endIdx - startIdx + 1) * WEEK_ROW_H - 2) + 'px';
       const label = b.title ? b.title : (b.isBookable ? '예약 가능' : '일정');
       block.style.background = b.isBookable ? 'var(--accent)' : colorForScheduleText(label);
+      if(block.style.background === AVAILABLE_EVENT_COLOR) block.style.color = 'var(--on-accent)';
       block.textContent = label;
       block.title = `${d.getMonth()+1}/${d.getDate()} ${b.startHour}:00-${b.endHour}:00 - ${label}`;
       if(b.isBookable && !isPast){
@@ -22399,14 +22407,14 @@ function renderFriendMonthView(){
           return (h + 1) * 60 > nowMin;
         });
       }
-      if(hasBookable) markupExtra = `<div class="month-event-label" style="background:var(--accent);color:#fff;">가능</div>`; // 칸이 좁아 "예약 가능"은 잘림
+      if(hasBookable) markupExtra = `<div class="month-event-label" style="background:var(--accent);color:var(--on-accent);">가능</div>`; // 칸이 좁아 "예약 가능"은 잘림
     } else {
       // 서버는 한 시간 칸마다 바쁨/제목을 줌 - 그대로 세면 2시간짜리 일정 하나가 라벨 두 개("회의","회의")로,
       // 제목 없는 3시간 일정이 "바쁨 3개"로 보였음. 이어진 같은 일정은 아래 패널처럼 한 덩어리로 묶어서 셈
       // (예약 가능 시간과 겹친 바쁨 일정도 예전처럼 세도록 bookable은 빈 배열로 넘김)
       const busyBlocks = groupFriendScheduleBlocks(monthData.hours, [], dayInfo.busy, dayInfo.titles);
       const titledBlocks = busyBlocks.filter(b => b.title);
-      const labels = titledBlocks.slice(0, 2).map(b => `<div class="month-event-label" style="background:${colorForScheduleText(b.title)}">${escapeHtml(truncateForMonthLabel(b.title))}</div>`).join('');
+      const labels = titledBlocks.slice(0, 2).map(b => `<div class="month-event-label" style="background:${colorForScheduleText(b.title)};${textColorOnEventBg(colorForScheduleText(b.title))}">${escapeHtml(truncateForMonthLabel(b.title))}</div>`).join('');
       const untitledBusy = busyBlocks.length - titledBlocks.length;
       const moreHtml = untitledBusy > 0 ? `<div class="month-event-more">바쁨 ${untitledBusy}개</div>` : '';
       markupExtra = labels + moreHtml;
