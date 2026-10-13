@@ -7512,6 +7512,14 @@
   .brand-name{ font-weight:600; font-size:15px; letter-spacing:0.06em; }
   .today-date{ letter-spacing:-0.03em; }
 
+  /* 설정·내 프로필도 탭처럼 카드 틀 없이 */
+  #settingsView, #myProfileView{ background:transparent; border:none; box-shadow:none; border-radius:0; margin:0; padding:6px 18px 90px; }
+  body.tab-not-home #settingsView, body.tab-not-home #myProfileView{ padding-top:calc(16px + env(safe-area-inset-top)); }
+  /* 목록 글자 줄의 "한 줄 전체" 규칙이 등급 배지까지 늘려서 이름 아래로 넓게 떨어지던 것 */
+  .placeholder-text .meet-badge-chip{ display:inline-flex; width:auto; vertical-align:1px; }
+  .placeholder-text .meet-badge-chip span{ display:inline; }
+  /* 일주일 보기 예약 가능 블록 - 진한 하늘색 대신 연한 톤 (한달·홈과 맞춤) */
+  .week-cal-block.avail{ background:var(--accent-soft) !important; color:var(--accent); box-shadow:inset 3px 0 0 var(--accent) !important; }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
   /* 이모티콘 대신 쓰는 라인 아이콘 */
@@ -11554,6 +11562,7 @@ function openSettings(){
   calendarCard.style.display = 'none';
   homeDash.style.display = 'none';
   document.getElementById('settingsView').style.display = 'block';
+  document.body.classList.add('tab-not-home'); // 다른 탭처럼 위쪽 로고·아이콘 줄 없이 제목이 맨 위로
   document.querySelector('.date-header').style.display = 'none'; // 설정 화면 위에 "TODAY 날짜"가 남지 않게
   document.getElementById('settingsHeaderLabel').textContent = '설정';
   document.getElementById('settingsListView').classList.add('active');
@@ -15346,6 +15355,7 @@ function openMyProfile(){
   calendarCard.style.display = 'none';
   homeDash.style.display = 'none';
   document.getElementById('myProfileView').style.display = 'block';
+  document.body.classList.add('tab-not-home'); // 다른 탭처럼 위쪽 로고·아이콘 줄 없이 제목이 맨 위로
   document.querySelector('.date-header').style.display = 'none';
   myProfileEditing = false;
   renderMyProfile();
@@ -19899,7 +19909,8 @@ function renderWeekView(){
         const blockHeightPx = (blockRange.endMin - blockRange.startMin) / 60 * WEEK_ROW_H;
 
         const block = document.createElement('div');
-        block.className = 'week-cal-block' + (isPending ? ' pending' : '') + (isLinked ? ' linked' : '');
+        block.className = 'week-cal-block' + (isPending ? ' pending' : '') + (isLinked ? ' linked' : '')
+          + (matchedEv && matchedEv.type === 'available' && !isPending && !isLinked && !matchedEv.color ? ' avail' : '');
         block.style.top = (blockTopPx + 1) + 'px';
         block.style.height = (blockHeightPx - 2) + 'px';
         if(!isPending && !isLinked) block.style.background = matchedEv ? colorForEvent(matchedEv) : colorForScheduleText(text);
