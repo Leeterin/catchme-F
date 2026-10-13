@@ -7693,14 +7693,19 @@
     border:none; background:var(--neu-bg); color:var(--neu-dim); border-radius:10px;
     box-shadow:inset 2px 2px 5px var(--neu-lo), inset -2px -2px 5px var(--neu-hi);
   }
-  /* 열린 날 - 하늘색으로 튀어나옴 */
+  /* 열린 날 - 연한 하늘색 판이 튀어나옴 (진한 색으로 칠하면 튀어나온 느낌이 사라져서 연하게 + 회색 판과 같은 그림자) */
   #homeDash .home-avail-day.on{
-    color:#fff; font-weight:700;
-    background:linear-gradient(145deg, #7DD3FC, #38BDF8);
-    box-shadow:3px 3px 7px rgba(56,150,200,0.45), -3px -3px 7px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.35);
+    color:#0369A1; font-weight:700;
+    background:linear-gradient(145deg, #CDEFFE, #9FDCFB);
+    box-shadow:4px 4px 9px var(--neu-lo), -4px -4px 9px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.7);
+  }
+  body.dark-mode #homeDash .home-avail-day.on{
+    color:#BAE6FD; background:linear-gradient(145deg, #23668A, #18506E);
+    box-shadow:4px 4px 9px var(--neu-lo), -4px -4px 9px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.12);
   }
   #homeDash .home-avail-day.today{ outline:1.5px solid var(--accent); outline-offset:-1.5px; color:var(--accent); }
-  #homeDash .home-avail-day.today.on{ outline:2px solid #0284C7; outline-offset:-2px; color:#fff; }
+  #homeDash .home-avail-day.today.on{ outline:2px solid #0EA5E9; outline-offset:-2px; color:#0369A1; }
+  body.dark-mode #homeDash .home-avail-day.today.on{ color:#E0F2FE; }
   #homeDash .home-avail-status{ color:var(--neu-dim); }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
