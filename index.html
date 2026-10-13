@@ -2022,6 +2022,19 @@
   }
   .settings-action-btn.danger{ color:var(--cta); }
 
+  /* 설정 > 홈 화면 편집 - 끌어서 순서 바꾸는 목록 */
+  .home-order-list{ display:flex; flex-direction:column; gap:8px; }
+  .home-order-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 8px 14px 16px; border-radius:14px; background:var(--surface);
+    border:1px solid var(--line); font-size:14px; color:var(--text);
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; touch-action:pan-y;
+    position:relative;
+  }
+  .home-order-row.dragging{ z-index:2; box-shadow:0 10px 24px rgba(0,0,0,0.16); transform-origin:center; }
+  .home-order-handle{ display:inline-flex; align-items:center; justify-content:center; width:40px; height:32px; color:var(--text-dim); touch-action:none; cursor:grab; }
+  .home-order-reset{ margin-top:16px; background:none; border:none; padding:6px 0; color:var(--text-dim); font-size:13px; text-decoration:underline; cursor:pointer; }
+
   .settings-notice-item{
     padding:12px 0;
     border-bottom:1px solid var(--line);
@@ -7805,12 +7818,12 @@
       <div class="home-card-title"><span>답할 차례</span></div>
       <div id="homePendingList"></div>
     </div>
-    <button type="button" class="home-plan-cta" id="homePlanCta" data-mode="plan">
+    <button type="button" class="home-plan-cta" id="homePlanCta" data-mode="plan" data-home-key="plan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v6M9 16h6"/></svg>
       <span><b id="homePlanCtaTitle">약속 잡기</b><small id="homePlanCtaSub">친구만 고르면 잡을 수 있는 방법을 알려줘요</small></span>
     </button>
     <!-- 이번 달 목표 - 운동·책 읽기처럼 한 달에 몇 번 할지 정하고 직접 [+1]을 눌러서 셈 (캘린더와 자동 연동 없음) -->
-    <div class="neu-goal" id="homeGoalCard">
+    <div class="neu-goal" id="homeGoalCard" data-home-key="goal">
       <div class="neu-head">
         <div>
           <div class="neu-eyebrow">이번 달 목표</div>
@@ -7823,17 +7836,17 @@
       </div>
       <div id="homeGoalList"><div class="neu-empty">불러오는 중...</div></div>
     </div>
-    <div class="home-card">
+    <div class="home-card" id="homeUpcomingCard" data-home-key="upcoming">
       <div class="home-card-title"><span>다가오는 약속</span><button type="button" class="home-card-link" id="homePastApptBtn">지난 약속</button></div>
       <div id="homeUpcomingList"></div>
     </div>
     <!-- 이번 주 시간 맞는 친구 - 앞으로 7일 동안 나와 친구가 둘 다 '예약 가능'으로 열어둔 시간이 겹치는 친구 (빈 시간 추측 없음) -->
-    <div class="home-card" id="homeMatchCard">
+    <div class="home-card" id="homeMatchCard" data-home-key="match">
       <div class="home-card-title"><span>이번 주 시간 맞는 친구</span></div>
       <div id="homeMatchList"><div class="home-empty">불러오는 중...</div></div>
     </div>
     <!-- 내 예약 가능 시간 - 친구가 나에게 약속을 걸 수 있는 시간이 얼마나 열려 있는지 (홈에 큰 달력 대신) -->
-    <div class="home-card">
+    <div class="home-card" id="homeAvailCard" data-home-key="avail">
       <div class="home-card-title"><span>내 예약 가능 시간</span></div>
       <div class="home-avail-strip" id="homeAvailStrip"></div>
       <div class="home-avail-status" id="homeAvailStatus"></div>
@@ -7843,7 +7856,7 @@
       </div>
     </div>
     <!-- 내 그룹 - 친구 그룹을 홈에서 바로 보고, 눌러서 고치고, 새로 만들 수 있게 -->
-    <div class="home-card" id="homeGroupCard">
+    <div class="home-card" id="homeGroupCard" data-home-key="group">
       <div class="home-card-title"><span>내 그룹</span><button type="button" class="home-card-link" id="homeGroupManageBtn">관리</button></div>
       <div class="home-group-list" id="homeGroupList"></div>
     </div>
@@ -11508,6 +11521,101 @@ function renderHomePending(){
     });
   });
 }
+// ---------- 홈 화면 편집 (설정 > 홈 화면 편집) ----------
+// 홈 카드 이름표(data-home-key)와 설정 목록에 보일 이름 - 이 순서가 기본 순서
+const HOME_SECTIONS = [
+  { key: 'plan', label: '약속 잡기 버튼' },
+  { key: 'goal', label: '이번 달 목표' },
+  { key: 'upcoming', label: '다가오는 약속' },
+  { key: 'match', label: '이번 주 시간 맞는 친구' },
+  { key: 'avail', label: '내 예약 가능 시간' },
+  { key: 'group', label: '내 그룹' },
+];
+// 저장된 순서 + (나중에 새로 생긴 카드는 기본 자리 순서대로 뒤에)
+function currentHomeOrder(){
+  const known = HOME_SECTIONS.map(x => x.key);
+  const saved = (Array.isArray(settingsState.home_order) ? settingsState.home_order : []).filter(k => known.includes(k));
+  return [...new Set([...saved, ...known])];
+}
+// 홈 카드들을 저장된 순서대로 다시 놓음 ('답할 차례'는 맨 위 그대로)
+function applyHomeOrder(){
+  const dash = document.getElementById('homeDash');
+  if(!dash) return;
+  currentHomeOrder().forEach(key => {
+    const el = dash.querySelector(`:scope > [data-home-key="${key}"]`);
+    if(el) dash.appendChild(el);
+  });
+}
+function setHomeOrder(order){
+  settingsState.home_order = order;
+  try { localStorage.setItem('catchme_home_order', JSON.stringify(order)); } catch(_){}
+  applyHomeOrder();
+  saveSettingToServer('home_order');
+}
+
+let homeOrderDrag = null;
+function renderHomeOrderList(){
+  const list = document.getElementById('homeOrderList');
+  if(!list) return;
+  const labels = Object.fromEntries(HOME_SECTIONS.map(x => [x.key, x.label]));
+  list.innerHTML = currentHomeOrder().map(key => `
+    <div class="home-order-row" data-key="${key}">
+      <span class="home-order-name">${escapeHtml(labels[key])}</span>
+      <span class="home-order-handle" aria-label="끌어서 순서 바꾸기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M4 8h16M4 12h16M4 16h16"/></svg></span>
+    </div>`).join('');
+  list.querySelectorAll('.home-order-row').forEach(attachHomeOrderDrag);
+}
+// 손잡이는 바로, 줄의 다른 곳은 꾹 눌러서 집어 들고 위아래로 끌기
+function attachHomeOrderDrag(row){
+  let pressTimer = null, startY = 0, startX = 0;
+  const clearPress = () => { if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } };
+  const begin = (e) => {
+    const list = row.parentElement;
+    homeOrderDrag = { row, list, pointerId: e.pointerId, grabY: startY - row.getBoundingClientRect().top };
+    row.classList.add('dragging');
+    try{ row.setPointerCapture(e.pointerId); }catch(_){}
+    if(navigator.vibrate) try{ navigator.vibrate(15); }catch(_){}
+  };
+  row.addEventListener('contextmenu', e => e.preventDefault());
+  row.addEventListener('pointerdown', (e) => {
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    startX = e.clientX; startY = e.clientY;
+    clearPress();
+    if(e.target.closest('.home-order-handle')){ e.preventDefault(); begin(e); return; }
+    pressTimer = setTimeout(() => { pressTimer = null; begin(e); }, 350);
+  });
+  row.addEventListener('pointermove', (e) => {
+    if(pressTimer && Math.hypot(e.clientX - startX, e.clientY - startY) > 8){ clearPress(); return; }
+    const d = homeOrderDrag;
+    if(!d || d.row !== row || e.pointerId !== d.pointerId) return;
+    e.preventDefault();
+    // 손가락이 옆 줄의 가운데를 넘으면 자리를 바꿈
+    const rows = [...d.list.querySelectorAll('.home-order-row')];
+    const idx = rows.indexOf(row);
+    const prev = rows[idx - 1], next = rows[idx + 1];
+    if(prev){ const r = prev.getBoundingClientRect(); if(e.clientY < r.top + r.height / 2) d.list.insertBefore(row, prev); }
+    if(next){ const r = next.getBoundingClientRect(); if(e.clientY > r.top + r.height / 2) d.list.insertBefore(row, next.nextSibling); }
+    // 집어 든 줄은 손가락을 따라감
+    row.style.transform = '';
+    const top = row.getBoundingClientRect().top;
+    row.style.transform = `translateY(${e.clientY - d.grabY - top}px)`;
+  });
+  const end = () => {
+    clearPress();
+    const d = homeOrderDrag;
+    if(!d || d.row !== row) return;
+    homeOrderDrag = null;
+    row.classList.remove('dragging');
+    row.style.transform = '';
+    const order = [...d.list.querySelectorAll('.home-order-row')].map(r => r.dataset.key);
+    if(order.join() !== currentHomeOrder().join()) setHomeOrder(order);
+  };
+  row.addEventListener('pointerup', end);
+  row.addEventListener('pointercancel', end);
+}
+// 집어 든 동안은 설정 화면이 스크롤되지 않게 (iOS는 touchmove를 막아야 함)
+document.addEventListener('touchmove', (e) => { if(homeOrderDrag) e.preventDefault(); }, { passive: false });
+
 function renderHomeDash(){
   const listEl = document.getElementById('homeUpcomingList');
   if(!listEl) return;
@@ -11657,6 +11765,7 @@ const SETTINGS_MENU = [
   { id: 'friends', label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
   { id: 'chat', label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
   { id: 'notice', label: '공지사항', icon: '<path d="M3 11l18-5v12L3 14v-3Z"/><path d="M7 14v4a2 2 0 0 0 2 2h1v-6"/>' },
+  { id: 'homeedit', label: '홈 화면 편집', icon: '<rect x="3" y="3" width="18" height="5" rx="1.5"/><rect x="3" y="10" width="18" height="5" rx="1.5"/><rect x="3" y="17" width="18" height="4" rx="1.5"/>' },
   { id: 'appmanage', label: '앱 관리', icon: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 8h.01M8 12h.01M8 16h.01M12 8h4M12 12h4M12 16h4"/>' },
   // 상세 화면 없이 바로 오류 신고 팝업을 엶
   { id: 'bugreport', label: '오류 신고하기', icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>', action: () => openBugReport('menu') },
@@ -11759,6 +11868,7 @@ const settingsState = {
   default_schedule_view: 'month', // 첫 화면/시간표 탭 진입 시 기본으로 보여줄 화면: day/week/month
   work_emoji: '💼', // 업무용 링크에 연 예약 가능 시간에 붙는 이모티콘
   color_labels: (() => { try { const v = JSON.parse(localStorage.getItem('catchme_color_labels') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; } })(), // 색 라벨 10개 이름 (빈칸 = 기본 이름)
+  home_order: (() => { try { const v = JSON.parse(localStorage.getItem('catchme_home_order') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; } })(), // 설정 > 홈 화면 편집 - 홈 카드 순서 (비어 있으면 기본 순서)
 };
 
 // 프론트 키(snake_case) <-> 서버 키(camelCase) 매핑
@@ -11776,7 +11886,9 @@ const SETTINGS_KEY_MAP = {
   default_schedule_view: 'defaultScheduleView',
   work_emoji: 'workEmoji',
   color_labels: 'colorLabels',
+  home_order: 'homeOrder',
 };
+applyHomeOrder(); // 앱 켤 때 폰에 기억해 둔 순서로 먼저 (서버 설정이 오면 한 번 더)
 
 // 로그인 직후 서버에 저장된 설정을 불러와서 반영
 async function loadSettingsFromServer(){
@@ -11793,6 +11905,15 @@ async function loadSettingsFromServer(){
           settingsState.color_labels = server;
           try { localStorage.setItem('catchme_color_labels', JSON.stringify(settingsState.color_labels)); } catch(_){}
         } else if(server !== undefined && local.some(Boolean)) saveSettingToServer('color_labels');
+        return;
+      }
+      if(localKey === 'home_order'){
+        const server = data.settings[serverKey];
+        if(Array.isArray(server) && server.length){
+          settingsState.home_order = server;
+          try { localStorage.setItem('catchme_home_order', JSON.stringify(server)); } catch(_){}
+        } else if(Array.isArray(server) && settingsState.home_order.length) saveSettingToServer('home_order');
+        applyHomeOrder();
         return;
       }
       if(data.settings[serverKey] !== undefined) settingsState[localKey] = data.settings[serverKey];
@@ -12130,6 +12251,19 @@ function openSettingsDetail(id){
       <div class="settings-detail-desc">MEETZIP의 새로운 소식이에요.</div>
       <div class="search-empty">아직 공지사항이 없어요.</div>
     `;
+
+  } else if(id === 'homeedit'){
+    body.innerHTML = `
+      <div class="settings-detail-desc">오른쪽 손잡이를 끌어서 홈 순서를 바꿔요. '답할 차례'는 답할 게 있을 때 항상 맨 위에 떠요.</div>
+      <div class="home-order-list" id="homeOrderList"></div>
+      <button type="button" class="home-order-reset" id="homeOrderResetBtn">기본 순서로 되돌리기</button>
+    `;
+    renderHomeOrderList();
+    document.getElementById('homeOrderResetBtn').addEventListener('click', () => {
+      setHomeOrder([]);
+      renderHomeOrderList();
+      showToast('기본 순서로 되돌렸어요');
+    });
 
   } else if(id === 'appmanage'){
     body.innerHTML = `
