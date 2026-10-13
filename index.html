@@ -7506,8 +7506,9 @@
   }
   .tab-panel h2{ font-size:26px; font-weight:800; letter-spacing:-0.03em; margin:0 0 14px; }
   .tab-panel h2 + .desc{ display:none; }
-  /* 홈이 아닌 탭에선 위쪽 로고를 숨기고 탭 제목이 그 자리 역할 (프로필·설정 아이콘은 그대로) */
-  body.tab-not-home .topbar .brand{ visibility:hidden; }
+  /* 프로필·설정 아이콘과 로고 줄은 홈에서만 - 다른 탭은 그 줄을 없애고 탭 제목이 화면 맨 위로 (상태바 높이만큼만 띄움) */
+  body.tab-not-home .topbar{ display:none; }
+  body.tab-not-home .tab-panel{ margin-top:0; padding-top:calc(16px + env(safe-area-inset-top)); }
   .brand-name{ font-weight:800; letter-spacing:0.02em; }
   .today-date{ letter-spacing:-0.03em; }
 
