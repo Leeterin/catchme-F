@@ -7014,7 +7014,9 @@
   }
   body.dark-mode .nav-indicator{ background:rgba(255,255,255,0.13); box-shadow:inset 0 1px 0 rgba(255,255,255,0.08); }
   /* 끄는 동안엔 손가락을 짧게 따라가게 (딱 붙으면 덜컥거려 보여서 아주 짧은 애니메이션) */
-  .bottom-nav.dragging .nav-indicator{ transition:transform .09s linear, width .2s ease; background:rgba(23,24,29,0.12); }
+  .bottom-nav.dragging .nav-indicator{ transition:transform .05s linear, width .2s ease; background:rgba(23,24,29,0.12); }
+  /* 끌기 시작 순간엔 알약이 손가락 밑으로 툭 튀지 않고 미끄러져 오게 */
+  .bottom-nav.dragging.drag-start .nav-indicator{ transition:transform .18s cubic-bezier(.22,1,.36,1), width .2s ease; }
   body.dark-mode .bottom-nav.dragging .nav-indicator{ background:rgba(255,255,255,0.2); }
   .bottom-nav.dragging .nav-item.active:not(.drag-over){ color:var(--text-dim); }
   .bottom-nav.dragging .nav-item.drag-over{ color:var(--accent); }
@@ -11273,7 +11275,8 @@ navItems.forEach(item => {
     if(!drag.moved){
       if(Math.abs(e.clientX - drag.startX) < 6) return;
       drag.moved = true;
-      nav.classList.add('dragging');
+      nav.classList.add('dragging', 'drag-start');
+      setTimeout(() => nav.classList.remove('drag-start'), 180);
       try{ nav.setPointerCapture(e.pointerId); }catch(_){}
     }
     // 바가 커지는 중이어도 어긋나지 않게 화면 좌표를 바 안쪽 좌표로 바꿔서 계산
@@ -11291,7 +11294,7 @@ navItems.forEach(item => {
     const wasDrag = drag.moved;
     drag = null;
     if(!wasDrag) return;
-    nav.classList.remove('dragging');
+    nav.classList.remove('dragging', 'drag-start');
     items.forEach(it => it.classList.remove('drag-over'));
     suppressClickUntil = Date.now() + 400;
     const target = e && e.type === 'pointerup' ? itemAtX(e.clientX) : null;
@@ -11304,8 +11307,9 @@ navItems.forEach(item => {
   nav.addEventListener('click', (e) => {
     if(e.isTrusted && Date.now() < suppressClickUntil){ e.stopPropagation(); e.preventDefault(); }
   }, true);
-  // 끄는 동안 iOS가 화면을 같이 스크롤하지 않게
-  nav.addEventListener('touchmove', (e) => { if(drag && drag.moved) e.preventDefault(); }, { passive: false });
+  // 바 위에서 손가락을 움직이면 처음부터 화면 스크롤을 막음 - 아이폰은 첫 움직임을 안 막으면 스크롤로 정해버리고
+  // 끌기를 취소(pointercancel)해서, 끌다가 중간에 알약이 제자리로 돌아가 버렸음 (바는 원래 스크롤할 게 없음)
+  nav.addEventListener('touchmove', (e) => { if(e.cancelable) e.preventDefault(); }, { passive: false });
 })();
 
 // 홈(브랜드 로고) 클릭 시 캘린더 메인 화면으로 복귀
