@@ -18,6 +18,7 @@
     --text:#17181D;
     --text-dim:#8A8C96;
     --accent:#38BDF8;
+    --sky-rgb:56,189,248; /* 하늘색(--accent)을 rgba(var(--sky-rgb), 투명도)로 쓰기 위한 숫자 - 다크 모드에선 미드나잇 */
     --accent-soft:rgba(56,189,248,0.14);
     --cta:#FF6B4A;
     --mask:#E3E3E0;
@@ -34,7 +35,10 @@
     --line:#3A3A3C;
     --text:#F2F2F2;
     --text-dim:#9B9B9E;
-    --accent-soft:rgba(56,189,248,0.18);
+    /* 다크 모드는 하늘색 대신 미드나잇 블루 (글씨로 써도 읽히게 너무 어둡지 않은 톤) */
+    --accent:#5B6FD8;
+    --sky-rgb:91,111,216;
+    --accent-soft:rgba(91,111,216,0.22);
     --mask:#3A3A3C;
     --glass-bg:rgba(255,255,255,0.06);
     --glass-bg-strong:rgba(255,255,255,0.045);
@@ -250,7 +254,7 @@
   /* 예약 가능 시간을 처음 만들 때만 보이는 안내 */
   .avail-first-tip{
     margin:0 0 12px; padding:10px 12px; border-radius:10px;
-    background:rgba(56,189,248,0.12); color:var(--text); font-size:12.5px; line-height:1.55; text-align:left;
+    background:rgba(var(--sky-rgb),0.12); color:var(--text); font-size:12.5px; line-height:1.55; text-align:left;
   }
   .avail-first-tip b{ display:block; margin-bottom:2px; }
   .first-event-card{ flex-direction:column; align-items:stretch; cursor:default; }
@@ -4289,7 +4293,7 @@
     border-radius:999px;
     transition:border-color .15s ease, box-shadow .15s ease;
   }
-  .chat-input-row:focus-within{ border-color:rgba(56,189,248,.55); box-shadow:0 0 0 3px var(--accent-soft); }
+  .chat-input-row:focus-within{ border-color:rgba(var(--sky-rgb),.55); box-shadow:0 0 0 3px var(--accent-soft); }
   .chat-input-row input{
     flex:1;
     min-width:0;
@@ -4779,8 +4783,8 @@
     margin-bottom:10px;
   }
   .day-event-card.available{
-    background:rgba(56,189,248,0.1);
-    border-color:#38BDF8;
+    background:rgba(var(--sky-rgb),0.1);
+    border-color:var(--accent);
   }
   .day-event-card.friend-view{ padding:12px 14px; cursor:default; }
   /* 약속 잡기 화면에서 친구 예약 가능 시간 사이에 같이 보여주는 "내 일정" - 누를 수 없고 친구 시간과 헷갈리지 않게 회색 점선 */
@@ -5452,8 +5456,8 @@
   .inv-bar-closed{ position:absolute; top:0; bottom:0; background:repeating-linear-gradient(-45deg, rgba(120,120,128,.55) 0 2px, rgba(120,120,128,.16) 2px 7px); pointer-events:none; z-index:2; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .inv-bar-closed span{ font-size:10px; font-weight:700; color:var(--text-dim); background:var(--surface); padding:0 4px; border-radius:4px; white-space:nowrap; }
   .inv-legend-closed{ background:repeating-linear-gradient(-45deg, rgba(120,120,128,.6) 0 2px, rgba(120,120,128,.16) 2px 5px) !important; }
-  .inv-bar-other{ position:absolute; bottom:2px; height:4px; border-radius:2px; background:rgba(56,189,248,.45); pointer-events:none; z-index:2; }
-  .inv-bar-heat{ position:absolute; top:0; bottom:0; background:rgba(56,189,248,var(--heat)); pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .inv-bar-other{ position:absolute; bottom:2px; height:4px; border-radius:2px; background:rgba(var(--sky-rgb),.45); pointer-events:none; z-index:2; }
+  .inv-bar-heat{ position:absolute; top:0; bottom:0; background:rgba(var(--sky-rgb),var(--heat)); pointer-events:none; display:flex; align-items:center; justify-content:center; overflow:hidden; }
   .inv-bar-heat b{ font-size:11px; font-weight:700; color:var(--text); }
   .inv-bar-sel{ position:absolute; top:-2px; bottom:-2px; border-radius:6px; box-shadow:inset 0 0 0 2px var(--cta); pointer-events:none; z-index:3; }
   .inv-bar-sel.done{ box-shadow:inset 0 0 0 2px #22C55E; }
@@ -6224,7 +6228,7 @@
     cursor:pointer;
   }
   .event-type-btn.active{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
-  .event-type-btn.active[data-type="available"]{ border-color:#38BDF8; color:#38BDF8; background:rgba(56,189,248,0.12); }
+  .event-type-btn.active[data-type="available"]{ border-color:var(--accent); color:var(--accent); background:rgba(var(--sky-rgb),0.12); }
   /* 예약 가능 시간을 누구에게 열지 (모두 / 친구만 / 일만) - 색은 캘린더 블록 색과 같음 */
   .avail-for-row{ display:flex; flex-wrap:wrap; gap:6px; }
   .avail-for-btn{ flex:1 0 auto; padding:9px 10px; border-radius:9px; border:1.5px solid var(--line); background:var(--surface); color:var(--text-dim); font-size:12.5px; font-weight:600; cursor:pointer; }
@@ -6537,13 +6541,13 @@
     cursor:not-allowed;
   }
   .week-cell.occupied.already-available{
-    background:rgba(56,189,248,0.25);
-    border-color:#38BDF8;
+    background:rgba(var(--sky-rgb),0.25);
+    border-color:var(--accent);
   }
   /* 이미 예약 가능으로 열린 칸 - 새로 열 때는 골라서 대상을 더할 수 있음 (점선으로 구분) */
   .week-cell.mergeable-available:not(.selected){
-    background:rgba(56,189,248,0.18);
-    border:1px dashed #38BDF8;
+    background:rgba(var(--sky-rgb),0.18);
+    border:1px dashed var(--accent);
   }
   .week-cell.selected{
     background:var(--accent);
@@ -6779,7 +6783,7 @@
     background:var(--accent);
     color:#FFFFFF;
     font-weight:800;
-    box-shadow:0 2px 6px rgba(56,189,248,0.45);
+    box-shadow:0 2px 6px rgba(var(--sky-rgb),0.45);
     align-items:center;
     justify-content:center;
     line-height:1;
@@ -7193,7 +7197,7 @@
     height:30px;
     border-radius:7px;
     background:var(--surface-2);
-    background-image:linear-gradient(rgba(56,189,248,var(--heat,0)), rgba(56,189,248,var(--heat,0)));
+    background-image:linear-gradient(rgba(var(--sky-rgb),var(--heat,0)), rgba(var(--sky-rgb),var(--heat,0)));
     text-align:center;
     font-size:11px;
     font-weight:700;
@@ -7225,8 +7229,8 @@
     flex-shrink:0; width:20px; height:20px; border-radius:6px; border:1.5px solid var(--line);
     display:flex; align-items:center; justify-content:center; color:#fff; font-size:12px; font-weight:800;
   }
-  .inv-cal-day.on{ border-color:#38BDF8; background:rgba(56,189,248,0.08); }
-  .inv-cal-day.on .ck{ background:#38BDF8; border-color:#38BDF8; }
+  .inv-cal-day.on{ border-color:var(--accent); background:rgba(var(--sky-rgb),0.08); }
+  .inv-cal-day.on .ck{ background:var(--accent); border-color:var(--accent); }
   .inv-cal-day .d{ font-size:13px; font-weight:700; min-width:64px; }
   .inv-cal-day .r{ font-size:12.5px; color:var(--text-dim); line-height:1.45; }
   .inv-cal-day.on .r{ color:var(--text); }
@@ -7317,7 +7321,7 @@
   body.app-booting .app{ visibility:hidden; }
   .app-splash-name{
     font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; letter-spacing:2px;
-    color:#38BDF8; animation:appSplashFade .6s .15s ease both;
+    color:var(--accent); animation:appSplashFade .6s .15s ease both;
   }
   @keyframes appSplashPop{ from{ opacity:0; transform:scale(.85); } to{ opacity:1; transform:scale(1); } }
   @keyframes appSplashFade{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
@@ -7495,7 +7499,7 @@
     background:repeating-linear-gradient(135deg, rgba(234,179,8,0.16) 0 8px, rgba(234,179,8,0.08) 8px 16px);
   }
   body.dark-mode .day-event-card.reservation-linked{ background:rgba(244,63,94,0.16); }
-  body.dark-mode .day-event-card.available{ background:rgba(56,189,248,0.14); }
+  body.dark-mode .day-event-card.available{ background:rgba(var(--sky-rgb),0.14); }
   /* 지도 위 장소 이름표 */
   body.dark-mode .place-viewer-label{ background:#2C2C2E; color:#F2F2F2; box-shadow:0 2px 8px rgba(0,0,0,0.5); }
   /* 앱 시작 로고 화면도 어두운 배경 */
@@ -7644,6 +7648,8 @@
   }
   body.dark-mode .topbar .brand .mark{ --neu-bg:#25262A; --neu-hi:rgba(255,255,255,0.05); --neu-lo:rgba(0,0,0,0.6); }
   .topbar .brand .mark svg{ width:26px; height:26px; }
+  body.dark-mode .topbar .brand .brand-sky{ fill:#5B6FD8; }
+  body.dark-mode .topbar .brand .brand-lens{ fill:#3B4BB0; }
   .topbar .brand{ gap:11px; }
   body:not(.tab-not-home) .topbar .icon-btn:active{ box-shadow:inset 4px 4px 9px var(--neu-lo), inset -4px -4px 9px var(--neu-hi); }
   #homeDash .home-card{
@@ -7710,12 +7716,12 @@
     box-shadow:4px 4px 9px var(--neu-lo), -4px -4px 9px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.7);
   }
   body.dark-mode #homeDash .home-avail-day.on{
-    color:#BAE6FD; background:linear-gradient(145deg, #23668A, #18506E);
+    color:#D5DBFF; background:linear-gradient(145deg, #34418F, #252F6B);
     box-shadow:4px 4px 9px var(--neu-lo), -4px -4px 9px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.12);
   }
   #homeDash .home-avail-day.today{ outline:1.5px solid var(--accent); outline-offset:-1.5px; color:var(--accent); }
   #homeDash .home-avail-day.today.on{ outline:2px solid #0EA5E9; outline-offset:-2px; color:#0369A1; }
-  body.dark-mode #homeDash .home-avail-day.today.on{ color:#E0F2FE; }
+  body.dark-mode #homeDash .home-avail-day.today.on{ color:#EEF0FF; outline-color:#7D8FF0; }
   #homeDash .home-avail-status{ color:var(--neu-dim); }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
@@ -7815,7 +7821,7 @@
   <div class="topbar">
     <div class="brand" id="homeBtn">
       <!-- 로고: 하늘색 원(왼쪽)과 연한 노란 원(오른쪽)이 겹침 (두 사람이 만남) - 겹친 부분은 진한 하늘색 -->
-      <div class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="brandMarkLens"><circle cx="8.4" cy="12" r="6.8"/></clipPath></defs><circle cx="8.4" cy="12" r="6.8" fill="#38BDF8"/><circle cx="15.6" cy="12" r="6.8" fill="#FDE272"/><circle cx="15.6" cy="12" r="6.8" fill="#0EA5E9" clip-path="url(#brandMarkLens)"/></svg></div>
+      <div class="mark"><svg viewBox="0 0 24 24" aria-hidden="true"><defs><clipPath id="brandMarkLens"><circle cx="8.4" cy="12" r="6.8"/></clipPath></defs><circle class="brand-sky" cx="8.4" cy="12" r="6.8" fill="#38BDF8"/><circle cx="15.6" cy="12" r="6.8" fill="#FDE272"/><circle class="brand-lens" cx="15.6" cy="12" r="6.8" fill="#0EA5E9" clip-path="url(#brandMarkLens)"/></svg></div>
       <span class="brand-name">MEETZIP</span>
     </div>
     <div class="top-actions">
@@ -20006,7 +20012,7 @@ function getScheduleTextOrderIndex(text){
 
 // 일정마다 등장 순서에 따라 같은 색 계열에서 점점 어두워지는 단색을 배정
 function colorForScheduleText(text){
-  if(text === '예약 가능') return '#38BDF8'; // 예약 가능 시간은 테마와 상관없이 항상 하늘색으로 고정
+  if(text === '예약 가능') return AVAILABLE_EVENT_COLOR; // 예약 가능 시간은 테마와 상관없이 항상 하늘색 (다크 모드는 미드나잇)
   if(text && text.endsWith(' 업무용 예약 가능')) return AVAILABLE_WORK_COLOR;
   if(text && text.startsWith('예약 가능 · ')) return AVAILABLE_EVENT_COLOR;
   const idx = getScheduleTextOrderIndex(text);
@@ -20017,7 +20023,7 @@ function colorForScheduleText(text){
 }
 
 // 종류별 기본색 - 예약 가능은 하늘색 그대로, 채팅으로 확정된 약속은 눈에 띄게 빨강, 일반 일정은 테마(기본 보라) 색
-const AVAILABLE_EVENT_COLOR = '#38BDF8';
+const AVAILABLE_EVENT_COLOR = 'var(--accent)'; // 다크 모드에선 미드나잇으로 바뀌게 색 변수로
 const APPOINTMENT_EVENT_COLOR = '#F43F5E';
 
 // 예약 가능 시간을 누구에게 열지 - "모든 친구 / 내 그룹들 / 업무용 링크" 칩을 여러 개 고름
@@ -34800,7 +34806,7 @@ function renderInviteManageHtml(){
   }
   html += renderInviteResultBarsHtml(inv, 'manage');
   if(n){
-    html += `<div class="inv-legend"><span><i style="background:rgba(56,189,248,0.7)"></i>진할수록 많이 가능</span><span><i class="inv-legend-closed"></i>${inv.fromCalendar ? '캘린더에서 닫은 시간' : '안 연 시간'}</span>${canPick ? '<span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>시작·끝은 아래에서 5분 단위로 고쳐요</span>' : ''}</div>`;
+    html += `<div class="inv-legend"><span><i style="background:rgba(var(--sky-rgb),0.7)"></i>진할수록 많이 가능</span><span><i class="inv-legend-closed"></i>${inv.fromCalendar ? '캘린더에서 닫은 시간' : '안 연 시간'}</span>${canPick ? '<span><i style="box-shadow:inset 0 0 0 2px var(--cta)"></i>확정할 시간</span><span>시작·끝은 아래에서 5분 단위로 고쳐요</span>' : ''}</div>`;
   }
   if(canPick && n){
     const sel = inviteState.confirmSel;
@@ -34940,7 +34946,7 @@ function renderInviteGuestHtml(){
     </div>
     <div class="inv-sub-head"><b>되는 시간 고르기</b><span>빈 곳을 누르고, 양 끝을 끌어 맞춰요</span></div>
     ${renderInviteGuestBarsHtml(inv)}
-    <div class="inv-legend"><span><i style="background:var(--accent)"></i>내가 고른 시간</span>${others.length ? '<span><i style="background:rgba(56,189,248,0.7)"></i>다른 친구가 되는 시간</span>' : ''}<span><i class="inv-legend-closed"></i>${creator}님이 안 되는 시간</span>${inv.dates.some(date => inviteGuestMyBusy(date).length) ? '<span><i style="background:rgba(120,120,128,.38)"></i>내 일정</span>' : ''}<span>시간 글자를 누르면 5분 단위로 고쳐요</span></div>`;
+    <div class="inv-legend"><span><i style="background:var(--accent)"></i>내가 고른 시간</span>${others.length ? '<span><i style="background:rgba(var(--sky-rgb),0.7)"></i>다른 친구가 되는 시간</span>' : ''}<span><i class="inv-legend-closed"></i>${creator}님이 안 되는 시간</span>${inv.dates.some(date => inviteGuestMyBusy(date).length) ? '<span><i style="background:rgba(120,120,128,.38)"></i>내 일정</span>' : ''}<span>시간 글자를 누르면 5분 단위로 고쳐요</span></div>`;
   if(others.length){
     html += `<div class="inv-label">먼저 응답한 친구 ${others.length}명</div><div class="inv-people">`
       + others.map(r => `<span class="inv-person">${escapeHtml(r.name)}</span>`).join('') + '</div>';
