@@ -7693,11 +7693,14 @@
     border:none; background:var(--neu-bg); color:var(--neu-dim); border-radius:10px;
     box-shadow:inset 2px 2px 5px var(--neu-lo), inset -2px -2px 5px var(--neu-hi);
   }
+  /* 열린 날 - 하늘색으로 튀어나옴 */
   #homeDash .home-avail-day.on{
-    color:var(--neu-ink); font-weight:700;
-    box-shadow:3px 3px 7px var(--neu-lo), -3px -3px 7px var(--neu-hi);
+    color:#fff; font-weight:700;
+    background:linear-gradient(145deg, #7DD3FC, #38BDF8);
+    box-shadow:3px 3px 7px rgba(56,150,200,0.45), -3px -3px 7px var(--neu-hi), inset 1px 1px 1px rgba(255,255,255,0.35);
   }
   #homeDash .home-avail-day.today{ outline:1.5px solid var(--accent); outline-offset:-1.5px; color:var(--accent); }
+  #homeDash .home-avail-day.today.on{ outline:2px solid #0284C7; outline-offset:-2px; color:#fff; }
   #homeDash .home-avail-status{ color:var(--neu-dim); }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
