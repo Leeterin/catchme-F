@@ -7309,10 +7309,14 @@
     inset:0;
     background:var(--bg);
     display:flex;
-    align-items:center;
+    /* 가운데 정렬하되, 내용이 화면보다 길면(작은 폰의 회원가입, 키보드가 올라온 때) 위가 잘리지 않고 스크롤되게 */
+    align-items:safe center;
     justify-content:center;
     z-index:3000;
     padding:24px;
+    padding-top:calc(24px + env(safe-area-inset-top));
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .auth-card{ width:100%; max-width:340px; }
   .auth-logo{
@@ -26909,6 +26913,7 @@ document.getElementById('dayViewChatBackBtn').addEventListener('click', () => go
 // 브라우저의 기본 동작(포커스+스크롤)을 막고, 우리가 직접 { preventScroll: true } 옵션으로 포커스를
 // 줘서 "포커스는 주되 스크롤은 절대 안 하도록" 만듦. 이러면 헤더가 애초에 밀릴 일이 없어서 튈 수가 없음.
 function focusWithoutScrollJump(input){
+  input.__noJumpBound = true; // 아래 앱 공통 처리(installAppKeyboardHandling)가 이 칸은 건너뜀
   // 꾹 누르기(글자 선택/붙여넣기 메뉴)는 기본 동작 그대로 둠 - 막으면 선택이 안 되고 메뉴도 안 떴음
   let touchStartAt = 0;
   input.addEventListener('touchstart', () => { touchStartAt = Date.now(); }, { passive: true });
@@ -26936,6 +26941,97 @@ focusWithoutScrollJump(document.getElementById('chatSearchInput'));
 // 일정 이동시간 검색칸도 - 일정 화면도 고정(fixed) 창이라 iOS가 페이지를 밀어 올리면 화면이 같이 튐
 focusWithoutScrollJump(document.getElementById('travelFromInput'));
 focusWithoutScrollJump(document.getElementById('travelDestInput'));
+
+// ---------- 입력칸 키보드 처리 (앱 전체 공통) ----------
+// 앱은 키보드가 떠도 화면 크기를 안 줄이는 설정(resize:none)이라 두 가지 문제가 있었음:
+//  1) 입력칸을 탭하면 iOS가 그 칸을 보이게 하려고 페이지 전체를 밀어 올려서 고정된 화면(일정 추가, 설정 등)이 튐
+//  2) 화면 아래쪽 입력칸(일정 메모, 회원가입 비밀번호 등)은 키보드에 그대로 가림
+// 채팅 입력칸·이동시간 검색칸에만 칸별로 막아뒀던 걸 모든 글자 입력칸에 공통으로 적용함
+const APP_TEXT_FIELD_SELECTOR = 'input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]):not([type=range]):not([type=color]):not([type=date]):not([type=time]):not([readonly]):not([disabled]), textarea:not([readonly]):not([disabled])';
+let appKeyboardHeight = 0;
+function appTextFieldFrom(target){
+  const el = target && target.closest ? target.closest('input, textarea') : null;
+  return el && el.matches(APP_TEXT_FIELD_SELECTOR) ? el : null;
+}
+// 입력칸을 감싼 것 중 세로로 스크롤되는 가장 가까운 화면 (없으면 페이지)
+function appScrollParentOf(el){
+  for(let p = el.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement){
+    const oy = getComputedStyle(p).overflowY;
+    if(oy === 'auto' || oy === 'scroll') return p;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+// 지금 입력 중인 칸이 키보드 위에 보이게 그 화면만 스크롤 - 공간이 모자라면 키보드 높이만큼 아래 여백을 잠깐 붙임
+function keepFocusedFieldAboveKeyboard(){
+  const el = document.activeElement;
+  if(!appKeyboardHeight || !el || !el.matches || !el.matches(APP_TEXT_FIELD_SELECTOR)) return;
+  if(el.closest('#chatRoomView') || el.closest('#travelGroup')) return; // 이 둘은 따로 처리함
+  const visibleBottom = window.innerHeight - appKeyboardHeight - 12;
+  const r = el.getBoundingClientRect();
+  if(r.bottom <= visibleBottom && r.top >= 0) return;
+  const sc = appScrollParentOf(el);
+  if(sc.dataset.kbPad === undefined){
+    sc.dataset.kbPad = sc.style.paddingBottom || '';
+    sc.style.paddingBottom = `calc(${getComputedStyle(sc).paddingBottom} + ${appKeyboardHeight}px)`;
+  }
+  const delta = r.top < 0 ? r.top - 12 : r.bottom - visibleBottom;
+  sc.scrollTop = sc.scrollTop + delta;
+}
+function releaseKeyboardPadding(){
+  document.querySelectorAll('[data-kb-pad]').forEach(sc => {
+    sc.style.paddingBottom = sc.dataset.kbPad;
+    delete sc.dataset.kbPad;
+  });
+}
+function onAppKeyboardChange(height){
+  appKeyboardHeight = height;
+  if(height > 0){
+    setTimeout(keepFocusedFieldAboveKeyboard, 40);
+    setTimeout(keepFocusedFieldAboveKeyboard, 350); // 키보드가 다 올라온 뒤 한 번 더
+  } else {
+    releaseKeyboardPadding();
+  }
+}
+(function installAppKeyboardHandling(){
+  // 1) 짧게 탭할 때 iOS의 페이지 밀어올림을 막고 포커스만 줌 (꾹 누르기는 그대로 - 글자 선택·붙여넣기)
+  document.addEventListener('touchstart', (e) => {
+    const f = appTextFieldFrom(e.target);
+    if(f) f.__touchStartAt = Date.now();
+  }, { passive: true, capture: true });
+  document.addEventListener('touchend', (e) => {
+    const f = appTextFieldFrom(e.target);
+    if(!f || f.__noJumpBound || document.activeElement === f) return;
+    if(Date.now() - (f.__touchStartAt || 0) > 350) return;
+    e.preventDefault();
+    f.focus({ preventScroll: true });
+    setTimeout(keepFocusedFieldAboveKeyboard, 60);
+  }, { capture: true });
+  // 다른 칸으로 옮겨가도 그 칸이 보이게
+  document.addEventListener('focusin', (e) => {
+    if(appTextFieldFrom(e.target)) setTimeout(keepFocusedFieldAboveKeyboard, 60);
+  });
+  // 2) 키보드 높이 - 앱은 키보드 플러그인 알림으로, 웹(모바일 브라우저)은 화면에 보이는 높이가 줄어든 만큼으로
+  const cap = window.Capacitor;
+  const kbPlugin = cap && cap.Plugins && cap.Plugins.Keyboard;
+  if(kbPlugin && typeof kbPlugin.addListener === 'function'){
+    kbPlugin.addListener('keyboardWillShow', (info) => onAppKeyboardChange((info && info.keyboardHeight) || 0));
+    kbPlugin.addListener('keyboardWillHide', () => onAppKeyboardChange(0));
+  } else if(window.visualViewport){
+    window.visualViewport.addEventListener('resize', () => {
+      const gap = window.innerHeight - window.visualViewport.height;
+      onAppKeyboardChange(gap > 120 ? gap : 0);
+    });
+  }
+  // 3) 장소 검색 칸에서 벗어나면 결과 목록을 닫음 - 열린 채 남아 아래 칸(예: 추천 글쓰기 주소)을 덮어서,
+  //    그 칸을 누르면 목록의 장소가 대신 골라졌음 (결과를 누르는 건 그 사이에 처리되도록 조금 기다렸다 닫음)
+  document.addEventListener('focusout', (e) => {
+    const f = appTextFieldFrom(e.target);
+    if(!f || !f.parentElement) return;
+    const box = f.parentElement.querySelector(':scope > .location-search-results');
+    if(!box) return;
+    setTimeout(() => { if(document.activeElement !== f) box.style.display = 'none'; }, 250);
+  }, true);
+})();
 
 // 위 방법으로 대부분의 튐은 막히지만, 그래도 혹시 다른 경로(예: 데스크톱에서 탭 키로 포커스 이동 등)로
 // 스크롤이 생기는 경우를 대비한 안전망으로 기존 보정 로직도 그대로 남겨둠.
