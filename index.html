@@ -6986,8 +6986,13 @@
     touch-action:none;
     user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
     transform-origin:50% 100%;
-    transition:transform .32s cubic-bezier(.2,.8,.2,1);
+    /* --navp: 0 = 원래 크기, 1 = 가장 작음. 스크롤 중엔 짧게(따라가기), 손 떼면 길고 부드럽게(제자리 잡기) */
+    --navp:0;
+    --nav-ease:.42s cubic-bezier(.22,1,.36,1);
+    transform:translateY(calc(var(--navp) * 4px)) scale(calc(1 - var(--navp) * 0.16));
+    transition:transform var(--nav-ease);
   }
+  .bottom-nav.nav-tracking{ --nav-ease:.12s linear; }
   body.dark-mode .bottom-nav{
     border-color:rgba(255,255,255,0.1);
     background:rgba(44,44,48,0.6);
@@ -6995,8 +7000,10 @@
   }
   .bottom-nav .nav-item{ flex:1; position:relative; z-index:1; padding:6px 0 5px; border-radius:999px; }
   .bottom-nav .nav-item.active{ background:transparent; box-shadow:none; }
-  .bottom-nav .nav-item > span:not(.nav-badge){ transition:opacity .2s ease; }
-  .bottom-nav .nav-item svg{ transition:transform .32s cubic-bezier(.2,.8,.2,1); }
+  .bottom-nav .nav-item > span:not(.nav-badge){ opacity:calc(1 - var(--navp) * 1.6); transition:opacity var(--nav-ease); }
+  .bottom-nav .nav-item svg{ transform:translateY(calc(var(--navp) * 7px)) scale(calc(1 + var(--navp) * 0.08)); transition:transform var(--nav-ease); }
+  /* 끄는 동안엔 처음 누른 탭이 눌린 채로 쪼그라들어 있지 않게 */
+  .bottom-nav.dragging .nav-item:active{ transform:none; }
   /* 선택된 탭 뒤 알약 - 끄는 동안은 손가락을 바로 따라오게 애니메이션 끔 */
   .nav-indicator{
     position:absolute; top:5px; bottom:5px; left:0; width:0; z-index:0;
@@ -7006,14 +7013,11 @@
     pointer-events:none; opacity:0;
   }
   body.dark-mode .nav-indicator{ background:rgba(255,255,255,0.13); box-shadow:inset 0 1px 0 rgba(255,255,255,0.08); }
-  .bottom-nav.dragging .nav-indicator{ transition:none; background:rgba(23,24,29,0.12); }
+  /* 끄는 동안엔 손가락을 짧게 따라가게 (딱 붙으면 덜컥거려 보여서 아주 짧은 애니메이션) */
+  .bottom-nav.dragging .nav-indicator{ transition:transform .09s linear, width .2s ease; background:rgba(23,24,29,0.12); }
   body.dark-mode .bottom-nav.dragging .nav-indicator{ background:rgba(255,255,255,0.2); }
   .bottom-nav.dragging .nav-item.active:not(.drag-over){ color:var(--text-dim); }
   .bottom-nav.dragging .nav-item.drag-over{ color:var(--accent); }
-  /* 아래로 스크롤하면 작아짐 - 글씨는 숨기고 아이콘만 (자리는 그대로라 화면이 들썩이지 않음) */
-  .bottom-nav.compact{ transform:scale(0.84) translateY(4px); }
-  .bottom-nav.compact .nav-item > span:not(.nav-badge){ opacity:0; }
-  .bottom-nav.compact .nav-item svg{ transform:translateY(7px) scale(1.08); }
   .nav-badge{
     position:absolute;
     top:0px;
@@ -11209,6 +11213,8 @@ navItems.forEach(item => {
   const nav = document.querySelector('.bottom-nav');
   const pill = nav.querySelector('.nav-indicator');
   const items = [...navItems];
+  let drag = null, suppressClickUntil = 0;
+
   // 선택 알약을 지금 탭 자리로
   function placePill(){
     const active = nav.querySelector('.nav-item.active');
@@ -11217,19 +11223,50 @@ navItems.forEach(item => {
     pill.style.transform = `translateX(${active.offsetLeft}px)`;
     pill.style.opacity = '1';
   }
-  // 탭이 바뀌거나 바가 다시 보이면 알약 위치를 맞추고 원래 크기로
-  const mo = new MutationObserver(() => { placePill(); setCompact(false); });
+  // 탭이 바뀌거나 바가 다시 보이면 알약 위치를 맞추고 원래 크기로 (끄는 중에 생기는 표시 변화는 무시)
+  const mo = new MutationObserver(() => { if(drag && drag.moved) return; placePill(); setShrink(0); });
   items.forEach(it => mo.observe(it, { attributes: true, attributeFilter: ['class'] }));
-  mo.observe(nav, { attributes: true, attributeFilter: ['style'] });
+  // 바 자체는 숨겼다(display:none) 다시 보일 때만 - 크기 값(--navp)도 style에 써서 그때마다 반응하면 안 됨
+  let lastDisplay = nav.style.display;
+  new MutationObserver(() => {
+    if(nav.style.display === lastDisplay) return;
+    lastDisplay = nav.style.display;
+    placePill(); setShrink(0);
+  }).observe(nav, { attributes: true, attributeFilter: ['style'] });
   window.addEventListener('resize', placePill);
   requestAnimationFrame(placePill);
 
-  // 끌기 - 바 위에서 손가락을 옆으로 밀면 알약이 따라오고, 놓은 곳의 탭으로 이동
-  let drag = null, suppressClickUntil = 0;
+  // ---- 크기: 0(원래) ~ 1(가장 작음) ----
+  let shrink = 0, settleTimer = null;
+  function setShrink(v, tracking){
+    shrink = Math.max(0, Math.min(1, v));
+    nav.classList.toggle('nav-tracking', !!tracking);
+    nav.style.setProperty('--navp', shrink.toFixed(3));
+  }
+  // 스크롤을 멈추면 가까운 쪽(원래/작게)으로 부드럽게 자리 잡음
+  function settle(){ setShrink(shrink > 0.45 ? 1 : 0); }
+  const lastY = new WeakMap();
+  document.addEventListener('scroll', (e) => {
+    if(drag && drag.moved) return;
+    const el = e.target === document ? document.scrollingElement : e.target;
+    if(!el || el.scrollHeight - el.clientHeight < 80) return; // 거의 안 움직이는 칸은 무시
+    const max = el.scrollHeight - el.clientHeight;
+    const y = Math.max(0, Math.min(max, el.scrollTop)); // 아이폰 튕김(맨 위·맨 아래 넘침)은 빼고
+    const prev = lastY.has(el) ? lastY.get(el) : y;
+    lastY.set(el, y);
+    clearTimeout(settleTimer);
+    if(y < 24){ setShrink(0); return; } // 맨 위 근처는 항상 원래 크기
+    // 스크롤한 거리만큼 조금씩 (90px 내리면 다 작아짐, 위로 올리면 그만큼 다시 커짐)
+    setShrink(shrink + (y - prev) / 90, true);
+    settleTimer = setTimeout(settle, 140);
+  }, { capture: true, passive: true });
+
+  // ---- 끌기: 바 위에서 손가락을 옆으로 밀면 알약이 따라오고, 놓은 곳의 탭으로 이동 ----
   const itemAtX = (x) => items.find(it => { const r = it.getBoundingClientRect(); return x >= r.left && x <= r.right; });
   nav.addEventListener('pointerdown', (e) => {
     if(e.pointerType === 'mouse' && e.button !== 0) return;
     drag = { id: e.pointerId, startX: e.clientX, moved: false };
+    if(shrink > 0){ clearTimeout(settleTimer); setShrink(0); } // 작아진 바를 누르면 먼저 원래 크기로
   });
   nav.addEventListener('pointermove', (e) => {
     if(!drag || e.pointerId !== drag.id) return;
@@ -11237,13 +11274,14 @@ navItems.forEach(item => {
       if(Math.abs(e.clientX - drag.startX) < 6) return;
       drag.moved = true;
       nav.classList.add('dragging');
-      setCompact(false);
       try{ nav.setPointerCapture(e.pointerId); }catch(_){}
     }
-    const navRect = nav.getBoundingClientRect();
+    // 바가 커지는 중이어도 어긋나지 않게 화면 좌표를 바 안쪽 좌표로 바꿔서 계산
+    const r = nav.getBoundingClientRect();
+    const k = nav.offsetWidth / (r.width || nav.offsetWidth);
     const w = pill.offsetWidth || (items[0] && items[0].offsetWidth) || 60;
-    const minX = 5, maxX = nav.clientWidth - 5 - w;
-    const x = Math.max(minX, Math.min(maxX, e.clientX - navRect.left - w / 2));
+    const local = (e.clientX - r.left) * k;
+    const x = Math.max(5, Math.min(nav.clientWidth - 5 - w, local - w / 2));
     pill.style.transform = `translateX(${x}px) scale(1.06)`;
     const over = itemAtX(e.clientX);
     items.forEach(it => it.classList.toggle('drag-over', it === over));
@@ -11268,28 +11306,6 @@ navItems.forEach(item => {
   }, true);
   // 끄는 동안 iOS가 화면을 같이 스크롤하지 않게
   nav.addEventListener('touchmove', (e) => { if(drag && drag.moved) e.preventDefault(); }, { passive: false });
-
-  // 스크롤 - 아래로 내리면 작아지고, 위로 올리거나 맨 위면 원래 크기
-  let compact = false;
-  function setCompact(on){
-    if(on === compact) return;
-    compact = on;
-    nav.classList.toggle('compact', on);
-  }
-  const lastY = new WeakMap();
-  document.addEventListener('scroll', (e) => {
-    if(nav.classList.contains('dragging')) return;
-    const el = e.target === document ? document.scrollingElement : e.target;
-    if(!el || el.scrollHeight - el.clientHeight < 80) return; // 거의 안 움직이는 칸은 무시
-    const y = el.scrollTop;
-    const prev = lastY.has(el) ? lastY.get(el) : y;
-    lastY.set(el, y);
-    if(y < 24) setCompact(false);
-    else if(y - prev > 6) setCompact(true);
-    else if(prev - y > 6) setCompact(false);
-  }, { capture: true, passive: true });
-  // 작아진 바를 누르면 먼저 원래 크기로
-  nav.addEventListener('pointerdown', () => setCompact(false));
 })();
 
 // 홈(브랜드 로고) 클릭 시 캘린더 메인 화면으로 복귀
