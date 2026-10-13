@@ -7542,14 +7542,14 @@
   /* 홈 - 이번 달 목표 (뉴모피즘: 튀어나온 판 + 안으로 눌린 알약 + 동그란 버튼) */
   .neu-goal{
     --neu-bg:#E4E5E9; --neu-hi:rgba(255,255,255,0.95); --neu-lo:rgba(156,161,175,0.55);
-    --neu-ink:#26272C; --neu-dim:#8D9099; --neu-ok:#26272C;
+    --neu-ink:#26272C; --neu-dim:#8D9099; --neu-ok:#26272C; --neu-name:#55575F;
     background:var(--neu-bg); border-radius:30px; padding:20px 18px 18px;
     box-shadow:9px 9px 22px var(--neu-lo), -9px -9px 22px var(--neu-hi);
     color:var(--neu-ink);
   }
   body.dark-mode .neu-goal{
     --neu-bg:#25262A; --neu-hi:rgba(255,255,255,0.05); --neu-lo:rgba(0,0,0,0.6);
-    --neu-ink:#ECECEE; --neu-dim:#8E9097; --neu-ok:#ECECEE;
+    --neu-ink:#ECECEE; --neu-dim:#8E9097; --neu-ok:#ECECEE; --neu-name:#C4C5CA;
   }
   .neu-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; padding:0 4px; }
   .neu-eyebrow{ font-size:12px; color:var(--neu-dim); letter-spacing:0.02em; }
@@ -7586,7 +7586,7 @@
   /* 목표 줄 - 이름은 왼쪽, 숫자는 오른쪽 한 줄 (칸이 너무 크다는 피드백으로 낮춤) */
   .neu-row .neu-well{ padding:11px 16px 12px; border-radius:20px; gap:0; }
   .neu-goal-line{ display:flex; align-items:center; gap:8px; width:100%; }
-  .neu-goal-name{ flex:1; min-width:0; font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .neu-goal-name{ flex:1; min-width:0; font-size:15px; font-weight:400; color:var(--neu-name); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .neu-row .neu-count{ font-size:20px; flex-shrink:0; }
   .neu-row .neu-count small{ font-size:13px; }
   .neu-row .neu-track{ margin-top:8px; }
