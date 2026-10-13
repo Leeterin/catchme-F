@@ -2032,6 +2032,10 @@
     position:relative;
   }
   .home-order-row.dragging{ z-index:2; box-shadow:0 10px 24px rgba(0,0,0,0.16); transform-origin:center; }
+  .home-order-name{ flex:1; min-width:0; }
+  .home-order-row.off .home-order-name{ color:var(--text-dim); }
+  .home-order-toggle{ flex-shrink:0; }
+  #homeDash > .home-section-off{ display:none !important; }
   .home-order-handle{ display:inline-flex; align-items:center; justify-content:center; width:40px; height:32px; color:var(--text-dim); touch-action:none; cursor:grab; }
   .home-order-reset{ margin-top:16px; background:none; border:none; padding:6px 0; color:var(--text-dim); font-size:13px; text-decoration:underline; cursor:pointer; }
 
@@ -11537,14 +11541,26 @@ function currentHomeOrder(){
   const saved = (Array.isArray(settingsState.home_order) ? settingsState.home_order : []).filter(k => known.includes(k));
   return [...new Set([...saved, ...known])];
 }
-// 홈 카드들을 저장된 순서대로 다시 놓음 ('답할 차례'는 맨 위 그대로)
+function isHomeSectionHidden(key){
+  return Array.isArray(settingsState.home_hidden) && settingsState.home_hidden.includes(key);
+}
+// 홈 카드들을 저장된 순서대로 다시 놓고, 끈 카드는 숨김 ('답할 차례'는 맨 위 그대로)
 function applyHomeOrder(){
   const dash = document.getElementById('homeDash');
   if(!dash) return;
   currentHomeOrder().forEach(key => {
     const el = dash.querySelector(`:scope > [data-home-key="${key}"]`);
-    if(el) dash.appendChild(el);
+    if(!el) return;
+    dash.appendChild(el);
+    el.classList.toggle('home-section-off', isHomeSectionHidden(key));
   });
+}
+function setHomeSectionHidden(key, hidden){
+  const cur = Array.isArray(settingsState.home_hidden) ? settingsState.home_hidden : [];
+  settingsState.home_hidden = hidden ? [...new Set([...cur, key])] : cur.filter(k => k !== key);
+  try { localStorage.setItem('catchme_home_hidden', JSON.stringify(settingsState.home_hidden)); } catch(_){}
+  applyHomeOrder();
+  saveSettingToServer('home_hidden');
 }
 function setHomeOrder(order){
   settingsState.home_order = order;
@@ -11559,11 +11575,21 @@ function renderHomeOrderList(){
   if(!list) return;
   const labels = Object.fromEntries(HOME_SECTIONS.map(x => [x.key, x.label]));
   list.innerHTML = currentHomeOrder().map(key => `
-    <div class="home-order-row" data-key="${key}">
+    <div class="home-order-row${isHomeSectionHidden(key) ? ' off' : ''}" data-key="${key}">
       <span class="home-order-name">${escapeHtml(labels[key])}</span>
+      <div class="toggle home-order-toggle${isHomeSectionHidden(key) ? '' : ' on'}" role="switch" aria-checked="${!isHomeSectionHidden(key)}" aria-label="${escapeHtml(labels[key])} 홈에 보이기"><div class="knob"></div></div>
       <span class="home-order-handle" aria-label="끌어서 순서 바꾸기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="20" height="20"><path d="M4 8h16M4 12h16M4 16h16"/></svg></span>
     </div>`).join('');
   list.querySelectorAll('.home-order-row').forEach(attachHomeOrderDrag);
+  // 켜기/끄기 - 끈 카드는 홈에서 안 보임 (순서는 그대로 기억)
+  list.querySelectorAll('.home-order-toggle').forEach(tg => tg.addEventListener('click', () => {
+    const row = tg.closest('.home-order-row');
+    const turnOn = !tg.classList.contains('on');
+    tg.classList.toggle('on', turnOn);
+    tg.setAttribute('aria-checked', String(turnOn));
+    row.classList.toggle('off', !turnOn);
+    setHomeSectionHidden(row.dataset.key, !turnOn);
+  }));
 }
 // 손잡이는 바로, 줄의 다른 곳은 꾹 눌러서 집어 들고 위아래로 끌기
 function attachHomeOrderDrag(row){
@@ -11579,6 +11605,7 @@ function attachHomeOrderDrag(row){
   row.addEventListener('contextmenu', e => e.preventDefault());
   row.addEventListener('pointerdown', (e) => {
     if(e.pointerType === 'mouse' && e.button !== 0) return;
+    if(e.target.closest('.home-order-toggle')) return;
     startX = e.clientX; startY = e.clientY;
     clearPress();
     if(e.target.closest('.home-order-handle')){ e.preventDefault(); begin(e); return; }
@@ -11869,6 +11896,7 @@ const settingsState = {
   work_emoji: '💼', // 업무용 링크에 연 예약 가능 시간에 붙는 이모티콘
   color_labels: (() => { try { const v = JSON.parse(localStorage.getItem('catchme_color_labels') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; } })(), // 색 라벨 10개 이름 (빈칸 = 기본 이름)
   home_order: (() => { try { const v = JSON.parse(localStorage.getItem('catchme_home_order') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; } })(), // 설정 > 홈 화면 편집 - 홈 카드 순서 (비어 있으면 기본 순서)
+  home_hidden: (() => { try { const v = JSON.parse(localStorage.getItem('catchme_home_hidden') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; } })(), // 설정 > 홈 화면 편집 - 꺼서 홈에 안 보이게 한 카드
 };
 
 // 프론트 키(snake_case) <-> 서버 키(camelCase) 매핑
@@ -11887,6 +11915,7 @@ const SETTINGS_KEY_MAP = {
   work_emoji: 'workEmoji',
   color_labels: 'colorLabels',
   home_order: 'homeOrder',
+  home_hidden: 'homeHidden',
 };
 applyHomeOrder(); // 앱 켤 때 폰에 기억해 둔 순서로 먼저 (서버 설정이 오면 한 번 더)
 
@@ -11907,12 +11936,13 @@ async function loadSettingsFromServer(){
         } else if(server !== undefined && local.some(Boolean)) saveSettingToServer('color_labels');
         return;
       }
-      if(localKey === 'home_order'){
+      if(localKey === 'home_order' || localKey === 'home_hidden'){
+        // 홈 화면 편집은 서버 값이 기준 - 다른 폰에서 되돌리거나 다시 켠 것도 그대로 따라옴
         const server = data.settings[serverKey];
-        if(Array.isArray(server) && server.length){
-          settingsState.home_order = server;
-          try { localStorage.setItem('catchme_home_order', JSON.stringify(server)); } catch(_){}
-        } else if(Array.isArray(server) && settingsState.home_order.length) saveSettingToServer('home_order');
+        if(Array.isArray(server)){
+          settingsState[localKey] = server;
+          try { localStorage.setItem('catchme_' + localKey, JSON.stringify(server)); } catch(_){}
+        }
         applyHomeOrder();
         return;
       }
@@ -12254,15 +12284,19 @@ function openSettingsDetail(id){
 
   } else if(id === 'homeedit'){
     body.innerHTML = `
-      <div class="settings-detail-desc">오른쪽 손잡이를 끌어서 홈 순서를 바꿔요. '답할 차례'는 답할 게 있을 때 항상 맨 위에 떠요.</div>
+      <div class="settings-detail-desc">오른쪽 손잡이를 끌어서 홈 순서를 바꾸고, 안 쓰는 건 꺼서 홈에서 숨겨요. '답할 차례'는 답할 게 있을 때 항상 맨 위에 떠요.</div>
       <div class="home-order-list" id="homeOrderList"></div>
       <button type="button" class="home-order-reset" id="homeOrderResetBtn">기본 순서로 되돌리기</button>
     `;
     renderHomeOrderList();
     document.getElementById('homeOrderResetBtn').addEventListener('click', () => {
       setHomeOrder([]);
+      settingsState.home_hidden = []; // 숨긴 것도 모두 다시 켬
+      try { localStorage.setItem('catchme_home_hidden', '[]'); } catch(_){}
+      applyHomeOrder();
+      saveSettingToServer('home_hidden');
       renderHomeOrderList();
-      showToast('기본 순서로 되돌렸어요');
+      showToast('기본 상태로 되돌렸어요');
     });
 
   } else if(id === 'appmanage'){
