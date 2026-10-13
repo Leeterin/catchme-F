@@ -7520,6 +7520,21 @@
   .placeholder-text .meet-badge-chip span{ display:inline; }
   /* 일주일 보기 예약 가능 블록 - 진한 하늘색 대신 연한 톤 (한달·홈과 맞춤) */
   .week-cal-block.avail{ background:var(--accent-soft) !important; color:var(--accent); box-shadow:inset 3px 0 0 var(--accent) !important; }
+  /* 뒤로 버튼 - 아이폰처럼 "‹" 아이콘 하나로 통일 (예전엔 "‹ 뒤로" 글자 / "‹" / 네모 버튼이 섞여 있었음) */
+  .profile-back, #myProfileBackBtn, #settingsBackToHomeBtn{
+    display:inline-flex; align-items:center; justify-content:center; gap:2px;
+    min-width:36px; height:36px; padding:0; margin:0 0 0 -8px;
+    border:none !important; background:transparent !important; box-shadow:none !important;
+    color:var(--text) !important; font-size:14px; font-weight:600; border-radius:10px; cursor:pointer;
+  }
+  .profile-back svg, #myProfileBackBtn svg, #settingsBackToHomeBtn svg{ width:24px; height:24px; flex-shrink:0; }
+  /* 혼자 한 줄을 차지하는 뒤로 버튼은 가운데 정렬 화면(친구 프로필 등)에서도 항상 왼쪽에 */
+  .profile-back.back-standalone{ display:flex; width:max-content; align-self:flex-start; margin-right:auto; margin-bottom:10px; }
+  /* 리뷰 상세 - 약속 장소로 선택 / 저장 / 보내기를 한 줄로 */
+  .feed-detail-action-row{ display:flex; align-items:center; gap:8px; margin:4px 0 14px; }
+  .feed-detail-action-row .feed-meet-place-btn{ flex:1; margin:0; }
+  .feed-detail-action-row .feed-detail-mini-btn{ width:46px; height:46px; border-radius:14px; flex-shrink:0; }
+  .feed-detail-action-row .feed-detail-mini-btn svg{ width:20px; height:20px; }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
   /* 이모티콘 대신 쓰는 라인 아이콘 */
@@ -7699,7 +7714,7 @@
   <!-- 내 프로필 화면 -->
   <div class="calendar-card" id="myProfileView" style="display:none">
     <div class="schedule-nav" style="margin-bottom:20px;">
-      <button id="myProfileBackBtn">&#8249;</button>
+      <button id="myProfileBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="schedule-nav-label">내 프로필</div>
       <button class="edit-icon-btn" id="myProfileEditBtn">&#9998;</button>
     </div>
@@ -7712,7 +7727,7 @@
   <!-- 설정 화면 -->
   <div class="calendar-card" id="settingsView" style="display:none">
     <div class="schedule-nav" style="margin-bottom:18px;">
-      <button id="settingsBackToHomeBtn">&#8249;</button>
+      <button id="settingsBackToHomeBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="schedule-nav-label" id="settingsHeaderLabel">설정</div>
       <div style="width:28px;"></div>
     </div>
@@ -7760,7 +7775,7 @@
     <div class="schedule-view active" id="scheduleView-day">
       <div class="day-header-row">
         <div style="display:flex;align-items:center;gap:8px;">
-          <button class="profile-back" id="dayViewChatBackBtn" style="display:none;padding:0 4px;font-size:14px;font-weight:700;white-space:nowrap;">&#8249; 채팅방</button>
+          <button class="profile-back" id="dayViewChatBackBtn" style="display:none;padding:0 4px;font-size:14px;font-weight:700;white-space:nowrap;" aria-label="채팅방으로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>채팅방</button>
           <div>
             <div class="day-header-title">내 캘린더</div>
             <div class="day-header-sub">
@@ -7816,7 +7831,7 @@
     <!-- 일정 추가/수정 폼 - 하루/일주일/한달 어디서 열든 항상 뜨도록 특정 뷰 안에 갇히지 않게 독립시킴 -->
     <div class="event-form-view" id="eventFormView">
       <div class="event-form-header">
-        <button id="eventFormBackBtn" class="profile-back">&#8249;</button>
+        <button id="eventFormBackBtn" class="profile-back" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span id="eventFormHeaderTitle">일정 추가</span>
       </div>
       <div class="event-form-scroll">
@@ -8012,7 +8027,7 @@
     </div>
 
     <div class="friend-profile-view" id="friendProfileView">
-      <button class="profile-back" id="profileBackBtn">&#8249; 뒤로</button>
+      <button class="profile-back back-standalone" id="profileBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="profile-avatar-lg" id="profileAvatarLg"></div>
       <div class="profile-name" id="profileName"></div>
       <div class="profile-status" id="profileStatus"></div>
@@ -8035,7 +8050,7 @@
 
     <!-- 친구 그룹 목록 (인스타 "친한 친구"처럼 이름 붙여 만드는 그룹 - 일정을 특정 그룹에게만 공개할 때 씀) -->
     <div class="friend-groups-view" id="friendGroupsView">
-      <button class="profile-back" id="groupsBackBtn">&#8249; 뒤로</button>
+      <button class="profile-back back-standalone" id="groupsBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <h2 style="margin-bottom:4px;">친구 그룹</h2>
       <p class="desc" style="margin-bottom:14px;">그룹을 만들어서, 그 그룹에 속한 친구에게만 공개할 일정을 정할 수 있어요.</p>
       <!-- 새 그룹 만들기 - 이모티콘·이름을 정하고, 친구는 안 골라도 만들 수 있음 (나중에 그룹 안에서 넣으면 됨) -->
@@ -8055,7 +8070,7 @@
 
     <!-- 그룹 상세 (이름 변경 / 멤버 선택 / 삭제) -->
     <div class="friend-group-detail-view" id="friendGroupDetailView">
-      <button class="profile-back" id="groupDetailBackBtn">&#8249; 뒤로</button>
+      <button class="profile-back back-standalone" id="groupDetailBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="friend-calendar-title" id="groupDetailTitle" style="margin-bottom:10px;">그룹</div>
       <div class="mp-input-group">
         <label>이모티콘 · 그룹 이름 <span style="font-weight:400;color:var(--text-dim);">(이모티콘은 캘린더의 예약 가능 시간에 붙어요)</span></label>
@@ -8075,13 +8090,13 @@
 
     <div class="friend-search-view" id="friendSearchView">
       <div class="search-list-view active" id="searchListView">
-        <button class="profile-back" id="searchBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="searchBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <input type="text" class="search-input" id="friendSearchInput" placeholder="아이디로 친구 검색" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <div id="friendSearchResults"></div>
       </div>
 
       <div class="person-profile-view" id="searchProfileView">
-        <button class="profile-back" id="searchProfileBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="searchProfileBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="profile-avatar-lg" id="searchProfileAvatar"></div>
         <div class="profile-name" id="searchProfileName"></div>
         <div class="profile-status" id="searchProfileBio"></div>
@@ -8310,7 +8325,7 @@
 
   <!-- 친구 캘린더 보기: 어느 탭(친구/채팅)에서 열든 그 위에 독립적으로 뜨는 오버레이 (가능여부만 표시) -->
     <div class="friend-calendar-view" id="friendCalendarView">
-      <button class="profile-back" id="friendCalendarBackBtn">&#8249; 뒤로</button>
+      <button class="profile-back back-standalone" id="friendCalendarBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="friend-calendar-title" id="friendCalendarTitle"></div>
 
       <div class="friend-cal-main active" id="friendCalendarMain">
@@ -8354,7 +8369,7 @@
       </div>
 
       <div class="friend-reserve-view" id="friendReserveView">
-        <button class="profile-back" id="friendReserveBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="friendReserveBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="friend-calendar-title" id="friendReserveTitle"></div>
         <div class="mp-input-group"><label>날짜</label><div class="feed-create-category" id="friendReserveDateLabel"></div><div class="reserve-window-hint" id="friendReserveWindowHint"></div><div class="reserve-window-hint" id="friendReserveMyEvents" style="display:none;"></div></div>
         <div class="mp-input-group">
@@ -8386,7 +8401,7 @@
     <!-- 캘린더 매칭 (별도 화면) -->
     <div class="calendar-match-view" id="calendarMatchView">
       <div class="match-panel-header">
-        <button class="profile-back" id="matchBackBtn">&#8249;</button>
+        <button class="profile-back" id="matchBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span id="matchViewTitle">둘 다 되는 시간 찾기</span>
       </div>
       <!-- 결과가 먼저 보이게 조건(기간/만날 시간)은 한 줄 요약으로 접어둠 -->
@@ -8753,7 +8768,7 @@
 
     <div class="chat-room-view" id="chatRoomView">
       <div class="chat-room-header">
-        <button class="profile-back" id="chatBackBtn">&#8249;</button>
+        <button class="profile-back" id="chatBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="chat-room-avatar" id="chatRoomAvatar"></div>
         <div class="chat-room-name" id="chatRoomName"></div>
         <div class="chat-members-dropdown" id="chatMembersDropdown"></div>
@@ -8852,7 +8867,7 @@
     <!-- 확정된 일정 상세보기 (상단 고정 카드를 누르면 열림) -->
     <div class="calendar-match-view" id="appointmentDetailView">
       <div class="match-panel-header">
-        <button class="profile-back" id="appointmentDetailBackBtn">&#8249;</button>
+        <button class="profile-back" id="appointmentDetailBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span id="appointmentDetailTitle">약속 상세</span>
       </div>
       <div id="appointmentDetailBody"></div>
@@ -8861,7 +8876,7 @@
     <!-- 지난 약속 목록 (채팅방 추가 기능 메뉴에서 열림) - 날짜가 지나서 상단 고정 카드에서는 사라진 약속들을 모아봄 -->
     <div class="calendar-match-view" id="pastAppointmentsView">
       <div class="match-panel-header">
-        <button class="profile-back" id="pastAppointmentsBackBtn">&#8249;</button>
+        <button class="profile-back" id="pastAppointmentsBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span>지난 약속</span>
       </div>
       <div id="pastAppointmentsBody"></div>
@@ -8870,7 +8885,7 @@
     <!-- 그룹 멤버 목록 (별도 화면) -->
     <div class="calendar-match-view" id="groupMembersView">
       <div class="match-panel-header">
-        <button class="profile-back" id="groupMembersBackBtn">&#8249;</button>
+        <button class="profile-back" id="groupMembersBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span id="groupMembersTitle">멤버</span>
       </div>
       <div id="groupMembersListBody"></div>
@@ -8878,7 +8893,7 @@
 
     <!-- 그룹 멤버 프로필 (별도 화면) -->
     <div class="friend-profile-view" id="groupMemberProfileView">
-      <button class="profile-back" id="groupMemberProfileBackBtn">&#8249; 뒤로</button>
+      <button class="profile-back back-standalone" id="groupMemberProfileBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="profile-avatar-lg" id="groupMemberProfileAvatar"></div>
       <div class="profile-name" id="groupMemberProfileName"></div>
       <div class="profile-status" id="groupMemberProfileStatus"></div>
@@ -8889,7 +8904,7 @@
     <!-- 이미 있는 그룹 채팅방에 친구 초대 -->
     <div class="calendar-match-view" id="inviteMembersView">
       <div class="match-panel-header">
-        <button class="profile-back" id="inviteMembersBackBtn">&#8249;</button>
+        <button class="profile-back" id="inviteMembersBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span>친구 초대하기</span>
       </div>
       <div class="hotplace-list-desc">채팅방에 추가할 친구를 골라주세요.</div>
@@ -8900,7 +8915,7 @@
     <!-- 새 모임(그룹 채팅) 만들기 -->
     <div class="calendar-match-view" id="newGroupView">
       <div class="match-panel-header">
-        <button class="profile-back" id="newGroupBackBtn">&#8249;</button>
+        <button class="profile-back" id="newGroupBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <span id="newGroupTitle">새 모임 만들기</span>
       </div>
       <input type="text" class="search-input" id="newGroupNameInput" placeholder="모임 이름" maxlength="30" />
@@ -8989,13 +9004,13 @@
 
       <!-- 장소 상세 (한 장소의 모든 리뷰) -->
       <div class="feed-list-view" id="feedPlaceDetailView">
-        <button class="profile-back" id="feedPlaceDetailBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="feedPlaceDetailBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div id="feedPlaceDetailHeader"></div>
       </div>
 
       <!-- 장소 태그(#상호명)를 눌렀을 때 - 카테고리 상관없이 같은 장소로 올라온 다른 글들을 해시태그처럼 모아서 보여줌 -->
       <div class="feed-list-view" id="feedTagView">
-        <button class="profile-back" id="feedTagBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="feedTagBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="feed-tag-view-header">
           <div>
             <div class="friend-calendar-title" id="feedTagTitle"></div>
@@ -9018,7 +9033,7 @@
            내 자신을 보는 경우(위쪽 "내 리뷰 프로필" 카드를 눌렀거나, 내 이름/뱃지를 눌렀을 때)는
            같은 화면을 재사용하되 연필 아이콘(수정 버튼)을 추가로 보여줌 -->
       <div class="feed-list-view" id="feedAuthorView">
-        <button class="profile-back" id="feedAuthorBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="feedAuthorBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="feed-author-view-header">
           <div id="feedAuthorViewAvatar"></div>
           <div style="flex:1;">
@@ -9042,7 +9057,7 @@
       </div>
 
       <div class="feed-create-view" id="feedCreateView">
-        <button class="profile-back" id="feedCreateBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="feedCreateBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="friend-calendar-title" id="feedCreateHeaderTitle">추천하기</div>
 
         <div class="feed-create-category-row" id="feedCreateCategoryRow">
@@ -9135,7 +9150,7 @@
       </div>
 
       <div class="meetup-create-view" id="meetupCreateView">
-        <button class="profile-back" id="meetupCreateBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="meetupCreateBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="friend-calendar-title" id="meetupCreateHeaderTitle">모임 만들기</div>
         <div class="mp-input-group">
           <label>카테고리</label>
@@ -9183,20 +9198,20 @@
 
       <!-- 모임 상세보기 -->
       <div class="meetup-detail-view" id="meetupDetailView">
-        <button class="profile-back" id="meetupDetailBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="meetupDetailBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div id="meetupDetailBody"></div>
       </div>
 
       <!-- 모임 참여 신청 목록 (방장이 수락/거절 처리) -->
       <div class="meetup-detail-view" id="meetupRequestsView">
-        <button class="profile-back" id="meetupRequestsBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="meetupRequestsBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="friend-calendar-title">참여 신청 목록</div>
         <div id="meetupRequestsBody"></div>
       </div>
 
       <!-- 모임 참가 신청 -->
       <div class="meetup-reserve-view" id="meetupReserveView">
-        <button class="profile-back" id="meetupReserveBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="meetupReserveBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <h2 style="font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0 0 4px;">모임 참가 신청</h2>
         <p class="desc" id="meetupReserveTargetTitle"></p>
         <div class="mp-input-group"><label>이름</label><input class="search-input" id="reserveNameInput" placeholder="이름을 입력하세요" maxlength="20" /></div>
@@ -9228,7 +9243,7 @@
       </div>
 
       <div class="person-profile-view" id="suggestProfileView">
-        <button class="profile-back" id="suggestProfileBackBtn">&#8249; 뒤로</button>
+        <button class="profile-back back-standalone" id="suggestProfileBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <div class="profile-avatar-lg" id="suggestProfileAvatar"></div>
         <div class="profile-name" id="suggestProfileName"></div>
         <div class="profile-status" id="suggestProfileBio"></div>
@@ -13314,11 +13329,10 @@ function feedPostDetailHtml(post){
       ${buildPlaceInfoRowHtml(post)}
       ${feedReviewTagsHtml(post)}
       <div class="feed-detail-note">${escapeHtml(post.note || '')}</div>
-      <button type="button" class="feed-meet-place-btn">${ICO.pin}<span>약속 장소로 선택</span></button>
-
-      <div class="feed-detail-mini-actions">
-        <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="이 장소 저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
-        <button type="button" class="feed-detail-mini-btn feed-share-btn" title="채팅방에 보내기">${ICO.send}</button>
+      <div class="feed-detail-action-row">
+        <button type="button" class="feed-meet-place-btn">${ICO.pin}<span>약속 장소로 선택</span></button>
+        <button type="button" class="feed-detail-mini-btn feed-save-btn${saved ? ' active' : ''}" title="이 장소 저장" aria-label="이 장소 저장">${saved ? ICO.starFilled : ICO.starOutline}</button>
+        <button type="button" class="feed-detail-mini-btn feed-share-btn" title="채팅방에 보내기" aria-label="채팅방에 보내기">${ICO.send}</button>
       </div>
     </div>
   `;
@@ -16560,9 +16574,9 @@ function renderDayView(){
       <div class="day-event-title">${escapeHtml(ev.title)}</div>
       ${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<div class="day-event-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${ev.travel.to && ev.travel.to.name ? ` · ${escapeHtml(ev.travel.to.name)}` : ''}${travelRouteLinkHtml(ev.travel, scheduleFocusDate, disp.startMin)}</div>` : ''}
       <div class="day-event-extras">${eventPlaceNoteHtml(ev)}</div>
-      <div class="day-event-tags">
+      ${ev.type === 'available' ? '' : `<div class="day-event-tags">
         ${visibilityButtonsHtml(ev.visibility, 'day-event-tag')}
-      </div>
+      </div>`}
     `;
 
     // 카드에서 바로 공개설정 클릭 한 번으로 전환 - 서버에도 바로 반영됨.
