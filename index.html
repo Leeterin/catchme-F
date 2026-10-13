@@ -7539,25 +7539,52 @@
   .feed-detail-action-row .feed-meet-place-btn{ flex:1; margin:0; }
   .feed-detail-action-row .feed-detail-mini-btn{ width:46px; height:46px; border-radius:14px; flex-shrink:0; }
   .feed-detail-action-row .feed-detail-mini-btn svg{ width:20px; height:20px; }
-  /* 홈 - 이번 달 목표 */
-  .goal-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line); }
-  .goal-row:first-child{ border-top:none; padding-top:2px; }
-  .goal-main{ flex:1; min-width:0; border:none; background:none; padding:0; text-align:left; cursor:pointer; color:var(--text); }
-  .goal-name-line{ display:flex; align-items:baseline; gap:6px; }
-  .goal-name{ font-size:14.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
-  .goal-count{ margin-left:auto; flex-shrink:0; font-size:12.5px; color:var(--text-dim); font-variant-numeric:tabular-nums; }
-  .goal-count b{ color:var(--text); font-size:14px; }
-  .goal-bar{ height:6px; border-radius:999px; background:var(--surface-2); margin-top:7px; overflow:hidden; }
-  .goal-bar > span{ display:block; height:100%; border-radius:999px; background:var(--accent); transition:width .25s ease; }
-  .goal-row.done .goal-count b, .goal-row.done .goal-done{ color:#16A34A; }
-  .goal-row.done .goal-bar > span{ background:#22C55E; }
-  .goal-done{ display:inline-flex; align-items:center; gap:2px; font-size:11.5px; font-weight:700; }
-  .goal-btns{ display:flex; gap:6px; flex-shrink:0; }
-  .goal-minus, .goal-plus{ height:34px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; }
-  .goal-minus{ width:34px; border:1px solid var(--line); background:var(--surface); color:var(--text-dim); }
-  .goal-plus{ padding:0 12px; border:none; background:var(--accent-soft); color:var(--accent); }
-  .goal-minus:disabled{ opacity:.35; cursor:default; }
-  .goal-empty-btn{ margin-top:8px; padding:9px 14px; border:1px dashed var(--line); border-radius:10px; background:none; color:var(--text-dim); font-size:13px; font-weight:600; cursor:pointer; }
+  /* 홈 - 이번 달 목표 (뉴모피즘: 튀어나온 판 + 안으로 눌린 알약 + 동그란 버튼) */
+  .neu-goal{
+    --neu-bg:#E4E5E9; --neu-hi:rgba(255,255,255,0.95); --neu-lo:rgba(156,161,175,0.55);
+    --neu-ink:#26272C; --neu-dim:#8D9099; --neu-ok:#26272C;
+    background:var(--neu-bg); border-radius:30px; padding:20px 18px 18px;
+    box-shadow:9px 9px 22px var(--neu-lo), -9px -9px 22px var(--neu-hi);
+    color:var(--neu-ink);
+  }
+  body.dark-mode .neu-goal{
+    --neu-bg:#25262A; --neu-hi:rgba(255,255,255,0.05); --neu-lo:rgba(0,0,0,0.6);
+    --neu-ink:#ECECEE; --neu-dim:#8E9097; --neu-ok:#ECECEE;
+  }
+  .neu-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; padding:0 4px; }
+  .neu-eyebrow{ font-size:12px; color:var(--neu-dim); letter-spacing:0.02em; }
+  .neu-month{ font-size:34px; font-weight:300; letter-spacing:-0.02em; line-height:1.1; margin-top:2px; }
+  .neu-head-right{ display:flex; align-items:center; gap:10px; }
+  .neu-ring{ min-width:30px; height:30px; padding:0 8px; box-sizing:border-box; border-radius:999px; border:1.5px solid var(--neu-dim); color:var(--neu-dim); font-size:12px; display:inline-flex; align-items:center; justify-content:center; font-variant-numeric:tabular-nums; }
+  .neu-round{
+    width:46px; height:46px; border-radius:50%; border:none; flex-shrink:0; cursor:pointer;
+    background:var(--neu-bg); color:var(--neu-ink); font-size:14px; font-weight:700;
+    display:inline-flex; align-items:center; justify-content:center;
+    box-shadow:5px 5px 12px var(--neu-lo), -5px -5px 12px var(--neu-hi);
+    transition:box-shadow .12s ease, transform .12s ease;
+  }
+  .neu-round:active{ box-shadow:inset 4px 4px 9px var(--neu-lo), inset -4px -4px 9px var(--neu-hi); transform:scale(0.97); }
+  .neu-round:disabled{ opacity:.4; cursor:default; box-shadow:2px 2px 6px var(--neu-lo), -2px -2px 6px var(--neu-hi); }
+  .neu-plus{ font-size:13px; letter-spacing:-0.02em; }
+  .neu-row{ display:flex; align-items:center; gap:10px; }
+  .neu-row + .neu-row{ margin-top:12px; }
+  .neu-well{
+    flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+    border:none; border-radius:24px; padding:12px 16px 13px; cursor:pointer; text-align:left;
+    background:var(--neu-bg); color:var(--neu-ink);
+    box-shadow:inset 5px 5px 11px var(--neu-lo), inset -5px -5px 11px var(--neu-hi);
+  }
+  .neu-well-sub{ font-size:12px; color:var(--neu-dim); max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .neu-well-line{ display:flex; align-items:center; gap:8px; }
+  .neu-well-title{ font-size:17px; font-weight:400; letter-spacing:-0.01em; }
+  .neu-count{ font-size:24px; font-weight:300; letter-spacing:-0.02em; font-variant-numeric:tabular-nums; line-height:1.15; }
+  .neu-count small{ font-size:14px; color:var(--neu-dim); margin-left:1px; }
+  .neu-chip{ font-size:11px; font-weight:700; color:var(--neu-bg); background:var(--neu-dim); padding:3px 9px; border-radius:999px; }
+  .neu-track{ width:100%; height:4px; border-radius:999px; margin-top:7px; background:rgba(127,130,140,0.18); overflow:hidden; }
+  .neu-track > span{ display:block; height:100%; border-radius:999px; background:var(--neu-ink); transition:width .25s ease; }
+  .neu-row.done .neu-count{ font-weight:400; }
+  .neu-empty{ font-size:13px; color:var(--neu-dim); padding:4px; }
+  .neu-empty-well{ width:100%; padding:16px 18px; }
   .goal-target-row{ display:flex; align-items:center; gap:8px; }
   .goal-step-btn{ width:40px; height:40px; border-radius:10px; border:1px solid var(--line); background:var(--surface-2); color:var(--text); font-size:18px; font-weight:700; cursor:pointer; flex-shrink:0; }
   .goal-target-input{ width:80px !important; text-align:center; font-size:16px; font-weight:700; }
@@ -7691,9 +7718,18 @@
       <span><b id="homePlanCtaTitle">약속 잡기</b><small id="homePlanCtaSub">친구만 고르면 잡을 수 있는 방법을 알려줘요</small></span>
     </button>
     <!-- 이번 달 목표 - 운동·책 읽기처럼 한 달에 몇 번 할지 정하고 직접 [+1]을 눌러서 셈 (캘린더와 자동 연동 없음) -->
-    <div class="home-card" id="homeGoalCard">
-      <div class="home-card-title"><span id="homeGoalCardTitle">이번 달 목표</span><button type="button" class="home-card-link" id="homeGoalAddBtn">+ 추가</button></div>
-      <div id="homeGoalList"><div class="home-empty">불러오는 중...</div></div>
+    <div class="neu-goal" id="homeGoalCard">
+      <div class="neu-head">
+        <div>
+          <div class="neu-eyebrow">이번 달 목표</div>
+          <div class="neu-month" id="homeGoalCardTitle">10월</div>
+        </div>
+        <div class="neu-head-right">
+          <span class="neu-ring" id="homeGoalDoneRing" title="달성한 목표" style="display:none;"></span>
+          <button type="button" class="neu-round" id="homeGoalAddBtn" aria-label="목표 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="18" height="18"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+      </div>
+      <div id="homeGoalList"><div class="neu-empty">불러오는 중...</div></div>
     </div>
     <div class="home-card">
       <div class="home-card-title"><span>다가오는 약속</span><button type="button" class="home-card-link" id="homePastApptBtn">지난 약속</button></div>
@@ -11192,12 +11228,21 @@ async function loadHomeGoals(){
 function renderHomeGoals(){
   const listEl = document.getElementById('homeGoalList');
   if(!listEl) return;
-  document.getElementById('homeGoalCardTitle').textContent = `이번 달 목표 · ${TODAY.getMonth() + 1}월`;
+  document.getElementById('homeGoalCardTitle').textContent = `${TODAY.getMonth() + 1}월`;
+  const ring = document.getElementById('homeGoalDoneRing');
+  if(homeGoals && homeGoals.length){
+    ring.style.display = '';
+    ring.textContent = `${homeGoals.filter(g => g.count >= g.target).length}/${homeGoals.length}`;
+  } else {
+    ring.style.display = 'none';
+  }
   if(homeGoals && homeGoalsMonth && homeGoalsMonth !== goalMonthKey()){ loadHomeGoals(); return; } // 자정 넘어 달이 바뀜
-  if(!homeGoals){ listEl.innerHTML = '<div class="home-empty">불러오는 중...</div>'; return; }
+  if(!homeGoals){ listEl.innerHTML = '<div class="neu-empty">불러오는 중...</div>'; return; }
   if(!homeGoals.length){
-    listEl.innerHTML = `<div class="home-empty">운동하기, 책 읽기처럼 이번 달에 몇 번 할지 정하고, 할 때마다 직접 눌러서 채워보세요.</div>
-      <button type="button" class="goal-empty-btn" id="homeGoalEmptyAddBtn">+ 이번 달 목표 만들기</button>`;
+    listEl.innerHTML = `<button type="button" class="neu-well neu-empty-well" id="homeGoalEmptyAddBtn">
+        <span class="neu-well-sub">운동하기, 책 읽기처럼</span>
+        <span class="neu-well-title">이번 달 목표 만들기</span>
+      </button>`;
     document.getElementById('homeGoalEmptyAddBtn').addEventListener('click', () => openGoalEdit(null));
     return;
   }
@@ -11205,19 +11250,17 @@ function renderHomeGoals(){
     const pct = Math.min(100, Math.round(g.count / g.target * 100));
     const done = g.count >= g.target;
     return `
-      <div class="goal-row${done ? ' done' : ''}">
-        <button type="button" class="goal-main" data-i="${i}" aria-label="${escapeHtml(g.title)} 목표 수정">
-          <div class="goal-name-line">
-            <span class="goal-name">${escapeHtml(g.title)}</span>
-            ${done ? `<span class="goal-done">${ICO.check} 달성</span>` : ''}
-            <span class="goal-count"><b>${g.count}</b> / ${g.target}회</span>
-          </div>
-          <div class="goal-bar"><span style="width:${pct}%"></span></div>
+      <div class="neu-row${done ? ' done' : ''}">
+        <button type="button" class="neu-well goal-main" data-i="${i}" aria-label="${escapeHtml(g.title)} 목표 수정">
+          <span class="neu-well-sub">${escapeHtml(g.title)}</span>
+          <span class="neu-well-line">
+            <span class="neu-count">${g.count}<small>/${g.target}</small></span>
+            ${done ? '<span class="neu-chip">달성</span>' : ''}
+          </span>
+          <span class="neu-track"><span style="width:${pct}%"></span></span>
         </button>
-        <div class="goal-btns">
-          <button type="button" class="goal-minus" data-i="${i}" aria-label="1회 되돌리기"${g.count <= 0 ? ' disabled' : ''}>−</button>
-          <button type="button" class="goal-plus" data-i="${i}" aria-label="1회 했어요">+1</button>
-        </div>
+        <button type="button" class="neu-round goal-minus" data-i="${i}" aria-label="1회 되돌리기"${g.count <= 0 ? ' disabled' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="18" height="18"><path d="M6 12h12"/></svg></button>
+        <button type="button" class="neu-round neu-plus goal-plus" data-i="${i}" aria-label="1회 했어요">+1</button>
       </div>`;
   }).join('');
   listEl.querySelectorAll('.goal-main').forEach(b => b.addEventListener('click', () => openGoalEdit(homeGoals[+b.dataset.i])));
