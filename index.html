@@ -7583,6 +7583,15 @@
   .neu-track{ width:100%; height:4px; border-radius:999px; margin-top:7px; background:rgba(127,130,140,0.18); overflow:hidden; }
   .neu-track > span{ display:block; height:100%; border-radius:999px; background:var(--neu-ink); transition:width .25s ease; }
   .neu-row.done .neu-count{ font-weight:400; }
+  /* 목표 줄 - 이름은 왼쪽, 숫자는 오른쪽 한 줄 (칸이 너무 크다는 피드백으로 낮춤) */
+  .neu-row .neu-well{ padding:11px 16px 12px; border-radius:20px; gap:0; }
+  .neu-goal-line{ display:flex; align-items:center; gap:8px; width:100%; }
+  .neu-goal-name{ flex:1; min-width:0; font-size:15px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .neu-row .neu-count{ font-size:20px; flex-shrink:0; }
+  .neu-row .neu-count small{ font-size:13px; }
+  .neu-row .neu-track{ margin-top:8px; }
+  .neu-row .neu-round{ width:42px; height:42px; }
+  .neu-row + .neu-row{ margin-top:10px; }
   .neu-empty{ font-size:13px; color:var(--neu-dim); padding:4px; }
   .neu-empty-well{ width:100%; padding:16px 18px; }
   .goal-target-row{ display:flex; align-items:center; gap:8px; }
@@ -11252,10 +11261,10 @@ function renderHomeGoals(){
     return `
       <div class="neu-row${done ? ' done' : ''}">
         <button type="button" class="neu-well goal-main" data-i="${i}" aria-label="${escapeHtml(g.title)} 목표 수정">
-          <span class="neu-well-sub">${escapeHtml(g.title)}</span>
-          <span class="neu-well-line">
-            <span class="neu-count">${g.count}<small>/${g.target}</small></span>
+          <span class="neu-goal-line">
+            <span class="neu-goal-name">${escapeHtml(g.title)}</span>
             ${done ? '<span class="neu-chip">달성</span>' : ''}
+            <span class="neu-count">${g.count}<small>/${g.target}</small></span>
           </span>
           <span class="neu-track"><span style="width:${pct}%"></span></span>
         </button>
