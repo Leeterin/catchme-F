@@ -7513,6 +7513,10 @@
 
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
+  /* 이모티콘 대신 쓰는 라인 아이콘 */
+  svg.li{ display:inline-block; flex-shrink:0; }
+  .place-review-tag .em svg.li, .feed-review-tag svg.li{ width:15px; height:15px; }
+  .invite-prompt-emoji svg.li{ width:40px; height:40px; }
 </style>
 </head>
 <body class="app-booting">
@@ -7888,8 +7892,8 @@
         <div class="mp-input-group" id="travelGroup" style="display:none;">
           <label>이동시간</label>
           <div class="travel-mode-row" id="travelModeRow">
-            <button type="button" class="travel-mode-btn" data-travel-mode="car">🚗 자동차</button>
-            <button type="button" class="travel-mode-btn" data-travel-mode="transit">🚇 대중교통</button>
+            <button type="button" class="travel-mode-btn" data-travel-mode="car"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><path d="M3 12h18"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg> 자동차</button>
+            <button type="button" class="travel-mode-btn" data-travel-mode="transit"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14"/><path d="M9 21l1.5-4M15 21l-1.5-4"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/></svg> 대중교통</button>
           </div>
           <!-- 출발 → 도착을 한 줄에 반씩. 검색 결과는 줄 전체 폭으로 펼침 -->
           <div class="travel-row">
@@ -7928,7 +7932,7 @@
       </div>
 
       <div id="availableGridGroup" style="display:none;">
-        <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
+        <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg> 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
         <div class="mp-input-group">
           <label>누구에게 열까요? <span style="font-weight:400;color:var(--text-dim);">(여러 개 고를 수 있어요)</span></label>
           <div class="avail-for-row" id="eventAvailForRow"></div>
@@ -8072,7 +8076,7 @@
         <div class="profile-avatar-lg" id="searchProfileAvatar"></div>
         <div class="profile-name" id="searchProfileName"></div>
         <div class="profile-status" id="searchProfileBio"></div>
-        <div class="feed-sponsored-badge" id="searchProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;">⚠ 노쇼 신고 이력이 있어요</div>
+        <div class="feed-sponsored-badge" id="searchProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg> 노쇼 신고 이력이 있어요</div>
         <div class="person-profile-actions">
           <button class="person-action-btn request" id="searchProfileRequestBtn">친구 요청</button>
           <button class="person-action-btn chat" id="searchProfileChatBtn">채팅</button>
@@ -8434,7 +8438,7 @@
     <div class="mini-confirm-card quick-avail-card">
       <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
-      <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b>💡 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
+      <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg> 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
       <div class="qa-repeat" id="quickAvailRepeatRow">
         <button type="button" class="qa-switch" id="quickAvailRepeatSwitch" role="switch" aria-checked="false"><span>4주 반복</span><i></i></button>
       </div>
@@ -8467,7 +8471,7 @@
   <!-- 첫 일정을 넣은 직후 딱 한 번 - 링크로 되는 시간 물어보기 (받는 사람은 가입 없이 응답) -->
   <div class="mini-confirm-overlay" id="invitePromptOverlay">
     <div class="mini-confirm-card invite-prompt-card">
-      <div class="invite-prompt-emoji">🗓️</div>
+      <div class="invite-prompt-emoji" style="color:var(--accent);"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
       <div class="mini-confirm-title" style="margin-bottom:6px;">이번 주에 만날 사람 있어요?</div>
       <p class="invite-prompt-desc">링크 하나만 보내면 친구가 <b>가입 없이</b> 되는 시간을 골라줘요.<br>단톡방에서 "언제 돼?" 안 물어봐도 돼요.</p>
       <button type="button" class="profile-chat-btn" id="invitePromptGoBtn">링크로 시간 물어보기</button>
@@ -8807,7 +8811,7 @@
         </div>
         <div class="chat-reply-preview-bar" id="chatCalSharePreviewBar" style="display:none;">
           <div class="chat-reply-preview-info">
-            <div class="chat-reply-preview-label">📅 일정 같이 보내기</div>
+            <div class="chat-reply-preview-label"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg> 일정 같이 보내기</div>
             <div class="chat-reply-preview-text" id="chatCalSharePreviewText"></div>
           </div>
           <button type="button" class="chat-reply-preview-close" id="chatCalSharePreviewClose">✕</button>
@@ -9209,7 +9213,7 @@
             내 주변 5km 이내에 있는, 위치 공유에 동의한 실제 회원만 추천해드려요.<br/>
             추천을 받으려면 위치 정보 제공에 동의해주세요.
           </div>
-          <button class="profile-chat-btn" id="suggestLocationAgreeBtn">📍 위치 공유 동의하고 추천받기</button>
+          <button class="profile-chat-btn" id="suggestLocationAgreeBtn"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg> 위치 공유 동의하고 추천받기</button>
         </div>
         <div id="suggestListContainer"></div>
       </div>
@@ -9219,7 +9223,7 @@
         <div class="profile-avatar-lg" id="suggestProfileAvatar"></div>
         <div class="profile-name" id="suggestProfileName"></div>
         <div class="profile-status" id="suggestProfileBio"></div>
-        <div class="feed-sponsored-badge" id="suggestProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;">⚠ 노쇼 신고 이력이 있어요</div>
+        <div class="feed-sponsored-badge" id="suggestProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg> 노쇼 신고 이력이 있어요</div>
         <div class="person-profile-actions">
           <button class="person-action-btn request" id="suggestProfileRequestBtn">친구 요청</button>
           <button class="person-action-btn chat" id="suggestProfileChatBtn">채팅</button>
@@ -10543,6 +10547,22 @@ const WEEKDAY_KO = ["일","월","화","수","목","금","토"];
 
 // ---------- 채팅(예약/제안/장소/핫플 등)에서 쓰는 라인 아이콘 (이모지 대체용) ----------
 const ICO = {
+  // 이모티콘 대신 쓰는 라인 아이콘 (글자 크기를 따라감)
+  carLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><path d="M3 12h18"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>',
+  trainLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14"/><path d="M9 21l1.5-4M15 21l-1.5-4"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/></svg>',
+  bulbLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>',
+  alertLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  calendarLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  pinLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
+  cameraLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  chatLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 1 1 21 11.5z"/></svg>',
+  clockLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  noteLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>',
+  talkLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>',
+  usersLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>',
+  coinsLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><circle cx="9" cy="9" r="6"/><path d="M15.5 9.2A6 6 0 1 1 9.2 15.5"/><path d="M9 6.5v5M7 8h3.5"/></svg>',
+  heartLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
+
   calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M12 21s-7-7.5-7-12a7 7 0 0 1 14 0c0 4.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
   pushpin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px;"><path d="M9 4v6L5 14v2h14v-2l-4-4V4"/><path d="M12 16v6"/></svg>',
@@ -13180,7 +13200,7 @@ function feedPostCardHtml(post){
     ${photos.length > 0 ? `
       <div class="feed-ig-photos">
         <div class="feed-review-photos feed-review-photos-hero">${photos.map(p => `<img loading="lazy" src="${p}" />`).join('')}</div>
-        ${photos.length > 1 ? `<div class="feed-ig-photo-count">📷 ${photos.length}</div>` : ''}
+        ${photos.length > 1 ? `<div class="feed-ig-photo-count">${ICO.cameraLi} ${photos.length}</div>` : ''}
       </div>
     ` : ''}
     <div class="feed-ig-header">
@@ -13434,10 +13454,10 @@ function meetPlaceInChatRoom(roomId, place, act){
 // 확정된 일정(날짜 있는 핀)이 끝난 지 7일 안이고, 장소가 길거리/역/주소가 아닌 "가게"(카카오 장소 검색에서
 // 상호로 찾아지는 곳)일 때만 띄움. 남긴 후기는 추천 게시물로 올라가고, 카페면 추천 > 카페 탭에 들어감.
 const PLACE_REVIEW_TAGS = [
-  { key: 'talk', em: '🗣️', label: '대화하기 좋았어요' },
-  { key: 'group', em: '👥', label: '여러 명이 이용하기 좋았어요' },
-  { key: 'price', em: '💰', label: '가격이 괜찮았어요' },
-  { key: 'revisit', em: '❤️', label: '다음에도 이용하고 싶어요' },
+  { key: 'talk', em: ICO.talkLi, label: '대화하기 좋았어요' },
+  { key: 'group', em: ICO.usersLi, label: '여러 명이 이용하기 좋았어요' },
+  { key: 'price', em: ICO.coinsLi, label: '가격이 괜찮았어요' },
+  { key: 'revisit', em: ICO.heartLi, label: '다음에도 이용하고 싶어요' },
 ];
 const PLACE_REVIEW_WINDOW_DAYS = 7;
 const PLACE_REVIEW_DONE_KEY = 'catchme_place_review_done';
@@ -13959,7 +13979,7 @@ function renderFeedPostCollection(container, posts, { emptyText, showPlace, mode
       if(post.photos && post.photos.length > 1){
         const badge = document.createElement('div');
         badge.className = 'feed-tag-grid-count';
-        badge.textContent = `📷 ${post.photos.length}`;
+        badge.innerHTML = `${ICO.cameraLi} ${post.photos.length}`;
         photo.appendChild(badge);
       }
       cell.appendChild(photo);
@@ -17211,7 +17231,7 @@ function isTravelEnabled(){
   try { return localStorage.getItem('catchme_travel_time') !== 'off'; } catch(_){ return true; } // 기본은 켜짐, 끈 사람만 꺼짐
 }
 // 이동 수단 - 자동차 / 대중교통. 마지막에 고른 걸 다음 일정에도 기본으로
-const TRAVEL_MODES = { car: { icon: '🚗', name: '자동차' }, transit: { icon: '🚇', name: '대중교통' } };
+const TRAVEL_MODES = { car: { icon: ICO.carLi, name: '자동차' }, transit: { icon: ICO.trainLi, name: '대중교통' } };
 function getTravelMode(){
   try { return localStorage.getItem('catchme_travel_mode') === 'car' ? 'car' : 'transit'; } catch(_){ return 'transit'; }
 }
@@ -17377,7 +17397,7 @@ function renderTravelSection(){
   else if(t.source === 'loading') head = `<span class="travel-depart">이동시간 계산 중...</span>`;
   else head = `
     <span class="travel-min">${TRAVEL_MODES[mode].icon} ${t.minutes}분</span>
-    <label class="travel-depart-btn" aria-label="출발 시간 설정">🕒 ${hm(travelFormStartMin() - t.minutes)} 출발<input type="time" id="travelDepartInput" value="${hm(travelFormStartMin() - t.minutes)}" /></label>
+    <label class="travel-depart-btn" aria-label="출발 시간 설정">${ICO.clockLi} ${hm(travelFormStartMin() - t.minutes)} 출발<input type="time" id="travelDepartInput" value="${hm(travelFormStartMin() - t.minutes)}" /></label>
     <span class="travel-depart-note">${t.source === 'fallback' ? '대략적인 시간' : t.source === 'manual' ? '직접 정한 시간' : ''}</span>
     <button type="button" class="travel-adj" data-adj="-5" aria-label="5분 줄이기">−</button>
     <button type="button" class="travel-adj" data-adj="5" aria-label="5분 늘리기">+</button>`;
@@ -17494,9 +17514,9 @@ function bindTravelPlaceSearch(inputId, resultsId, onPick){
 function eventPlaceNoteHtml(ev){
   if(!ev) return '';
   const place = ev.place && ev.place.name
-    ? `<a class="ev-info-line ev-info-place" href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener"><span class="ev-info-icon">📍</span><span class="ev-info-text"><b>${escapeHtml(ev.place.name)}</b>${ev.place.address && ev.place.address !== ev.place.name ? `<span class="ev-info-addr">${escapeHtml(ev.place.address)}</span>` : ''}</span></a>`
+    ? `<a class="ev-info-line ev-info-place" href="${escapeHtml(eventPlaceMapUrl(ev.place))}" target="_blank" rel="noopener"><span class="ev-info-icon">${ICO.pinLi}</span><span class="ev-info-text"><b>${escapeHtml(ev.place.name)}</b>${ev.place.address && ev.place.address !== ev.place.name ? `<span class="ev-info-addr">${escapeHtml(ev.place.address)}</span>` : ''}</span></a>`
     : '';
-  const note = ev.note ? `<div class="ev-info-line ev-info-note"><span class="ev-info-icon">📝</span><span class="ev-info-text">${escapeHtml(ev.note)}</span></div>` : '';
+  const note = ev.note ? `<div class="ev-info-line ev-info-note"><span class="ev-info-icon">${ICO.noteLi}</span><span class="ev-info-text">${escapeHtml(ev.note)}</span></div>` : '';
   return place || note ? `<div class="ev-info">${place}${note}</div>` : '';
 }
 // 일정 장소 - 검색해서 고르면 주소·좌표까지, 그냥 적으면 이름만 저장 (나만 보는 정보)
@@ -19492,16 +19512,16 @@ function availFriendGroupIds(f, vis){
 function shownGroups(groupIds){ return (groupIds || []).map(id => MY_GROUPS.find(g => g.id === id)).filter(Boolean); }
 // 내 캘린더에 보이는 이름 - 예) "예약 가능 · 🎸동아리 · 💼업무", 업무용만이면 "💼 업무용 예약 가능"
 function availableTitleFor(f, vis){
-  if(f === 'work') return `${workEmoji()} 업무용 예약 가능`;
+  if(f === 'work') return '업무용 예약 가능';
   const parts = ['예약 가능'];
   const groupIds = availFriendGroupIds(f, vis);
-  if(vis && vis.private) parts.push('🔒나만 보기');
+  if(vis && vis.private) parts.push('나만 보기');
   else shownGroups(groupIds).forEach(g => parts.push(groupEmojiOf(g) + g.name));
   return parts.join(' · ');
 }
 // 한 달 칸처럼 좁은 곳에 쓰는 짧은 이름 - 모든 친구면 "가능", 그룹이면 그룹 이모티콘들, 업무용 링크도 열렸으면 업무용 이모티콘
 function availableShortFor(f, vis){
-  if(f === 'work') return `${workEmoji()}업무`;
+  if(f === 'work') return '업무';
   const groupIds = availFriendGroupIds(f, vis);
   if(shownGroups(groupIds).length) return shownGroups(groupIds).map(groupEmojiOf).join('');
   return '가능';
@@ -21624,7 +21644,7 @@ function renderFriendToday(){
       <div class="day-event-time">${String(b.startHour).padStart(2,'0')}:00-${String(b.endHour).padStart(2,'0')}:00</div>
       <div class="day-event-title">${label}</div>
       ${overlap.length ? `<div class="day-event-overlap">내 일정과 겹쳐요 · ${overlap.map(x => escapeHtml(myRangeLabel(x))).join(', ')}</div>` : ''}
-      ${(!b.isBookable && friendCalendarMode !== 'reserve') ? `<button type="button" class="day-event-ask-btn">💬 친구한테 물어보기</button>` : ''}
+      ${(!b.isBookable && friendCalendarMode !== 'reserve') ? `<button type="button" class="day-event-ask-btn">${ICO.chatLi} 친구한테 물어보기</button>` : ''}
     `;
     const askBtn = card.querySelector('.day-event-ask-btn');
     if(askBtn) askBtn.addEventListener('click', () => askFriendAboutSchedule(friend, new Date(friendDayFocusDate), b));
@@ -21876,7 +21896,7 @@ function showFriendBlockAskPopover(anchorEl, friend, dateObj, block){
   pop.innerHTML = `
     <div class="fbp-time">${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 (${WEEKDAY_KO[dateObj.getDay()]}) ${String(block.startHour).padStart(2,'0')}:00-${String(block.endHour).padStart(2,'0')}:00</div>
     <div class="fbp-title">${escapeHtml(label)}</div>
-    <button type="button" class="day-event-ask-btn">💬 친구한테 물어보기</button>`;
+    <button type="button" class="day-event-ask-btn">${ICO.chatLi} 친구한테 물어보기</button>`;
   document.body.appendChild(pop);
   pop.querySelector('.day-event-ask-btn').addEventListener('click', (e) => {
     e.stopPropagation();
@@ -21923,7 +21943,7 @@ function renderFriendMonthSelectedPanel(monthData){
     return `<div class="day-event-card friend-view${b.isBookable ? ' available clickable' : ''}" data-hour="${b.startHour}">
       <div class="day-event-time">${String(b.startHour).padStart(2,'0')}:00-${String(b.endHour).padStart(2,'0')}:00</div>
       <div class="day-event-title">${label}</div>
-      ${b.askable ? `<button type="button" class="day-event-ask-btn" data-idx="${i}">💬 친구한테 물어보기</button>` : ''}
+      ${b.askable ? `<button type="button" class="day-event-ask-btn" data-idx="${i}">${ICO.chatLi} 친구한테 물어보기</button>` : ''}
     </div>`;
   }).join('');
 
@@ -28156,7 +28176,7 @@ function stripCalShare(text){
   if(sys) return sysNoticeLabel(sys);
   const p = parseCalShare(text);
   if(!p) return text || '';
-  return `📅 일정 공유${p.rest.trim() ? ' - ' + p.rest.trim() : ''}`;
+  return `일정 공유${p.rest.trim() ? ' - ' + p.rest.trim() : ''}`;
 }
 function calShareDateObj(share){
   const [y, mo, d] = share.date.split('-').map(Number);
@@ -28185,7 +28205,7 @@ function buildCalShareCardEl(share, room){
   card.type = 'button';
   card.className = 'cal-share-card';
   card.innerHTML = `
-    <div class="csc-head">📅 ${escapeHtml(ownerName)} 일정</div>
+    <div class="csc-head">${ICO.calendarLi} ${escapeHtml(ownerName)} 일정</div>
     <div class="csc-when"></div>
     ${share.title ? '<div class="csc-title"></div>' : ''}
     <div class="csc-go">눌러서 캘린더에서 보기 ›</div>`;
@@ -29882,7 +29902,7 @@ async function sendDateAsk(roomId, dateKey){
     }
   } else {
     // 데모방 - 잠시 뒤 상대가 좋다고 한 것처럼
-    const msg = { who: 'me', text: `📅 ${dateAskLabel(dateKey)} 어때요?`, time: new Date(), id: 'msg' + (locationMsgIdCounter++), dateAsk: { date: dateKey, status: 'PENDING' } };
+    const msg = { who: 'me', text: `${dateAskLabel(dateKey)} 어때요?`, time: new Date(), id: 'msg' + (locationMsgIdCounter++), dateAsk: { date: dateKey, status: 'PENDING' } };
     room.messages.push(msg);
     setTimeout(() => {
       if(msg.dateAsk.status !== 'PENDING') return;
@@ -29979,7 +29999,7 @@ function buildDateAskCardEl(m, room){
   const card = document.createElement('div');
   card.className = `date-ask-card${cls ? ' ' + cls : ''}`;
   card.innerHTML = `
-    <div class="dac-head">${da.status === 'CONFIRMED' ? '✓ 날짜 정해짐' : '📅 날짜 물어보기'}</div>
+    <div class="dac-head">${da.status === 'CONFIRMED' ? '✓ 날짜 정해짐' : ICO.calendarLi + ' 날짜 물어보기'}</div>
     <div class="dac-date"></div>
     ${desc ? '<div class="dac-desc"></div>' : ''}
     ${btns.length ? `<div class="dac-actions">${btns.map(([k, t, primary]) => `<button type="button" class="dac-btn${primary ? ' primary' : ''}" data-act="${k}">${t}</button>`).join('')}</div>` : ''}`;
