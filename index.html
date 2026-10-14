@@ -2053,7 +2053,8 @@
   #settingsDetailBody .settings-detail-desc{ font-size:13px; line-height:1.5; color:var(--text-dim); margin:4px 6px 8px; }
   #settingsDetailBody .settings-group + .settings-detail-desc{ margin-top:-6px; }
   /* 목록 - 색 아이콘 */
-  .settings-group .settings-menu-icon{ width:30px; height:30px; border-radius:8px; color:#fff; }
+  /* 아이콘 칸은 한 가지 색 - 밝은 화면은 하늘색, 다크 모드는 앱의 다른 아이콘처럼 회색 (강조색 변수가 알아서 바뀜) */
+  .settings-group .settings-menu-icon{ width:30px; height:30px; border-radius:8px; background:var(--accent); color:var(--on-accent); }
   .settings-group .settings-menu-icon svg{ width:17px; height:17px; }
   .settings-group .settings-menu-label{ font-size:15.5px; font-weight:500; }
   .settings-group .settings-menu-chevron, .settings-profile-card .settings-menu-chevron{ font-size:20px; color:var(--text-dim); opacity:.7; }
@@ -2065,7 +2066,8 @@
   .settings-profile-card:active{ background:var(--surface-2); }
   .settings-profile-avatar{
     width:52px; height:52px; border-radius:50%; flex-shrink:0; overflow:hidden;
-    display:flex; align-items:center; justify-content:center; color:#fff; font-size:21px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:700;
+    background:var(--accent); color:var(--on-accent); /* 아이콘 칸과 같은 색 - 밝은 화면 하늘색, 다크 모드 회색 */
   }
   .settings-profile-avatar img{ width:100%; height:100%; object-fit:cover; }
   .settings-profile-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
@@ -12013,15 +12015,15 @@ document.getElementById('settingsBtn').addEventListener('click', openSettings);
 // ============================================================
 // 설정 메뉴 - 성격별로 묶음 (예전엔 11개가 섞여 있었고 '앱 관리'에 다크 모드·일정 설정·약관이 뒤섞여 있었음)
 const SETTINGS_MENU = [
-  { id: 'account', group: 0, color: '#38BDF8', label: '계정·로그인', icon: '<circle cx="12" cy="7" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
-  { id: 'display', group: 1, color: '#6366F1', label: '화면', icon: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>' },
-  { id: 'schedule', group: 1, color: '#F43F5E', label: '일정', icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v5M9.5 15.5 12 18l2.5-2.5"/>' },
-  { id: 'notifications', group: 1, color: '#F97316', label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
-  { id: 'friends', group: 2, color: '#22C55E', label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
-  { id: 'chat', group: 2, color: '#14B8A6', label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
-  { id: 'help', group: 3, color: '#8E8E93', label: '도움말', icon: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17h.01"/>' },
+  { id: 'account', group: 0, label: '계정·로그인', icon: '<circle cx="12" cy="7" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
+  { id: 'display', group: 1, label: '화면', icon: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+  { id: 'schedule', group: 1, label: '일정', icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v5M9.5 15.5 12 18l2.5-2.5"/>' },
+  { id: 'notifications', group: 1, label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
+  { id: 'friends', group: 2, label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
+  { id: 'chat', group: 2, label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
+  { id: 'help', group: 3, label: '도움말', icon: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17h.01"/>' },
   // 상세 화면 없이 바로 오류 신고 팝업을 엶
-  { id: 'bugreport', group: 3, color: '#F59E0B', label: '오류 신고하기', icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>', action: () => openBugReport('menu') },
+  { id: 'bugreport', group: 3, label: '오류 신고하기', icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>', action: () => openBugReport('menu') },
 ];
 // 메뉴 안에서 한 단계 더 들어가는 화면 이름 (화면 > 홈 화면 편집, 일정 > 자주 쓰는 출발지)
 const SETTINGS_SUBPAGE_LABELS = { homeedit: '홈 화면 편집', locations: '자주 쓰는 출발지' };
@@ -12306,7 +12308,7 @@ function renderSettingsMenu(){
   const profile = document.createElement('div');
   profile.className = 'settings-profile-card';
   profile.innerHTML = `
-    <div class="settings-profile-avatar"${img ? '' : ` style="background:${escapeHtml(myProfileData.color || 'var(--accent)')}"`}>${img ? `<img src="${escapeHtml(img)}" alt="" />` : escapeHtml(name[0])}</div>
+    <div class="settings-profile-avatar">${img ? `<img src="${escapeHtml(img)}" alt="" />` : escapeHtml(name[0])}</div>
     <div class="settings-profile-text"><b>${escapeHtml(name)}</b><span>@${escapeHtml(myProfileData.id || '')} · 계정·로그인</span></div>
     <div class="settings-menu-chevron">&#8250;</div>`;
   profile.addEventListener('click', () => openSettingsDetail('account'));
@@ -12318,7 +12320,7 @@ function renderSettingsMenu(){
       const row = document.createElement('div');
       row.className = 'settings-menu-row';
       row.innerHTML = `
-        <div class="settings-menu-icon" style="background:${item.color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${item.icon}</svg></div>
+        <div class="settings-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${item.icon}</svg></div>
         <div class="settings-menu-label">${item.label}</div>
         <div class="settings-menu-chevron">&#8250;</div>
       `;
