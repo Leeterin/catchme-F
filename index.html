@@ -9929,13 +9929,14 @@ function openDeleteAccountConfirm(){
   document.getElementById('deleteAccountPwInput').value = '';
   document.getElementById('deleteAccountError').style.display = 'none';
   document.getElementById('deleteAccountConfirmOverlay').classList.add('show');
+  pushViewState(closeDeleteAccountConfirm); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeDeleteAccountConfirm(){
   document.getElementById('deleteAccountConfirmOverlay').classList.remove('show');
 }
-document.getElementById('deleteAccountCancelBtn').addEventListener('click', closeDeleteAccountConfirm);
+document.getElementById('deleteAccountCancelBtn').addEventListener('click', () => goBackOrClose(closeDeleteAccountConfirm));
 document.getElementById('deleteAccountConfirmOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'deleteAccountConfirmOverlay') closeDeleteAccountConfirm();
+  if(e.target.id === 'deleteAccountConfirmOverlay') goBackOrClose(closeDeleteAccountConfirm);
 });
 document.getElementById('deleteAccountConfirmBtn').addEventListener('click', async () => {
   const password = document.getElementById('deleteAccountPwInput').value;
@@ -9956,7 +9957,7 @@ document.getElementById('deleteAccountConfirmBtn').addEventListener('click', asy
   btn.textContent = '삭제 중...';
   try {
     await apiRequest('/profile/delete', { method: 'POST', body: JSON.stringify({ password }) });
-    closeDeleteAccountConfirm();
+    dismissView(closeDeleteAccountConfirm);
     if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
     authToken = null;
     refreshTokenValue = null;
@@ -12223,12 +12224,15 @@ function openLegalPage(type){
   document.getElementById('legalPageTitle').textContent = page.title;
   document.getElementById('legalPageBody').textContent = page.body;
   document.getElementById('legalPageOverlay').classList.add('show');
+  // 뒤로가기 기록에 올림 - 전엔 안 올려서 폰 뒤로가기를 누르면 약관은 떠 있고 밑의 설정 화면만 닫혔음
+  pushViewState(closeLegalPage);
 }
-document.getElementById('legalPageCloseBtn').addEventListener('click', () => {
+function closeLegalPage(){
   document.getElementById('legalPageOverlay').classList.remove('show');
-});
+}
+document.getElementById('legalPageCloseBtn').addEventListener('click', () => goBackOrClose(closeLegalPage));
 document.getElementById('legalPageOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'legalPageOverlay') document.getElementById('legalPageOverlay').classList.remove('show');
+  if(e.target.id === 'legalPageOverlay') goBackOrClose(closeLegalPage);
 });
 
 // 설정을 열기 전에 보던 탭 - 설정에서 끝까지 뒤로가면 메인이 아니라 그 탭으로 돌아감
@@ -12368,7 +12372,11 @@ function openSettingsDetail(id){
       <div class="settings-simple-row"><span>계정 삭제</span><button class="settings-action-btn danger">삭제</button></div>
     `;
     document.getElementById('goToProfileBtn').addEventListener('click', openMyProfile);
-    document.getElementById('logoutBtn').addEventListener('click', performLogout);
+    // 바로 아래 '삭제'와 붙어 있어 실수로 눌리기 쉬워서 한 번 물어봄
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      const ok = await appConfirm({ title: '로그아웃할까요?', html: '다시 쓰려면 아이디와 비밀번호로 로그인해야 해요.', yesText: '로그아웃', noText: '취소' });
+      if(ok) performLogout();
+    });
     body.querySelector('.settings-action-btn.danger').addEventListener('click', openDeleteAccountConfirm);
 
   } else if(id === 'locations'){
@@ -12418,7 +12426,6 @@ function openSettingsDetail(id){
       <div class="settings-detail-desc">받고 싶은 알림만 골라서 켜두세요.</div>
       ${toggleRowHTML('notif_message', 'MEETZIP 푸시 알림 받기', '새 메시지, 친구 요청, 약속 확정 알림을 받아요', false)}
       <div id="engagementPrefRows"></div>
-      ${toggleRowHTML('notif_marketing', '마케팅/이벤트 알림', '이벤트와 혜택 소식을 받아요', false)}
     `;
     bindToggleRows(body);
     renderEngagementPrefRows();
@@ -12689,6 +12696,7 @@ function openDepartureLocationPicker(opts){
   }
 
   document.getElementById('depLocPickerOverlay').classList.add('show');
+  pushViewState(closeDepartureLocationPicker); // 폰 뒤로가기로 이 창부터 닫히게
 }
 
 function closeDepartureLocationPicker(){
@@ -12734,7 +12742,7 @@ document.getElementById('depLocPickerInput').addEventListener('input', () => {
   }, 300);
 });
 
-document.getElementById('depLocPickerCancelBtn').addEventListener('click', closeDepartureLocationPicker);
+document.getElementById('depLocPickerCancelBtn').addEventListener('click', () => goBackOrClose(closeDepartureLocationPicker));
 document.getElementById('depLocPickerSaveBtn').addEventListener('click', () => {
   if(!depLocPickerState || !depLocPickerState.picked){
     showToast('출발지를 검색하거나 저장된 장소 중에서 골라주세요.');
@@ -12747,7 +12755,7 @@ document.getElementById('depLocPickerSaveBtn').addEventListener('click', () => {
   }
   const onConfirm = depLocPickerState.onConfirm;
   const picked = { ...depLocPickerState.picked, customLabel: customLabel || null };
-  closeDepartureLocationPicker();
+  dismissView(closeDepartureLocationPicker);
   onConfirm(picked);
 });
 
