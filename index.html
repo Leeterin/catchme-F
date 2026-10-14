@@ -14778,11 +14778,15 @@ document.getElementById('feedShareSendBtn').addEventListener('click', async () =
   btn.dataset.sending = '1'; // 두 번 눌러서 두 번 가는 것 방지
   btn.disabled = true;
   // 리뷰 카드와 같이 적은 메시지는 따로 - 카드 하나 보내고, 메시지는 그 아래 일반 채팅으로 이어서 보냄
-  const cardText = buildPostShareText(pendingSharePost);
+  const post = pendingSharePost;
+  const cardText = buildPostShareText(post);
   const comment = document.getElementById('feedShareComment').value.trim();
-  const sentNames = [];
-  let lastError = null;
-  for(const key of [...feedShareSelected]){
+  const keys = [...feedShareSelected];
+  // 서버 답을 기다리지 않고 시트는 바로 닫음 (예전엔 받는 곳마다 요청 2~3번이 차례로 끝날 때까지 시트가 멈춰 있었음)
+  // 여러 곳은 동시에 보내고, 한 방 안에서는 카드 → 메시지 순서를 지킴
+  delete btn.dataset.sending;
+  closeFeedShareFriendPicker();
+  const results = await Promise.all(keys.map(async key => {
     try {
       let roomId, name;
       if(key.startsWith('room:')){
@@ -14790,29 +14794,34 @@ document.getElementById('feedShareSendBtn').addEventListener('click', async () =
         name = (CHAT_ROOMS[roomId] || {}).name || '채팅방';
       } else {
         const friend = FRIENDS.find(f => f.id === key.slice(7));
-        if(!friend) continue;
+        if(!friend) return null;
         roomId = await resolveFriendRoomId(friend);
         name = friend.name;
       }
       const room = CHAT_ROOMS[roomId];
       await apiRequest(`/chats/${roomId}/messages`, { method: 'POST', body: JSON.stringify({ text: cardText }) });
       if(comment) await apiRequest(`/chats/${roomId}/messages`, { method: 'POST', body: JSON.stringify({ text: comment }) });
-      feedShareSelected.delete(key); // 보낸 곳은 빼둠 - 일부만 실패하면 남은 곳만 다시 보낼 수 있게
-      sentNames.push(room && room.isGroup ? `${name}에` : `${name}님에게`);
+      return { ok: true, label: room && room.isGroup ? `${name}에` : `${name}님에게` };
     } catch(err){
-      lastError = err;
+      return { ok: false, key, err };
     }
-  }
-  delete btn.dataset.sending;
-  if(lastError){
-    // 실패한 곳만 골라진 채로 남겨둠
-    renderFeedShareTargets();
-    updateFeedShareCompose();
-    showToast(sentNames.length ? `${sentNames.length}곳엔 보냈는데, 나머지는 못 보냈어요. ${lastError.message}` : lastError.message);
+  }));
+  const sent = results.filter(r => r && r.ok);
+  const failed = results.filter(r => r && !r.ok);
+  if(failed.length){
+    // 못 보낸 곳만 골라진 채로 시트를 다시 열어서 바로 다시 보낼 수 있게 (적은 메시지도 그대로)
+    if(!document.getElementById('feedShareOverlay').classList.contains('show')){
+      openFeedShareFriendPicker(post);
+      failed.forEach(r => feedShareSelected.add(r.key));
+      document.getElementById('feedShareComment').value = comment;
+      renderFeedShareTargets();
+      updateFeedShareCompose();
+    }
+    const msg = failed[failed.length - 1].err.message;
+    showToast(sent.length ? `${sent.length}곳엔 보냈는데, 나머지는 못 보냈어요. ${msg}` : msg);
     return;
   }
-  closeFeedShareFriendPicker();
-  if(sentNames.length) showToast(sentNames.length === 1 ? `${sentNames[0]} 보냈어요!` : `${sentNames.length}곳에 보냈어요!`);
+  if(sent.length) showToast(sent.length === 1 ? `${sent[0].label} 보냈어요!` : `${sent.length}곳에 보냈어요!`);
 });
 function closeFeedShareFriendPicker(){
   pendingSharePost = null;
