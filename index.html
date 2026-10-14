@@ -1616,50 +1616,86 @@
     font-size:12.5px;
     margin-left:2px;
   }
-  .feed-share-friend-list{
-    max-height:320px;
-    overflow-y:auto;
+  /* 리뷰 보내기 시트 (인스타 DM 공유처럼 아래에서 올라옴) */
+  .feed-share-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(23,24,29,0.45);
+    z-index:3000;
+  }
+  .feed-share-overlay.show{ display:block; }
+  .feed-share-sheet{
+    position:absolute;
+    left:0; right:0; bottom:var(--fss-kb, 0px);
+    max-height:min(72vh, calc(100vh - var(--fss-kb, 0px) - 50px));
     display:flex;
     flex-direction:column;
-    gap:2px;
-  }
-  .feed-share-friend-row{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding:9px 4px;
-    border-radius:10px;
-    cursor:pointer;
-    font-size:13.5px;
-    color:var(--text);
-  }
-  .feed-share-friend-row:hover{ background:var(--surface-2); }
-  /* 보낼 곳으로 고른 줄 - 오른쪽 동그라미에 체크 */
-  .feed-share-friend-row .fsr-check{
-    margin-left:auto;
-    width:22px; height:22px;
-    border-radius:50%;
-    border:1.5px solid var(--line);
-    display:flex; align-items:center; justify-content:center;
-    color:#FFFFFF; font-size:13px; font-weight:700;
-    flex-shrink:0;
-  }
-  .feed-share-friend-row.selected .fsr-check{ background:var(--accent); border-color:var(--accent); }
-  .feed-share-friend-row.selected .fsr-check::after{ content:'✓'; }
-  .feed-share-comment{
-    display:block;
-    width:100%;
-    box-sizing:border-box;
-    margin-top:10px;
-    padding:9px 11px;
-    border:1px solid var(--line);
-    border-radius:10px;
     background:var(--surface);
-    color:var(--text);
-    font:inherit;
-    font-size:13.5px;
-    resize:none;
+    border-radius:20px 20px 0 0;
+    padding-bottom:env(safe-area-inset-bottom);
+    box-shadow:0 -6px 24px rgba(0,0,0,0.12);
+    transition:bottom .25s ease;
+    animation:fssUp .28s cubic-bezier(.2,.9,.3,1);
   }
+  @keyframes fssUp{ from{ transform:translateY(100%); } to{ transform:none; } }
+  .fss-handle{ width:38px; height:4px; border-radius:2px; background:var(--line); margin:9px auto 6px; flex-shrink:0; }
+  .fss-search-wrap{ padding:4px 16px 8px; flex-shrink:0; }
+  .fss-search{
+    width:100%; box-sizing:border-box;
+    border:none; border-radius:12px;
+    background:var(--surface-2); color:var(--text);
+    padding:10px 14px; font:inherit; font-size:14px;
+  }
+  .fss-grid{
+    flex:1;
+    min-height:150px;
+    overflow-y:auto;
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:14px 6px;
+    padding:8px 12px 16px;
+    align-content:start;
+  }
+  .fss-cell{ display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; min-width:0; -webkit-tap-highlight-color:transparent; }
+  .fss-avatar{
+    position:relative;
+    width:64px; height:64px;
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#FFFFFF; font-size:22px; font-weight:700;
+    transition:transform .15s ease;
+  }
+  .fss-avatar img{ width:100%; height:100%; border-radius:50%; object-fit:cover; }
+  .fss-cell.selected .fss-avatar{ transform:scale(.94); }
+  .fss-cell.selected .fss-avatar::after{
+    content:'✓';
+    position:absolute; right:-2px; bottom:-2px;
+    width:22px; height:22px; border-radius:50%;
+    background:var(--accent); color:#FFFFFF;
+    border:2px solid var(--surface);
+    font-size:12px; font-weight:800;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .fss-name{ font-size:12px; color:var(--text); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
+  .fss-empty{ grid-column:1 / -1; text-align:center; color:var(--text-dim); font-size:13px; padding:30px 0; }
+  /* 받을 곳을 하나라도 고르면 아래에 메시지 칸 + 보내기 버튼이 나타남 */
+  .fss-compose{ display:none; flex-shrink:0; border-top:1px solid var(--line); padding:8px 16px 12px; }
+  .feed-share-sheet.has-selection .fss-compose{ display:block; }
+  .fss-comment{
+    display:block; width:100%; box-sizing:border-box;
+    border:none; background:transparent; color:var(--text);
+    font:inherit; font-size:14px; padding:8px 0 10px;
+    resize:none; outline:none;
+  }
+  .fss-send-btn{
+    width:100%;
+    border:none; border-radius:12px;
+    background:var(--accent); color:#FFFFFF;
+    padding:12px; font:inherit; font-size:14.5px; font-weight:700;
+    cursor:pointer;
+  }
+  .fss-send-btn:disabled{ opacity:.6; }
   .profile-avatar-sm{
     width:34px;
     height:34px;
@@ -4161,28 +4197,35 @@
   .cal-share-card .csc-when{ font-size:13px; font-weight:700; }
   .cal-share-card .csc-title{ font-size:13px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cal-share-card .csc-go{ font-size:11px; color:var(--text-dim); margin-top:5px; }
-  /* 소식 탭 리뷰를 보낸 카드 (인스타 DM 게시물 공유처럼 사진 + 글) - 누르면 그 리뷰로 */
+  /* 소식 탭 리뷰를 보낸 카드 (인스타 DM 게시물 공유처럼 말풍선 없이 게시물 그대로) - 누르면 그 리뷰로 */
+  .msg-row .msg-bubble.msg-bubble-post{ background:transparent; padding:0; border-radius:0; color:var(--text); max-width:none; }
+  .msg-bubble-post > .msg-bubble-text{ margin-top:4px; padding:9px 12px; border-radius:15px; background:var(--surface-2); color:var(--text); max-width:240px; }
   .post-share-card{
     display:block;
-    width:220px;
-    max-width:100%;
+    width:240px;
+    max-width:68vw;
     padding:0;
     text-align:left;
     border:1px solid var(--line);
     background:var(--surface);
     color:var(--text);
-    border-radius:14px;
+    border-radius:16px;
     overflow:hidden;
-    margin-bottom:6px;
     cursor:pointer;
     font:inherit;
+    box-shadow:0 2px 10px rgba(0,0,0,0.06);
   }
-  .post-share-card .psc-author{ font-size:12px; font-weight:700; padding:8px 10px; }
-  .post-share-card .psc-photo{ display:block; width:100%; aspect-ratio:1 / 1; object-fit:cover; background:var(--surface-2); }
-  .post-share-card .psc-body{ padding:8px 10px 10px; }
-  .post-share-card .psc-title{ font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .post-share-card .psc-loc{ font-size:11.5px; color:var(--text-dim); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .post-share-card .psc-note{ font-size:12.5px; margin-top:4px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; }
+  .post-share-card .psc-head{ display:flex; align-items:center; gap:8px; padding:9px 11px; }
+  .post-share-card .psc-avatar{ width:28px; height:28px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#FFFFFF; font-size:12px; font-weight:700; overflow:hidden; }
+  .post-share-card .psc-avatar img{ width:100%; height:100%; object-fit:cover; }
+  .post-share-card .psc-author{ font-size:13px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .post-share-card .psc-photo{ display:block; width:100%; aspect-ratio:4 / 5; object-fit:cover; background:var(--surface-2); }
+  .post-share-card .psc-body{ padding:9px 11px 11px; }
+  .post-share-card .psc-title-row{ display:flex; align-items:baseline; gap:6px; min-width:0; }
+  .post-share-card .psc-title{ font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .post-share-card .psc-stars{ font-size:12px; color:#F5A623; letter-spacing:1px; flex-shrink:0; }
+  .post-share-card .psc-loc{ font-size:11.5px; color:var(--text-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .post-share-card .psc-note{ font-size:13px; line-height:1.4; margin-top:6px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; word-break:break-word; }
   /* 날짜 먼저 물어보기("20일 어때요?") 카드 - 좋아요 하면 같은 카드에서 바로 시간·장소 정하기 */
   .date-ask-card{
     min-width:200px;
@@ -9076,16 +9119,18 @@
     </div>
   </div>
 
-  <!-- 게시물을 채팅방이나 친구한테 메시지로 보내는 팝업 -->
-  <div class="mini-confirm-overlay" id="feedShareOverlay">
-    <div class="mini-confirm-card" style="text-align:left;">
-      <div class="mini-confirm-title" style="margin-bottom:10px;">어디로 보낼까요?</div>
-      <div class="feed-share-friend-list" id="feedShareFriendList"></div>
-      <!-- 인스타 DM처럼 받을 곳을 고르고 한마디 같이 적어서 보냄 -->
-      <textarea id="feedShareComment" class="feed-share-comment" rows="2" maxlength="500" placeholder="메시지 쓰기 (선택)"></textarea>
-      <div class="mini-confirm-actions">
-        <button type="button" id="feedShareCancelBtn" class="mini-confirm-btn">취소</button>
-        <button type="button" id="feedShareSendBtn" class="mini-confirm-btn primary" disabled>보내기</button>
+  <!-- 게시물을 채팅방이나 친구한테 메시지로 보내는 시트 - 인스타 DM 공유처럼 아래에서 올라오고,
+       받을 곳을 고르면 그때 아래에 메시지 칸과 보내기 버튼이 나타남 -->
+  <div class="feed-share-overlay" id="feedShareOverlay">
+    <div class="feed-share-sheet" id="feedShareSheet">
+      <div class="fss-handle"></div>
+      <div class="fss-search-wrap">
+        <input type="text" id="feedShareSearch" class="fss-search" placeholder="검색" autocomplete="off" />
+      </div>
+      <div class="fss-grid" id="feedShareFriendList"></div>
+      <div class="fss-compose" id="feedShareCompose">
+        <textarea id="feedShareComment" class="fss-comment" rows="1" maxlength="500" placeholder="메시지 작성..."></textarea>
+        <button type="button" id="feedShareSendBtn" class="fss-send-btn">보내기</button>
       </div>
     </div>
   </div>
@@ -14662,13 +14707,13 @@ function feedReviewTagsHtml(post){
 let pendingSharePost = null;
 // 고른 받을 곳들 - 'room:방id' 또는 'friend:친구id' (인스타 DM처럼 여러 곳을 골라 한 번에 보냄)
 const feedShareSelected = new Set();
+let feedShareTargets = []; // 시트에 보여줄 받을 곳 목록 (검색할 때 다시 그리려고 들고 있음)
 function openFeedShareFriendPicker(post){
   pendingSharePost = post;
   feedShareSelected.clear();
   document.getElementById('feedShareComment').value = '';
-  updateFeedShareSendBtn();
-  const list = document.getElementById('feedShareFriendList');
-  // 내 채팅방 목록 순서 그대로(고정 먼저, 최근 대화 순), 그 아래엔 아직 1:1 채팅방이 없는 친구
+  document.getElementById('feedShareSearch').value = '';
+  // 내 채팅방 목록 순서 그대로(고정 먼저, 최근 대화 순), 그 뒤엔 아직 1:1 채팅방이 없는 친구
   // (서버에 있는 진짜 채팅방만 - 기기에만 있는 연습용 방은 서버로 보낼 수 없음)
   const rooms = Object.entries(CHAT_ROOMS).filter(([, r]) => r.isRealRoom).sort(([, a], [, b]) => {
     const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0);
@@ -14677,39 +14722,43 @@ function openFeedShareFriendPicker(post){
   });
   const roomUsernames = new Set(rooms.map(([, r]) => r.counterpartUsername).filter(Boolean));
   const friendsNoRoom = FRIENDS.filter(f => !roomUsernames.has(f.username));
-  if(!rooms.length && !friendsNoRoom.length){
-    list.innerHTML = `<div class="search-empty">보낼 수 있는 채팅방이 없어요.</div>`;
-  } else {
-    const roomRows = rooms.map(([id, r]) => `
-      <div class="feed-share-friend-row" data-room-id="${escapeHtml(id)}">
-        <div class="profile-avatar-sm" style="${r.avatar ? 'overflow:hidden;' : `background:${r.color || 'var(--accent)'};`}">${r.avatar ? `<img src="${r.avatar}" alt="" style="width:100%;height:100%;object-fit:cover;" />` : escapeHtml(r.initial || (r.name || '')[0] || '')}</div>
-        <div>${escapeHtml(r.name || '')}${r.isGroup && r.members && r.members.length ? ` <span style="color:var(--text-dim);font-size:12px;">${r.members.length}</span>` : ''}</div>
-        <div class="fsr-check"></div>
-      </div>
-    `).join('');
-    const friendRows = friendsNoRoom.map(f => `
-      <div class="feed-share-friend-row" data-friend-id="${f.id}">
-        <div class="profile-avatar-sm" style="background:${f.color || 'var(--accent)'};">${escapeHtml((f.name || '')[0] || '')}</div>
-        <div>${escapeHtml(f.name)}</div>
-        <div class="fsr-check"></div>
-      </div>
-    `).join('');
-    const label = (t) => `<div style="font-size:11.5px;font-weight:700;color:var(--text-dim);padding:8px 4px 2px;">${t}</div>`;
-    list.innerHTML = (rooms.length ? label('채팅방') + roomRows : '') + (friendsNoRoom.length ? label('친구') + friendRows : '');
-    // 줄을 누르면 고르기/빼기만 하고, 실제 전송은 아래 '보내기' 버튼으로
-    list.querySelectorAll('.feed-share-friend-row').forEach(row => {
-      row.addEventListener('click', () => {
-        const key = row.dataset.roomId ? 'room:' + row.dataset.roomId : 'friend:' + row.dataset.friendId;
-        if(feedShareSelected.has(key)) feedShareSelected.delete(key);
-        else feedShareSelected.add(key);
-        row.classList.toggle('selected', feedShareSelected.has(key));
-        updateFeedShareSendBtn();
-      });
-    });
-  }
+  feedShareTargets = [
+    ...rooms.map(([id, r]) => ({ key: 'room:' + id, name: r.name || '채팅방', avatar: r.avatar, color: r.color, initial: r.initial || (r.name || '')[0] || '', count: r.isGroup && r.members ? r.members.length : 0 })),
+    ...friendsNoRoom.map(f => ({ key: 'friend:' + f.id, name: f.name || '', avatar: f.avatar, color: f.color, initial: (f.name || '')[0] || '' })),
+  ];
+  renderFeedShareTargets();
+  updateFeedShareCompose();
   document.getElementById('feedShareOverlay').classList.add('show');
 }
-function updateFeedShareSendBtn(){
+function renderFeedShareTargets(){
+  const list = document.getElementById('feedShareFriendList');
+  const q = document.getElementById('feedShareSearch').value.trim().toLowerCase();
+  const shown = q ? feedShareTargets.filter(t => t.name.toLowerCase().includes(q)) : feedShareTargets;
+  if(!shown.length){
+    list.innerHTML = `<div class="fss-empty">${feedShareTargets.length ? '찾는 친구가 없어요.' : '보낼 수 있는 채팅방이 없어요.'}</div>`;
+    return;
+  }
+  list.innerHTML = shown.map(t => `
+    <div class="fss-cell${feedShareSelected.has(t.key) ? ' selected' : ''}" data-key="${escapeHtml(t.key)}">
+      <div class="fss-avatar" style="${t.avatar ? '' : `background:${t.color || 'var(--accent)'};`}">${t.avatar ? `<img src="${t.avatar}" alt="" />` : escapeHtml(t.initial)}</div>
+      <div class="fss-name">${escapeHtml(t.name)}${t.count ? ` <span style="color:var(--text-dim);">${t.count}</span>` : ''}</div>
+    </div>
+  `).join('');
+  // 누르면 고르기/빼기만 하고, 실제 전송은 아래 '보내기' 버튼으로
+  list.querySelectorAll('.fss-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      const key = cell.dataset.key;
+      if(feedShareSelected.has(key)) feedShareSelected.delete(key);
+      else feedShareSelected.add(key);
+      cell.classList.toggle('selected', feedShareSelected.has(key));
+      updateFeedShareCompose();
+    });
+  });
+}
+document.getElementById('feedShareSearch').addEventListener('input', renderFeedShareTargets);
+// 하나라도 고르면 메시지 칸 + 보내기 버튼을 보여줌
+function updateFeedShareCompose(){
+  document.getElementById('feedShareSheet').classList.toggle('has-selection', feedShareSelected.size > 0);
   const btn = document.getElementById('feedShareSendBtn');
   btn.disabled = !feedShareSelected.size;
   btn.textContent = feedShareSelected.size > 1 ? `따로 보내기 (${feedShareSelected.size})` : '보내기';
@@ -14719,7 +14768,9 @@ document.getElementById('feedShareSendBtn').addEventListener('click', async () =
   if(!pendingSharePost || !feedShareSelected.size || btn.dataset.sending) return;
   btn.dataset.sending = '1'; // 두 번 눌러서 두 번 가는 것 방지
   btn.disabled = true;
-  const text = buildPostShareText(pendingSharePost, document.getElementById('feedShareComment').value.trim());
+  // 리뷰 카드와 같이 적은 메시지는 따로 - 카드 하나 보내고, 메시지는 그 아래 일반 채팅으로 이어서 보냄
+  const cardText = buildPostShareText(pendingSharePost);
+  const comment = document.getElementById('feedShareComment').value.trim();
   const sentNames = [];
   let lastError = null;
   for(const key of [...feedShareSelected]){
@@ -14735,7 +14786,8 @@ document.getElementById('feedShareSendBtn').addEventListener('click', async () =
         name = friend.name;
       }
       const room = CHAT_ROOMS[roomId];
-      await apiRequest(`/chats/${roomId}/messages`, { method: 'POST', body: JSON.stringify({ text }) });
+      await apiRequest(`/chats/${roomId}/messages`, { method: 'POST', body: JSON.stringify({ text: cardText }) });
+      if(comment) await apiRequest(`/chats/${roomId}/messages`, { method: 'POST', body: JSON.stringify({ text: comment }) });
       feedShareSelected.delete(key); // 보낸 곳은 빼둠 - 일부만 실패하면 남은 곳만 다시 보낼 수 있게
       sentNames.push(room && room.isGroup ? `${name}에` : `${name}님에게`);
     } catch(err){
@@ -14745,11 +14797,8 @@ document.getElementById('feedShareSendBtn').addEventListener('click', async () =
   delete btn.dataset.sending;
   if(lastError){
     // 실패한 곳만 골라진 채로 남겨둠
-    document.querySelectorAll('#feedShareFriendList .feed-share-friend-row').forEach(row => {
-      const key = row.dataset.roomId ? 'room:' + row.dataset.roomId : 'friend:' + row.dataset.friendId;
-      row.classList.toggle('selected', feedShareSelected.has(key));
-    });
-    updateFeedShareSendBtn();
+    renderFeedShareTargets();
+    updateFeedShareCompose();
     showToast(sentNames.length ? `${sentNames.length}곳엔 보냈는데, 나머지는 못 보냈어요. ${lastError.message}` : lastError.message);
     return;
   }
@@ -14758,12 +14807,37 @@ document.getElementById('feedShareSendBtn').addEventListener('click', async () =
 });
 function closeFeedShareFriendPicker(){
   pendingSharePost = null;
+  const comment = document.getElementById('feedShareComment');
+  if(document.activeElement === comment || document.activeElement === document.getElementById('feedShareSearch')) document.activeElement.blur();
   document.getElementById('feedShareOverlay').classList.remove('show');
 }
-document.getElementById('feedShareCancelBtn').addEventListener('click', closeFeedShareFriendPicker);
 document.getElementById('feedShareOverlay').addEventListener('click', (e) => {
   if(e.target.id === 'feedShareOverlay') closeFeedShareFriendPicker();
 });
+// 시트 손잡이를 아래로 끌면 닫힘 (인스타처럼)
+(function bindFeedShareSheetDrag(){
+  const sheet = document.getElementById('feedShareSheet');
+  const handleArea = sheet.querySelector('.fss-handle');
+  let startY = null, dy = 0;
+  sheet.addEventListener('touchstart', (e) => {
+    if(!e.target.closest('.fss-handle, .fss-search-wrap') || e.target.closest('input')) return;
+    startY = e.touches[0].clientY; dy = 0;
+    sheet.style.transition = 'none';
+  }, { passive: true });
+  sheet.addEventListener('touchmove', (e) => {
+    if(startY === null) return;
+    dy = Math.max(0, e.touches[0].clientY - startY);
+    sheet.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+  sheet.addEventListener('touchend', () => {
+    if(startY === null) return;
+    startY = null;
+    sheet.style.transition = '';
+    sheet.style.transform = '';
+    if(dy > 80) closeFeedShareFriendPicker();
+  });
+  if(handleArea) handleArea.style.cursor = 'grab';
+})();
 
 // 상세보기를 닫았을 때 돌아갈 화면 - 열 때 보고 있던 화면(목록·장소 모아보기·작성자 리뷰)을 그대로 기억함
 // (예전엔 목록/모아보기만 숨겨서, 작성자 리뷰 화면에서 글을 누르면 그 목록 밑에 상세가 붙어서 떴음)
@@ -27945,7 +28019,7 @@ function appScrollParentOf(el){
 function keepFocusedFieldAboveKeyboard(){
   const el = document.activeElement;
   if(!appKeyboardHeight || !el || !el.matches || !el.matches(APP_TEXT_FIELD_SELECTOR)) return;
-  if(el.closest('#chatRoomView') || el.closest('#travelGroup')) return; // 이 둘은 따로 처리함
+  if(el.closest('#chatRoomView') || el.closest('#travelGroup') || el.closest('#feedShareOverlay')) return; // 이 셋은 따로 처리함
   const visibleBottom = window.innerHeight - appKeyboardHeight - 12;
   const r = el.getBoundingClientRect();
   if(r.bottom <= visibleBottom && r.top >= 0) return;
@@ -27965,6 +28039,8 @@ function releaseKeyboardPadding(){
 }
 function onAppKeyboardChange(height){
   appKeyboardHeight = height;
+  // 리뷰 보내기 시트는 키보드 바로 위로 통째로 올림 (메시지 칸·보내기 버튼이 키보드에 가리지 않게)
+  document.getElementById('feedShareSheet').style.setProperty('--fss-kb', height + 'px');
   if(height > 0){
     setTimeout(keepFocusedFieldAboveKeyboard, 40);
     setTimeout(keepFocusedFieldAboveKeyboard, 350); // 키보드가 다 올라온 뒤 한 번 더
@@ -28933,6 +29009,8 @@ function renderChatMessages(){
         textEl.parentNode.insertBefore(buildDateAskCardEl(m, room), textEl);
         textEl.remove();
       } else if(postShare){
+        // 파란/회색 말풍선으로 덮지 않고 게시물 카드 그대로 보이게
+        textEl.parentNode.classList.add('msg-bubble-post');
         textEl.parentNode.insertBefore(buildPostShareCardEl(postShare.share), textEl);
         if(postShare.rest.trim()) fillChatTextWithSearchHits(textEl, postShare.rest, q);
         else textEl.remove();
@@ -29206,24 +29284,32 @@ function parseCalShare(text){
   };
 }
 // ---------- 소식 탭 리뷰 공유 카드 (인스타 DM 게시물 공유처럼) ----------
-// 일정 공유와 같은 방식 - 일반 TEXT 메시지 맨 앞에 ⟦post|글id|첫사진주소|제목|위치|작성자|글 앞부분⟧을 붙이고,
-// 그 뒤에 보낸 사람이 같이 적은 한마디가 옴. 화면에서는 사진+글 카드로 그리고, 누르면 그 리뷰 상세로 감
+// 일정 공유와 같은 방식 - 일반 TEXT 메시지 맨 앞에
+// ⟦post|글id|첫사진주소|제목|위치|작성자닉네임|글 앞부분|작성자id|프로필사진종류(r=리뷰용,a=실명,빈칸=없음)|별점⟧ 을 붙임.
+// 화면에서는 말풍선 없이 게시물 모양 카드로 그리고, 누르면 그 리뷰 상세로 감.
+// 같이 적은 메시지는 카드 뒤에 일반 메시지로 따로 보냄 (예전에 보낸 건 머리말 뒤에 붙어 있을 수 있음)
 const POST_SHARE_RE = /^⟦post\|([^⟧]*)⟧\n?/;
 function buildPostShareText(post, comment){
-  // 머리말 안에 ⟧가 들어가면 카드가 깨지니 빼둠 (encodeURIComponent는 ⟧를 그대로 두지 않지만 혹시 몰라서)
-  const enc = (v) => encodeURIComponent(String(v || '').replace(/[⟦⟧]/g, ''));
+  // 머리말 안에 ⟦⟧가 들어가면 카드가 깨지니 빼둠
+  const enc = (v) => encodeURIComponent(String(v == null ? '' : v).replace(/[⟦⟧]/g, ''));
   const note = String(post.note || '').trim();
-  const head = ['post', post.id, enc((post.photos || [])[0]), enc(post.title), enc(post.location), enc(feedAuthorDisplayName(post.author)), enc(note.length > 100 ? note.slice(0, 100) + '…' : note)].join('|');
-  return `⟦${head}⟧\n${comment || ''}`;
+  const author = post.author || {};
+  const avatarKind = author.hasReviewAvatar ? 'r' : (author.hasAvatar ? 'a' : '');
+  const rating = typeof post.rating === 'number' ? post.rating : (typeof post.avgRating === 'number' ? post.avgRating : '');
+  const head = ['post', post.id, enc((post.photos || [])[0]), enc(post.title), enc(post.location), enc(feedAuthorDisplayName(author)),
+    enc(note.length > 150 ? note.slice(0, 150) + '…' : note), enc(author.id || ''), avatarKind, rating].join('|');
+  return `⟦${head}⟧${comment ? '\n' + comment : ''}`;
 }
 function parsePostShare(text){
   const m = POST_SHARE_RE.exec(text || '');
   if(!m) return null;
-  const [id, photo, title, location, author, note] = m[1].split('|');
+  const [id, photo, title, location, author, note, authorId, avatarKind, rating] = m[1].split('|');
   if(!id) return null;
   const dec = (v) => { try { return decodeURIComponent(v || ''); } catch(_){ return v || ''; } };
+  const r = parseFloat(rating);
   return {
-    share: { id, photo: dec(photo), title: dec(title), location: dec(location), author: dec(author), note: dec(note) },
+    share: { id, photo: dec(photo), title: dec(title), location: dec(location), author: dec(author), note: dec(note),
+      authorId: dec(authorId), avatarKind: avatarKind || '', rating: Number.isFinite(r) ? r : null },
     rest: text.slice(m[0].length),
   };
 }
@@ -29233,18 +29319,34 @@ function buildPostShareCardEl(share){
   card.className = 'post-share-card';
   // 사진 주소는 우리 서버의 리뷰 사진 주소만 그림 (메시지 글을 직접 꾸며 보낸 경우 엉뚱한 주소를 띄우지 않게)
   const photoOk = /^https?:\/\/[^\s"'<>]+\/api\/feed-photos\/[^\s"'<>]+$/.test(share.photo);
+  const idOk = /^[\w-]+$/.test(share.authorId || '');
+  const avatarSrc = !idOk ? null : share.avatarKind === 'r' ? cachedReviewAvatarUrl(share.authorId) : share.avatarKind === 'a' ? cachedAvatarUrl(share.authorId) : null;
+  const avatarStyle = avatarSrc ? '' : `background:${colorForFriendId(share.authorId || share.author || '?')};`;
   card.innerHTML = `
-    ${share.author ? '<div class="psc-author"></div>' : ''}
+    <div class="psc-head">
+      <div class="psc-avatar" style="${avatarStyle}">${avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="" loading="lazy" />` : escapeHtml((share.author || '?')[0])}</div>
+      <div class="psc-author"></div>
+    </div>
     ${photoOk ? `<img class="psc-photo" src="${escapeHtml(share.photo)}" alt="" loading="lazy" />` : ''}
     <div class="psc-body">
-      <div class="psc-title"></div>
+      <div class="psc-title-row">
+        <span class="psc-title"></span>
+        ${typeof share.rating === 'number' ? `<span class="psc-stars">${renderStarsHtml(share.rating)}</span>` : ''}
+      </div>
       ${share.location ? '<div class="psc-loc"></div>' : ''}
       ${share.note ? '<div class="psc-note"></div>' : ''}
     </div>`;
-  if(share.author) card.querySelector('.psc-author').textContent = share.author;
+  card.querySelector('.psc-author').textContent = share.author || '리뷰';
   card.querySelector('.psc-title').textContent = share.title || '추천 리뷰';
   if(share.location) card.querySelector('.psc-loc').textContent = share.location;
-  if(share.note) card.querySelector('.psc-note').textContent = share.note;
+  if(share.note){
+    // 인스타처럼 "닉네임 글" 순서로
+    const noteEl = card.querySelector('.psc-note');
+    const nameB = document.createElement('b');
+    nameB.textContent = (share.author || '') + ' ';
+    noteEl.appendChild(nameB);
+    noteEl.appendChild(document.createTextNode(share.note));
+  }
   card.addEventListener('click', (e) => {
     e.stopPropagation();
     if(Date.now() - chatSwipeReplyAt < 400) return;
