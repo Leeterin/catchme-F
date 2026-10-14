@@ -12369,30 +12369,39 @@ function bindToggleRows(container){
 }
 
 // 정기 알림(아침 오늘 일정 / 일요일 다음 주 시간) - 일반 설정과 따로 서버(/engagement/prefs)에 저장됨
+// 마지막으로 받아온 값 - 줄은 처음부터 이 값으로 바로 그리고, 서버 값이 오면 스위치만 맞춤
+// (전엔 서버 응답을 기다렸다가 줄을 만들어서, 알림 화면이 한 줄이었다가 갑자기 세 줄로 늘어났음)
+let engagementPrefsCache = { morningBrief: true, weeklyNudge: true };
 async function renderEngagementPrefRows(){
   const wrap = document.getElementById('engagementPrefRows');
   if(!wrap || !authToken) return;
-  let prefs = { morningBrief: true, weeklyNudge: true };
-  try { prefs = await apiRequest('/engagement/prefs'); } catch(e){}
-  if(!document.body.contains(wrap)) return;
   const row = (key, label, sub) => `
     <div class="settings-toggle-row">
       <div><div class="stt-label">${label}</div><div class="stt-sub">${sub}</div></div>
-      <div class="toggle${prefs[key] ? ' on' : ''}" data-eng-key="${key}"><div class="knob"></div></div>
+      <div class="toggle${engagementPrefsCache[key] ? ' on' : ''}" data-eng-key="${key}"><div class="knob"></div></div>
     </div>`;
   wrap.innerHTML = row('morningBrief', '아침 오늘 일정 알림', '일정이 있는 날 아침 8시에 오늘 일정을 알려줘요')
     + row('weeklyNudge', '다음 주 시간 열기 알림', '일요일 저녁, 다음 주에 열어둔 시간이 없으면 알려줘요');
+  let touched = false; // 서버 값이 오기 전에 직접 눌렀으면 그 선택을 덮어쓰지 않음
   wrap.querySelectorAll('[data-eng-key]').forEach(el => el.addEventListener('click', async () => {
+    touched = true;
     const key = el.dataset.engKey;
     const next = !el.classList.contains('on');
     el.classList.toggle('on', next);
     try {
       await apiRequest('/engagement/prefs', { method: 'PATCH', body: JSON.stringify({ [key]: next }) });
+      engagementPrefsCache[key] = next;
     } catch(err){
       el.classList.toggle('on', !next);
       showToast(err.message || '알림 설정을 저장하지 못했어요.');
     }
   }));
+  try {
+    const prefs = await apiRequest('/engagement/prefs');
+    engagementPrefsCache = { ...engagementPrefsCache, ...prefs };
+  } catch(e){ return; }
+  if(touched || !document.body.contains(wrap)) return;
+  wrap.querySelectorAll('[data-eng-key]').forEach(el => el.classList.toggle('on', !!engagementPrefsCache[el.dataset.engKey]));
 }
 
 // 차단 목록 불러와서 보여줌 (각 항목에 차단 해제 버튼 포함)
