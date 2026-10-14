@@ -11458,10 +11458,19 @@ navItems.forEach(item => {
 
   // ---- 크기: 0(원래) ~ 1(가장 작음) ----
   let shrink = 0, settleTimer = null;
+  // 스크롤 이벤트마다 바로 쓰면 한 프레임에 여러 번 바가 다시 그려져서(흐림 배경이라 무거움) 버벅임 -
+  // 값만 바로 바꾸고, 화면에 쓰는 건 프레임마다 한 번, 값이 바뀌었을 때만
+  let navRaf = 0, navTracking = false, shownP = '', shownTracking = null;
+  function flushShrink(){
+    navRaf = 0;
+    const p = shrink.toFixed(3);
+    if(navTracking !== shownTracking){ nav.classList.toggle('nav-tracking', navTracking); shownTracking = navTracking; }
+    if(p !== shownP){ nav.style.setProperty('--navp', p); shownP = p; }
+  }
   function setShrink(v, tracking){
     shrink = Math.max(0, Math.min(1, v));
-    nav.classList.toggle('nav-tracking', !!tracking);
-    nav.style.setProperty('--navp', shrink.toFixed(3));
+    navTracking = !!tracking;
+    if(!navRaf) navRaf = requestAnimationFrame(flushShrink);
   }
   // 스크롤을 멈추면 가까운 쪽(원래/작게)으로 부드럽게 자리 잡음
   function settle(){ setShrink(shrink > 0.45 ? 1 : 0); }
@@ -28173,7 +28182,9 @@ function isInsideScrollableArea(el){
   }
   return false;
 }
-document.addEventListener('touchmove', (e) => {
+// 화면 전체에 막을 수 있는(passive 아닌) touchmove가 붙어 있으면 iOS는 손가락이 움직일 때마다 스크립트를 기다린 뒤에야
+// 스크롤을 시작해서, 채팅이 아닌 화면 스크롤까지 버벅였음 - 그래서 채팅방이 열려 있을 때만 붙여 둠
+function chatTouchMoveLock(e){
   if(!document.body.classList.contains('chat-open')) return;
   // 채팅에서 연 전체화면 지도(장소 고르기/장소 투표 등) 위에서는 아무것도 안 함 - 지도는 스스로 터치를 처리하는데,
   // 여기서 손가락이 움직일 때마다 화면 구조를 훑느라(getComputedStyle) 두 손가락 확대/축소가 버벅였음
@@ -28183,7 +28194,17 @@ document.addEventListener('touchmove', (e) => {
   if(e.target.closest && e.target.closest('input, textarea')) return;
   if(isInsideScrollableArea(e.target)) return;
   e.preventDefault();
-}, { passive: false });
+}
+let chatTouchLockOn = false;
+function syncChatTouchMoveLock(){
+  const on = document.body.classList.contains('chat-open');
+  if(on === chatTouchLockOn) return;
+  chatTouchLockOn = on;
+  if(on) document.addEventListener('touchmove', chatTouchMoveLock, { passive: false });
+  else document.removeEventListener('touchmove', chatTouchMoveLock, { passive: false });
+}
+new MutationObserver(syncChatTouchMoveLock).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+syncChatTouchMoveLock();
 
 
 // 예전엔 채팅 내역을 스크롤하면(예전 대화 보려고 위로 올리면) 키보드를 자동으로 닫았는데,
