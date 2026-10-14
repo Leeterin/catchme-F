@@ -1254,6 +1254,7 @@
   }
   .location-search-result-row:last-child{ border-bottom:none; }
   .location-search-result-row:hover{ background:var(--surface-2); }
+  .location-search-result-head{ padding:8px 12px 4px; font-size:11px; font-weight:700; color:var(--text-dim); }
   .location-search-result-name{ font-size:13px; font-weight:600; color:var(--text); }
   .location-search-result-addr{ font-size:11px; color:var(--text-dim); margin-top:2px; }
   .feed-place-map{
@@ -8570,7 +8571,6 @@
         <div class="profile-avatar-lg" id="searchProfileAvatar"></div>
         <div class="profile-name" id="searchProfileName"></div>
         <div class="profile-status" id="searchProfileBio"></div>
-        <div class="feed-sponsored-badge" id="searchProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg> 노쇼 신고 이력이 있어요</div>
         <div class="person-profile-actions">
           <button class="person-action-btn request" id="searchProfileRequestBtn">친구 요청</button>
           <button class="person-action-btn chat" id="searchProfileChatBtn">채팅</button>
@@ -9107,7 +9107,6 @@
       <div class="report-reason-list" id="reportReasonList">
         <label class="report-reason-row"><input type="radio" name="reportReason" value="스팸/광고" /> 스팸/광고</label>
         <label class="report-reason-row"><input type="radio" name="reportReason" value="부적절한 내용" /> 부적절한 내용</label>
-        <label class="report-reason-row"><input type="radio" name="reportReason" value="노쇼" /> 노쇼(약속 어김)</label>
         <label class="report-reason-row"><input type="radio" name="reportReason" value="욕설/괴롭힘" /> 욕설/괴롭힘</label>
         <label class="report-reason-row"><input type="radio" name="reportReason" value="기타" /> 기타</label>
       </div>
@@ -9744,7 +9743,6 @@
         <div class="profile-avatar-lg" id="suggestProfileAvatar"></div>
         <div class="profile-name" id="suggestProfileName"></div>
         <div class="profile-status" id="suggestProfileBio"></div>
-        <div class="feed-sponsored-badge" id="suggestProfileTrustBadge" style="display:none;background:rgba(239,68,68,0.15);color:#EF4444;"><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg> 노쇼 신고 이력이 있어요</div>
         <div class="person-profile-actions">
           <button class="person-action-btn request" id="suggestProfileRequestBtn">친구 요청</button>
           <button class="person-action-btn chat" id="suggestProfileChatBtn">채팅</button>
@@ -13009,8 +13007,7 @@ document.getElementById('depLocPickerInput').addEventListener('input', () => {
   if(!val){ resultsBox.style.display = 'none'; return; }
   depLocPickerSearchTimer = setTimeout(() => {
     ensureKakaoMapsLoaded(() => {
-      const places = new kakao.maps.services.Places();
-      places.keywordSearch(val, (results, status) => {
+      kakaoKeywordOrAddressSearch(val, (results, status) => {
         if(status !== kakao.maps.services.Status.OK || results.length === 0){
           resultsBox.style.display = 'none';
           return;
@@ -13137,8 +13134,7 @@ document.getElementById('locationCustomApplyBtn').addEventListener('click', () =
   const val = document.getElementById('locationCustomInput').value.trim();
   if(!val) return;
   ensureKakaoMapsLoaded(() => {
-    const places = new kakao.maps.services.Places();
-    places.keywordSearch(val, async (results, status) => {
+    kakaoKeywordOrAddressSearch(val, async (results, status) => {
       if(status !== kakao.maps.services.Status.OK || results.length === 0){
         showToast('그 위치를 찾지 못했어요. 다른 이름으로 시도해보세요.');
         return;
@@ -16144,8 +16140,7 @@ document.getElementById('meetupLocationInput').addEventListener('input', () => {
   }
   meetupLocationSearchTimer = setTimeout(() => {
     ensureKakaoMapsLoaded(() => {
-    const places = new kakao.maps.services.Places();
-    places.keywordSearch(val, (results, status) => {
+    kakaoKeywordOrAddressSearch(val, (results, status) => {
       if(status !== kakao.maps.services.Status.OK || results.length === 0){
         resultsBox.style.display = 'none';
         return;
@@ -18408,7 +18403,7 @@ function travelOriginOptions(){
   });
   if(prev) opts.push({ key: 'prev', name: `${prev.ev.title} (${prev.ev.travel.to.name || '앞 일정'})`, short: prev.ev.travel.to.name || prev.ev.title, lat: prev.ev.travel.to.lat, lon: prev.ev.travel.to.lon });
   (mySavedLocations || []).forEach(loc => {
-    if(typeof loc.lat === 'number' && typeof loc.lon === 'number') opts.push({ key: 'saved:' + loc.id, name: loc.displayName || loc.address, short: loc.displayName || loc.address, lat: loc.lat, lon: loc.lon, label: loc.label });
+    if(typeof loc.lat === 'number' && typeof loc.lon === 'number') opts.push({ key: 'saved:' + loc.id, name: loc.displayName || loc.address, short: loc.displayName || loc.address, address: loc.address, lat: loc.lat, lon: loc.lon, label: loc.label });
   });
   return opts;
 }
@@ -18556,19 +18551,57 @@ function liftTravelSearchField(){
     if(view.classList.contains('travel-typing')) setTimeout(liftTravelSearchField, 30);
   });
 })();
+// 카카오 장소 검색 공용 - "서울시 송파구 오금로31길 11"처럼 '서울시'를 붙인 전체 주소는 키워드 검색에 안 나와서
+// 앞의 '서울시'·'부산시' 같은 건 카카오식(서울·부산)으로 바꿔 찾고, 그래도 없으면 주소 검색으로 한 번 더 찾음
+function normalizeKoreanAddressQuery(q){
+  return String(q || '').replace(/(^|\s)(서울|부산|대구|인천|광주|대전|울산|세종)시(?=\s)/g, '$1$2').trim();
+}
+function kakaoKeywordOrAddressSearch(query, cb){
+  const S = kakao.maps.services;
+  const q = normalizeKoreanAddressQuery(query);
+  new S.Places().keywordSearch(q, (results, status) => {
+    if(status === S.Status.OK && results && results.length) return cb(results, status);
+    new S.Geocoder().addressSearch(q, (res, st) => {
+      if(st !== S.Status.OK || !res || !res.length) return cb(results || [], status);
+      cb(res.map(r => {
+        const road = r.road_address ? r.road_address.address_name : '';
+        const building = r.road_address && r.road_address.building_name;
+        return { place_name: building || road || r.address_name, road_address_name: road, address_name: r.address_name, x: r.x, y: r.y };
+      }), S.Status.OK);
+    });
+  });
+}
 // 출발/도착 검색칸 공용 - 장소 추천 글쓰기와 같은 카카오 장소 검색
-function bindTravelPlaceSearch(inputId, resultsId, onPick){
+// suggest: 검색어를 아직 안 쳤을 때 보여줄 목록(출발지 칸이면 자주 쓰는 출발지) - [{ name, address, lat, lon }]
+function bindTravelPlaceSearch(inputId, resultsId, onPick, suggest){
   const input = document.getElementById(inputId);
   const resultsBox = document.getElementById(resultsId);
   let timer = null;
+  function showSuggest(){
+    const list = suggest ? suggest() : [];
+    if(!list.length){ resultsBox.style.display = 'none'; return; }
+    resultsBox.innerHTML = `<div class="location-search-result-head">자주 쓰는 출발지</div>` + list.map((o, i) => `
+      <div class="location-search-result-row" data-idx="${i}">
+        <div class="location-search-result-name">${escapeHtml(o.name)}</div>
+        ${o.address && o.address !== o.name ? `<div class="location-search-result-addr">${escapeHtml(o.address)}</div>` : ''}
+      </div>`).join('');
+    resultsBox.style.display = 'block';
+    resultsBox.querySelectorAll('.location-search-result-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const o = list[parseInt(row.dataset.idx, 10)];
+        resultsBox.style.display = 'none';
+        input.blur();
+        onPick({ name: o.name, address: o.address || null, lat: o.lat, lon: o.lon });
+      });
+    });
+  }
   input.addEventListener('input', () => {
     const val = input.value.trim();
     clearTimeout(timer);
-    if(val.length < 2){ resultsBox.style.display = 'none'; return; }
+    if(val.length < 2){ if(suggest) showSuggest(); else resultsBox.style.display = 'none'; return; }
     timer = setTimeout(() => {
       ensureKakaoMapsLoaded(() => {
-        const places = new kakao.maps.services.Places();
-        places.keywordSearch(val, (results, status) => {
+        kakaoKeywordOrAddressSearch(val, (results, status) => {
           if(status !== kakao.maps.services.Status.OK || results.length === 0){ resultsBox.style.display = 'none'; return; }
           resultsBox.innerHTML = results.slice(0, 6).map((r, i) => `
             <div class="location-search-result-row" data-idx="${i}">
@@ -18591,6 +18624,7 @@ function bindTravelPlaceSearch(inputId, resultsId, onPick){
   // 키보드가 올라와도 검색칸과 결과가 보이게 - 화면은 그대로 두고 "이동시간" 제목이 위쪽에 오도록 스크롤만 살짝
   // (폰 키보드가 다 올라온 뒤 화면 높이가 바뀌므로 한 번 더 맞춤)
   input.addEventListener('focus', () => {
+    if(suggest) showSuggest(); // 누르자마자 자주 쓰는 출발지 목록 - 치기 시작하면 검색 결과로 바뀜
     document.getElementById('eventFormView').classList.add('travel-typing');
     setTimeout(liftTravelSearchField, 80);
     setTimeout(liftTravelSearchField, 450);
@@ -18672,7 +18706,7 @@ document.getElementById('travelModeRow').addEventListener('click', (e) => {
 bindTravelPlaceSearch('travelFromInput', 'travelFromResults', (place) => {
   formTravel = { ...(formTravel || {}), from: place };
   computeFormTravel();
-});
+}, () => travelOriginOptions().map(o => ({ name: o.short, address: o.key === 'prev' ? '앞 일정 장소' : o.address, lat: o.lat, lon: o.lon })));
 bindTravelPlaceSearch('travelDestInput', 'travelDestResults', (place) => {
   formTravel = { ...(formTravel || {}), to: place };
   if(!formTravel.from) formTravel.from = defaultTravelOrigin(); // 출발지를 안 골랐으면 앞 일정 장소 → 집 순으로 자동
@@ -23892,17 +23926,6 @@ function openPersonProfile(user, context, viewPrefix){
   document.getElementById(prefix + 'ProfileName').textContent = user.name;
   document.getElementById(prefix + 'ProfileBio').textContent = user.bio || '';
 
-  // 노쇼 신고 이력이 있으면 살짝 경고 배지를 보여줌 (실제 서버에 있는 사람일 때만 조회)
-  const trustBadge = document.getElementById(prefix + 'ProfileTrustBadge');
-  if(trustBadge){
-    trustBadge.style.display = 'none';
-    if(user.id && authToken){
-      apiRequest(`/reports/trust/${user.id}`).then(data => {
-        trustBadge.style.display = data.hasNoShowHistory ? 'inline-flex' : 'none';
-      }).catch(() => {});
-    }
-  }
-
   const already = FRIENDS.some(f => f.id === user.id);
   const alreadyRequested = OUTGOING_FRIEND_REQUESTS.some(f => f.id === user.id);
 
@@ -26399,8 +26422,7 @@ function searchLocationPickerSuggestions(query, opts){
   listEl.classList.add('show');
 
   ensureKakaoMapsLoaded(() => {
-    const places = new kakao.maps.services.Places();
-    places.keywordSearch(query, (results, status) => {
+    kakaoKeywordOrAddressSearch(query, (results, status) => {
       // 검색어가 바뀌는 동안 늦게 도착한 이전 결과는 무시함
       if(document.getElementById('locationPickerInput').value.trim() !== query && !(opts && opts.centerOnly)) return;
 
