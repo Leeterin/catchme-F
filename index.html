@@ -7804,6 +7804,81 @@
     box-shadow:inset 4px 4px 9px var(--neu-lo), inset -4px -4px 9px var(--neu-hi);
   }
   #homeDash .home-group-chip.add{ color:var(--neu-dim); box-shadow:inset 3px 3px 8px var(--neu-lo), inset -3px -3px 8px var(--neu-hi); }
+
+  /* ---- 내 프로필 - 홈과 같은 뉴모피즘 (회색 바탕 + 튀어나온 판 + 눌린 입력칸 + 동그란 버튼) ---- */
+  body:has(#myProfileView[style*="block"]){ background:#E4E5E9; }
+  body.dark-mode:has(#myProfileView[style*="block"]){ background:#25262A; }
+  #myProfileView{
+    --neu-bg:#E4E5E9; --neu-hi:rgba(255,255,255,0.95); --neu-lo:rgba(156,161,175,0.55);
+    --neu-ink:#26272C; --neu-dim:#8D9099;
+    color:var(--neu-ink);
+  }
+  body.dark-mode #myProfileView{
+    --neu-bg:#25262A; --neu-hi:rgba(255,255,255,0.05); --neu-lo:rgba(0,0,0,0.6);
+    --neu-ink:#ECECEE; --neu-dim:#8E9097;
+  }
+  #myProfileView .edit-icon-btn{
+    width:42px; height:42px; border-radius:50%; border:none; background:var(--neu-bg); color:var(--neu-ink);
+    display:inline-flex; align-items:center; justify-content:center;
+    box-shadow:5px 5px 12px var(--neu-lo), -5px -5px 12px var(--neu-hi);
+  }
+  #myProfileView > .schedule-nav{ position:relative; }
+  #myProfileView > .schedule-nav .schedule-nav-label{ position:absolute; left:50%; transform:translateX(-50%); } /* 오른쪽 버튼이 더 커서 제목이 왼쪽으로 치우치던 것 */
+  #myProfileView .edit-icon-btn:active{ box-shadow:inset 4px 4px 9px var(--neu-lo), inset -4px -4px 9px var(--neu-hi); }
+  /* 프로필 사진 - 튀어나온 동그란 판 위에 */
+  #myProfileView .my-profile-avatar-wrap{ display:flex; justify-content:center; margin:4px 0 14px; }
+  #myProfileView .profile-avatar-lg{
+    width:104px; height:104px; margin:0; font-size:38px;
+    background:var(--accent); color:var(--on-accent);
+    border:7px solid var(--neu-bg); box-sizing:content-box;
+    box-shadow:9px 9px 20px var(--neu-lo), -9px -9px 20px var(--neu-hi);
+  }
+  #myProfileView .profile-name{ font-size:22px; font-weight:700; color:var(--neu-ink); }
+  #myProfileView .profile-status{ color:var(--neu-dim); margin-bottom:22px; }
+  /* 카드 */
+  #myProfileView .mp-card{
+    background:var(--neu-bg); border-radius:28px; padding:18px; margin-bottom:22px;
+    box-shadow:9px 9px 22px var(--neu-lo), -9px -9px 22px var(--neu-hi);
+  }
+  #myProfileView .mp-card-title{ color:var(--neu-dim); font-weight:500; font-size:12.5px; margin:0 2px 12px; }
+  #myProfileView .mp-info-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:14px 16px; border-radius:20px;
+    box-shadow:inset 4px 4px 10px var(--neu-lo), inset -4px -4px 10px var(--neu-hi);
+  }
+  #myProfileView .mp-info-row + .mp-info-row{ margin-top:12px; }
+  #myProfileView .mp-info-text{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  #myProfileView .mp-field-label{ font-family:inherit; font-size:12px; color:var(--neu-dim); }
+  #myProfileView .mp-field-value{ font-family:inherit; font-size:15px; color:var(--neu-ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #myProfileView .mp-empty{ color:var(--neu-dim); font-size:13.5px; font-weight:400; }
+  /* 공개/비공개 - 공개는 튀어나온 알약(강조색 글씨), 비공개는 눌린 알약 */
+  #myProfileView .visibility-toggle{
+    flex-shrink:0; border:none; background:var(--neu-bg); color:var(--neu-dim); padding:8px 14px; font-size:12.5px;
+    box-shadow:inset 3px 3px 7px var(--neu-lo), inset -3px -3px 7px var(--neu-hi);
+  }
+  #myProfileView .visibility-toggle.on{ color:var(--accent); box-shadow:4px 4px 9px var(--neu-lo), -4px -4px 9px var(--neu-hi); }
+  /* 편집 */
+  #myProfileView .mp-photo-btns{ display:flex; justify-content:center; gap:12px; margin:-2px 0 22px; }
+  #myProfileView .mp-pill-btn{
+    border:none; background:var(--neu-bg); color:var(--neu-ink); font-size:13.5px; font-weight:600;
+    padding:10px 18px; border-radius:999px; cursor:pointer;
+    box-shadow:5px 5px 12px var(--neu-lo), -5px -5px 12px var(--neu-hi);
+  }
+  #myProfileView .mp-pill-btn.danger{ color:var(--cta); }
+  #myProfileView .mp-pill-btn:active{ box-shadow:inset 4px 4px 9px var(--neu-lo), inset -4px -4px 9px var(--neu-hi); }
+  #myProfileView .mp-input-group label{ color:var(--neu-dim); font-size:12px; margin-left:4px; }
+  #myProfileView .mp-input-group .search-input{
+    background:var(--neu-bg); border:none; border-radius:18px; color:var(--neu-ink);
+    box-shadow:inset 4px 4px 10px var(--neu-lo), inset -4px -4px 10px var(--neu-hi);
+  }
+  #myProfileView .mp-card .mp-input-group:last-child{ margin-bottom:0; }
+  #myProfileView .mp-visibility-row{ border-bottom:none; padding:0 4px 14px; color:var(--neu-dim); font-size:12.5px; }
+  #myProfileView .mp-card .mp-visibility-row:last-child{ padding-bottom:0; }
+  #myProfileView #mpSaveBtn{
+    background:var(--neu-bg); color:var(--accent); font-weight:700; border:none; border-radius:20px; padding:15px;
+    box-shadow:6px 6px 14px var(--neu-lo), -6px -6px 14px var(--neu-hi);
+  }
+  #myProfileView #mpSaveBtn:active{ box-shadow:inset 4px 4px 9px var(--neu-lo), inset -4px -4px 9px var(--neu-hi); }
   /* 내 예약 가능 시간 - 날짜 칸: 닫힌 날은 눌림, 열린 날은 튀어나옴 */
   #homeDash .home-avail-wd{ color:var(--neu-dim); }
   #homeDash .home-avail-day{
@@ -8020,7 +8095,7 @@
     <div class="schedule-nav" style="margin-bottom:20px;">
       <button id="myProfileBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="schedule-nav-label">내 프로필</div>
-      <button class="edit-icon-btn" id="myProfileEditBtn">&#9998;</button>
+      <button class="edit-icon-btn" id="myProfileEditBtn" aria-label="프로필 편집"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
     </div>
     <div class="my-profile-avatar-wrap">
       <div class="profile-avatar-lg" id="myProfileAvatar"></div>
@@ -16205,7 +16280,7 @@ function renderMyProfile(){
   } else {
     avatar.innerHTML = '';
     avatar.textContent = myProfileData.name[0];
-    avatar.style.background = myProfileData.color;
+    avatar.style.background = ''; // 색은 CSS - 밝은 화면 하늘색, 다크 모드 회색
   }
 
   const body = document.getElementById('myProfileBody');
@@ -16214,10 +16289,17 @@ function renderMyProfile(){
     body.innerHTML = `
       <div class="profile-name" style="text-align:center;">${escapeHtml(myProfileData.name)}</div>
       <div class="profile-status" style="text-align:center;">@${escapeHtml(myProfileData.id)}</div>
-      <div class="mp-field-row"><span class="mp-field-label">전화번호</span><span class="mp-field-value">${escapeHtml(myProfileData.phone)}</span></div>
-      <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.phonePublic ? ' on' : ''}" id="phoneVisBtn">${myProfileData.phonePublic ? '공개' : '비공개'}</button></div>
-      <div class="mp-field-row"><span class="mp-field-label">이메일</span><span class="mp-field-value">${escapeHtml(myProfileData.email)}</span></div>
-      <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtn">${myProfileData.emailPublic ? '공개' : '비공개'}</button></div>
+      <div class="mp-card">
+        <div class="mp-card-title">친구에게 보이는 정보</div>
+        <div class="mp-info-row">
+          <div class="mp-info-text"><span class="mp-field-label">전화번호</span><span class="mp-field-value">${myProfileData.phone ? escapeHtml(myProfileData.phone) : '<span class="mp-empty">아직 없어요 · 편집에서 추가</span>'}</span></div>
+          <button class="visibility-toggle${myProfileData.phonePublic ? ' on' : ''}" id="phoneVisBtn">${myProfileData.phonePublic ? '공개' : '비공개'}</button>
+        </div>
+        <div class="mp-info-row">
+          <div class="mp-info-text"><span class="mp-field-label">이메일</span><span class="mp-field-value">${myProfileData.email ? escapeHtml(myProfileData.email) : '<span class="mp-empty">아직 없어요 · 편집에서 추가</span>'}</span></div>
+          <button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtn">${myProfileData.emailPublic ? '공개' : '비공개'}</button>
+        </div>
+      </div>
     `;
     document.getElementById('phoneVisBtn').addEventListener('click', () => {
       myProfileData.phonePublic = !myProfileData.phonePublic;
@@ -16231,19 +16313,24 @@ function renderMyProfile(){
     });
   } else {
     body.innerHTML = `
-      <div style="display:flex;justify-content:center;gap:10px;margin-bottom:14px;">
-        <button class="pin-action-btn" id="mpPhotoChangeBtn">사진 변경</button>
-        ${myProfileData.profileImageUrl ? `<button class="pin-action-btn danger" id="mpPhotoRemoveBtn">사진 삭제</button>` : ''}
+      <div class="mp-photo-btns">
+        <button type="button" class="mp-pill-btn" id="mpPhotoChangeBtn">사진 변경</button>
+        ${myProfileData.profileImageUrl ? `<button type="button" class="mp-pill-btn danger" id="mpPhotoRemoveBtn">사진 삭제</button>` : ''}
         <input type="file" id="mpPhotoInput" accept="image/*" style="display:none;" />
       </div>
-      <div class="mp-input-group"><label>이름</label><input class="search-input" id="mpNameInput" value="${myProfileData.name}" maxlength="20" /></div>
-      <div class="mp-input-group"><label>아이디</label><input class="search-input" id="mpIdInput" value="${myProfileData.id}" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" /></div>
-      <div class="mp-input-group"><label>전화번호</label><input class="search-input" id="mpPhoneInput" value="${myProfileData.phone}" maxlength="20" /></div>
-      <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.phonePublic ? ' on' : ''}" id="phoneVisBtnEdit">${myProfileData.phonePublic ? '공개' : '비공개'}</button></div>
-      <div class="mp-input-group"><label>이메일</label><input class="search-input" id="mpEmailInput" value="${myProfileData.email}" maxlength="40" /></div>
-      <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtnEdit">${myProfileData.emailPublic ? '공개' : '비공개'}</button></div>
+      <div class="mp-card">
+        <div class="mp-input-group"><label>이름</label><input class="search-input" id="mpNameInput" value="${escapeHtml(myProfileData.name)}" maxlength="20" /></div>
+        <div class="mp-input-group"><label>아이디</label><input class="search-input" id="mpIdInput" value="${escapeHtml(myProfileData.id)}" maxlength="20" autocapitalize="off" autocorrect="off" spellcheck="false" /></div>
+      </div>
+      <div class="mp-card">
+        <div class="mp-card-title">친구에게 보이는 정보</div>
+        <div class="mp-input-group"><label>전화번호</label><input class="search-input" id="mpPhoneInput" value="${escapeHtml(myProfileData.phone)}" maxlength="20" inputmode="tel" /></div>
+        <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.phonePublic ? ' on' : ''}" id="phoneVisBtnEdit">${myProfileData.phonePublic ? '공개' : '비공개'}</button></div>
+        <div class="mp-input-group"><label>이메일</label><input class="search-input" id="mpEmailInput" value="${escapeHtml(myProfileData.email)}" maxlength="40" inputmode="email" /></div>
+        <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtnEdit">${myProfileData.emailPublic ? '공개' : '비공개'}</button></div>
+      </div>
 
-      <button class="profile-chat-btn" id="mpSaveBtn" style="margin-top:6px;">저장하기</button>
+      <button class="profile-chat-btn" id="mpSaveBtn">저장하기</button>
     `;
     document.getElementById('mpPhotoChangeBtn').addEventListener('click', () => {
       document.getElementById('mpPhotoInput').click();
