@@ -2027,6 +2027,8 @@
     padding:0;
   }
   .settings-action-btn.danger{ color:var(--cta); }
+  .settings-link-row{ cursor:pointer; }
+  .settings-link-row .settings-menu-chevron{ color:var(--text-dim); font-size:20px; flex-shrink:0; }
 
   /* 설정 > 홈 화면 편집 - 끌어서 순서 바꾸는 목록 */
   .home-order-list{ display:flex; flex-direction:column; gap:8px; }
@@ -11967,20 +11969,20 @@ document.getElementById('settingsBtn').addEventListener('click', openSettings);
 // ============================================================
 // 설정 화면
 // ============================================================
+// 설정 메뉴 - 성격별로 묶음 (예전엔 11개가 섞여 있었고 '앱 관리'에 다크 모드·일정 설정·약관이 뒤섞여 있었음)
 const SETTINGS_MENU = [
   { id: 'account', label: '계정·로그인', icon: '<circle cx="12" cy="7" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
-  { id: 'locations', label: '자주 쓰는 출발지', icon: '<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3Z" opacity="0"/><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>' },
-  { id: 'privacy', label: '개인/보안', icon: '<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5l-8-3Z"/>' },
-  { id: 'calimport', label: '캘린더 불러오기', icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v5M9.5 15.5 12 18l2.5-2.5"/>', action: () => openCalImport('settings') },
+  { id: 'display', label: '화면', icon: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+  { id: 'schedule', label: '일정', icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v5M9.5 15.5 12 18l2.5-2.5"/>' },
   { id: 'notifications', label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
   { id: 'friends', label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
   { id: 'chat', label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
-  { id: 'notice', label: '공지사항', icon: '<path d="M3 11l18-5v12L3 14v-3Z"/><path d="M7 14v4a2 2 0 0 0 2 2h1v-6"/>' },
-  { id: 'homeedit', label: '홈 화면 편집', icon: '<rect x="3" y="3" width="18" height="5" rx="1.5"/><rect x="3" y="10" width="18" height="5" rx="1.5"/><rect x="3" y="17" width="18" height="4" rx="1.5"/>' },
-  { id: 'appmanage', label: '앱 관리', icon: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 8h.01M8 12h.01M8 16h.01M12 8h4M12 12h4M12 16h4"/>' },
+  { id: 'help', label: '도움말', icon: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17h.01"/>' },
   // 상세 화면 없이 바로 오류 신고 팝업을 엶
   { id: 'bugreport', label: '오류 신고하기', icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>', action: () => openBugReport('menu') },
 ];
+// 메뉴 안에서 한 단계 더 들어가는 화면 이름 (화면 > 홈 화면 편집, 일정 > 자주 쓰는 출발지)
+const SETTINGS_SUBPAGE_LABELS = { homeedit: '홈 화면 편집', locations: '자주 쓰는 출발지' };
 
 // 자주 쓰는 출발지(집/회사/학교/직접입력) - 다중 모임 장소 추천에서 바로 골라 쓸 수 있게 내 정보에 저장해둠
 let mySavedLocations = [];
@@ -12248,6 +12250,7 @@ function openSettings(){
   document.getElementById('settingsHeaderLabel').textContent = '설정';
   document.getElementById('settingsListView').classList.add('active');
   document.getElementById('settingsDetailView').classList.remove('active');
+  settingsDetailStack = [];
   renderSettingsMenu();
   pushViewState(settingsBackAction);
 }
@@ -12353,12 +12356,29 @@ async function renderBlockedList(){
   }
 }
 
+// 지금 열려 있는 설정 상세 화면들 (예: ['display', 'homeedit']) - 뒤로가면 바로 앞 화면으로
+let settingsDetailStack = [];
 function openSettingsDetail(id){
+  settingsDetailStack.push(id);
+  pushViewState(settingsBackAction);
+  renderSettingsDetail(id);
+}
+// 상세 화면 안의 "› 들어가기" 줄 - 누르면 openSettingsDetail(그 화면)
+function settingsLinkRowHTML(id, label, sub){
+  return `<div class="settings-toggle-row settings-link-row" data-open="${id}"><div><div class="stt-label">${label}</div>${sub ? `<div class="stt-sub">${sub}</div>` : ''}</div><span class="settings-menu-chevron">&#8250;</span></div>`;
+}
+function bindSettingsLinkRows(container){
+  container.querySelectorAll('.settings-link-row[data-open]').forEach(row => row.addEventListener('click', () => {
+    if(row.dataset.open === 'calimport') openCalImport('settings');
+    else openSettingsDetail(row.dataset.open);
+  }));
+}
+function renderSettingsDetail(id){
   const menu = SETTINGS_MENU.find(m => m.id === id);
-  document.getElementById('settingsHeaderLabel').textContent = menu.label;
+  document.getElementById('settingsHeaderLabel').textContent = menu ? menu.label : (SETTINGS_SUBPAGE_LABELS[id] || '설정');
   document.getElementById('settingsListView').classList.remove('active');
   document.getElementById('settingsDetailView').classList.add('active');
-  pushViewState(settingsBackAction);
+  window.scrollTo(0, 0);
 
   const body = document.getElementById('settingsDetailBody');
 
@@ -12407,19 +12427,59 @@ function openSettingsDetail(id){
       });
     });
 
-  } else if(id === 'privacy'){
+  } else if(id === 'display'){
     body.innerHTML = `
-      <div class="settings-detail-desc">친구에게 내 일정이 어떻게 보이는지는 일정마다 고르는 공개 설정으로 정해져요.</div>
-      <!-- 예전엔 끌 수 없는 "매칭 시 가능여부만 공유" 스위치가 있었는데, 실제로는 전체 공개 일정은 제목까지 보여서 사실과 달랐음 -->
-      <div class="privacy-rules">
-        <div><b>전체 공개</b> · 모든 친구에게 제목까지 보여요</div>
-        <div><b>친구 그룹</b> · 고른 그룹의 친구에게만 제목이 보여요</div>
-        <div><b>나만 보기</b> · 친구에게는 제목 없이 '일정 있음'으로만 보여요</div>
-        <div class="privacy-rules-note">어떤 설정이든 그 시간이 비어 있는 것처럼 보이지는 않아서, 친구가 겹치는 시간에 약속을 요청할 수 없어요. 친구가 약속을 요청할 수 있는 건 내가 연 '예약 가능 시간'뿐이에요.</div>
+      <div class="settings-detail-desc">홈과 앱 화면을 내 취향대로 바꿔요.</div>
+      ${settingsLinkRowHTML('homeedit', '홈 화면 편집', '홈 카드 순서를 바꾸고 안 쓰는 건 숨겨요')}
+      ${toggleRowHTML('dark_mode', '다크 모드', '어두운 화면으로 바꿔요', false)}
+      <div class="settings-simple-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+        <span>캘린더 탭 기본 화면</span>
+        <div class="repeat-toggle-row" id="defaultScheduleViewPicker">
+          <button class="repeat-mode-btn${settingsState.default_schedule_view === 'day' ? ' active' : ''}" data-view="day" type="button">하루</button>
+          <button class="repeat-mode-btn${settingsState.default_schedule_view === 'week' ? ' active' : ''}" data-view="week" type="button">일주일</button>
+          <button class="repeat-mode-btn${settingsState.default_schedule_view === 'month' ? ' active' : ''}" data-view="month" type="button">한달</button>
+        </div>
       </div>
-      ${toggleRowHTML('priv_stranger_chat', '친구가 아닌 사람의 채팅 요청 허용', '끄면 친구만 나에게 새 채팅을 걸 수 있어요', false)}
     `;
+    bindSettingsLinkRows(body);
     bindToggleRows(body);
+    body.querySelector('.toggle[data-key="dark_mode"]').addEventListener('click', applyDarkMode);
+    document.getElementById('defaultScheduleViewPicker').querySelectorAll('.repeat-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        settingsState.default_schedule_view = btn.dataset.view;
+        document.getElementById('defaultScheduleViewPicker').querySelectorAll('.repeat-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
+        saveSettingToServer('default_schedule_view');
+        showToast(`캘린더 기본 화면을 "${btn.textContent}"(으)로 설정했어요.`);
+      });
+    });
+
+  } else if(id === 'schedule'){
+    body.innerHTML = `
+      <div class="settings-detail-desc">일정을 만들 때 쓰는 기본값이에요.</div>
+      ${settingsLinkRowHTML('calimport', '캘린더 불러오기', '다른 캘린더 앱의 일정을 가져와요')}
+      <div class="settings-toggle-row">
+        <div><div class="stt-label">새 일정에 "이 시간에도 예약 받기" 항상 켜기</div><div class="stt-sub">일정을 추가할 때 처음부터 켜진 상태로 시작해요</div></div>
+        <div class="toggle${isAllowBookingAlways() ? ' on' : ''}" id="allowBookingAlwaysToggle"><div class="knob"></div></div>
+      </div>
+      <div class="settings-toggle-row">
+        <div><div class="stt-label">일정에 이동시간 넣기</div><div class="stt-sub">일정을 추가할 때 목적지를 고르면 자동차·대중교통 이동시간을 출발 시각 기준으로 계산해서 캘린더에 일정 앞 "이동시간"으로 보여줘요</div></div>
+        <div class="toggle${isTravelEnabled() ? ' on' : ''}" id="travelTimeToggle"><div class="knob"></div></div>
+      </div>
+      ${settingsLinkRowHTML('locations', '자주 쓰는 출발지', '집·회사처럼 자주 가는 곳을 저장해 두고 바로 골라요')}
+    `;
+    bindSettingsLinkRows(body);
+    document.getElementById('travelTimeToggle').addEventListener('click', (e) => {
+      const next = !isTravelEnabled();
+      setTravelEnabled(next);
+      e.currentTarget.classList.toggle('on', next);
+      showToast(next ? '이제 일정을 추가할 때 이동시간을 넣을 수 있어요.' : '이동시간 넣기를 껐어요. 이미 넣은 이동시간은 그대로 보여요.');
+    });
+    document.getElementById('allowBookingAlwaysToggle').addEventListener('click', (e) => {
+      const next = !isAllowBookingAlways();
+      setAllowBookingAlways(next);
+      e.currentTarget.classList.toggle('on', next);
+      showToast(next ? '새 일정에서 "이 시간에도 예약 받기"가 켜진 상태로 시작해요.' : '새 일정은 다시 꺼진 상태로 시작해요.');
+    });
 
   } else if(id === 'notifications'){
     body.innerHTML = `
@@ -12432,13 +12492,21 @@ function openSettingsDetail(id){
 
   } else if(id === 'friends'){
     body.innerHTML = `
-      <div class="settings-detail-desc">친구 요청과 검색 관련 설정이에요.</div>
+      <div class="settings-detail-desc">친구 요청과 검색, 내 일정이 친구에게 보이는 방식이에요.</div>
       ${toggleRowHTML('friend_autoaccept', '친구 요청 자동 수락', '', false)}
       ${toggleRowHTML('friend_search_allow', '아이디로 나를 검색 허용', '', false)}
+      ${toggleRowHTML('priv_stranger_chat', '친구가 아닌 사람의 채팅 요청 허용', '끄면 친구만 나에게 새 채팅을 걸 수 있어요', false)}
+      <div class="settings-detail-desc" style="margin-top:16px;margin-bottom:8px;">내 일정이 친구에게 보이는 방식 (일정마다 고르는 공개 설정)</div>
+      <div class="privacy-rules">
+        <div><b>전체 공개</b> · 모든 친구에게 제목까지 보여요</div>
+        <div><b>친구 그룹</b> · 고른 그룹의 친구에게만 제목이 보여요</div>
+        <div><b>나만 보기</b> · 친구에게는 제목 없이 '일정 있음'으로만 보여요</div>
+        <div class="privacy-rules-note">어떤 설정이든 그 시간이 비어 있는 것처럼 보이지는 않아서, 친구가 겹치는 시간에 약속을 요청할 수 없어요. 친구가 약속을 요청할 수 있는 건 내가 연 '예약 가능 시간'뿐이에요.</div>
+      </div>
       <div class="settings-detail-desc" style="margin-top:16px;">차단한 사람은 서로 친구 요청/채팅을 할 수 없어요.</div>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <input type="text" class="search-input" id="blockUsernameInput" placeholder="차단할 아이디 입력" style="margin-bottom:0;" autocapitalize="off" autocorrect="off" spellcheck="false" />
-        <button type="button" class="profile-chat-btn" id="blockUserSubmitBtn" style="width:auto;padding:0 16px;">차단</button>
+        <button type="button" class="profile-chat-btn" id="blockUserSubmitBtn" style="width:auto;padding:0 16px;white-space:nowrap;flex-shrink:0;">차단</button>
       </div>
       <div id="blockedListContainer"></div>
     `;
@@ -12466,12 +12534,6 @@ function openSettingsDetail(id){
     `;
     bindToggleRows(body);
 
-  } else if(id === 'notice'){
-    body.innerHTML = `
-      <div class="settings-detail-desc">MEETZIP의 새로운 소식이에요.</div>
-      <div class="search-empty">아직 공지사항이 없어요.</div>
-    `;
-
   } else if(id === 'homeedit'){
     body.innerHTML = `
       <div class="settings-detail-desc">오른쪽 손잡이를 끌어서 홈 순서를 바꾸고, 안 쓰는 건 꺼서 홈에서 숨겨요. '답할 차례'는 답할 게 있을 때 항상 맨 위에 떠요.</div>
@@ -12489,48 +12551,19 @@ function openSettingsDetail(id){
       showToast('기본 상태로 되돌렸어요');
     });
 
-  } else if(id === 'appmanage'){
+  } else if(id === 'help'){
     body.innerHTML = `
-      <div class="settings-detail-desc">앱 버전과 저장공간을 관리해요.</div>
-      ${toggleRowHTML('dark_mode', '다크 모드', '어두운 화면으로 바꿔요', false)}
-      <div class="settings-simple-row" style="flex-direction:column;align-items:stretch;gap:8px;">
-        <span>캘린더 탭 기본 화면</span>
-        <div class="repeat-toggle-row" id="defaultScheduleViewPicker">
-          <button class="repeat-mode-btn${settingsState.default_schedule_view === 'day' ? ' active' : ''}" data-view="day" type="button">하루</button>
-          <button class="repeat-mode-btn${settingsState.default_schedule_view === 'week' ? ' active' : ''}" data-view="week" type="button">일주일</button>
-          <button class="repeat-mode-btn${settingsState.default_schedule_view === 'month' ? ' active' : ''}" data-view="month" type="button">한달</button>
-        </div>
-      </div>
+      <div class="settings-detail-desc">약관과 앱 정보, 문제가 생겼을 때 쓰는 기능이에요.</div>
       <div class="settings-toggle-row">
         <div><div class="stt-label">흔들어서 오류 신고하기</div><div class="stt-sub">폰을 5번 흔들면 오류 신고 창이 열려요</div></div>
         <div class="toggle${isShakeReportEnabled() ? ' on' : ''}" id="shakeReportToggle"><div class="knob"></div></div>
       </div>
-      <div class="settings-toggle-row">
-        <div><div class="stt-label">새 일정에 "이 시간에도 예약 받기" 항상 켜기</div><div class="stt-sub">일정을 추가할 때 처음부터 켜진 상태로 시작해요</div></div>
-        <div class="toggle${isAllowBookingAlways() ? ' on' : ''}" id="allowBookingAlwaysToggle"><div class="knob"></div></div>
-      </div>
-      <div class="settings-toggle-row">
-        <div><div class="stt-label">일정에 이동시간 넣기</div><div class="stt-sub">일정을 추가할 때 목적지를 고르면 자동차·대중교통 이동시간을 출발 시각 기준으로 계산해서 캘린더에 일정 앞 "이동시간"으로 보여줘요</div></div>
-        <div class="toggle${isTravelEnabled() ? ' on' : ''}" id="travelTimeToggle"><div class="knob"></div></div>
-      </div>
-      <div class="settings-simple-row"><span>오류 신고하기</span><button class="settings-action-btn" id="appmanageBugReportBtn">신고 &#8250;</button></div>
-      <div class="settings-simple-row"><span>현재 버전</span><span class="value">1.0.0</span></div>
       <div class="settings-simple-row"><span>캐시 삭제</span><button class="settings-action-btn" id="clearCacheBtn">삭제</button></div>
-      <div class="settings-simple-row"><span>이용약관</span><button class="settings-action-btn">보기 &#8250;</button></div>
-      <div class="settings-simple-row"><span>개인정보 처리방침</span><button class="settings-action-btn">보기 &#8250;</button></div>
+      <div class="settings-simple-row"><span>이용약관</span><button class="settings-action-btn" id="termsPageBtn">보기 &#8250;</button></div>
+      <div class="settings-simple-row"><span>개인정보 처리방침</span><button class="settings-action-btn" id="privacyPageBtn">보기 &#8250;</button></div>
+      <div class="settings-simple-row"><span>현재 버전</span><span class="value">1.0.0</span></div>
     `;
-    bindToggleRows(body);
-    body.querySelector('.toggle[data-key="dark_mode"]').addEventListener('click', applyDarkMode);
-    document.getElementById('defaultScheduleViewPicker').querySelectorAll('.repeat-mode-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        settingsState.default_schedule_view = btn.dataset.view;
-        document.getElementById('defaultScheduleViewPicker').querySelectorAll('.repeat-mode-btn').forEach(b => b.classList.toggle('active', b === btn));
-        saveSettingToServer('default_schedule_view');
-        showToast(`캘린더 기본 화면을 "${btn.textContent}"(으)로 설정했어요.`);
-      });
-    });
     document.getElementById('clearCacheBtn').addEventListener('click', clearLocalCaches);
-    document.getElementById('appmanageBugReportBtn').addEventListener('click', () => openBugReport('menu'));
     document.getElementById('shakeReportToggle').addEventListener('click', (e) => {
       const next = !isShakeReportEnabled();
       setShakeReportEnabled(next);
@@ -12538,26 +12571,20 @@ function openSettingsDetail(id){
       if(next) requestShakePermissionIfNeeded();
       showToast(next ? '이제 폰을 5번 흔들면 오류 신고 창이 열려요.' : '흔들어서 오류 신고하기를 껐어요.');
     });
-    document.getElementById('travelTimeToggle').addEventListener('click', (e) => {
-      const next = !isTravelEnabled();
-      setTravelEnabled(next);
-      e.currentTarget.classList.toggle('on', next);
-      showToast(next ? '이제 일정을 추가할 때 이동시간을 넣을 수 있어요.' : '이동시간 넣기를 껐어요. 이미 넣은 이동시간은 그대로 보여요.');
-    });
-    document.getElementById('allowBookingAlwaysToggle').addEventListener('click', (e) => {
-      const next = !isAllowBookingAlways();
-      setAllowBookingAlways(next);
-      e.currentTarget.classList.toggle('on', next);
-      showToast(next ? '새 일정에서 "이 시간에도 예약 받기"가 켜진 상태로 시작해요.' : '새 일정은 다시 꺼진 상태로 시작해요.');
-    });
-    document.querySelector('#settingsDetailBody .settings-simple-row:nth-last-child(2) .settings-action-btn').addEventListener('click', () => openLegalPage('terms'));
-    document.querySelector('#settingsDetailBody .settings-simple-row:last-child .settings-action-btn').addEventListener('click', () => openLegalPage('privacy'));
+    document.getElementById('termsPageBtn').addEventListener('click', () => openLegalPage('terms'));
+    document.getElementById('privacyPageBtn').addEventListener('click', () => openLegalPage('privacy'));
   }
 }
 
 function settingsBackAction(){
   const detailView = document.getElementById('settingsDetailView');
   if(detailView.classList.contains('active')){
+    settingsDetailStack.pop();
+    if(settingsDetailStack.length){
+      // 한 단계 더 들어간 화면 -> 바로 앞 화면 (예: 홈 화면 편집 -> 화면)
+      renderSettingsDetail(settingsDetailStack[settingsDetailStack.length - 1]);
+      return;
+    }
     // 상세 화면 -> 설정 메뉴 목록으로
     detailView.classList.remove('active');
     document.getElementById('settingsListView').classList.add('active');
