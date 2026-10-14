@@ -25945,7 +25945,7 @@ document.getElementById('bugReportSubmitBtn').addEventListener('click', async ()
       body: JSON.stringify({ targetType: 'BUG', reason: checked ? checked.value : '기타', detail, images: bugReportPhotos }),
     });
     goBackOrClose(closeBugReport);
-    showToast('오류 신고가 접수됐어요. 고마워요!');
+    showToast('소중한 의견 감사합니다. 확인 후 빠르게 고칠게요!');
   } catch(err){
     showToast(err.message);
   } finally {
