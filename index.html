@@ -1429,9 +1429,10 @@
   }
 
   /* ---------------- 소식 게시물 상세보기 (사진 -> 제목 -> 별점 -> 위치 -> 한줄소개 순) ---------------- */
+  /* gap을 화면 옆 여백(18px)과 같게 - 그래야 사진을 넘겼을 때 앞뒤 사진이 가장자리에 삐져나오지 않고 딱 한 장만 보임 */
   .feed-detail-photos{
     display:flex;
-    gap:4px;
+    gap:18px;
     overflow-x:auto;
     margin:0 -18px 14px;
     padding:0 18px;
@@ -14901,8 +14902,8 @@ function relayoutFeedDetailPhotosWhenLoaded(container){
   container.querySelectorAll('.feed-detail-photos img').forEach(img => img.addEventListener('load', () => layoutFeedDetailPhotos(container)));
   layoutFeedDetailPhotos(container);
 }
-// 상세 사진 크기 - 모든 사진을 같은 높이로 맞추고 너비는 각자 원래 비율대로.
-// 높이는 가장 가로로 긴 사진이 화면 너비에 딱 맞게 정해서, 가로 사진은 꽉 차고 세로 사진은 옆으로 나란히 이어짐.
+// 상세 사진 크기 - 사진은 항상 한 번에 한 장씩, 화면 너비에 꽉 차게 (옆으로 넘겨야 다음 사진이 나옴).
+// 높이는 첫 번째 사진 비율에 맞추고, 다른 비율의 사진은 그 틀에 맞게 가장자리를 잘라서 채움.
 // 사진이 하나면 원래 비율 그대로 화면 너비에 맞춤 (너무 길쭉한 세로 사진만 높이를 제한)
 function layoutFeedDetailPhotos(container){
   const row = container.querySelector('.feed-detail-photos');
@@ -14912,31 +14913,25 @@ function layoutFeedDetailPhotos(container){
   const W = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   if(W <= 0) return;
   const ratios = imgs.map(img => (img.naturalWidth && img.naturalHeight) ? img.naturalWidth / img.naturalHeight : (feedPhotoRatioCache.get(img.getAttribute('src')) || 0));
-  const known = ratios.filter(r => r > 0);
   const maxH = W * 1.25;
   row.classList.toggle('single', imgs.length === 1);
   let H;
   if(imgs.length === 1){
-    H = known.length ? Math.min(W / known[0], maxH) : W * 0.75;
+    H = ratios[0] > 0 ? Math.min(W / ratios[0], maxH) : W * 0.75;
   } else if(row.dataset.lockedH){
-    // 사진이 여러 장이면 처음 정한 높이를 끝까지 유지 - 늦게 도착한 사진 때문에 높이가 바뀌면
-    // 이미 보이던 사진 크기가 달라지고 두 번째 사진이 옆으로 밀려 보였음 (늦게 온 사진은 자기 너비만 맞춤)
+    // 사진이 여러 장이면 처음 정한 높이를 끝까지 유지 - 늦게 도착한 사진 때문에 높이가 바뀌면 보던 사진 크기가 달라짐
     H = parseFloat(row.dataset.lockedH);
   } else {
-    const widest = known.length ? Math.max(...known) : 4 / 3;
-    // 파노라마처럼 아주 긴 사진이 있어도 너무 납작해지지 않게 최소 높이를 둠 (그 사진만 옆으로 넘쳐서 밀어서 봄)
-    H = Math.max(W * 0.55, Math.min(W / widest, maxH));
-    row.dataset.lockedH = String(H);
+    // 첫 사진 비율로 높이를 정함 (아주 납작한 파노라마도 너무 얇아지지 않게 최소 높이)
+    H = ratios[0] > 0 ? Math.max(W * 0.55, Math.min(W / ratios[0], maxH)) : W;
+    if(ratios[0] > 0) row.dataset.lockedH = String(H);
   }
   // 크기를 바꿔도 보던 위치는 그대로 (사진이 늦게 와서 다시 맞출 때 옆으로 튀지 않게)
   const scrollLeft = row.scrollLeft;
   imgs.forEach((img, i) => {
     const r = ratios[i] || 3 / 4;
     img.style.height = Math.round(H) + 'px';
-    // 화면 너비에 거의 꽉 차는 사진(세로 3:4 사진 등)은 너비를 화면에 딱 맞춤 - 안 그러면 오른쪽에 다음 사진이
-    // 조금 삐져나와서 사진이 옆으로 밀려 보였음 (모자란 만큼은 위아래를 살짝 잘라서 채움)
-    const w = imgs.length === 1 ? Math.min(W, H * r) : (H * r >= W * 0.85 && H * r < W ? W : H * r);
-    img.style.width = Math.round(w) + 'px';
+    img.style.width = Math.round(imgs.length === 1 ? Math.min(W, H * r) : W) + 'px';
   });
   if(row.scrollLeft !== scrollLeft) row.scrollLeft = scrollLeft;
   // 앞에서부터 크기를 다 아는 사진까지만 보여줌 (그 앞 사진 크기가 안 바뀌니 더 이상 안 밀림)
