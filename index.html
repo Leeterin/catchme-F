@@ -14933,7 +14933,10 @@ function layoutFeedDetailPhotos(container){
   imgs.forEach((img, i) => {
     const r = ratios[i] || 3 / 4;
     img.style.height = Math.round(H) + 'px';
-    img.style.width = Math.round(imgs.length === 1 ? Math.min(W, H * r) : H * r) + 'px';
+    // 화면 너비에 거의 꽉 차는 사진(세로 3:4 사진 등)은 너비를 화면에 딱 맞춤 - 안 그러면 오른쪽에 다음 사진이
+    // 조금 삐져나와서 사진이 옆으로 밀려 보였음 (모자란 만큼은 위아래를 살짝 잘라서 채움)
+    const w = imgs.length === 1 ? Math.min(W, H * r) : (H * r >= W * 0.85 && H * r < W ? W : H * r);
+    img.style.width = Math.round(w) + 'px';
   });
   if(row.scrollLeft !== scrollLeft) row.scrollLeft = scrollLeft;
   // 앞에서부터 크기를 다 아는 사진까지만 보여줌 (그 앞 사진 크기가 안 바뀌니 더 이상 안 밀림)
