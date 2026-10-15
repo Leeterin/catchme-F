@@ -8131,6 +8131,72 @@
   #homeDash .neu-round, #homeDash .neu-round:active, #homeDash .neu-round:disabled{ background:var(--hm-accent-soft); color:var(--hm-accent); box-shadow:none; }
   #homeDash .neu-track > span{ background:var(--hm-accent); }
   #homeDash .neu-chip{ background:var(--hm-accent); color:#fff; }
+  /* 작은 위젯 (오늘 / 친구 / 안 읽은 메시지) - 반 칸, 둘이 나란히 */
+  #homeDash > .home-mini{ flex:1 1 calc(50% - 6px); }
+  #homeDash .home-mini{
+    display:flex; flex-direction:column; align-items:flex-start; min-height:150px;
+    text-align:left; font-family:inherit; cursor:pointer;
+  }
+  #homeDash .home-mini:active{ opacity:.85; }
+  .hm-mini-label{ font-size:13px; font-weight:500; color:var(--hm-dim); }
+  .hm-mini-big{ font-size:40px; font-weight:800; line-height:1.1; letter-spacing:-0.03em; color:var(--hm-ink); margin-top:4px; }
+  .hm-mini-big small{ font-size:16px; font-weight:700; margin-left:2px; }
+  .hm-mini-label.accent, .hm-mini-big.accent{ color:var(--hm-accent); font-weight:700; }
+  .hm-mini-sub{ font-size:13px; color:var(--hm-dim); }
+  .hm-mini-foot{ margin-top:auto; padding-top:10px; width:100%; font-size:12.5px; font-weight:600; color:var(--hm-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hm-mini-faces{ display:flex; margin-top:auto; padding-top:10px; }
+  .hm-mini-faces .hp-face{ width:30px; height:30px; font-size:12px; margin-right:-7px; box-shadow:0 0 0 2px var(--hm-card); }
+  /* 맨 아래 [홈 편집] */
+  #homeDash > .home-edit-entry{
+    flex:0 0 auto; margin:2px auto 0; padding:8px 16px; border:none; border-radius:999px;
+    background:var(--hm-card); color:var(--hm-dim); font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  /* 홈 편집 중 - 아이폰처럼 흔들리고, 왼쪽 위에 [−] */
+  #homeDash > [data-home-key]{ -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+  .home-edit-x{ display:none; }
+  .home-edit-bar{ display:none; }
+  body.home-editing .home-edit-bar{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    position:fixed; top:0; left:0; right:0; z-index:60;
+    padding:calc(12px + env(safe-area-inset-top)) 16px 12px; background:var(--hm-bg);
+  }
+  .home-edit-add, .home-edit-done{ border:none; font-family:inherit; cursor:pointer; }
+  .home-edit-add{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--hm-card); color:var(--hm-ink); }
+  .home-edit-done{ padding:9px 18px; border-radius:999px; background:var(--hm-accent); color:#fff; font-size:14px; font-weight:700; }
+  .home-edit-hint{ font-size:12.5px; color:var(--hm-dim); }
+  body.home-editing #homeDash > .home-edit-entry, body.home-editing #homePendingCard{ display:none !important; }
+  body.home-editing #homeDash > [data-home-key]{ position:relative; overflow:visible; touch-action:pan-y; transition:none; animation:homeJiggle .3s ease-in-out infinite; }
+  #homeDash .home-edit-x svg{ width:12px; height:12px; padding:0; border-radius:0; box-shadow:none; color:#fff; }
+  body.home-editing #homeDash > [data-home-key]:nth-child(2n){ animation-delay:-.15s; animation-direction:reverse; }
+  body.home-editing #homeDash > [data-home-key] > :not(.home-edit-x){ pointer-events:none; }
+  body.home-editing #homeDash > [data-home-key].dragging{ animation:none; z-index:20; box-shadow:0 14px 34px rgba(0,0,0,0.18); opacity:.96; }
+  @keyframes homeJiggle{ 0%,100%{ transform:rotate(-0.5deg); } 50%{ transform:rotate(0.5deg); } }
+  body.home-editing .home-edit-x{
+    display:flex; align-items:center; justify-content:center;
+    position:absolute; top:-8px; left:-8px; z-index:2; width:26px; height:26px; border-radius:50%;
+    background:#8E8984; color:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.2); cursor:pointer;
+  }
+  /* 위젯 추가 시트 */
+  .home-widget-overlay{ display:none; position:fixed; inset:0; z-index:70; background:rgba(0,0,0,0.35); align-items:flex-end; }
+  .home-widget-overlay.show{ display:flex; }
+  .home-widget-sheet{
+    width:100%; max-height:75vh; overflow-y:auto; box-sizing:border-box;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom)); border-radius:24px 24px 0 0;
+    background:var(--hm-bg); color:var(--hm-ink);
+  }
+  .home-widget-sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; font-size:17px; }
+  .home-widget-close{ border:none; background:none; font-size:26px; line-height:1; color:var(--hm-dim); cursor:pointer; }
+  .home-widget-gallery{ display:flex; flex-direction:column; gap:8px; }
+  .home-widget-gallery .home-empty{ color:var(--hm-dim); font-size:13px; padding:12px 0; }
+  .home-widget-item{ display:flex; align-items:center; gap:12px; padding:12px; border-radius:18px; background:var(--hm-card); }
+  .home-widget-thumb{ flex-shrink:0; width:48px; height:48px; display:flex; align-items:center; }
+  .home-widget-thumb i{ display:block; height:26px; border-radius:7px; background:var(--hm-accent-soft); border:1.5px solid var(--hm-accent); box-sizing:border-box; }
+  .home-widget-thumb.small i{ width:26px; margin:0 auto; }
+  .home-widget-thumb.wide i{ width:48px; }
+  .home-widget-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .home-widget-info b{ font-size:14.5px; }
+  .home-widget-info small{ font-size:12px; color:var(--hm-dim); }
+  .home-widget-add{ flex-shrink:0; border:none; padding:8px 14px; border-radius:999px; background:var(--hm-accent); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
 </style>
 </head>
 <body class="app-booting">
@@ -8296,6 +8362,25 @@
     <div class="home-card" id="homeGroupCard" data-home-key="group">
       <div class="home-card-title"><span>내 그룹</span><span class="home-card-title-actions"><button type="button" class="home-card-link" id="homeGroupManageBtn">관리</button><button type="button" class="home-card-link home-card-plus" id="homeGroupAddBtn" aria-label="새 그룹 만들기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg></button></span></div>
       <div class="home-group-list" id="homeGroupList"></div>
+    </div>
+    <!-- 작은 위젯들 - 처음엔 홈에 없고, 홈 편집의 [+ 위젯 추가]나 설정 > 홈 화면 편집에서 켜면 나옴 -->
+    <button type="button" class="home-card home-mini" id="homeTodayCard" data-home-key="today"></button>
+    <button type="button" class="home-card home-mini" id="homeFriendsCard" data-home-key="friends"></button>
+    <button type="button" class="home-card home-mini" id="homeUnreadCard" data-home-key="unread"></button>
+    <!-- 맨 아래 [홈 편집] - 카드를 꾹 눌러도 편집이 시작됨 (applyHomeOrder가 항상 맨 뒤로 옮김) -->
+    <button type="button" class="home-edit-entry" id="homeEditEntryBtn">홈 편집</button>
+  </div>
+  <!-- 홈 편집 중 위쪽 막대 - 아이폰처럼 왼쪽 [+], 오른쪽 [완료] -->
+  <div class="home-edit-bar" id="homeEditBar">
+    <button type="button" class="home-edit-add" id="homeEditAddBtn" aria-label="위젯 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" width="18" height="18"><path d="M12 5v14M5 12h14"/></svg></button>
+    <span class="home-edit-hint">끌어서 옮기고 −로 빼요</span>
+    <button type="button" class="home-edit-done" id="homeEditDoneBtn">완료</button>
+  </div>
+  <!-- 위젯 추가 - 지금 홈에 없는 위젯 목록 -->
+  <div class="home-widget-overlay" id="homeWidgetOverlay">
+    <div class="home-widget-sheet">
+      <div class="home-widget-sheet-head"><b>위젯 추가</b><button type="button" class="home-widget-close" id="homeWidgetCloseBtn" aria-label="닫기">&times;</button></div>
+      <div class="home-widget-gallery" id="homeWidgetGallery"></div>
     </div>
   </div>
 
@@ -11447,6 +11532,7 @@ const panels = {
 
 let currentTopTab = null; // 지금 보고 있는 아래 탭 (null = 메인 캘린더)
 function showTab(tabKey){
+  exitHomeEdit(); // 홈 편집 중에 다른 화면으로 가면 편집은 끝냄
   currentTopTab = tabKey;
   profileReturnToChat = null; // 다른 탭으로 옮기면 "프로필 닫으면 채팅방으로" 상태는 버림
   document.body.classList.remove('chat-open');
@@ -12093,13 +12179,17 @@ function renderHomePending(){
 // ---------- 홈 화면 편집 (설정 > 홈 화면 편집) ----------
 // 홈 카드 이름표(data-home-key)와 설정 목록에 보일 이름 - 이 순서가 기본 순서
 // (다가오는 약속·내 그룹이 붙어 있으면 맨 위에 반반으로 나란히 보임)
+// size: 'small'은 반 칸(둘이 나란히), 'wide'는 한 줄 전체 / defaultOff: 직접 추가하기 전까진 홈에 없음
 const HOME_SECTIONS = [
-  { key: 'upcoming', label: '다가오는 약속' },
-  { key: 'group', label: '내 그룹' },
-  { key: 'plan', label: '약속 잡기 버튼' },
-  { key: 'match', label: '이번 주 시간 맞는 친구' },
-  { key: 'avail', label: '내 예약 가능 시간' },
-  { key: 'goal', label: '이번 달 목표' },
+  { key: 'upcoming', label: '다가오는 약속', size: 'small', desc: '가장 가까운 약속과 D-day' },
+  { key: 'group', label: '내 그룹', size: 'small', desc: '친구 그룹을 바로 열고 만들기' },
+  { key: 'plan', label: '약속 잡기 버튼', size: 'wide', desc: '친구를 골라 약속 잡기 시작' },
+  { key: 'match', label: '이번 주 시간 맞는 친구', size: 'wide', desc: '이번 주에 나와 시간이 겹치는 친구' },
+  { key: 'avail', label: '내 예약 가능 시간', size: 'wide', desc: '앞으로 7일 동안 열어둔 시간' },
+  { key: 'goal', label: '이번 달 목표', size: 'wide', desc: '운동·독서처럼 한 달 목표 세기' },
+  { key: 'today', label: '오늘', size: 'small', desc: '오늘 날짜와 오늘 약속', defaultOff: true },
+  { key: 'friends', label: '친구', size: 'small', desc: '친구 수와 얼굴', defaultOff: true },
+  { key: 'unread', label: '안 읽은 메시지', size: 'small', desc: '안 읽은 채팅 수', defaultOff: true },
 ];
 // 저장된 순서 + (나중에 새로 생긴 카드는 기본 자리 순서대로 뒤에)
 function currentHomeOrder(){
@@ -12108,7 +12198,10 @@ function currentHomeOrder(){
   return [...new Set([...saved, ...known])];
 }
 function isHomeSectionHidden(key){
-  return Array.isArray(settingsState.home_hidden) && settingsState.home_hidden.includes(key);
+  if(Array.isArray(settingsState.home_hidden) && settingsState.home_hidden.includes(key)) return true;
+  // 나중에 생긴 위젯(defaultOff)은 직접 추가해서 저장된 순서에 들어가기 전까진 숨김
+  const sec = HOME_SECTIONS.find(x => x.key === key);
+  return !!(sec && sec.defaultOff) && !(Array.isArray(settingsState.home_order) && settingsState.home_order.includes(key));
 }
 // 홈 카드들을 저장된 순서대로 다시 놓고, 끈 카드는 숨김 ('답할 차례'는 맨 위 그대로)
 function applyHomeOrder(){
@@ -12120,15 +12213,23 @@ function applyHomeOrder(){
     dash.appendChild(el);
     el.classList.toggle('home-section-off', isHomeSectionHidden(key));
   });
+  const entry = document.getElementById('homeEditEntryBtn');
+  if(entry) dash.appendChild(entry);
 }
 function setHomeSectionHidden(key, hidden){
   const cur = Array.isArray(settingsState.home_hidden) ? settingsState.home_hidden : [];
   settingsState.home_hidden = hidden ? [...new Set([...cur, key])] : cur.filter(k => k !== key);
   try { localStorage.setItem('catchme_home_hidden', JSON.stringify(settingsState.home_hidden)); } catch(_){}
+  // defaultOff 위젯을 켜면 저장된 순서에 넣어야 계속 보임
+  const saved = Array.isArray(settingsState.home_order) ? settingsState.home_order : [];
+  if(!hidden && !saved.includes(key)) setHomeOrder(currentHomeOrder(), key);
   applyHomeOrder();
   saveSettingToServer('home_hidden');
 }
-function setHomeOrder(order){
+// showKey: 이번에 켜는 defaultOff 위젯 - 그 밖에 아직 추가 안 한 defaultOff 위젯은 순서에 넣지 않음 (넣으면 켜진 걸로 보임)
+function setHomeOrder(order, showKey){
+  const saved = Array.isArray(settingsState.home_order) ? settingsState.home_order : [];
+  order = order.filter(k => k === showKey || saved.includes(k) || !(HOME_SECTIONS.find(x => x.key === k) || {}).defaultOff);
   settingsState.home_order = order;
   try { localStorage.setItem('catchme_home_order', JSON.stringify(order)); } catch(_){}
   applyHomeOrder();
@@ -12209,6 +12310,203 @@ function attachHomeOrderDrag(row){
 // 집어 든 동안은 설정 화면이 스크롤되지 않게 (iOS는 touchmove를 막아야 함)
 document.addEventListener('touchmove', (e) => { if(homeOrderDrag) e.preventDefault(); }, { passive: false });
 
+// ---------- 작은 위젯 (오늘 / 친구 / 안 읽은 메시지) ----------
+function renderHomeMiniWidgets(){
+  const todayCard = document.getElementById('homeTodayCard');
+  if(!todayCard) return;
+  const todayKey = toDateInputValue(TODAY);
+  const todays = homeUpcomingAppointments().filter(x => toDateInputValue(x.pin.dateObj) === todayKey);
+  const first = todays[0];
+  todayCard.innerHTML = `
+    <span class="hm-mini-label accent">${WEEKDAY_KO[TODAY.getDay()]}요일</span>
+    <b class="hm-mini-big">${TODAY.getDate()}</b>
+    <span class="hm-mini-sub">${TODAY.getMonth() + 1}월</span>
+    <span class="hm-mini-foot">${first
+      ? escapeHtml(`${first.room.name || '약속'}${first.pin.timeLabel ? ' · ' + first.pin.timeLabel : ''}${todays.length > 1 ? ` 외 ${todays.length - 1}개` : ''}`)
+      : '오늘 약속 없음'}</span>`;
+
+  const friends = groupableFriends();
+  const faces = friends.slice(0, 4).map(f => f.avatar
+    ? `<span class="hp-face"><img src="${f.avatar}" alt="" /></span>`
+    : `<span class="hp-face" style="background:${f.color}">${escapeHtml((f.name || '?')[0])}</span>`).join('');
+  document.getElementById('homeFriendsCard').innerHTML = `
+    <span class="hm-mini-label">친구</span>
+    <b class="hm-mini-big">${friends.length}<small>명</small></b>
+    ${faces ? `<span class="hm-mini-faces">${faces}</span>` : '<span class="hm-mini-foot">친구를 추가해 보세요</span>'}`;
+
+  const rooms = Object.values(CHAT_ROOMS).filter(r => (r.unreadCount || 0) > 0);
+  const total = rooms.reduce((sum, r) => sum + r.unreadCount, 0);
+  document.getElementById('homeUnreadCard').innerHTML = `
+    <span class="hm-mini-label">안 읽은 메시지</span>
+    <b class="hm-mini-big${total ? ' accent' : ''}">${total > 99 ? '99+' : total}</b>
+    <span class="hm-mini-foot">${rooms.length
+      ? escapeHtml(rooms.slice(0, 2).map(r => r.name || '채팅').join(', ') + (rooms.length > 2 ? ` 외 ${rooms.length - 2}곳` : ''))
+      : '모두 읽었어요'}</span>`;
+  ensureHomeEditBadges(); // innerHTML로 다시 그리면 편집용 [−]도 지워져서 다시 붙임
+}
+document.getElementById('homeTodayCard').addEventListener('click', () => switchTopTab('schedule'));
+document.getElementById('homeFriendsCard').addEventListener('click', () => switchTopTab('friends'));
+document.getElementById('homeUnreadCard').addEventListener('click', () => switchTopTab('chat'));
+
+// ---------- 홈 위젯 편집 (아이폰 홈 화면처럼) ----------
+// 카드를 꾹 누르거나 맨 아래 [홈 편집] → 카드가 흔들리고, 끌어서 옮기고, [−]로 빼고, 위쪽 [+]로 추가.
+// 저장은 설정 > 홈 화면 편집과 같은 home_order/home_hidden 그대로
+let homeWidgetDrag = null;
+let homeSwallowClick = false; // 꾹 눌러 편집을 시작한 손을 뗄 때 그 카드의 원래 버튼이 눌리지 않게
+function ensureHomeEditBadges(){
+  const labels = Object.fromEntries(HOME_SECTIONS.map(x => [x.key, x.label]));
+  document.querySelectorAll('#homeDash > [data-home-key]').forEach(el => {
+    if(el.querySelector(':scope > .home-edit-x')) return;
+    el.insertAdjacentHTML('beforeend', `<span class="home-edit-x" role="button" aria-label="${escapeHtml(labels[el.dataset.homeKey] || '')} 빼기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" width="12" height="12"><path d="M6 12h12"/></svg></span>`);
+  });
+}
+function enterHomeEdit(){
+  if(document.body.classList.contains('home-editing')) return;
+  ensureHomeEditBadges();
+  document.body.classList.add('home-editing');
+  if(navigator.vibrate) try{ navigator.vibrate(15); }catch(_){}
+}
+// 다른 탭으로 갈 때도 불림 (앱 켜는 중에도 불릴 수 있어서 편집 중이 아니면 바로 끝냄)
+function exitHomeEdit(){
+  if(!document.body.classList.contains('home-editing')) return;
+  endHomeWidgetDrag();
+  document.body.classList.remove('home-editing');
+}
+function removeHomeWidget(key){
+  setHomeSectionHidden(key, true);
+  const sec = HOME_SECTIONS.find(x => x.key === key);
+  showToast(`'${sec ? sec.label : '위젯'}'을 뺐어요. 위쪽 +로 다시 넣을 수 있어요`);
+}
+function addHomeWidget(key){
+  // 아이폰처럼 새 위젯은 맨 위에 - 끌어서 원하는 자리로
+  setHomeOrder([key, ...currentHomeOrder().filter(k => k !== key)], key);
+  setHomeSectionHidden(key, false);
+  renderHomeDash();
+  ensureHomeEditBadges();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function startHomeWidgetDrag(el, pointerId, x, y){
+  const r = el.getBoundingClientRect();
+  homeWidgetDrag = { el, pointerId, x, y, grabX: x - r.left, grabY: y - r.top, lastSwap: 0 };
+  el.classList.add('dragging');
+  // 화면 위/아래 끝에 손가락을 대고 있으면 천천히 스크롤 (가만히 있어도)
+  homeWidgetDrag.scrollTimer = setInterval(() => {
+    const d = homeWidgetDrag;
+    if(!d) return;
+    const dy = d.y < 90 ? -10 : d.y > window.innerHeight - 110 ? 10 : 0;
+    if(!dy) return;
+    window.scrollBy(0, dy);
+    moveHomeWidgetDrag(d.x, d.y);
+  }, 16);
+  moveHomeWidgetDrag(x, y);
+}
+function moveHomeWidgetDrag(x, y){
+  const d = homeWidgetDrag;
+  if(!d) return;
+  d.x = x; d.y = y;
+  const dash = document.getElementById('homeDash');
+  // 손가락 밑에 있는 위젯 앞/뒤로 끼움 - 반 칸 위젯은 좌우 절반, 한 줄 위젯은 위아래 절반 기준
+  if(Date.now() - d.lastSwap > 150){
+    const others = [...dash.querySelectorAll(':scope > [data-home-key]:not(.home-section-off)')].filter(w => w !== d.el);
+    const w = others.find(o => { const r = o.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; });
+    if(w){
+      const r = w.getBoundingClientRect();
+      const before = r.width < dash.clientWidth * 0.75 ? x < r.left + r.width / 2 : y < r.top + r.height / 2;
+      if(before ? d.el.nextElementSibling !== w : w.nextElementSibling !== d.el){
+        dash.insertBefore(d.el, before ? w : w.nextSibling);
+        d.lastSwap = Date.now();
+      }
+    }
+  }
+  // 집어 든 위젯은 손가락을 따라감
+  d.el.style.transform = '';
+  const r = d.el.getBoundingClientRect();
+  d.el.style.transform = `translate(${x - d.grabX - r.left}px, ${y - d.grabY - r.top}px) scale(1.03)`;
+}
+function endHomeWidgetDrag(){
+  const d = homeWidgetDrag;
+  if(!d) return;
+  homeWidgetDrag = null;
+  clearInterval(d.scrollTimer);
+  d.el.classList.remove('dragging');
+  d.el.style.transform = '';
+  const order = [...document.querySelectorAll('#homeDash > [data-home-key]')].map(w => w.dataset.homeKey);
+  if(order.join() !== currentHomeOrder().join()) setHomeOrder(order);
+}
+(function attachHomeWidgetEditing(){
+  const dash = document.getElementById('homeDash');
+  let press = null;
+  const clearPress = () => { if(press) clearTimeout(press.timer); press = null; };
+  dash.addEventListener('contextmenu', (e) => { if(e.target.closest('#homeDash > [data-home-key]')) e.preventDefault(); });
+  dash.addEventListener('pointerdown', (e) => {
+    homeSwallowClick = false;
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.target.closest('#homeDash > [data-home-key]');
+    if(!el || e.target.closest('.home-edit-x')) return;
+    clearPress();
+    const editing = document.body.classList.contains('home-editing');
+    // 평소엔 0.5초 꾹 누르면 편집 시작 + 바로 집어 듦, 편집 중엔 0.2초만 누르고 있으면 집어 듦 (바로 쓸면 스크롤)
+    press = { el, pointerId: e.pointerId, x: e.clientX, y: e.clientY };
+    press.timer = setTimeout(() => {
+      const p = press;
+      press = null;
+      if(!document.body.classList.contains('home-editing')){ enterHomeEdit(); homeSwallowClick = true; }
+      startHomeWidgetDrag(p.el, p.pointerId, p.x, p.y);
+    }, editing ? 200 : 500);
+  });
+  document.addEventListener('pointermove', (e) => {
+    if(press && e.pointerId === press.pointerId && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) clearPress();
+    const d = homeWidgetDrag;
+    if(!d || e.pointerId !== d.pointerId) return;
+    e.preventDefault();
+    moveHomeWidgetDrag(e.clientX, e.clientY);
+  }, { passive: false });
+  const up = (e) => {
+    if(press && e.pointerId === press.pointerId) clearPress();
+    if(homeWidgetDrag && e.pointerId === homeWidgetDrag.pointerId) endHomeWidgetDrag();
+  };
+  document.addEventListener('pointerup', up);
+  document.addEventListener('pointercancel', up);
+  document.addEventListener('touchmove', (e) => { if(homeWidgetDrag) e.preventDefault(); }, { passive: false });
+  // 편집 중엔 카드 안 버튼이 안 눌리고 [−]만 동작, 빈 곳을 누르면 편집 끝
+  dash.addEventListener('click', (e) => {
+    if(homeSwallowClick){ homeSwallowClick = false; e.preventDefault(); e.stopPropagation(); return; }
+    if(!document.body.classList.contains('home-editing')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const x = e.target.closest('.home-edit-x');
+    if(x) removeHomeWidget(x.parentElement.dataset.homeKey);
+    else if(e.target === dash) exitHomeEdit();
+  }, true);
+  document.getElementById('homeEditEntryBtn').addEventListener('click', enterHomeEdit);
+  document.getElementById('homeEditDoneBtn').addEventListener('click', exitHomeEdit);
+  document.getElementById('homeEditAddBtn').addEventListener('click', openHomeWidgetGallery);
+  document.getElementById('homeWidgetCloseBtn').addEventListener('click', () => goBackOrClose(closeHomeWidgetGallery));
+  document.getElementById('homeWidgetOverlay').addEventListener('click', (e) => {
+    if(e.target.id === 'homeWidgetOverlay') goBackOrClose(closeHomeWidgetGallery);
+  });
+})();
+// 위젯 추가 - 지금 홈에 없는 위젯만 (크기 그림: 반 칸 / 한 줄)
+function openHomeWidgetGallery(){
+  const list = document.getElementById('homeWidgetGallery');
+  const off = HOME_SECTIONS.filter(x => isHomeSectionHidden(x.key));
+  list.innerHTML = off.length ? off.map(x => `
+    <div class="home-widget-item">
+      <span class="home-widget-thumb ${x.size}"><i></i></span>
+      <span class="home-widget-info"><b>${escapeHtml(x.label)}</b><small>${escapeHtml(x.desc)} · ${x.size === 'small' ? '반 칸' : '한 줄'}</small></span>
+      <button type="button" class="home-widget-add" data-key="${x.key}">추가</button>
+    </div>`).join('') : '<div class="home-empty">홈에 모든 위젯이 있어요. 빼고 싶은 위젯은 −를 눌러요.</div>';
+  list.querySelectorAll('.home-widget-add').forEach(btn => btn.addEventListener('click', () => {
+    goBackOrClose(closeHomeWidgetGallery);
+    addHomeWidget(btn.dataset.key);
+  }));
+  document.getElementById('homeWidgetOverlay').classList.add('show');
+  pushViewState(closeHomeWidgetGallery); // 폰 뒤로가기로 이 창부터 닫히게
+}
+function closeHomeWidgetGallery(){
+  document.getElementById('homeWidgetOverlay').classList.remove('show');
+}
+
 function renderHomeDash(){
   const listEl = document.getElementById('homeUpcomingList');
   if(!listEl) return;
@@ -12218,6 +12516,7 @@ function renderHomeDash(){
   renderHomePlanCta();
   renderHomeFriendMatches();
   renderHomeGroupCard();
+  renderHomeMiniWidgets();
   const items = homeUpcomingAppointments();
   if(!items.length){
     // 맨 위 버튼 이름이 상황에 따라 바뀌니(친구 추가하기/약속 잡기) 그 이름 그대로 안내
@@ -24412,6 +24711,7 @@ function updateChatNavBadge(){
   } else {
     badge.style.display = 'none';
   }
+  try { renderHomeMiniWidgets(); } catch(_){} // 홈의 '안 읽은 메시지' 위젯도 같이
 }
 function markRoomRead(roomId){
   const room = CHAT_ROOMS[roomId];
