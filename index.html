@@ -9072,7 +9072,7 @@
     </div>
   </div>
 
-  <div class="server-waking-banner" id="serverWakingBanner" hidden><span class="server-waking-spinner"></span>서버를 깨우는 중이에요. 최대 30초 정도 걸릴 수 있어요</div>
+  <div class="server-waking-banner" id="serverWakingBanner" hidden><span class="server-waking-spinner"></span><span id="serverWakingText">서버를 깨우는 중이에요. 최대 30초 정도 걸릴 수 있어요</span></div>
 
   <!-- 앱 오류 신고 팝업 - 폰을 흔들거나 설정 메뉴 "오류 신고하기"로 열림 -->
   <div class="mini-confirm-overlay" id="bugReportOverlay">
@@ -10012,19 +10012,25 @@ let isRefreshingToken = null; // 리프레시가 동시에 여러 번 실행되�
 // 서버(무료 요금제)는 한동안 안 쓰면 잠들어서 첫 요청이 30초 넘게 걸릴 수 있음 - 요청이 3초 넘게
 // 안 끝나면 화면 위에 "서버를 깨우는 중" 안내를 띄워서 앱이 멈춘 것처럼 보이지 않게 함
 let slowRequestCount = 0;
-function setServerWakingBanner(show){
+const SERVER_WAKING_DEFAULT_TEXT = '서버를 깨우는 중이에요. 최대 30초 정도 걸릴 수 있어요';
+// message를 주면 그 문구로 띄움 (예: 리뷰 올릴 땐 "리뷰 업로드 중이에요")
+function setServerWakingBanner(show, message){
   const el = document.getElementById('serverWakingBanner');
-  if(el) el.hidden = !show;
+  if(!el) return;
+  const text = document.getElementById('serverWakingText');
+  if(show && text) text.textContent = message || SERVER_WAKING_DEFAULT_TEXT;
+  el.hidden = !show;
 }
 async function apiRequest(path, options = {}, _isRetry) {
-  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  const { slowMessage, ...fetchOptions } = options; // slowMessage: 오래 걸릴 때 띄울 문구 (fetch엔 안 넘김)
+  const headers = { 'Content-Type': 'application/json', ...(fetchOptions.headers || {}) };
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
 
   let res;
   let isSlow = false;
-  const slowTimer = setTimeout(() => { isSlow = true; slowRequestCount++; setServerWakingBanner(true); }, 3000);
+  const slowTimer = setTimeout(() => { isSlow = true; slowRequestCount++; setServerWakingBanner(true, slowMessage); }, 3000);
   try {
-    res = await fetch(API_BASE_URL + path, { ...options, headers });
+    res = await fetch(API_BASE_URL + path, { ...fetchOptions, headers });
   } catch (networkErr) {
     throw new Error('서버에 연결할 수 없어요. 인터넷 연결을 확인하고 잠시 후 다시 시도해주세요.');
   } finally {
@@ -13553,7 +13559,7 @@ document.addEventListener('click', async (e) => {
   }
   const note = document.getElementById('meetupReviewNoteInput').value.trim();
   try {
-    await apiRequest(`/meetups/${meetup.serverId}/reviews`, { method: 'POST', body: JSON.stringify({ rating: meetupReviewSelectedRating, note: note || null }) });
+    await apiRequest(`/meetups/${meetup.serverId}/reviews`, { method: 'POST', slowMessage: '리뷰 업로드 중이에요', body: JSON.stringify({ rating: meetupReviewSelectedRating, note: note || null }) });
     showToast('후기를 남겼어요!');
     loadAndRenderMeetupReviews(meetup);
   } catch(err){
@@ -14680,6 +14686,7 @@ async function submitPlaceReview(note, btn){
   try {
     const data = await apiRequest('/feed', {
       method: 'POST',
+      slowMessage: '리뷰 업로드 중이에요',
       body: JSON.stringify({
         category: info.category, title: c.name, note, tags, fromMeetup: true, photos: st.photos,
         location: info.address || c.address || '', address: info.address || null, phone: info.phone || null,
@@ -16081,6 +16088,7 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
       if(!editingFeedPostId) return;
       const data = await apiRequest(`/feed/${editingFeedPostId}`, {
         method: 'PATCH',
+        slowMessage: '리뷰 업로드 중이에요',
         body: JSON.stringify({ title, note, location, rating: feedSelectedRating, photos: feedSelectedPhotos, lat: feedLat, lon: feedLon, address: feedAddress, phone: feedPhone }),
       });
       let updated = null;
@@ -16098,6 +16106,7 @@ document.getElementById('feedCreateSubmitBtn').addEventListener('click', async (
     // ---------- 새 게시물 작성 ----------
     const data = await apiRequest('/feed', {
       method: 'POST',
+      slowMessage: '리뷰 업로드 중이에요',
       body: JSON.stringify({ category: feedCreateSelectedCategory, title, note, rating: feedSelectedRating, photos: feedSelectedPhotos, location, lat: feedLat, lon: feedLon, address: feedAddress, phone: feedPhone }),
     });
     FEED_POSTS[feedCreateSelectedCategory].unshift(data.post);
