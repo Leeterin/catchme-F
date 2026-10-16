@@ -1,0 +1,116 @@
+# iOS 앱을 빌드해서 TestFlight에 올린다.
+# 화면(index.html)만 바꾼 경우는 Render 배포로 바로 반영되니 이걸 돌릴 필요 없다.
+# 아이콘·플러그인·권한·capacitor.config.json 같은 네이티브 부분을 바꿨을 때만 돌린다.
+#
+# 실행: GitHub 저장소 > Actions > "iOS TestFlight 업로드" > Run workflow
+#   또는 ios-v1.0.1 같은 태그를 push
+#
+# 필요한 저장소 Secrets (Settings > Secrets and variables > Actions)
+#   APP_STORE_CONNECT_KEY_ID     : App Store Connect API 키 ID
+#   APP_STORE_CONNECT_ISSUER_ID  : 발급자(Issuer) ID
+#   APP_STORE_CONNECT_API_KEY    : 내려받은 AuthKey_XXXX.p8 파일 내용 전체
+name: iOS TestFlight 업로드
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '앱 버전 (비워두면 Xcode에 적힌 버전 그대로, 예: 1.0.1)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'ios-v*'
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 웹 빌드 + 검사 + iOS 동기화
+        run: |
+          npm run build
+          npm test
+          npx cap sync ios
+
+      - name: API 키 파일 만들기
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY" > "$RUNNER_TEMP/keys/AuthKey.p8"
+
+      - name: 빌드 번호·버전 정하기
+        id: ver
+        run: |
+          # 빌드 번호는 매번 커져야 업로드된다. 시각(년월일시분)을 써서 손으로 올린 빌드와도 겹치지 않게 한다.
+          echo "build=$(date -u +%y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ] && [[ "$GITHUB_REF_NAME" == ios-v* ]]; then
+            VERSION="${GITHUB_REF_NAME#ios-v}"
+          fi
+          if [ -n "$VERSION" ]; then
+            echo "version_arg=MARKETING_VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 아카이브
+        run: |
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
+            CURRENT_PROJECT_VERSION=${{ steps.ver.outputs.build }} \
+            ${{ steps.ver.outputs.version_arg }}
+
+      - name: TestFlight로 업로드
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>Z86JLY6SML</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+          echo "빌드 ${{ steps.ver.outputs.build }} 업로드 완료. App Store Connect에서 처리되면 TestFlight에 나타나요." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: API 키 지우기
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
