@@ -23107,10 +23107,11 @@ function renderFriendsTopParts(){
     for(let i = 0; i < 7; i++){
       const d = new Date(TODAY);
       d.setDate(d.getDate() + i);
-      const avail = getEventsForDate(d).filter(e => e.type === 'available');
+      // 오늘 이미 지난 부분은 빼고 셈 - 캘린더에서 사라진 시간이 "오늘 열어둠"으로 남지 않게
+      const avail = getEventsForDate(d).filter(e => e.type === 'available' && availRangeFromNow(e, d));
       if(!avail.length) continue;
       days.push(i === 0 ? '오늘' : WEEKDAY_KO[d.getDay()]);
-      avail.forEach(e => { const r = getEventDisplayRangeForDate(e, d); mins += Math.max(0, r.endMin - r.startMin); });
+      avail.forEach(e => { const r = availRangeFromNow(e, d); mins += Math.max(0, r.endMin - r.startMin); });
     }
     const name = myProfileData.name || '나';
     const img = myProfileData.profileImageUrl;
@@ -33078,7 +33079,8 @@ function myAvailableDayCount(startDate, endDate){
   const d = new Date(startDate);
   d.setHours(0, 0, 0, 0);
   while(d <= endDate){
-    if(getEventsForDate(d).some(e => e.type === 'available')) n++;
+    // 오늘 이미 다 지난 예약 가능 시간은 캘린더에서 사라지니 날 수에서도 뺌
+    if(getEventsForDate(d).some(e => e.type === 'available' && availRangeFromNow(e, d))) n++;
     d.setDate(d.getDate() + 1);
   }
   return n;
