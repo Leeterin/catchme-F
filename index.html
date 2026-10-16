@@ -8018,10 +8018,10 @@
   #homeDash .home-avail-status{ color:var(--neu-dim); }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
-  .month-avail-mark{ display:flex; align-items:center; justify-content:center; gap:2px; height:13px; margin:1px 0 2px; }
+  .month-avail-mark{ display:flex; align-items:center; justify-content:center; gap:2px; height:13px; margin:1px 0 2px; flex-shrink:0; }
   .month-avail-mark .month-avail-dot{ flex-shrink:0; margin:0; }
-  /* 이모티콘은 글자 칸보다 위로 커서 line-height:1이면 윗부분이 잘림 → 줄 높이를 넉넉히 */
-  .month-avail-emoji{ font-size:9px; line-height:13px; white-space:nowrap; overflow:hidden; }
+  /* 이모티콘은 글자 칸보다 위로 커서 overflow:hidden이면 윗부분이 잘림 → 잘라내지 않음 (최대 3개라 칸을 넘지 않음) */
+  .month-avail-emoji{ font-size:9px; line-height:13px; white-space:nowrap; overflow:visible; }
   /* 이모티콘 대신 쓰는 라인 아이콘 */
   svg.li{ display:inline-block; flex-shrink:0; }
   .place-review-tag .em svg.li, .feed-review-tag svg.li{ width:15px; height:15px; }
