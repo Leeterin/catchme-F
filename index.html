@@ -8628,6 +8628,7 @@
   #feedReviewProfileBadge .meet-badge-chip svg{ display:none; }
   .feed-review-profile-card .feed-review-profile-mine{ margin-top:4px; font-size:13px; font-weight:500; color:var(--mz-gray); }
   #feedReviewProfileEditBtn{ width:32px; height:32px; border:none; border-radius:50%; background:transparent; color:var(--mz-gray); display:flex; align-items:center; justify-content:center; }
+  #feedReviewProfileEditBtn svg{ width:16px; height:16px; }
   /* 카테고리 칩 - 흰 알약, 고른 칩은 검정 */
   #feedSegment{ gap:8px; margin-bottom:12px; }
   #feedSegment .meetup-chip, #feedSegment .feed-map-view-btn{
@@ -8635,12 +8636,12 @@
     background:var(--mz-card); color:var(--mz-ink); font-family:inherit; font-size:14px; font-weight:600;
   }
   #feedSegment .meetup-chip.active{ background:var(--mz-ink); color:var(--mz-card); }
-  #feedSegment svg{ flex-shrink:0; }
+  #feedSegment svg{ flex-shrink:0; width:13px; height:13px; }
   /* 검색칸 + 정렬 + 보기 전환 - 흰 칸 세 개 (보기 전환은 지금 아닌 쪽 아이콘 하나만 보임) */
   .feed-search-sort-row{ gap:8px; margin-bottom:12px; }
   #feedSearchInput{
-    height:46px; padding:0 14px 0 42px; border:none; border-radius:18px; font-family:inherit; font-size:15px; color:var(--mz-ink);
-    background:var(--mz-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888780' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 15px center / 18px;
+    height:46px; padding:0 14px 0 38px; border:none; border-radius:18px; font-family:inherit; font-size:15px; color:var(--mz-ink);
+    background:var(--mz-card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888780' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 15px center / 15px;
   }
   body.dark-mode #feedSearchInput{ background-color:var(--mz-card); background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239A948C' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E"); }
   #feedSearchInput::placeholder{ color:var(--mz-gray); }
@@ -8648,11 +8649,11 @@
   #feedSortTriggerBtn{ height:46px; padding:0 15px; border:none; border-radius:18px; background:var(--mz-card); color:var(--mz-ink); font-family:inherit; font-size:14px; font-weight:700; }
   #feedMainViewToggle{ margin:0; padding:0; border:none; background:none; gap:0; }
   #feedMainViewToggle .feed-tag-view-btn{ width:46px; height:46px; padding:0; border:none; border-radius:18px; background:var(--mz-card); color:var(--mz-ink); display:flex; align-items:center; justify-content:center; }
-  #feedMainViewToggle .feed-tag-view-btn svg{ width:20px; height:20px; }
+  #feedMainViewToggle .feed-tag-view-btn svg{ width:16px; height:16px; }
   #feedMainViewToggle .feed-tag-view-btn.active{ display:none; }
   /* 이달의 리뷰왕 - 연한 토마토 띠 */
   .feed-monthly-king-banner{ gap:7px; border:none; border-radius:16px; background:var(--mz-tomato-light); color:var(--mz-tomato-deep); padding:12px 16px; font-size:14px; }
-  .feed-monthly-king-banner svg{ width:15px; height:15px; color:var(--mz-tomato-deep); }
+  .feed-monthly-king-banner svg{ width:13px; height:13px; color:var(--mz-tomato-deep); }
   .feed-monthly-king-banner b{ color:var(--mz-tomato-deep); font-weight:800; }
   /* 리뷰 카드 - 위는 사진(없으면 카테고리 색 + 아이콘) 꽉 채움, 왼쪽 아래 작성자 칩, 아래는 이름·별점·주소·한줄·버튼 */
   #feedListContainer .feed-review-card{ padding:0; overflow:hidden; border-radius:22px; margin-bottom:14px; }
@@ -8662,9 +8663,9 @@
   .feed-ig-noimg[data-cat="cafe"]{ background:#A8B4A0; }
   .feed-ig-noimg[data-cat="experience"]{ background:#A9A3C4; }
   body.dark-mode .feed-ig-noimg{ filter:brightness(0.82); }
-  .feed-ig-noimg > svg{ width:60px; height:60px; stroke-width:1.6; margin-top:-16px; }
+  .feed-ig-noimg > svg{ width:40px; height:40px; stroke-width:1.8; margin-top:-16px; }
   #feedListContainer .feed-ig-photo-count{ top:12px; right:12px; display:flex; align-items:center; gap:4px; padding:4px 10px; background:rgba(44,44,42,0.6); font-size:13px; font-weight:600; }
-  #feedListContainer .feed-ig-photo-count svg{ width:14px; height:14px; vertical-align:0; }
+  #feedListContainer .feed-ig-photo-count svg{ width:12px; height:12px; vertical-align:0; }
   #feedListContainer .feed-ig-header{ position:absolute; left:12px; bottom:12px; margin:0; gap:6px; padding:4px 12px 4px 4px; border-radius:999px; background:var(--mz-card); max-width:calc(100% - 24px); flex-wrap:nowrap; }
   #feedListContainer .feed-ig-header .placeholder-avatar{ width:26px; height:26px; font-size:11px; flex-shrink:0; }
   #feedListContainer .feed-ig-author-name{ font-size:13.5px; font-weight:700; color:var(--mz-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -8681,13 +8682,13 @@
   /* 주소줄과 길찾기·공유 버튼을 따로 놓으려고 묶음 상자는 풀어둠 */
   #feedListContainer .feed-place-info-row{ display:contents; }
   #feedListContainer .feed-place-info-addr{ order:2; flex:0 0 100%; margin-top:4px; gap:5px; font-family:inherit; font-size:13.5px; font-weight:500; color:var(--mz-gray); }
-  #feedListContainer .feed-place-info-addr svg{ width:15px; height:15px; flex-shrink:0; }
+  #feedListContainer .feed-place-info-addr svg{ width:12px; height:12px; flex-shrink:0; }
   #feedListContainer .feed-review-tags{ order:3; margin-top:8px; }
   #feedListContainer .feed-post-note{ order:4; margin:10px 0 0; font-size:14.5px; line-height:1.55; color:var(--mz-ink); -webkit-line-clamp:2; }
   #feedListContainer .feed-place-info-actions{ order:5; flex:0 0 auto; gap:8px; margin-top:14px; }
   #feedListContainer .feed-place-info-btn{ gap:5px; height:36px; padding:0 13px; border:none; border-radius:14px; background:var(--mz-bg); color:var(--mz-ink); font-family:inherit; font-size:14px; font-weight:600; }
   body.dark-mode #feedListContainer .feed-place-info-btn{ background:var(--mz-segment); }
-  #feedListContainer .feed-place-info-btn svg{ width:16px; height:16px; }
+  #feedListContainer .feed-place-info-btn svg, #feedListContainer .feed-card-share-btn svg{ width:13px; height:13px; }
   #feedListContainer .feed-review-social-row{ order:5; flex:0 0 auto; margin:14px 0 0 auto; }
   #feedListContainer .feed-card-share-btn{ gap:6px; height:36px; padding:0 14px; border-radius:14px; background:var(--mz-tomato-light); color:var(--mz-tomato-deep); font-family:inherit; font-size:14px; font-weight:700; }
   #feedListContainer .feed-post-bottom-row{ order:6; justify-content:flex-end; margin-top:10px; }
@@ -8699,6 +8700,7 @@
     border:none !important; border-radius:999px; background:var(--mz-tomato) !important; color:#FFFFFF !important;
     font-family:inherit; font-size:16px; font-weight:700; box-shadow:0 8px 22px rgba(216,90,48,0.32);
   }
+  #createFeedPostBtn.feed-write-fab svg{ width:14px; height:14px; }
   #createFeedPostBtn.feed-write-fab:active{ background:var(--mz-tomato-deep) !important; }
 </style>
 </head>
