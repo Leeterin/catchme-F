@@ -453,7 +453,7 @@ struct MonthView: View {
 
         VStack(spacing: 0) {
             HStack {
-                Text("\(cal.component(.year, from: now))년 \(cal.component(.month, from: now))월")
+                Text("\(cal.component(.month, from: now))월")
                     .font(.system(size: 13, weight: .heavy)).foregroundColor(mzInk)
                 Spacer()
                 Text("MEETZIP").font(.system(size: 9, weight: .heavy)).foregroundColor(mzTomato)
@@ -562,7 +562,7 @@ struct WeekView: View {
 
         VStack(spacing: 0) {
             HStack {
-                Text("\(cal.component(.year, from: now))년 \(cal.component(.month, from: now))월")
+                Text("\(cal.component(.month, from: now))월")
                     .font(.system(size: 13, weight: .heavy)).foregroundColor(mzInk)
                 Spacer()
                 Text("MEETZIP").font(.system(size: 9, weight: .heavy)).foregroundColor(mzTomato)
