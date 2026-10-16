@@ -8349,6 +8349,37 @@
   #dayEventList .day-event-tag.private-tag.on{ background:var(--hm-ink); color:var(--hm-card); }
   #dayEventList .day-memo-card{ border-radius:18px; }
   #dayEventList .day-event-empty{ padding:34px 0; border-radius:22px; background:var(--hm-card); color:var(--hm-dim); font-size:13.5px; }
+
+  /* 메모 - 노란 포스트잇처럼 (모서리 접힘 + 하루 보기는 테이프·그림자·살짝 기울임). 확정 대기 노란 카드와 헷갈리지 않게 */
+  body{ --memo-paper:#FFE89A; --memo-fold:#E8BE3C; --memo-ink:#6B4A0A; }
+  body.dark-mode{ --memo-paper:#4A3F1E; --memo-fold:#8A7430; --memo-ink:#FDE68A; }
+  #dayEventList .day-memo-card{
+    position:relative; border:none; border-radius:4px 4px 4px 4px; padding:16px 16px 14px; margin:6px 4px 14px;
+    background:linear-gradient(45deg, var(--memo-fold) 50%, transparent 50%) top right / 18px 18px no-repeat,
+               linear-gradient(225deg, transparent 12.7px, var(--memo-paper) 12.7px);
+    color:var(--memo-ink); font-size:14px; transform:rotate(-0.8deg);
+    filter:drop-shadow(0 4px 6px rgba(120,80,0,0.16));
+  }
+  #dayEventList .day-memo-card:nth-child(even){ transform:rotate(0.7deg); }
+  #dayEventList .day-memo-card::before{
+    content:''; position:absolute; top:-7px; left:50%; width:64px; height:16px; margin-left:-32px; transform:rotate(-2deg);
+    background:rgba(255,255,255,0.55); box-shadow:0 1px 2px rgba(0,0,0,0.06); border-radius:2px;
+  }
+  body.dark-mode #dayEventList .day-memo-card::before{ background:rgba(255,255,255,0.16); }
+  body.dark-mode #dayEventList .day-memo-card{ filter:drop-shadow(0 4px 6px rgba(0,0,0,0.35)); }
+  #dayEventList .day-memo-card .memo-check{ color:var(--memo-ink); }
+  #dayEventList .day-memo-actions{ margin-right:2px; }
+  #weekGrid .week-cal-memo-item, #monthSchedGrid .month-memo-label{
+    border:none; border-radius:4px; color:var(--memo-ink);
+    background:linear-gradient(45deg, var(--memo-fold) 50%, transparent 50%) top right / 6px 6px no-repeat,
+               linear-gradient(225deg, transparent 4.24px, var(--memo-paper) 4.24px);
+  }
+  #panel-schedule .month-memo-row{
+    margin-bottom:6px; padding:10px 12px; border-radius:4px; color:var(--memo-ink);
+    background:linear-gradient(45deg, var(--memo-fold) 50%, transparent 50%) top right / 12px 12px no-repeat,
+               linear-gradient(225deg, transparent 8.5px, var(--memo-paper) 8.5px);
+  }
+  #panel-schedule .month-memo-row .month-selected-text, #panel-schedule .month-memo-row .memo-check{ color:var(--memo-ink); }
 </style>
 </head>
 <body class="app-booting">
