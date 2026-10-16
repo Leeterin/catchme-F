@@ -7062,6 +7062,7 @@
     min-width:0;
   }
   .month-selected-main{ flex:1; display:flex; flex-direction:column; min-width:0; }
+  .month-selected-text.avail-emoji-title{ white-space:normal; overflow-wrap:anywhere; } /* 그룹 이모티콘이 많아도 잘리지 않고 다음 줄로 */
   .month-selected-travel{ margin-top:3px; font-size:11.5px; color:var(--text-dim); }
   /* 장소·메모 줄이 있으면 점·시간은 제목 줄에 맞춤 */
   .month-selected-row:has(.ev-info){ align-items:flex-start; }
@@ -20553,7 +20554,9 @@ function formAvailInfoHtml(dk, min){
 // 한 줄에 시간을 하나 더 넣음 - 누른 곳(centerMin)이 있으면 거기, 없으면 가장 넓은 빈 곳 가운데에 2시간
 function formAvailAddRange(dk, centerMin){
   const ranges = formAvailRanges[dk] || [];
-  const gaps = subtractMinuteRanges([{ s: formAvailAxis.s, e: formAvailAxis.e }], [...ranges, ...formAvailHardBusy(dk)]).filter(g => g.e - g.s >= QUICK_AVAIL_MIN_LEN);
+  // 새로 넣는 시간은 고칠 때도 지난 시간(빗금)에는 안 생기게 - 원래 있던 막대만 안 잘라냄
+  const pastEnd = formAvailPastEnd(dk);
+  const gaps = subtractMinuteRanges([{ s: formAvailAxis.s, e: formAvailAxis.e }], [...ranges, ...formAvailHardBusy(dk), ...(pastEnd > 0 ? [{ s: 0, e: pastEnd }] : [])]).filter(g => g.e - g.s >= QUICK_AVAIL_MIN_LEN);
   const gap = centerMin != null ? gaps.find(g => g.s <= centerMin && g.e >= centerMin) : gaps.reduce((a, b) => (!a || b.e - b.s > a.e - a.s ? b : a), null);
   if(!gap){
     if(centerMin == null) showToast('더 넣을 빈 시간이 없어요.');
@@ -20726,7 +20729,8 @@ function formAvailMinAt(track, clientX){
         return;
       }
       formAvailInfo = null;
-      if(dr.tap && !editingEventId && min < formAvailPastEnd(dr.dk)){ showToast('이미 지난 시간이에요. 지금 이후 시간을 눌러 주세요.'); return; }
+      // 이미 연 시간을 고칠 때도 빗금(지난 시간)을 누르면 새 시간이 생기지 않게 막음
+      if(dr.tap && min < formAvailPastEnd(dr.dk)){ showToast('이미 지난 시간이에요. 지금 이후 시간을 눌러 주세요.'); return; }
       if(dr.tap){ formAvailAddRange(dr.dk, min); renderFormAvailBars(); return; }
       formAvailEdit = { dk: dr.dk, idx: dr.idx };
       renderFormAvailBars();
@@ -21801,6 +21805,13 @@ function availableShortFor(f, vis){
   if(shownGroups(groupIds).length) return shownGroups(groupIds).map(groupEmojiOf).join('');
   return '가능';
 }
+// 한 달 아래 하루 목록에 쓰는 이름 - 그룹 이름은 빼고 이모티콘만 (그룹이 많아도 다 보이게 줄바꿈) 예) "예약 가능 👯💼💗"
+function availableEmojiTitleFor(f, vis){
+  if(f === 'work') return '업무용 예약 가능';
+  if(vis && vis.private) return '예약 가능 · 나만 보기';
+  const emojis = shownGroups(availFriendGroupIds(f, vis)).map(groupEmojiOf).join('');
+  return emojis ? `예약 가능 ${emojis}` : '예약 가능';
+}
 // 친구 + 업무용 링크에 함께 열린 시간은 띠 왼쪽에 보라 줄
 function availWorkStripeStyle(ev){
   return ''; // 업무용 메뉴를 없애서 보라 줄도 안 그림
@@ -22478,7 +22489,7 @@ function renderMonthSelectedPanel(){
         <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''} style="--ev:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}">
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}"></span>
           <span class="month-selected-time">${minutesToLabel(disp.startMin)}</span>
-          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span><span class="month-selected-range">${minutesToLabel(disp.startMin)} – ${minutesToLabel(disp.endMin)}</span>${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<span class="month-selected-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${travelRouteLinkHtml(ev.travel, monthSelectedDate, disp.startMin)}</span>` : ''}${eventPlaceNoteHtml(ev)}</span>
+          <span class="month-selected-main"><span class="month-selected-text${ev.type === 'available' && !isSpecial ? ' avail-emoji-title' : ''}">${escapeHtml(ev.type === 'available' && !isSpecial ? availableEmojiTitleFor(availableForOf(ev), ev.visibility) : ev.title)}</span><span class="month-selected-range">${minutesToLabel(disp.startMin)} – ${minutesToLabel(disp.endMin)}</span>${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<span class="month-selected-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${travelRouteLinkHtml(ev.travel, monthSelectedDate, disp.startMin)}</span>` : ''}${eventPlaceNoteHtml(ev)}</span>
           ${goesToChat ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
           ${isSpecial ? '' : `
           <span class="month-selected-row-actions">
