@@ -24562,6 +24562,18 @@ function getFriendTitlesForRender(friend, dateObj){
   return (real && real.titles) ? real.titles : null;
 }
 
+// 친구가 일정에 정해둔 색 / 나랑 잡은 약속인지 (시간 칸별 배열, 서버가 안 줬으면 null)
+function getFriendSlotExtrasForRender(friend, dateObj){
+  const real = friendRealScheduleCache[friend.username + '::' + dateKeyOf(dateObj)];
+  return { colors: (real && real.colors) || null, withMe: (real && real.withMe) || null };
+}
+// 친구 일정 블록 색 - 친구가 정한 색이 있으면 그 색, 나랑 잡은 약속이면 내 캘린더 약속처럼 빨강, 아니면 예전처럼 테마 색
+function friendBlockColor(b){
+  if(b.color) return b.color;
+  if(b.withMe) return APPOINTMENT_EVENT_COLOR;
+  return colorForScheduleText(b.title || '일정');
+}
+
 function getFriendBusyForRender(friend, dateObj){
   const cacheKey = friend.username + '::' + dateKeyOf(dateObj);
   const real = friendRealScheduleCache[cacheKey];
@@ -24569,22 +24581,24 @@ function getFriendBusyForRender(friend, dateObj){
 }
 
 // 시간별 배열(예약가능/바쁨/제목)을 연속된 블록으로 묶어서, 내 하루뷰 일정 카드처럼 하나씩 보여줄 수 있게 만듦
-function groupFriendScheduleBlocks(hours, bookableArr, busyArr, titlesArr){
+function groupFriendScheduleBlocks(hours, bookableArr, busyArr, titlesArr, colorsArr, withMeArr){
   const blocks = [];
   let current = null;
   hours.forEach((h, i) => {
     const isBookable = !!bookableArr[i];
     const isBusy = busyArr ? !!busyArr[i] : !isBookable; // 데모 친구는 busy 배열이 없으니 "예약 가능 아니면 바쁨"으로 취급
     const title = (isBusy && titlesArr && titlesArr[i]) ? titlesArr[i] : null;
+    const color = (isBusy && colorsArr && colorsArr[i]) || null;
+    const withMe = !!(isBusy && withMeArr && withMeArr[i]);
 
     let state = null;
     if(isBookable) state = 'bookable';
-    else if(isBusy) state = title ? ('title:' + title) : 'busy';
+    else if(isBusy) state = (title ? ('title:' + title) : 'busy') + (color ? ':' + color : '');
 
     if(state && current && current.state === state && current.endHour === h){
       current.endHour = h + 1;
     } else if(state){
-      current = { state, startHour: h, endHour: h + 1, title, isBookable };
+      current = { state, startHour: h, endHour: h + 1, title, isBookable, color, withMe };
       blocks.push(current);
     } else {
       current = null;
@@ -24687,7 +24701,8 @@ function renderFriendToday(){
   const busyArr = friend ? getFriendBusyForRender(friend, friendDayFocusDate) : null;
   list.innerHTML = '';
 
-  let blocks = groupFriendScheduleBlocks(HOURS, sched, busyArr, titles);
+  const extras = friend ? getFriendSlotExtrasForRender(friend, friendDayFocusDate) : {};
+  let blocks = groupFriendScheduleBlocks(HOURS, sched, busyArr, titles, extras.colors, extras.withMe);
   // "예약하기" 모드에서는 예약 가능한 블록만 정리해서 보여주고, 나머지는 아예 뺌 - 오늘인데 이미 지난 시간대도 마찬가지로 뺌
   if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(friendDayFocusDate, b));
 
@@ -24720,14 +24735,14 @@ function renderFriendToday(){
     }
     const card = document.createElement('div');
     card.className = 'day-event-card friend-view' + (b.isBookable ? ' available' : '');
-    card.style.setProperty('--ev', b.isBookable ? 'var(--accent)' : colorForScheduleText(b.title || '일정')); // 시간 알약 색 (내 하루 보기와 같게)
+    card.style.setProperty('--ev', b.isBookable ? 'var(--accent)' : friendBlockColor(b)); // 시간 알약 색 (내 하루 보기와 같게)
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
     const overlap = mine.filter(x => x.s < b.endHour * 60 && x.e > b.startHour * 60);
     card.innerHTML = `
       <div class="day-event-time">${minutesToLabel(b.startHour * 60)}-${minutesToLabel(b.endHour * 60)}</div>
       <div class="day-event-title">${label}</div>
       ${overlap.length ? `<div class="day-event-overlap">내 일정과 겹쳐요 · ${overlap.map(x => escapeHtml(myRangeLabel(x))).join(', ')}</div>` : ''}
-      ${(!b.isBookable && friendCalendarMode !== 'reserve') ? `<button type="button" class="day-event-ask-btn">${ICO.chatLi} 친구한테 물어보기</button>` : ''}
+      ${(!b.isBookable && !b.withMe && friendCalendarMode !== 'reserve') ? `<button type="button" class="day-event-ask-btn">${ICO.chatLi} 친구한테 물어보기</button>` : ''}
     `;
     const askBtn = card.querySelector('.day-event-ask-btn');
     if(askBtn) askBtn.addEventListener('click', () => askFriendAboutSchedule(friend, new Date(friendDayFocusDate), b));
@@ -24764,7 +24779,8 @@ function renderFriendWeek(){
     const titles = friend ? getFriendTitlesForRender(friend, d) : null;
     const busyArr = friend ? getFriendBusyForRender(friend, d) : null;
     // 이 날짜 데이터가 아직 서버에서 도착 전이면, 있지도 않은 일정을 잠깐 지어내 보여주지 않고 그냥 빈 칸으로 둠
-    let blocks = dayCached ? groupFriendScheduleBlocks(HOURS, sched, busyArr, titles) : [];
+    const extras = friend ? getFriendSlotExtrasForRender(friend, d) : {};
+    let blocks = dayCached ? groupFriendScheduleBlocks(HOURS, sched, busyArr, titles, extras.colors, extras.withMe) : [];
     // 예약하기 모드에서는 이미 지난 날짜/시간대 블록은 아예 목록에서 빼서 그리지도 않음
     if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(d, b));
     const isPast = dateKeyNum(d) < dateKeyNum(TODAY); // 이번주 안이라도 이미 지난 날짜는 예약 불가능하게
@@ -24822,7 +24838,7 @@ function renderFriendWeek(){
       block.style.top = ((startIdx - minIdx) * WEEK_ROW_H + 1) + 'px';
       block.style.height = ((endIdx - startIdx + 1) * WEEK_ROW_H - 2) + 'px';
       const label = b.title ? b.title : (b.isBookable ? '예약 가능' : '일정');
-      block.style.background = b.isBookable ? 'var(--accent)' : colorForScheduleText(label);
+      block.style.background = b.isBookable ? 'var(--accent)' : friendBlockColor(b);
       block.style.setProperty('--ev', block.style.background);
       if(block.style.background === AVAILABLE_EVENT_COLOR && friendCalendarMode === 'reserve') block.style.color = 'var(--on-accent)';
       // 칸이 좁아서 내 주 보기처럼 예약 가능은 짧게 "가능" (전체 이름은 title에)
@@ -24834,7 +24850,7 @@ function renderFriendWeek(){
         } else {
           block.addEventListener('click', () => openFriendReserve(new Date(d), b.startHour));
         }
-      } else if(!b.isBookable && friendCalendarMode !== 'reserve'){
+      } else if(!b.isBookable && !b.withMe && friendCalendarMode !== 'reserve'){
         // 친구 일정 블록을 누르면 '친구한테 물어보기' 버튼이 있는 작은 팝업을 띄움
         block.style.cursor = 'pointer';
         block.addEventListener('click', (e) => { e.stopPropagation(); showFriendBlockAskPopover(block, friend, new Date(d), b); });
@@ -24954,10 +24970,10 @@ function renderFriendMonthView(){
       // 제목 없는 3시간 일정이 "바쁨 3개"로 보였음. 이어진 같은 일정은 아래 패널처럼 한 덩어리로 묶어서 셈
       // (예약 가능 시간과 겹친 바쁨 일정도 예전처럼 세도록 bookable은 빈 배열로 넘김)
       // 내 한달 보기와 같은 모양 - 예약 가능 시간은 날짜 아래 점, 일정은 3개까지 칩(제목 없는 건 "일정"), 넘치면 +N개
-      const busyBlocks = groupFriendScheduleBlocks(monthData.hours, [], dayInfo.busy, dayInfo.titles);
+      const busyBlocks = groupFriendScheduleBlocks(monthData.hours, [], dayInfo.busy, dayInfo.titles, dayInfo.colors, dayInfo.withMe);
       const labels = busyBlocks.slice(0, 3).map(b => {
         const text = b.title || '일정';
-        const bg = colorForScheduleText(text);
+        const bg = friendBlockColor(b);
         return `<div class="month-event-label" style="--ev:${bg};background:${bg};${textColorOnEventBg(bg)}">${escapeHtml(truncateForMonthLabel(text))}</div>`;
       }).join('');
       const moreHtml = busyBlocks.length > 3 ? `<div class="month-event-more">+${busyBlocks.length - 3}개</div>` : '';
@@ -25032,19 +25048,19 @@ function renderFriendMonthSelectedPanel(monthData){
 
   if(!dayInfo){ panel.innerHTML = ''; return; }
 
-  let blocks = groupFriendScheduleBlocks(monthData.hours, dayInfo.bookable, dayInfo.busy, dayInfo.titles);
+  let blocks = groupFriendScheduleBlocks(monthData.hours, dayInfo.bookable, dayInfo.busy, dayInfo.titles, dayInfo.colors, dayInfo.withMe);
   if(friendCalendarMode === 'reserve'){
     // 예약하기 모드에서는 날짜 전체가 지났든, 오늘이어도 그 시간이 이미 지났든 아예 목록에서 빼버림
     blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(friendMonthSelectedDate, b));
   } else {
-    blocks = blocks.map(b => ({ ...b, askable: !b.isBookable })); // 예약 가능 시간 말고 친구 일정에만 '물어보기' 버튼
+    blocks = blocks.map(b => ({ ...b, askable: !b.isBookable && !b.withMe })); // 예약 가능 시간 말고 친구 일정에만 '물어보기' 버튼 (나랑 잡은 약속은 물어볼 필요 없음)
     if(isPast) blocks = blocks.map(b => ({ ...b, isBookable: false })); // 캘린더 구경 모드에서는 지난 날짜 일정도 보여주되 클릭(예약)은 못 하게
   }
 
   // 내 한달 보기 아래 칸과 같은 모양 - 시작 시각 알약 + 제목 + 시간 범위
   const cardsHtml = blocks.map((b, i) => {
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
-    const color = b.isBookable ? 'var(--accent)' : colorForScheduleText(b.title || '일정');
+    const color = b.isBookable ? 'var(--accent)' : friendBlockColor(b);
     return `<div class="month-selected-row${b.isBookable ? ' clickable' : ''}" data-hour="${b.startHour}" style="--ev:${color}">
       <span class="month-selected-time">${minutesToLabel(b.startHour * 60)}</span>
       <span class="month-selected-main"><span class="month-selected-text">${label}</span><span class="month-selected-range">${minutesToLabel(b.startHour * 60)} – ${minutesToLabel(b.endHour * 60)}</span>
