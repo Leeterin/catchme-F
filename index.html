@@ -8180,6 +8180,14 @@
   .hm-mini-label.accent, .hm-mini-big.accent{ color:var(--hm-accent); font-weight:700; }
   .hm-mini-sub{ font-size:13px; color:var(--hm-dim); }
   .hm-mini-foot{ margin-top:auto; padding-top:10px; width:100%; font-size:12.5px; font-weight:600; color:var(--hm-ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* '오늘' 위젯의 오늘 일정 목록 - 색 점 + 시각 + 제목 한 줄씩 */
+  .hm-today-list{ display:flex; flex-direction:column; gap:4px; margin-top:auto; padding-top:10px; width:100%; min-width:0; }
+  .hm-today-row{ display:flex; align-items:center; gap:5px; min-width:0; font-size:12px; font-weight:600; color:var(--hm-ink); }
+  .hm-today-row.done{ opacity:.45; }
+  .hm-today-row i{ flex:0 0 auto; width:6px; height:6px; border-radius:50%; }
+  .hm-today-row em{ flex:0 0 auto; font-style:normal; font-weight:500; color:var(--hm-dim); font-variant-numeric:tabular-nums; }
+  .hm-today-row span{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hm-today-more{ font-size:11.5px; color:var(--hm-dim); }
   .hm-mini-faces{ display:flex; margin-top:auto; padding-top:10px; }
   .hm-mini-faces .hp-face{ width:30px; height:30px; font-size:12px; margin-right:-7px; box-shadow:0 0 0 2px var(--hm-card); }
   /* 맨 아래 [홈 편집] */
@@ -13031,6 +13039,7 @@ async function loadHomePending(){
     return; // 서버가 아직 이 기능을 모르거나 네트워크 오류면 카드만 안 보이게 두고 조용히 넘어감
   }
   renderHomePending();
+  renderHomeMiniWidgets(); // 오늘 받은 약속 요청은 '오늘' 위젯에도 보임
 }
 function homePendingWhen(start, end){
   if(!start) return '';
@@ -13099,7 +13108,7 @@ const HOME_SECTIONS = [
   { key: 'match', label: '이번 주 시간 맞는 친구', size: 'wide', desc: '이번 주에 나와 시간이 겹치는 친구' },
   { key: 'avail', label: '내 예약 가능 시간', size: 'wide', desc: '앞으로 7일 동안 열어둔 시간' },
   { key: 'goal', label: '이번 달 목표', size: 'wide', desc: '운동·독서처럼 한 달 목표 세기' },
-  { key: 'today', label: '오늘', size: 'small', desc: '오늘 날짜와 오늘 약속', defaultOff: true },
+  { key: 'today', label: '오늘', size: 'small', desc: '오늘 날짜와 오늘 일정 전체', defaultOff: true },
   { key: 'friends', label: '친구', size: 'small', desc: '친구 수와 얼굴', defaultOff: true },
   { key: 'unread', label: '안 읽은 메시지', size: 'small', desc: '안 읽은 채팅 수', defaultOff: true },
 ];
@@ -13223,19 +13232,59 @@ function attachHomeOrderDrag(row){
 document.addEventListener('touchmove', (e) => { if(homeOrderDrag) e.preventDefault(); }, { passive: false });
 
 // ---------- 작은 위젯 (오늘 / 친구 / 안 읽은 메시지) ----------
+// '오늘' 위젯에 보일 오늘 일정 전체 - 메모, 약속, 내 일정, 보낸 약속 요청(요청중), 받은 약속 요청(요청받음)
+// 예약 가능 시간은 '내 예약 가능 시간' 위젯이 따로 있어서 뺌. 메모(시간 없음)가 맨 위, 나머지는 시작 시각 순
+const HOME_TODAY_MAX = 3;
+function homeTodayItems(){
+  const todayKey = toDateInputValue(TODAY);
+  const items = getMemosForDate(TODAY).map(m => ({ startMin: null, endMin: null, text: m.text, color: 'var(--hm-dim)' }));
+  const pinRooms = new Set();
+  homeUpcomingAppointments().filter(x => toDateInputValue(x.pin.dateObj) === todayKey).forEach(x => {
+    pinRooms.add(x.roomId);
+    const mins = x.pin.timeLabel ? parseTimeLabelMinutes(x.pin.timeLabel) : null;
+    items.push({ startMin: mins ? mins.startMin : 0, endMin: mins ? mins.endMin : null, text: x.room.name || '약속', color: APPOINTMENT_EVENT_COLOR });
+  });
+  getEventsForDate(TODAY).forEach(ev => {
+    if(ev.type === 'available' && !ev.isPendingHold && !ev.isReservationLinked) return;
+    if(ev.isReservationLinked && pinRooms.has(ev.sourceChatRoomId)) return; // 위 약속과 같은 거라 두 번 안 보이게
+    const r = getEventDisplayRangeForDate(ev, TODAY);
+    items.push({ startMin: r.startMin, endMin: r.endMin, text: ev.isPendingHold // 반 칸이라 끝이 잘려도 '요청중'은 보이게 앞에 둠
+      ? (CHAT_ROOMS[ev.sourceChatRoomId] && CHAT_ROOMS[ev.sourceChatRoomId].name ? `요청중 · ${CHAT_ROOMS[ev.sourceChatRoomId].name}` : (ev.title || '약속 요청중'))
+      : (ev.title || '일정'),
+      color: ev.isPendingHold ? '#F59E0B' : colorForEvent(ev) });
+  });
+  homePendingItems.forEach(x => {
+    if(x.kind !== 'reservation' || !x.start || !CHAT_ROOMS[x.roomId]) return;
+    const s = new Date(x.start);
+    if(toDateInputValue(s) !== todayKey || s.getTime() < Date.now()) return; // 시간이 지난 요청은 자동 취소
+    const who = (x.sender && x.sender.name) || CHAT_ROOMS[x.roomId].name || '친구';
+    const startMin = s.getHours() * 60 + s.getMinutes();
+    items.push({ startMin, endMin: x.end ? startMin + Math.round((new Date(x.end) - s) / 60000) : null, // 자정 넘는 요청도 끝 시각이 앞으로 안 돌아가게
+      text: `요청받음 · ${who}`, color: 'var(--hm-accent)' });
+  });
+  return items.sort((a, b) => (a.startMin == null ? -1 : a.startMin) - (b.startMin == null ? -1 : b.startMin));
+}
 function renderHomeMiniWidgets(){
   const todayCard = document.getElementById('homeTodayCard');
   if(!todayCard) return;
-  const todayKey = toDateInputValue(TODAY);
-  const todays = homeUpcomingAppointments().filter(x => toDateInputValue(x.pin.dateObj) === todayKey);
-  const first = todays[0];
+  const todays = homeTodayItems();
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+  const isDone = x => x.endMin != null && x.endMin <= nowMin;
+  // 칸이 모자라면 이미 끝난 일정부터 빼서 앞으로 남은 일정이 보이게 (순서는 그대로)
+  let shown = todays;
+  if(todays.length > HOME_TODAY_MAX){
+    const dropDone = new Set(todays.filter(isDone).slice(0, todays.length - HOME_TODAY_MAX));
+    shown = todays.filter(x => !dropDone.has(x)).slice(0, HOME_TODAY_MAX);
+  }
   todayCard.innerHTML = `
     <span class="hm-mini-label accent">${WEEKDAY_KO[TODAY.getDay()]}요일</span>
     <b class="hm-mini-big">${TODAY.getDate()}</b>
     <span class="hm-mini-sub">${TODAY.getMonth() + 1}월</span>
-    <span class="hm-mini-foot">${first
-      ? escapeHtml(`${first.room.name || '약속'}${first.pin.timeLabel ? ' · ' + first.pin.timeLabel : ''}${todays.length > 1 ? ` 외 ${todays.length - 1}개` : ''}`)
-      : '오늘 약속 없음'}</span>`;
+    ${todays.length ? `<span class="hm-today-list">${shown.map(x => `
+      <span class="hm-today-row${isDone(x) ? ' done' : ''}">
+        <i style="background:${x.color}"></i><em>${x.startMin == null ? '메모' : minutesToLabel(x.startMin)}</em><span>${escapeHtml(x.text)}</span>
+      </span>`).join('')}${todays.length > shown.length ? `<span class="hm-today-more">외 ${todays.length - shown.length}개</span>` : ''}</span>`
+      : '<span class="hm-mini-foot">오늘 일정 없음</span>'}`;
 
   const friends = groupableFriends();
   const faces = friends.slice(0, 4).map(f => f.avatar
