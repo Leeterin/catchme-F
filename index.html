@@ -13643,9 +13643,9 @@ let widgetSyncTimer = null;
 let lastWidgetPayload = null;
 function widgetPlugin(){
   const cap = window.Capacitor;
-  if(!cap || !cap.isNativePlatform || !cap.isNativePlatform() || !cap.registerPlugin) return null;
-  if(!widgetPlugin.cached) widgetPlugin.cached = cap.registerPlugin('CatchmeWidget');
-  return widgetPlugin.cached;
+  // 이 앱은 @capacitor/core를 안 불러와서 registerPlugin이 없음 - 앱이 직접 넣어주는 Capacitor.Plugins에서 꺼내 씀
+  // (예전엔 registerPlugin만 찾다가 없어서 위젯에 아무것도 안 넘어갔고, 위젯은 계속 '로그인하면 일정이 보여요'였음)
+  return (cap && cap.Plugins && cap.Plugins.CatchmeWidget) || null;
 }
 function buildWidgetPayload(){
   if(!authToken) return { loggedIn: false, items: [] };
