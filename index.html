@@ -8560,6 +8560,20 @@
   #dayEventList .day-event-tag.on, #friendTodayList .day-event-tag.on{ background:var(--hm-accent-soft); color:var(--hm-accent); }
   #dayEventList .day-event-tag.private-tag.on, #friendTodayList .day-event-tag.private-tag.on{ background:var(--hm-ink); color:var(--hm-card); }
   #dayEventList .day-memo-card, #friendTodayList .day-memo-card{ border-radius:18px; }
+  /* 채팅에서 들어온 하루 보기 - "캘린더" 제목 대신 맨 위에 "‹ 채팅방" 한 줄 */
+  #panel-schedule.from-chat::before{ display:none; }
+  #panel-schedule .day-chat-back{ align-items:center; gap:2px; margin:0 0 12px -6px; padding:4px 6px; font-size:15px; font-weight:700; color:var(--hm-ink); white-space:nowrap; }
+  /* 일정 카드 - 수정/삭제 아이콘은 위쪽 시간 알약 줄에만 있어서, 아래 공개설정 칩은 카드 끝까지 쓰고 한 줄로(넘치면 옆으로 밀기) */
+  #dayEventList .day-event-card{ padding-right:16px; }
+  #dayEventList .day-event-time{ margin-right:64px; }
+  #dayEventList .day-event-tags{ flex-wrap:nowrap; gap:5px; margin-top:10px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  #dayEventList .day-event-tags::-webkit-scrollbar{ display:none; }
+  #dayEventList .day-event-tag{ flex-shrink:0; padding:4px 10px; font-size:11px; white-space:nowrap; }
+  #dayEventList .day-event-tag:not(.on){ background:transparent; box-shadow:inset 0 0 0 1px var(--hm-well); }
+  /* 확정 약속/예약 가능 카드의 왼쪽 색 줄 - 둥근 모서리를 따라 휘어 보여서, 카드 안쪽에 짧은 막대로 */
+  #dayEventList .day-event-card.available, #dayEventList .day-event-card.reservation-linked{ box-shadow:none; }
+  #dayEventList .day-event-card.available::before, #dayEventList .day-event-card.reservation-linked::before{ content:''; position:absolute; left:0; top:18px; bottom:18px; width:4px; border-radius:0 4px 4px 0; background:var(--hm-accent); }
+  #dayEventList .day-event-card.reservation-linked::before{ background:#F43F5E; }
   #dayEventList .day-event-empty, #friendTodayList .day-event-empty{ padding:34px 0; border-radius:22px; background:var(--hm-card); color:var(--hm-dim); font-size:13.5px; }
   /* 친구 캘린더 - 내 캘린더와 같은 베이지 바탕 + 큰 제목 (위 규칙들에 친구 캘린더 id도 같이 걸어둠) */
   .friend-calendar-view{ background:var(--hm-bg); color:var(--hm-ink); }
@@ -9220,6 +9234,8 @@
 
   <!-- 시간표 패널 -->
   <div class="tab-panel" id="panel-schedule">
+    <!-- 채팅에서 날짜를 눌러 들어왔을 때만 보이는 뒤로가기 - 날짜 줄 옆에 끼어 있으면 날짜·버튼이 겹쳐 보여서 맨 위 한 줄로 -->
+    <button class="profile-back day-chat-back" id="dayViewChatBackBtn" style="display:none;" aria-label="채팅방으로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>채팅방</button>
     <h2 class="sched-title">내 캘린더<span class="sched-head-actions">
       <!-- 제목 옆 아이콘 - 이미 있는 "캘린더 불러오기"와 지금 보기의 "일정 추가"를 그대로 엶 -->
       <button type="button" class="sched-head-btn" id="schedHeadImportBtn" title="캘린더 불러오기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 19h14"/></svg></button>
@@ -9255,7 +9271,6 @@
     <div class="schedule-view active" id="scheduleView-day">
       <div class="day-header-row">
         <div style="display:flex;align-items:center;gap:8px;">
-          <button class="profile-back" id="dayViewChatBackBtn" style="display:none;padding:0 4px;font-size:14px;font-weight:700;white-space:nowrap;" aria-label="채팅방으로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>채팅방</button>
           <div>
             <div class="day-header-title">내 캘린더</div>
             <div class="day-header-sub">
@@ -30154,7 +30169,7 @@ function viewDayFromChat(dateObj){
   showTab('schedule');
   switchScheduleView('day'); // 기본 보기(한달 등)가 아니라 그날 하루 일정을 바로 보여줌
 
-  panels['schedule'].classList.add('home-clean-mode');
+  panels['schedule'].classList.add('home-clean-mode', 'from-chat');
   document.querySelector('.bottom-nav').style.display = 'none';
   document.getElementById('dayViewChatBackBtn').style.display = 'flex';
   pushViewState(closeDayViewFromChat);
@@ -30163,7 +30178,7 @@ function closeDayViewFromChat(){
   const roomId = dayViewOpenedFromChat;
   dayViewOpenedFromChat = null;
   document.getElementById('dayViewChatBackBtn').style.display = 'none';
-  panels['schedule'].classList.remove('home-clean-mode');
+  panels['schedule'].classList.remove('home-clean-mode', 'from-chat');
   if(roomId){
     showTab('chat');
     openChatRoom(roomId, { noPush: true }); // 채팅방 히스토리 항목은 하루 보기 밑에 그대로 남아 있음 - 또 쌓으면 뒤로가기를 한 번 더 눌러야 함
