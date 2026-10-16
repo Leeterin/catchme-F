@@ -8337,15 +8337,15 @@
   }
   #monthSchedGrid .day-cell.selected-day{ outline:none; background:var(--hm-well); border-radius:12px; border-top-color:transparent; }
   #monthSchedGrid .month-avail-dot{ background:var(--hm-accent); }
-  /* 일정 칩 - 진한 색 칠 대신 연한 배경 + 진한 글씨 (색은 일정마다 정해진 색 그대로) */
+  /* 일정 칩 - 진한 색 칠 대신 연한 배경 + 진한 글씨 (색은 일정마다 정해진 색 그대로). 너무 옅으면 색끼리 헷갈려서 배경을 조금 진하게 */
   #monthSchedGrid .month-event-label{ font-size:10px; font-weight:600; padding:2px 4px; border-radius:5px; text-align:left; line-height:1.45; }
   @supports (background:color-mix(in srgb, red 50%, white)){
     #monthSchedGrid .month-event-label:not(.month-memo-label){
-      background:color-mix(in srgb, var(--ev) 16%, var(--hm-card)) !important;
+      background:color-mix(in srgb, var(--ev) 28%, var(--hm-card)) !important;
       color:color-mix(in srgb, var(--ev) 60%, #1E1B18) !important;
     }
     body.dark-mode #monthSchedGrid .month-event-label:not(.month-memo-label){
-      background:color-mix(in srgb, var(--ev) 26%, var(--hm-card)) !important;
+      background:color-mix(in srgb, var(--ev) 38%, var(--hm-card)) !important;
       color:color-mix(in srgb, var(--ev) 55%, #FFFFFF) !important;
     }
   }
