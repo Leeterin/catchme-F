@@ -33462,6 +33462,9 @@ function leaveChatRoom(roomId){
   if(room && room.isRealRoom){
     apiRequest(`/chats/${roomId}/leave`, { method: 'POST' }).catch(err => showToast(err.message));
   }
+  // 1:1 방은 나가도 서버에 방이 남아서 상대가 새 메시지를 보내면 같은 방이 다시 뜸 - 그때 예전 대화가 폰에 남아 보이지 않게 지움
+  clearTimeout(chatCacheSaveTimers[roomId]);
+  try { localStorage.removeItem(chatCacheKey(roomId)); } catch(e) {}
   delete CHAT_ROOMS[roomId];
   document.body.classList.remove('chat-open');
   document.getElementById('chatRoomView').classList.remove('active');
