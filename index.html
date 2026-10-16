@@ -3623,10 +3623,7 @@
     touch-action:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
   }
   .chat-pinned-schedule .pin-place-row.pin-row-shift{ transition:transform .15s ease; }
-  .chat-pinned-schedule .pin-place-row.pin-row-dragging{
-    position:relative; z-index:2; border-radius:10px; background:var(--surface);
-    box-shadow:0 6px 18px rgba(0,0,0,.18);
-  }
+  .chat-pinned-schedule .pin-place-row.pin-row-dragging{ position:relative; z-index:2; }
   .chat-pinned-schedule .pin-place-row.pin-row-dragging .pin-drag-handle{ color:var(--accent); cursor:grabbing; }
   .chat-pinned-schedule .pin-place-order{ font-size:10.5px; font-weight:800; color:var(--text-dim); }
 
@@ -29768,7 +29765,7 @@ function renderPinnedSchedule(){
       const startDrag = () => {
         pressTimer = null;
         dragging = true;
-        if(navigator.vibrate) navigator.vibrate(15);
+        hapticImpact('MEDIUM'); // 잡았을 때 진동 한 번
         centers = rows.map(r => { const rc = r.getBoundingClientRect(); return rc.top + rc.height / 2; });
         const gap = rows.length > 1 ? rows[1].getBoundingClientRect().top - rows[0].getBoundingClientRect().bottom : 0;
         step = row.getBoundingClientRect().height + gap;
@@ -29791,8 +29788,10 @@ function renderPinnedSchedule(){
         }
         row.style.transform = `translateY(${dy}px)`;
         const y = centers[fromIdx] + dy;
+        const prevIdx = toIdx;
         toIdx = 0;
         centers.forEach((c, i) => { if(i !== fromIdx && y > c) toIdx++; });
+        if(toIdx !== prevIdx) hapticImpact('LIGHT'); // 한 칸 넘어갈 때마다 진동 한 번
         // 끌고 가는 자리 사이에 있는 장소들은 한 칸씩 비켜줌
         rows.forEach((r, i) => {
           if(i === fromIdx) return;
