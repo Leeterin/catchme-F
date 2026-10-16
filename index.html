@@ -10053,8 +10053,11 @@
     <div class="mini-confirm-card" style="text-align:left;">
       <div class="mini-confirm-title" id="depLocPickerTitle" style="margin-bottom:10px;">출발지 입력</div>
       <div id="depLocPickerSavedList" style="margin-bottom:10px;"></div>
-      <input type="text" class="search-input" id="depLocPickerInput" placeholder="주소나 장소명을 검색하세요 (예: 강남역)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-      <div class="location-search-results" id="depLocPickerResults" style="display:none;"></div>
+      <!-- 검색 결과가 카드 맨 아래(키보드에 가리는 곳)가 아니라 검색칸 바로 밑에 뜨게 감쌈 -->
+      <div style="position:relative;">
+        <input type="text" class="search-input" id="depLocPickerInput" placeholder="주소나 장소명을 검색하세요 (예: 강남역)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <div class="location-search-results" id="depLocPickerResults" style="display:none;"></div>
+      </div>
       <div id="depLocPickerPickedInfo" style="font-size:12px;color:var(--text-dim);margin-top:8px;"></div>
       <input type="text" class="search-input" id="depLocPickerCustomNameInput" placeholder="이름 (예: 헬스장, 본가)" maxlength="10" style="display:none;margin-top:8px;" />
       <div class="mini-confirm-actions" style="margin-top:14px;">
