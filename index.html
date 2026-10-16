@@ -12031,7 +12031,9 @@ function refreshTodayIfDateChanged(){
   return true;
 }
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') refreshTodayIfDateChanged();
+  if(document.visibilityState !== 'visible') return;
+  // 날짜가 그대로여도 앱을 내려둔 사이 오늘 열어둔 시간이 끝났을 수 있어서 홈의 "앞으로 2주 중 N일"은 다시 셈
+  if(!refreshTodayIfDateChanged() && currentTopTab === null) renderHomeAvailCard();
 });
 setInterval(refreshTodayIfDateChanged, 60 * 1000); // 앱을 켜 둔 채 자정을 넘기는 경우
 
@@ -12484,12 +12486,13 @@ function renderHomeAvailCard(){
   for(let i = 0; i < 14; i++){
     const d = new Date(TODAY);
     d.setDate(d.getDate() + i);
-    const avail = getEventsForDate(d).filter(e => e.type === 'available');
+    // 오늘 이미 다 지난 예약 가능 시간은 빼고 셈 (캘린더에서도 사라지고, 친구도 그 시간엔 요청 못 함)
+    const avail = getEventsForDate(d).filter(e => e.type === 'available').map(e => availRangeFromNow(e, d)).filter(Boolean);
     const on = avail.length > 0;
     if(on) n++;
     // 4시간 이상 열어둔 날은 진하게 (보이기만 다름)
     let mins = 0;
-    avail.forEach(e => { const r = getEventDisplayRangeForDate(e, d); mins += Math.max(0, r.endMin - r.startMin); });
+    avail.forEach(r => { mins += Math.max(0, r.endMin - r.startMin); });
     const label = `${d.getMonth() + 1}/${d.getDate()}${i === 0 ? ' 오늘' : ''}${on ? ' 열려 있음' : ''}`;
     html += `<span class="home-avail-day${on ? ' on' : ''}${mins >= 240 ? ' many' : ''}${i === 0 ? ' today' : ''}" title="${label}" aria-label="${label}">${d.getDate()}</span>`;
   }
