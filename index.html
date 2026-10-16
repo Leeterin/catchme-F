@@ -19115,6 +19115,8 @@ function nextVisibilityOnClick(vis, clickedVis, clickedGroupId){
 function availRangeFromNow(ev, dateObj){
   const r = getEventDisplayRangeForDate(ev, dateObj);
   if(ev.type !== 'available') return r;
+  // 어제 이전 날짜의 예약 가능 시간은 다 지났으니 안 보여줌 (자정 넘겨 어제를 보면 지난 시간이 그대로 남았음)
+  if(dateKeyOf(dateObj) < dateKeyOf(new Date())) return null;
   const pastEnd = formAvailPastEnd(dateKeyOf(dateObj));
   if(pastEnd <= r.startMin) return r;
   if(pastEnd >= r.endMin) return null;
