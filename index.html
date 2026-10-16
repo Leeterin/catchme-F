@@ -8830,6 +8830,20 @@
   @keyframes mzNavPop{ 0%{ scale:1; } 40%{ scale:1.18; } 100%{ scale:1; } }
   @keyframes mzPressIn{ from{ scale:1; } to{ scale:var(--mz-press, .95); } }
   @keyframes mzPressOut{ from{ scale:var(--mz-press, .95); } to{ scale:1; } }
+  @keyframes mzFadeOut{ from{ opacity:1; } to{ opacity:0; } }
+  @keyframes mzScreenOut{ from{ translate:none; } 70%{ opacity:1; } to{ opacity:.6; translate:100% 0; } }
+  @keyframes mzPopOut{ from{ opacity:1; scale:none; } to{ opacity:0; scale:.94; } }
+  @keyframes mzSheetDown{ from{ translate:none; } to{ translate:0 100%; } }
+  @keyframes mzMenuOut{ from{ opacity:1; scale:none; } to{ opacity:0; scale:.96; } }
+
+  /* 누를 때 뒤에 깔리던 회색·검정 네모(폰 기본 터치 표시)와 누른 뒤 남는 테두리는 전부 없앰 - 눌림은 위 모션으로 보여줌 */
+  *{ -webkit-tap-highlight-color:transparent; }
+  :focus:not(:focus-visible){ outline:none; }
+
+  /* 닫히는 중인 화면·창 - 실제로는 이미 닫혔지만 잠깐 그대로 보여주면서 사라지는 모션만 (누르기는 통과) - setupExitMotion */
+  .mz-leaving{ display:block !important; pointer-events:none !important; }
+  .mz-leaving.mz-leave-flex{ display:flex !important; }
+  .mz-leaving.mz-leave-view{ position:fixed !important; z-index:30; margin:0 !important; overflow:hidden; box-shadow:-6px 0 20px rgba(0,0,0,0.08); }
 
   /* 움직임 줄이기를 켠 폰에서는 전부 끔 */
   @media (prefers-reduced-motion: no-preference){
@@ -8847,10 +8861,11 @@
   .chat-room-view.active, .calendar-match-view.active, .event-form-view.active, .friend-calendar-view.active{
     animation:mzScreenIn .26s cubic-bezier(.2,.8,.3,1);
   }
-  body.nav-back :is(.friend-profile-view, .friend-search-view, .person-profile-view, .friend-reserve-view,
+  /* 뒤로가기로 다시 보이게 된 화면 (setupExitMotion이 붙이고, 그 화면이 다시 숨을 때까지 둠 - 중간에 떼면 애니메이션이 또 돌아서) */
+  :is(.friend-profile-view, .friend-search-view, .person-profile-view, .friend-reserve-view,
     .settings-detail-view, .feed-create-view, .meetup-create-view, .meetup-detail-view, .meetup-reserve-view,
     .friend-groups-view, .friend-group-detail-view, #feedPlaceDetailView, #feedTagView, #feedAuthorView,
-    .chat-room-view, .calendar-match-view, .event-form-view, .friend-calendar-view).active{
+    .chat-room-view, .calendar-match-view, .event-form-view, .friend-calendar-view).active.mz-back-in{
     animation-name:mzScreenBack;
   }
   /* 손가락으로 밀어서 뒤로가는 중에는 화면이 이미 손을 따라 움직이니 밑에 깔리는 화면은 그대로 */
@@ -8880,6 +8895,13 @@
   /* 버튼·누를 수 있는 줄을 누르는 동안 살짝 들어감 (누를 수 있는 걸 스크립트가 찾아 붙임 - setupPressMotion) */
   .mz-pressing{ animation:mzPressIn .1s ease-out forwards; }
   .mz-released{ animation:mzPressOut .2s cubic-bezier(.3,1.5,.5,1); }
+  /* 닫힐 때 - 안쪽 화면은 오른쪽으로 밀려나가고, 확인 창은 작아지며 사라지고, 아래 창은 아래로 내려감 */
+  .mz-leaving.mz-leave-view, .mz-leaving.mz-leave-screen{ animation:mzScreenOut .26s cubic-bezier(.4,0,.7,1) forwards !important; }
+  .mz-leaving.mz-leave-popup{ animation:mzFadeOut .2s ease forwards !important; }
+  .mz-leaving.mz-leave-popup > :is(.mini-confirm-card, .app-confirm-card, .custom-picker-card), .mz-leaving.mz-leave-popup img{ animation:mzPopOut .2s ease forwards !important; }
+  .mz-leaving.mz-leave-popup > :is(.week-block-sheet, .home-widget-sheet, .feed-share-sheet){ animation:mzSheetDown .22s cubic-bezier(.4,0,.8,.6) forwards !important; }
+  .mz-leaving.mz-leave-menu{ animation:mzMenuOut .12s ease-in forwards !important; transform-origin:top right; }
+  .mz-leaving *{ transition:none !important; }
 
   }
 </style>
@@ -10888,9 +10910,16 @@ function goBackOrClose(closeFn){
 // 뒤로가기로 다시 보이는 화면은 왼쪽에서 들어오게 (앞으로 갈 때는 오른쪽에서) - 화면이 바뀐 직후 잠깐만 붙임
 function markNavBack(){
   document.body.classList.add('nav-back');
+  // 닫히기 직전 보이던 안쪽 화면 위치를 기억 - 닫힌 뒤 그 자리에서 오른쪽으로 밀려나가게 (setupExitMotion)
+  mzBackRects = new Map();
+  document.querySelectorAll(MZ_EXIT_VIEWS).forEach(el => {
+    if(el.getClientRects().length) mzBackRects.set(el, el.getBoundingClientRect());
+  });
   clearTimeout(markNavBack._timer);
-  markNavBack._timer = setTimeout(() => document.body.classList.remove('nav-back'), 350);
+  markNavBack._timer = setTimeout(() => { document.body.classList.remove('nav-back'); mzBackRects = null; }, 350);
 }
+const MZ_EXIT_VIEWS = '.friend-profile-view, .friend-search-view, .person-profile-view, .friend-reserve-view, .settings-detail-view, .feed-create-view, .meetup-create-view, .meetup-detail-view, .meetup-reserve-view, .friend-groups-view, .friend-group-detail-view, #feedPlaceDetailView, #feedTagView, #feedAuthorView';
+let mzBackRects = null;
 
 // 버튼이나 누를 수 있는 줄·카드를 누르는 동안 살짝 들어갔다가, 떼면 통 튀며 돌아옴 (모든 화면 공통)
 // 끌어서 옮기는 곳(주간 캘린더, 하단 탭, 홈 편집, 말풍선 밀기 등)과 원래 눌림 효과가 있는 버튼은 건드리지 않음
@@ -10941,6 +10970,77 @@ function markNavBack(){
   document.addEventListener('pointerup', release, true);
   document.addEventListener('pointercancel', release, true);
   document.addEventListener('scroll', release, true);
+})();
+
+// 화면·창이 닫힐 때 사라지는 모션 - 여는 코드와 닫는 코드가 화면마다 제각각이라(클래스 빼기, display:none, hidden)
+// 닫는 쪽은 그대로 두고, 닫힌 걸 알아채면 잠깐만 다시 보이게 붙잡아서 사라지는 애니메이션을 보여준 뒤 놓아줌
+(function setupExitMotion(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const KINDS = [
+    ['screen', '.chat-room-view, .calendar-match-view, .event-form-view, .friend-calendar-view, .invite-overlay, .location-picker-full', 260],
+    ['popup', '.mini-confirm-overlay, .app-confirm-overlay, .custom-picker-overlay, .image-preview-overlay, .week-block-sheet-overlay, .home-widget-overlay, .feed-share-overlay, .place-detail-map-overlay, .hotplace-overlay', 210],
+    ['menu', '.sort-dropdown-menu, .chat-members-dropdown, .chat-extra-dropdown, .chat-row-menu, .feed-detail-kebab-menu, .location-dropdown', 120],
+    ['view', MZ_EXIT_VIEWS, 260],
+  ];
+  const FLEX = '.chat-room-view, .event-form-view, .mini-confirm-overlay, .app-confirm-overlay, .custom-picker-overlay, .image-preview-overlay, .week-block-sheet-overlay, .home-widget-overlay, .place-detail-map-overlay, .hotplace-overlay, .invite-overlay, .location-picker-full';
+  const ALL = KINDS.map(k => k[1]).join(', ');
+  const shown = new WeakMap(); // 마지막으로 본 "열려 있었는지"
+  const isShown = (el) => el.getClientRects().length > 0;
+  let observer = null;
+
+  function stop(el){
+    if(!el._mzLeave) return;
+    const st = el._mzLeave; el._mzLeave = null;
+    clearTimeout(st.timer);
+    el.classList.remove('mz-leaving', 'mz-leave-' + st.kind, 'mz-leave-flex');
+    if(st.kind === 'view') ['top', 'left', 'width', 'height', 'background'].forEach(k => el.style[k] = st.saved[k]);
+    observer.takeRecords(); // 방금 우리가 바꾼 건 무시
+  }
+  function play(el){
+    const [kind, , ms] = KINDS.find(k => el.matches(k[1]));
+    // 손가락으로 밀어서 닫는 화면은 이미 밀려나가는 모션이 있음
+    if(el.classList.contains('swiping') || el.classList.contains('feed-swiping') || document.body.classList.contains('feed-swipe-active') || el.style.transform) return;
+    let rect = null;
+    if(kind === 'view'){
+      // 안쪽 화면은 뒤로가기로 닫힐 때만 (앞으로 갈 때 뒤에 남는 화면은 그냥 바뀜)
+      rect = mzBackRects && mzBackRects.get(el);
+      if(!rect) return;
+    }
+    el._mzLeave = { kind, saved: { top: el.style.top, left: el.style.left, width: el.style.width, height: el.style.height, background: el.style.background } };
+    el.classList.add('mz-leaving', 'mz-leave-' + kind);
+    if(el.matches(FLEX)) el.classList.add('mz-leave-flex');
+    if(rect){
+      el.style.top = rect.top + 'px'; el.style.left = rect.left + 'px';
+      el.style.width = rect.width + 'px'; el.style.height = Math.min(rect.height, window.innerHeight - rect.top) + 'px';
+      // 투명하면 밑에 돌아온 화면과 글자가 겹쳐 보여서, 앱 바탕색을 깔고 밀려나감
+      el.style.background = getComputedStyle(document.body).backgroundColor;
+    }
+    el._mzLeave.timer = setTimeout(() => stop(el), ms + 30);
+    observer.takeRecords();
+  }
+  function check(el){
+    if(el._mzLeave){
+      // 사라지는 중에 다시 열렸거나 다른 게 바뀌면 바로 놓아주고 새 상태로 판단
+      stop(el);
+    }
+    const now = isShown(el);
+    const was = shown.get(el);
+    shown.set(el, now);
+    if(was && !now){ el.classList.remove('mz-back-in'); play(el); }
+    else if(!was && now) el.classList.toggle('mz-back-in', document.body.classList.contains('nav-back'));
+    observer.takeRecords();
+  }
+  observer = new MutationObserver((records) => {
+    const seen = new Set();
+    for(const r of records){
+      const el = r.target;
+      if(el.nodeType !== 1 || seen.has(el)) continue;
+      seen.add(el);
+      if(el.matches(ALL)) check(el);
+    }
+  });
+  document.querySelectorAll(ALL).forEach(el => shown.set(el, isShown(el)));
+  observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
 })();
 
 function showToast(message, duration = 2400){
