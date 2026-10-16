@@ -8645,6 +8645,8 @@
   .cl-stack-face:first-child{ left:0; top:0; }
   .cl-stack-face:last-child{ right:0; bottom:0; box-shadow:0 0 0 2px var(--hm-card); }
   .cl-stack-face img{ width:100%; height:100%; object-fit:cover; }
+  .chat-room-avatar.cl-stack{ position:relative; overflow:visible; }
+  .chat-room-avatar .cl-stack-face{ width:24px; height:24px; }
   #chatListContainer .chat-row-menu-btn{ width:22px; margin-left:-6px; color:var(--hm-dim); opacity:0.6; flex-shrink:0; }
   #panel-chat .new-chat-wrap > .icon-btn{ background:var(--hm-accent) !important; color:#fff !important; }
   /* 채팅 목록만 한 단계 작게 - 줄 높이, 프로필 사진, 아이콘 (친구 목록은 그대로) */
@@ -28739,12 +28741,11 @@ function renderChatList(){
     const row = document.createElement('div');
     row.className = 'placeholder-row chat-row-with-menu';
     // 단톡방에 사진이 없으면 멤버 두 명 얼굴을 겹쳐서
-    const stackMembers = !room.avatar && room.isGroup && room.members
-      ? room.members.filter(m => !currentUser || m.userId !== currentUser.id).slice(0, 2) : [];
+    const stackMembers = groupStackMembers(room);
     const avatarInner = room.avatar
       ? `<img loading="lazy" src="${room.avatar}" alt="${escapeHtml(room.name)}" />`
       : stackMembers.length === 2
-        ? stackMembers.map(m => `<span class="cl-stack-face" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="" />` : MASCOT_AVATAR_SVG}</span>`).join('')
+        ? groupStackFacesHtml(stackMembers)
         : (room.isGroup ? escapeHtml(room.initial) : MASCOT_AVATAR_SVG);
     const unreadBadge = room.unreadCount > 0
       ? `<span class="cl-unread">${room.unreadCount > 99 ? '99+' : room.unreadCount}</span>`
@@ -29638,6 +29639,16 @@ syncChatTouchMoveLock();
 // 스크롤하는 도중에도 키보드는 그대로 열려있고, 키보드 자체를 직접 내리는 제스처(키보드를 아래로
 // 드래그하는 등 기기 자체의 키보드 숨기기 동작)를 했을 때만 닫히길 원해서 이 자동 닫힘 로직은 제거함.
 
+// 단톡방 겹친 얼굴에 쓸 멤버 두 명 - 다른 사람 먼저, 다른 사람이 한 명뿐이면 나까지
+function groupStackMembers(room){
+  if(!room || room.avatar || !room.isGroup || !room.members || room.members.length < 2) return [];
+  const isMe = m => currentUser && m.userId === currentUser.id;
+  return room.members.filter(m => !isMe(m)).concat(room.members.filter(isMe)).slice(0, 2);
+}
+function groupStackFacesHtml(members){
+  return members.map(m => `<span class="cl-stack-face" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="" />` : MASCOT_AVATAR_SVG}</span>`).join('');
+}
+
 function openChatRoom(id, opts){
   setChatPlusMenu(false); // + 패널은 방을 옮기거나 닫으면 접음
   const room = CHAT_ROOMS[id];
@@ -29649,7 +29660,12 @@ function openChatRoom(id, opts){
   document.getElementById('chatRoomView').style.bottom = ''; // top과 같은 이유로 bottom(키보드 보정값)도 초기화
 
   const avatarEl = document.getElementById('chatRoomAvatar');
-  if(room.avatar){
+  const headerStack = groupStackMembers(room);
+  avatarEl.classList.toggle('cl-stack', headerStack.length === 2);
+  if(headerStack.length === 2){
+    avatarEl.style.background = 'transparent';
+    avatarEl.innerHTML = groupStackFacesHtml(headerStack);
+  } else if(room.avatar){
     avatarEl.style.background = 'transparent';
     avatarEl.innerHTML = `<img src="${room.avatar}" alt="${escapeHtml(room.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
   } else {
