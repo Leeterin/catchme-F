@@ -12519,6 +12519,7 @@ function snapshotScreen(){
     roomId: tab === 'chat' && document.getElementById('chatRoomView').classList.contains('active') ? activeChatRoomId : null,
     chatOpen: document.body.classList.contains('chat-open'),
     displays: SCREEN_DISPLAY_SELECTORS.map(sel => [sel, document.querySelector(sel).style.display]),
+    notHome: document.body.classList.contains('tab-not-home'),
     scrollY: window.scrollY,
   };
 }
@@ -12533,6 +12534,12 @@ function restoreScreen(snap){
   if(snap.roomId && CHAT_ROOMS[snap.roomId]) openChatRoom(snap.roomId, { noPush: true }); // 그 방의 뒤로가기 기록은 이미 밑에 있음
   snap.displays.forEach(([sel, val]) => { document.querySelector(sel).style.display = val; });
   document.body.classList.toggle('chat-open', snap.chatOpen);
+  // 홈으로 돌아올 때 "다른 탭" 표시가 남아 있으면 위쪽 로고·아이콘 줄이 사라진 채라 홈 높이가 줄어서 엉뚱한 위치로 갔음
+  document.body.classList.toggle('tab-not-home', snap.notHome);
+  // 들어간 화면에서 입력칸에 포커스를 줬으면(홈 "+ 새 그룹" 등) 숨겨진 입력칸에 포커스가 남아 iOS 키보드가 안 내려가고
+  // 화면이 아래로 밀린 채 멈췄음 - 돌아올 때 포커스를 뺌
+  const focused = document.activeElement;
+  if(focused && focused !== document.body && focused.matches('input, textarea, select, [contenteditable="true"]')) focused.blur();
   if(snap.tab === null) renderHomeDash();
   window.scrollTo(0, snap.scrollY);
 }
