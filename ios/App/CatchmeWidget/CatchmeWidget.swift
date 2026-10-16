@@ -515,11 +515,12 @@ struct MonthCell: View {
                     .padding(.top, 1)
                 if room >= 1 {
                     ForEach(Array(busy.prefix(slots).enumerated()), id: \.offset) { _, ev in
+                        // 칸 너비를 고정해서 이름 앞부분부터 보이고 뒷부분만 잘림
                         Text(ev.title).font(.system(size: Self.fontSize, weight: .semibold)).foregroundColor(pastelInk(ev))
                             .lineLimit(1).fixedSize()
-                            .padding(.horizontal, 3)
-                            .frame(maxWidth: .infinity, alignment: .leading).frame(height: Self.chipH)
+                            .frame(width: max(geo.size.width - 6, 0), height: Self.chipH, alignment: .leading)
                             .clipped()
+                            .padding(.horizontal, 3)
                             .background(RoundedRectangle(cornerRadius: 4).fill(pastelBg(ev)))
                     }
                     if busy.count > slots {
@@ -545,6 +546,129 @@ struct MonthCell: View {
         .padding(.horizontal, 1)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+    }
+}
+
+// 일주일 달력 (중) - 이번 주 일~토 한 줄, 칸이 높아서 일정 이름이 더 많이 들어감
+struct WeekView: View {
+    let entry: CalEntry
+
+    var body: some View {
+        let cal = Calendar.current
+        let now = entry.date
+        let today = cal.startOfDay(for: now)
+        let sunday = cal.date(byAdding: .day, value: -(cal.component(.weekday, from: today) - 1), to: today) ?? today
+        let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
+
+        VStack(spacing: 0) {
+            HStack {
+                Text("\(cal.component(.year, from: now))년 \(cal.component(.month, from: now))월")
+                    .font(.system(size: 13, weight: .heavy)).foregroundColor(mzInk)
+                Spacer()
+                Text("MEETZIP").font(.system(size: 9, weight: .heavy)).foregroundColor(mzTomato)
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 3)
+            HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { i in
+                    Text(weekdays[i]).font(.system(size: 9, weight: .medium))
+                        .foregroundColor(i == 0 ? mzSun : (i == 6 ? mzSat : mzGray))
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.bottom, 2)
+            mzDivider.frame(height: 1)
+            HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { col in
+                    if let day = cal.date(byAdding: .day, value: col, to: sunday) {
+                        MonthCell(n: cal.component(.day, from: day), isToday: cal.isDate(day, inSameDayAs: now), col: col, events: entry.events(on: day))
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+}
+
+// 하루 일정 (소) - 오늘 일정을 앱 캘린더 칩 모양으로 시간순
+struct DayView: View {
+    let entry: CalEntry
+
+    static let rowH: CGFloat = 17
+
+    var body: some View {
+        let cal = Calendar.current
+        let now = entry.date
+        let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
+        let col = cal.component(.weekday, from: now) - 1
+        let events = entry.events(on: now).sorted { $0.startMin < $1.startMin }
+
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text("\(cal.component(.month, from: now))월 \(cal.component(.day, from: now))일")
+                    .font(.system(size: 13, weight: .heavy)).foregroundColor(mzInk)
+                Text(weekdays[col]).font(.system(size: 11, weight: .bold))
+                    .foregroundColor(col == 0 ? mzSun : (col == 6 ? mzSat : mzGray))
+                Spacer(minLength: 0)
+                Text("MEETZIP").font(.system(size: 8, weight: .heavy)).foregroundColor(mzTomato)
+            }
+            mzDivider.frame(height: 1)
+            if events.isEmpty {
+                Spacer(minLength: 0)
+                Text("오늘 일정이 없어요").font(.system(size: 11, weight: .semibold)).foregroundColor(mzGray)
+                Spacer(minLength: 0)
+            } else {
+                // 높이에 들어가는 만큼만 보여주고 나머지는 +N
+                GeometryReader { geo in
+                    let room = max(Int((geo.size.height + 3) / (Self.rowH + 3)), 1)
+                    let slots = events.count > room ? room - 1 : room
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(events.prefix(slots).enumerated()), id: \.offset) { _, ev in
+                            DayChip(ev: ev).frame(height: Self.rowH)
+                        }
+                        if events.count > slots {
+                            Text("+\(events.count - slots)개 더").font(.system(size: 9, weight: .medium)).foregroundColor(mzGray)
+                                .frame(height: Self.rowH)
+                        }
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+                }
+            }
+        }
+        .padding(.horizontal, 2)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+// 시간 + 이름 칩 - 이름이 길면 뒷부분이 "…"로 잘림
+struct DayChip: View {
+    let ev: CalEvent
+    var body: some View {
+        let avail = ev.kind == "avail"
+        let ink = avail ? mzTomato : pastelInk(ev)
+        HStack(spacing: 4) {
+            Text(minLabel(ev.startMin)).font(.system(size: 9, weight: .medium)).foregroundColor(ink.opacity(0.8))
+                .fixedSize()
+            Text(avail ? "예약 가능" : ev.title).font(.system(size: 11, weight: .semibold)).foregroundColor(ink)
+                .lineLimit(1).truncationMode(.tail)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 5)
+        .frame(maxHeight: .infinity)
+        .background(RoundedRectangle(cornerRadius: 4).fill(avail ? mzTomatoLight : pastelBg(ev)))
+    }
+}
+
+// 달력 위젯 - 크기별로 하루(소) / 일주일(중) / 한달(대)
+struct CalendarView: View {
+    @Environment(\.widgetFamily) var family
+    let entry: CalEntry
+    var body: some View {
+        switch family {
+        case .systemSmall: DayView(entry: entry)
+        case .systemMedium: WeekView(entry: entry)
+        default: MonthView(entry: entry)
+        }
     }
 }
 
@@ -609,15 +733,15 @@ struct CatchmeMonthWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "CatchmeMonth", provider: CalProvider()) { entry in
             Group {
-                if entry.loggedIn { MonthView(entry: entry) } else { CalLoggedOutView() }
+                if entry.loggedIn { CalendarView(entry: entry) } else { CalLoggedOutView() }
             }
             // 앱 캘린더처럼 다크 모드에서도 흰 바탕
             .environment(\.colorScheme, .light)
             .widgetBackground(.white)
         }
-        .configurationDisplayName("한달 달력")
-        .description("이번 달 일정과 예약 가능한 날을 보여줘요.")
-        .supportedFamilies([.systemMedium, .systemLarge])
+        .configurationDisplayName("달력")
+        .description("작은 크기는 오늘 하루, 중간은 이번 주, 큰 크기는 한달 일정을 보여줘요.")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
 
