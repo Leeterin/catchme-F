@@ -13291,19 +13291,23 @@ document.getElementById('settingsBtn').addEventListener('click', openSettings);
 // ============================================================
 // 설정 화면
 // ============================================================
-// 설정 메뉴 - 성격별로 묶음 (예전엔 11개가 섞여 있었고 '앱 관리'에 다크 모드·일정 설정·약관이 뒤섞여 있었음)
+// 설정 메뉴 - 아래 탭(홈·캘린더·친구·채팅·장소) 순서대로 묶고, 앱 전체 설정(알림·화면)과 도움말은 따로
+// (예전엔 화면/일정/친구/채팅으로 나눠서 홈 화면 편집은 '화면'에, 출발지는 '일정'에, 채팅 요청 허용은 '친구'에 섞여 있었음)
 const SETTINGS_MENU = [
   { id: 'account', group: 0, label: '계정·로그인', icon: '<circle cx="12" cy="7" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>' },
-  { id: 'display', group: 1, label: '화면', icon: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>' },
-  { id: 'schedule', group: 1, label: '일정', icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M12 13v5M9.5 15.5 12 18l2.5-2.5"/>' },
-  { id: 'notifications', group: 1, label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
-  { id: 'friends', group: 2, label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
-  { id: 'chat', group: 2, label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
+  // 홈·장소는 들어갈 화면이 하나뿐이라 바로 그 화면을 엶
+  { id: 'home', group: 1, label: '홈', icon: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>', action: () => openSettingsDetail('homeedit') },
+  { id: 'schedule', group: 1, label: '캘린더', icon: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/><path d="M8 14h.01M12 14h.01M16 14h.01"/>' },
+  { id: 'friends', group: 1, label: '친구', icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>' },
+  { id: 'chat', group: 1, label: '채팅', icon: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z"/>' },
+  { id: 'place', group: 1, label: '장소', icon: '<path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>', action: () => openSettingsDetail('locations') },
+  { id: 'notifications', group: 2, label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
+  { id: 'display', group: 2, label: '화면', icon: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>' },
   { id: 'help', group: 3, label: '도움말', icon: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17h.01"/>' },
   // 상세 화면 없이 바로 오류 신고 팝업을 엶
   { id: 'bugreport', group: 3, label: '오류 신고하기', icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>', action: () => openBugReport('menu') },
 ];
-// 메뉴 안에서 한 단계 더 들어가는 화면 이름 (화면 > 홈 화면 편집, 일정 > 자주 쓰는 출발지)
+// 메뉴 안에서 한 단계 더 들어가는 화면 이름 (홈 > 홈 화면 편집, 장소 > 자주 쓰는 출발지)
 const SETTINGS_SUBPAGE_LABELS = { homeedit: '홈 화면 편집', locations: '자주 쓰는 출발지' };
 
 // 자주 쓰는 출발지(집/회사/학교/직접입력) - 다중 모임 장소 추천에서 바로 골라 쓸 수 있게 내 정보에 저장해둠
@@ -13797,21 +13801,42 @@ function renderSettingsDetailBody(id){
 
   } else if(id === 'display'){
     body.innerHTML = `
-      <div class="settings-detail-desc">홈과 앱 화면을 내 취향대로 바꿔요.</div>
-      ${settingsLinkRowHTML('homeedit', '홈 화면 편집', '홈 카드 순서를 바꾸고 안 쓰는 건 숨겨요')}
+      <div class="settings-detail-desc">앱 전체 화면 설정이에요.</div>
       ${toggleRowHTML('dark_mode', '다크 모드', '어두운 화면으로 바꿔요', false)}
+    `;
+    bindToggleRows(body);
+    body.querySelector('.toggle[data-key="dark_mode"]').addEventListener('click', applyDarkMode);
+
+  } else if(id === 'schedule'){
+    body.innerHTML = `
+      <div class="settings-detail-desc">캘린더 탭을 열 때 처음 보여줄 화면이에요.</div>
       <div class="settings-simple-row" style="flex-direction:column;align-items:stretch;gap:8px;">
-        <span>캘린더 탭 기본 화면</span>
+        <span>기본 화면</span>
         <div class="repeat-toggle-row" id="defaultScheduleViewPicker">
           <button class="repeat-mode-btn${settingsState.default_schedule_view === 'day' ? ' active' : ''}" data-view="day" type="button">하루</button>
           <button class="repeat-mode-btn${settingsState.default_schedule_view === 'week' ? ' active' : ''}" data-view="week" type="button">일주일</button>
           <button class="repeat-mode-btn${settingsState.default_schedule_view === 'month' ? ' active' : ''}" data-view="month" type="button">한달</button>
         </div>
       </div>
+      <div class="settings-detail-desc" style="margin-top:16px;">일정을 만들 때 쓰는 기본값이에요.</div>
+      ${settingsLinkRowHTML('calimport', '캘린더 불러오기', '다른 캘린더 앱의 일정을 가져와요')}
+      <div class="settings-toggle-row">
+        <div><div class="stt-label">새 일정에 "이 시간에도 예약 받기" 항상 켜기</div><div class="stt-sub">일정을 추가할 때 처음부터 켜진 상태로 시작해요</div></div>
+        <div class="toggle${isAllowBookingAlways() ? ' on' : ''}" id="allowBookingAlwaysToggle"><div class="knob"></div></div>
+      </div>
+      <div class="settings-toggle-row">
+        <div><div class="stt-label">일정에 이동시간 넣기</div><div class="stt-sub">일정 장소를 고르면 가는 데 걸리는 시간을 일정 앞에 "이동시간"으로 넣어줘요</div></div>
+        <div class="toggle${isTravelEnabled() ? ' on' : ''}" id="travelTimeToggle"><div class="knob"></div></div>
+      </div>
+      <div class="settings-detail-desc" style="margin-top:16px;margin-bottom:8px;">내 일정이 친구에게 보이는 방식 (일정마다 고르는 공개 설정)</div>
+      <div class="privacy-rules">
+        <div><b>전체 공개</b> · 모든 친구에게 제목까지 보여요</div>
+        <div><b>친구 그룹</b> · 고른 그룹의 친구에게만 제목이 보여요</div>
+        <div><b>나만 보기</b> · 친구에게는 제목 없이 '일정 있음'으로만 보여요</div>
+        <div class="privacy-rules-note">어떤 설정이든 그 시간이 비어 있는 것처럼 보이지는 않아서, 친구가 겹치는 시간에 약속을 요청할 수 없어요. 친구가 약속을 요청할 수 있는 건 내가 연 '예약 가능 시간'뿐이에요.</div>
+      </div>
     `;
     bindSettingsLinkRows(body);
-    bindToggleRows(body);
-    body.querySelector('.toggle[data-key="dark_mode"]').addEventListener('click', applyDarkMode);
     document.getElementById('defaultScheduleViewPicker').querySelectorAll('.repeat-mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         settingsState.default_schedule_view = btn.dataset.view;
@@ -13820,22 +13845,6 @@ function renderSettingsDetailBody(id){
         showToast(`캘린더 기본 화면을 "${btn.textContent}"(으)로 설정했어요.`);
       });
     });
-
-  } else if(id === 'schedule'){
-    body.innerHTML = `
-      <div class="settings-detail-desc">일정을 만들 때 쓰는 기본값이에요.</div>
-      ${settingsLinkRowHTML('calimport', '캘린더 불러오기', '다른 캘린더 앱의 일정을 가져와요')}
-      <div class="settings-toggle-row">
-        <div><div class="stt-label">새 일정에 "이 시간에도 예약 받기" 항상 켜기</div><div class="stt-sub">일정을 추가할 때 처음부터 켜진 상태로 시작해요</div></div>
-        <div class="toggle${isAllowBookingAlways() ? ' on' : ''}" id="allowBookingAlwaysToggle"><div class="knob"></div></div>
-      </div>
-      <div class="settings-toggle-row">
-        <div><div class="stt-label">일정에 이동시간 넣기</div><div class="stt-sub">일정을 추가할 때 목적지를 고르면 자동차·대중교통 이동시간을 출발 시각 기준으로 계산해서 캘린더에 일정 앞 "이동시간"으로 보여줘요</div></div>
-        <div class="toggle${isTravelEnabled() ? ' on' : ''}" id="travelTimeToggle"><div class="knob"></div></div>
-      </div>
-      ${settingsLinkRowHTML('locations', '자주 쓰는 출발지', '집·회사처럼 자주 가는 곳을 저장해 두고 바로 골라요')}
-    `;
-    bindSettingsLinkRows(body);
     document.getElementById('travelTimeToggle').addEventListener('click', (e) => {
       const next = !isTravelEnabled();
       setTravelEnabled(next);
@@ -13853,6 +13862,7 @@ function renderSettingsDetailBody(id){
     body.innerHTML = `
       <div class="settings-detail-desc">받고 싶은 알림만 골라서 켜두세요.</div>
       ${toggleRowHTML('notif_message', 'MEETZIP 푸시 알림 받기', '새 메시지, 친구 요청, 약속 확정 알림을 받아요', false)}
+      ${toggleRowHTML('chat_preview', '알림에 메시지 미리보기 표시', '끄면 메시지 내용 없이 새 메시지가 왔다고만 알려줘요', false)}
       <div id="engagementPrefRows"></div>
     `;
     bindToggleRows(body);
@@ -13860,17 +13870,9 @@ function renderSettingsDetailBody(id){
 
   } else if(id === 'friends'){
     body.innerHTML = `
-      <div class="settings-detail-desc">친구 요청과 검색, 내 일정이 친구에게 보이는 방식이에요.</div>
+      <div class="settings-detail-desc">친구 요청과 검색 설정이에요.</div>
       ${toggleRowHTML('friend_autoaccept', '친구 요청 자동 수락', '', false)}
       ${toggleRowHTML('friend_search_allow', '아이디로 나를 검색 허용', '', false)}
-      ${toggleRowHTML('priv_stranger_chat', '친구가 아닌 사람의 채팅 요청 허용', '끄면 친구만 나에게 새 채팅을 걸 수 있어요', false)}
-      <div class="settings-detail-desc" style="margin-top:16px;margin-bottom:8px;">내 일정이 친구에게 보이는 방식 (일정마다 고르는 공개 설정)</div>
-      <div class="privacy-rules">
-        <div><b>전체 공개</b> · 모든 친구에게 제목까지 보여요</div>
-        <div><b>친구 그룹</b> · 고른 그룹의 친구에게만 제목이 보여요</div>
-        <div><b>나만 보기</b> · 친구에게는 제목 없이 '일정 있음'으로만 보여요</div>
-        <div class="privacy-rules-note">어떤 설정이든 그 시간이 비어 있는 것처럼 보이지는 않아서, 친구가 겹치는 시간에 약속을 요청할 수 없어요. 친구가 약속을 요청할 수 있는 건 내가 연 '예약 가능 시간'뿐이에요.</div>
-      </div>
       <div class="settings-detail-desc" style="margin-top:16px;">차단한 사람은 서로 친구 요청/채팅을 할 수 없어요.</div>
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <input type="text" class="search-input" id="blockUsernameInput" placeholder="차단할 아이디 입력" style="margin-bottom:0;" autocapitalize="off" autocorrect="off" spellcheck="false" />
@@ -13896,9 +13898,9 @@ function renderSettingsDetailBody(id){
 
   } else if(id === 'chat'){
     body.innerHTML = `
-      <div class="settings-detail-desc">채팅 관련 표시 설정이에요.</div>
+      <div class="settings-detail-desc">채팅 요청과 읽음 표시 설정이에요.</div>
+      ${toggleRowHTML('priv_stranger_chat', '친구가 아닌 사람의 채팅 요청 허용', '끄면 친구만 나에게 새 채팅을 걸 수 있어요', false)}
       ${toggleRowHTML('chat_read_receipt', '읽음 표시', '끄면 상대에게 내가 읽었는지 안 보이고, 나도 상대의 읽음 여부를 볼 수 없어요', false)}
-      ${toggleRowHTML('chat_preview', '알림에 메시지 미리보기 표시', '', false)}
     `;
     bindToggleRows(body);
 
