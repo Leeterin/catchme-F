@@ -33805,7 +33805,18 @@ function quickHoursText(min){
 // 이미 열려 있던 시간을 잘라낼 땐(quickFitRanges) 매주 일정만 봄 - 그날만 있는 일정까지 자르면 다른 주에 열린 시간까지 닫혀서
 function quickBusyWeekly(b){ return !b.soft && b.dates.length >= quickDowCount(b.dates[0].getDay()); }
 function quickHardBusy(dow){ return quickMergeRanges((quickAvailBusy[dow] || []).filter(quickBusyWeekly).map(b => ({ s: b.s, e: b.e }))); }
-function quickWallBusy(dow){ return quickMergeRanges((quickAvailBusy[dow] || []).filter(b => !b.soft).map(b => ({ s: b.s, e: b.e }))); }
+function quickWallBusy(dow){
+  const wall = (quickAvailBusy[dow] || []).filter(b => !b.soft).map(b => ({ s: b.s, e: b.e }));
+  const pastEnd = quickAvailPastEnd(dow);
+  if(pastEnd > 0) wall.push({ s: 0, e: pastEnd }); // 오늘 지난 시간(빗금)에도 막대를 못 놓음
+  return quickMergeRanges(wall);
+}
+// '이 주만'으로 이번 주를 볼 때 오늘 줄이면 이미 지난 시간의 끝 (일정 추가 화면과 같이 지금을 5분 단위로 올림), 아니면 0
+// 4주 반복일 땐 같은 줄이 다음 주들에도 쓰여서 빗금을 안 그림 (오늘 지난 시간은 저장할 때 빠짐)
+function quickAvailPastEnd(dow){
+  if(quickAvailRepeat !== 'once' || quickAvailWeek !== 0 || dow !== TODAY.getDay()) return 0;
+  return formAvailPastEnd(dateKeyOf(TODAY));
+}
 // 매주 있는 일정과 겹친 부분은 잘라내고 30분 안 되는 조각은 버림
 function quickFitRanges(dow, ranges){
   const hard = quickHardBusy(dow);
@@ -33913,6 +33924,13 @@ function renderQuickAvail(){
   quickTabKeys().forEach(k => QUICK_AVAIL_DOWS.forEach(dow => {
     const pat = quickAvailTabs[k].pattern;
     if(pat[dow] && pat[dow].length) pat[dow] = quickFitRanges(dow, pat[dow]);
+    // 오늘 줄은 지난 시간을 잘라냄 - 처음 열려 있던 시간도 똑같이 잘라서 지난 부분을 '닫기'로 보지 않음 (7:50부터 열려 있었으면 지금이 7:55면 7:55부터로 보임)
+    const pastEnd = quickAvailPastEnd(dow);
+    if(pastEnd > 0){
+      const cut = rs => subtractMinuteRanges(rs || [], [{ s: 0, e: pastEnd }]).filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN);
+      pat[dow] = cut(pat[dow]);
+      quickAvailTabs[k].initial[dow] = cut(quickAvailTabs[k].initial[dow]);
+    }
   }));
   // 3시간마다 눈금, 넓게 볼 땐 글자는 6시간마다
   const ticks = [];
@@ -33943,6 +33961,8 @@ function renderQuickAvail(){
       .map(b => `<i class="qa-busy${b.soft ? ' soft' : quickBusyWeekly(b) ? '' : ' once'}" style="${quickBarStyle({ s: Math.max(b.s, quickAvailAxis.s), e: Math.min(b.e, quickAvailAxis.e) })}"></i>`).join('');
     const others = quickMergeRanges(quickTabKeys().filter(k => k !== quickAvailTab).flatMap(k => quickAvailTabs[k].pattern[dow]))
       .map(r => `<i class="qa-other" style="${quickBarStyle(r)}"></i>`).join('');
+    const pastEnd = quickAvailPastEnd(dow);
+    const past = pastEnd > quickAvailAxis.s ? `<i class="qa-past" style="${quickBarStyle({ s: 0, e: pastEnd })}"></i>` : '';
     return `<div class="qa-row${on ? '' : ' off'}">
       <div class="qa-row-top">
         <button type="button" class="qa-day${weekend ? ' weekend' : ''}" data-qa-toggle="${row.key}" aria-pressed="${on}"${on ? '' : ' disabled'}><i></i>${row.label}${(quickAvailRepeat === 'once' ? dateKeyOf(d) === todayKey : dow === TODAY.getDay()) ? QA_TODAY_HTML : ''}</button>
@@ -33950,7 +33970,7 @@ function renderQuickAvail(){
         ${on ? `<button type="button" class="qa-add" data-qa-add="${row.key}" aria-label="${row.label} 시간 더 넣기">+</button>` : ''}
       </div>
       ${editing >= 0 ? quickAvailEditHtml(dow, editing) : ''}
-      <div class="qa-track" data-qa-track="${row.key}">${grid}${others}${ranges.map((r, i) => quickBarHtml(row, r, i)).join('')}${busy}</div>
+      <div class="qa-track" data-qa-track="${row.key}">${grid}${others}${ranges.map((r, i) => quickBarHtml(row, r, i)).join('')}${busy}${past}</div>
       ${quickAvailInfo && quickAvailInfo.dow === dow ? quickAvailInfoHtml(dow, quickAvailInfo.min) : ''}
     </div>`;
   }).join('');
@@ -34255,6 +34275,7 @@ function endQuickDrag(e){
   const isTap = e.type === 'pointerup' && Math.abs(e.clientX - dr.x) < 8 && Math.abs(e.clientY - dr.y) < 8 && !dr.moved;
   if(isTap){
     const min = availSnapToBusy(quickAvailBusy[dow] || [], quickMinAt(dr.track, e.clientX), dr.track, quickAvailAxis);
+    if(dr.tap && min < quickAvailPastEnd(dow)){ showToast('이미 지난 시간이에요. 지금 이후 시간을 눌러 주세요.'); return; }
     const busyHere = quickBusyAt(dow, min);
     // 회색/점선 위를 누르면 무슨 일정인지 먼저 보여줌 - 점선(겹쳐도 예약 받는 일정)이면 설명 안의 '이 시간 열기'로 시간을 넣음 (막대 위면 시간 고르기)
     if(dr.tap && busyHere.length){
@@ -34278,6 +34299,16 @@ function endQuickDrag(e){
 quickAvailRowsEl.addEventListener('pointerup', endQuickDrag);
 quickAvailRowsEl.addEventListener('pointercancel', endQuickDrag);
 document.getElementById('quickAvailCloseBtn').addEventListener('click', () => goBackOrClose(closeQuickAvail));
+// 빠르게 열기 화면을 열어둔 채 시간이 지나면 오늘 빗금을 늘리고 막대 시작도 지금으로 당김 (일정 추가 화면과 같이)
+let quickAvailLastPastEnd = -1;
+setInterval(() => {
+  if(!document.getElementById('quickAvailOverlay').classList.contains('show')) return;
+  const pastEnd = quickAvailPastEnd(TODAY.getDay());
+  if(pastEnd === quickAvailLastPastEnd) return;
+  if(quickDrag) return; // 끄는 중엔 다시 그리지 않음 (손가락을 놓침) - 다음 번에 맞춤
+  quickAvailLastPastEnd = pastEnd;
+  renderQuickAvail();
+}, 15 * 1000);
 
 // [s, e) 구간들에서 빼낼 구간들을 뺀 나머지
 function subtractMinuteRanges(ranges, cuts){
@@ -34322,7 +34353,7 @@ function quickOpenTab(key){
   const aud = quickTabAud(key);
   const out = { created: [], mergedCount: 0, openedDays: new Set() };
   const now = new Date();
-  const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30; // 오늘은 지금 이후 30분 단위부터
+  const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP; // 오늘은 지금 이후부터 - 빗금 끝(5분 단위)과 같게
   for(let i = 0; i < quickAvailDays(); i++){
     const d = quickAvailStartDate();
     d.setDate(d.getDate() + i);
