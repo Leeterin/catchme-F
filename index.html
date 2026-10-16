@@ -28541,7 +28541,9 @@ function renderChatList(){
     try {
     if(last){
       if(last.type === 'reservation'){
-        const statusLabel = last.status === 'confirmed' ? '약속 확정됨' : (last.status === 'declined' ? '거절됨' : (last.status === 'cancelled' ? '취소됨' : (last.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
+        // 답을 못 받은 채 시간이 지나 (자동으로) 취소된 요청은 "요청 취소됨"으로
+        const lastPast = (last.status === 'pending' || last.status === 'withdrawn') && last.startMs && last.startMs < Date.now();
+        const statusLabel = lastPast ? '요청 취소됨' : last.status === 'confirmed' ? '약속 확정됨' : (last.status === 'declined' ? '거절됨' : (last.status === 'cancelled' ? '취소됨' : (last.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
         previewTag = '약속 요청';
         previewText = statusLabel;
       } else if(last.type === 'location-suggest'){
@@ -29953,7 +29955,9 @@ function renderChatMessages(){
     if(m.type === 'reservation'){
       // 답을 못 받은 채 약속 시간이 지난 요청은 수락/거절 버튼 대신 "시간이 지났어요"로 (서버도 지난 요청은 수락을 막음)
       const expired = m.status === 'pending' && m.startMs && m.startMs < Date.now();
-      const statusLabel = expired ? '시간이 지나 취소됐어요' : m.status === 'confirmed' ? '약속 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
+      // 시간이 지나 자동으로 철회된 요청도 "요청 취소함"(내가 취소한 것처럼) 대신 "요청 취소됨"으로
+      const pastWithdrawn = m.status === 'withdrawn' && m.startMs && m.startMs < Date.now();
+      const statusLabel = (expired || pastWithdrawn) ? '요청 취소됨' : m.status === 'confirmed' ? '약속 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
       const showActions = m.who === 'other' && m.status === 'pending' && !expired;
       const showWithdraw = m.who === 'me' && m.status === 'pending' && !expired;
       const showConfirmedExtras = m.status === 'confirmed';
