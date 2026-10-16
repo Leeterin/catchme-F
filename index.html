@@ -8001,13 +8001,24 @@
 
   /* ===================== 홈 새 디자인 (밋집: 베이지 바탕 + 흰 카드 + 토마토색) =====================
      위의 홈 뉴모피즘 규칙을 덮어씀 - 기능(버튼·id·data-*)은 그대로, 모양만 */
+  /* 밋집 색 (MEETZIP_DESIGN.md 2장) - 화면 색은 전부 이 값에서 가져옴. --hm-*는 예전 이름이라 같은 값을 가리키게만 둠 */
   body{
-    --hm-bg:#F1EFEA; --hm-card:#FFFFFF; --hm-ink:#26231F; --hm-dim:#8A857E; --hm-line:#ECE8E2;
-    --hm-well:#F5F3EF; --hm-accent:#C8603C; --hm-accent-soft:#F8E6DD; --hm-dash:#CFCAC3;
+    --mz-tomato:#D85A30;       /* 메인 - 주요 버튼, 강조 숫자, 선택된 탭 */
+    --mz-tomato-deep:#993C1D;  /* 버튼 눌림, 연한 토마토 위 글씨 */
+    --mz-tomato-light:#FAECE7; /* 연한 강조 배경, 꼬리표 배경 */
+    --mz-golden:#FAC775;       /* 골든타임(겹치는 시간) 전용 */
+    --mz-ink:#2C2C2A; --mz-gray:#888780; --mz-gray-dark:#5F5E5A;
+    --mz-line:#D3D1C7; --mz-divider:#F1EFE8; --mz-bg:#F1EFE8; --mz-card:#FFFFFF; --mz-segment:#E5E3DC;
+    --hm-bg:var(--mz-bg); --hm-card:var(--mz-card); --hm-ink:var(--mz-ink); --hm-dim:var(--mz-gray); --hm-line:var(--mz-divider);
+    --hm-well:var(--mz-bg); --hm-accent:var(--mz-tomato); --hm-accent-soft:var(--mz-tomato-light); --hm-dash:var(--mz-line);
+    -webkit-font-smoothing:antialiased;
   }
+  /* 다크 모드 - 디자인 문서엔 없어서 예전 다크 값을 그대로 씀 */
   body.dark-mode{
-    --hm-bg:#1B1A19; --hm-card:#282624; --hm-ink:#EEEAE5; --hm-dim:#9A948C; --hm-line:#36332F;
-    --hm-well:#312E2B; --hm-accent:#E07A52; --hm-accent-soft:rgba(224,122,82,0.16); --hm-dash:#4A4642;
+    --mz-tomato:#E07A52; --mz-tomato-deep:#F2A27F; --mz-tomato-light:rgba(224,122,82,0.16); --mz-golden:#FAC775;
+    --mz-ink:#EEEAE5; --mz-gray:#9A948C; --mz-gray-dark:#B5AFA7;
+    --mz-line:#4A4642; --mz-divider:#36332F; --mz-bg:#1B1A19; --mz-card:#282624; --mz-segment:#312E2B;
+    --hm-well:#312E2B;
   }
   body:not(.tab-not-home), body.dark-mode:not(.tab-not-home){ background:var(--hm-bg); }
   /* 시안엔 "TODAY 날짜" 줄이 없어서 홈에서도 숨김 */
@@ -8197,6 +8208,83 @@
   .home-widget-info b{ font-size:14.5px; }
   .home-widget-info small{ font-size:12px; color:var(--hm-dim); }
   .home-widget-add{ flex-shrink:0; border:none; padding:8px 14px; border-radius:999px; background:var(--hm-accent); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  /* ===================== 홈 - MEETZIP_DESIGN.md 값으로 맞춤 (위 홈 규칙을 덮어씀, 기능은 그대로) ===================== */
+  /* 헤더 - 로고 24px + "밋집" 20px, 오른쪽 버튼은 34px 흰 원 */
+  .topbar .brand .mark, body.dark-mode .topbar .brand .mark, .topbar .brand .mark svg{ width:24px; height:24px; }
+  .topbar .brand-name{ font-size:20px; font-weight:700; letter-spacing:-0.02em; color:var(--mz-ink); }
+  body:not(.tab-not-home) .topbar .icon-btn, body:not(.tab-not-home) .topbar .icon-btn:active{
+    width:34px; height:34px; border-radius:50%; background:var(--mz-card); color:var(--mz-gray-dark); box-shadow:none;
+  }
+  body:not(.tab-not-home) .topbar .icon-btn svg{ width:18px; height:18px; stroke-width:1.9; }
+  /* 카드 배치 - 화면 좌우 12px, 카드 사이 10px, 카드 안쪽 12px 14px */
+  #homeDash{ gap:10px; margin:12px 12px 0; font-variant-numeric:tabular-nums; }
+  #homeDash > #homeUpcomingCard, #homeDash > #homeGroupCard, #homeDash > .home-mini{ flex:1 1 calc(50% - 5px); }
+  #homeDash .home-card, body.dark-mode #homeDash .home-card,
+  #homeDash .neu-goal, body.dark-mode #homeDash .neu-goal{ border-radius:22px; padding:12px 14px; box-shadow:none; }
+  #homeDash .home-pending-card, body.dark-mode #homeDash .home-pending-card{ box-shadow:none; border:1.5px solid var(--mz-tomato); }
+  /* 위젯 라벨 12px gray */
+  #homeDash .home-card-title, #homeDash .neu-eyebrow, .hm-mini-label{ font-size:12px; font-weight:500; color:var(--mz-gray); margin-bottom:8px; }
+  #homeDash .home-card-link{ font-size:12px; color:var(--mz-gray); }
+  #homeDash .home-empty{ font-size:12.5px; color:var(--mz-gray); }
+  /* 버튼 - 14px 600, 모서리 12px. 주요 = 토마토, 보조 = 배경색 */
+  #homeDash .home-match-empty-btn, #homeDash .home-avail-actions button{
+    border-radius:12px; background:var(--mz-bg); color:var(--mz-ink); font-size:14px; font-weight:600;
+  }
+  body.dark-mode #homeDash .home-match-empty-btn, body.dark-mode #homeDash .home-avail-actions button{ background:var(--hm-well); }
+  #homeDash .home-avail-actions button.primary, body.dark-mode #homeDash .home-avail-actions button.primary{ background:var(--mz-tomato); color:#fff; }
+  #homeDash .home-avail-actions button.primary:active{ background:var(--mz-tomato-deep); opacity:1; }
+  /* 다가오는 약속 - 첫 약속 D-day 32px 800 토마토 */
+  #homeDash .home-appt-when b{ color:var(--mz-tomato); }
+  #homeDash .home-appt-row:first-of-type .home-appt-when b{ font-size:32px; font-weight:800; }
+  #homeDash .home-appt-name{ font-size:15px; font-weight:700; }
+  #homeDash .home-appt-sub{ font-size:12.5px; font-weight:500; color:var(--mz-gray); }
+  #homeDash .home-appt-act{ border-radius:999px; font-size:11px; font-weight:600; background:var(--mz-bg); }
+  body.dark-mode #homeDash .home-appt-act{ background:var(--hm-well); }
+  #homeDash .home-appt-act.place{ background:var(--mz-tomato-light); color:var(--mz-tomato-deep); }
+  body.dark-mode #homeDash .home-appt-act.place{ color:var(--mz-tomato); }
+  /* 약속 없을 때 - 회색 달력 아이콘 + "아직 없어요" */
+  .home-upcoming-empty{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding-top:4px; }
+  .home-upcoming-empty svg{ width:28px; height:28px; color:var(--mz-line); }
+  /* 약속 잡기 - 흰 배경 + 1.5px 토마토 테두리, 얼굴 3개 + 점선 + 원 + 오른쪽 "친구 고르기" */
+  #homeDash .home-plan-cta{ border:1.5px solid var(--mz-tomato); border-radius:22px; padding:12px 14px 14px; }
+  .hp-eyebrow{ font-size:12px; font-weight:700; color:var(--mz-tomato); }
+  #homeDash .home-plan-cta .hp-question{ font-size:19px; font-weight:700; letter-spacing:-0.02em; color:var(--mz-ink); }
+  #homeDash .home-plan-cta small{ font-size:12.5px; color:var(--mz-gray); }
+  .hp-bottom{ margin-top:14px; }
+  .hp-faces{ align-items:center; gap:6px; }
+  .hp-face{ width:34px; height:34px; font-size:13px; }
+  .hp-face-add{ position:relative; margin-left:26px; border:1.5px dashed var(--mz-line); color:var(--mz-gray); overflow:visible; }
+  .hp-face-add::before{ content:''; position:absolute; right:100%; top:50%; width:20px; margin-right:4px; border-top:1.5px dashed var(--mz-line); }
+  .hp-go{ padding:10px 14px; border-radius:12px; background:var(--mz-tomato); font-size:14px; font-weight:600; }
+  /* 이번 주 시간 맞는 친구 - 아바타 34px, 이름 + 토마토 시간, 가장 많이 겹치는 친구는 노란 링 */
+  #homeDash .home-match-avatar{ width:34px; height:34px; font-size:13px; }
+  #homeDash .home-match-avatar.golden{ outline:2px solid var(--mz-golden); outline-offset:2px; }
+  #homeDash .home-match-name{ margin-top:8px; font-size:13px; font-weight:600; }
+  #homeDash .home-match-slot{ font-size:11px; font-weight:600; color:var(--mz-tomato); }
+  #homeDash .home-match-more{ font-size:11px; color:var(--mz-gray); }
+  .home-match-dashes{ display:flex; gap:8px; margin-bottom:8px; }
+  .home-match-dashes i{ width:34px; height:34px; border-radius:50%; border:1.5px dashed var(--mz-line); box-sizing:border-box; }
+  /* 내 예약 가능 시간 - 많이 연 날 토마토, 조금 연 날 연한 토마토, 오늘은 ink 테두리. 하나도 안 열었으면 카드에 토마토 테두리 */
+  #homeDash .home-avail-wd{ font-size:11px; color:var(--mz-gray); }
+  #homeDash .home-avail-day, body.dark-mode #homeDash .home-avail-day{ background:var(--mz-bg); color:var(--mz-gray); border-radius:9px; font-size:12px; }
+  body.dark-mode #homeDash .home-avail-day{ background:var(--hm-well); }
+  #homeDash .home-avail-day.on, body.dark-mode #homeDash .home-avail-day.on{ background:var(--mz-tomato-light); color:var(--mz-tomato-deep); }
+  body.dark-mode #homeDash .home-avail-day.on{ color:var(--mz-tomato); }
+  #homeDash .home-avail-day.on.many, body.dark-mode #homeDash .home-avail-day.on.many{ background:var(--mz-tomato); color:#fff; }
+  #homeDash .home-avail-day.today, #homeDash .home-avail-day.today.on, body.dark-mode #homeDash .home-avail-day.today.on{ outline:1.5px solid var(--mz-ink); outline-offset:-1.5px; }
+  #homeDash .home-avail-day.today:not(.many){ color:var(--mz-ink); }
+  #homeDash .home-avail-status{ font-size:12.5px; color:var(--mz-gray); }
+  #homeDash #homeAvailCard.none-open{ border:1.5px solid var(--mz-tomato); }
+  /* 내 그룹 - 이름 15px 700 + 인원 gray */
+  #homeDash .home-group-chip{ font-size:15px; font-weight:700; }
+  #homeDash .home-group-chip small{ font-size:12.5px; color:var(--mz-gray); }
+  #homeDash .home-group-chip.add, body.dark-mode #homeDash .home-group-chip.add{ border:1px dashed var(--mz-line); font-size:13px; font-weight:500; }
+  /* 작은 위젯 - 큰 숫자 32px 800 */
+  .hm-mini-big{ font-size:32px; font-weight:800; }
+  .hm-mini-big.accent{ color:var(--mz-tomato); font-weight:800; }
+  .hm-mini-sub, .hm-mini-foot{ font-size:12.5px; }
+  #homeDash > .home-edit-entry{ font-size:13px; font-weight:500; color:var(--mz-gray-dark); }
+  .home-edit-done{ background:var(--mz-tomato); font-size:14px; font-weight:600; }
   /* ===================== 캘린더 탭 새 디자인 (홈과 같은 밋집: 베이지 바탕 + 흰 카드 + 토마토색) =====================
      기능(버튼·id·data-*)은 그대로, 모양만. 내 캘린더(#panel-schedule)에만 적용 - 친구 캘린더는 그대로 */
   body:has(#panel-schedule.active), body.dark-mode:has(#panel-schedule.active){ background:var(--hm-bg); }
@@ -12161,13 +12249,18 @@ function renderHomeAvailCard(){
   for(let i = 0; i < 14; i++){
     const d = new Date(TODAY);
     d.setDate(d.getDate() + i);
-    const on = getEventsForDate(d).some(e => e.type === 'available');
+    const avail = getEventsForDate(d).filter(e => e.type === 'available');
+    const on = avail.length > 0;
     if(on) n++;
+    // 4시간 이상 열어둔 날은 진하게 (보이기만 다름)
+    let mins = 0;
+    avail.forEach(e => { const r = getEventDisplayRangeForDate(e, d); mins += Math.max(0, r.endMin - r.startMin); });
     const label = `${d.getMonth() + 1}/${d.getDate()}${i === 0 ? ' 오늘' : ''}${on ? ' 열려 있음' : ''}`;
-    html += `<span class="home-avail-day${on ? ' on' : ''}${i === 0 ? ' today' : ''}" title="${label}" aria-label="${label}">${d.getDate()}</span>`;
+    html += `<span class="home-avail-day${on ? ' on' : ''}${mins >= 240 ? ' many' : ''}${i === 0 ? ' today' : ''}" title="${label}" aria-label="${label}">${d.getDate()}</span>`;
   }
   strip.innerHTML = html;
   homeAvailOpenDays = n;
+  document.getElementById('homeAvailCard').classList.toggle('none-open', n === 0);
   const status = document.getElementById('homeAvailStatus');
   // 빨간 경고는 한 번이라도 열어본 적 있는 사람에게만 (다 지나서 비었을 때) - 처음 쓰는 사람에겐 담담하게 안내만 함
   const everOpened = SCHEDULE_EVENTS.some(e => e.type === 'available');
@@ -12267,8 +12360,8 @@ function openHomeMatchSlot(friendId, dateKey){
 function renderHomeFriendMatches(){
   const listEl = document.getElementById('homeMatchList');
   if(!listEl) return;
-  const emptyWith = (text, btnText, onClick) => {
-    listEl.innerHTML = `<div class="home-empty">${text}</div>${btnText ? `<button type="button" class="home-match-empty-btn">${btnText}</button>` : ''}`;
+  const emptyWith = (text, btnText, onClick, pre) => {
+    listEl.innerHTML = `${pre || ''}<div class="home-empty">${text}</div>${btnText ? `<button type="button" class="home-match-empty-btn">${btnText}</button>` : ''}`;
     if(btnText) listEl.querySelector('.home-match-empty-btn').addEventListener('click', onClick);
   };
   if(!authToken) return emptyWith('로그인하면 시간 맞는 친구를 보여줘요.');
@@ -12280,7 +12373,7 @@ function renderHomeFriendMatches(){
   // 친구 목록(이름/사진)이 아직 안 불러와졌으면 잠깐 기다림 - 불러오면 renderFriendsList가 홈을 다시 그림
   if(!FRIENDS.length && homeMatchData.friends.length) return emptyWith('불러오는 중...');
   if(!homeMatchData.myAvailability){
-    return emptyWith('내 예약 가능 시간을 열면, 같은 시간에 열어둔 친구를 보여줘요.', '내 시간 열기', () => document.getElementById('homeAvailQuickBtn').click());
+    return emptyWith('내 시간을 열면 같은 시간에 연 친구가 보여요', '내 시간 열기', () => document.getElementById('homeAvailQuickBtn').click(), '<div class="home-match-dashes"><i></i><i></i><i></i></div>');
   }
   const rows = homeMatchData.friends
     .map(entry => ({ entry, friend: FRIENDS.find(f => f.id === entry.userId), slots: homeMatchSlotsOf(entry) }))
@@ -12289,12 +12382,15 @@ function renderHomeFriendMatches(){
     return emptyWith('이번 주엔 친구와 겹치게 열어둔 시간이 없어요. 친구 캘린더에서 친구가 열어둔 시간을 볼 수 있어요.');
   }
   const shown = homeMatchExpanded ? rows : rows.slice(0, HOME_MATCH_FRIENDS_MAX);
+  // 가장 많이 겹치는 친구 한 명은 얼굴에 노란 링 (보이기만 다름)
+  const overlapMins = x => x.slots.reduce((sum, sl) => sum + (sl.endMin - sl.startMin), 0);
+  const goldenIdx = shown.reduce((best, x, i) => overlapMins(x) > overlapMins(shown[best]) ? i : best, 0);
   // 친구마다 한 칸: 얼굴 · 이름 · 겹치는 시간(누르면 그 날짜로 약속 잡기). 얼굴을 눌러도 첫 시간으로
   listEl.innerHTML = '<div class="home-match-grid">' + shown.map((x, i) => {
     const f = x.friend;
     const avatar = f.avatar
-      ? `<span class="home-match-avatar"><img src="${f.avatar}" alt="" /></span>`
-      : `<span class="home-match-avatar" style="background:${f.color}">${escapeHtml((f.name || '?')[0])}</span>`;
+      ? `<span class="home-match-avatar${i === goldenIdx ? ' golden' : ''}"><img src="${f.avatar}" alt="" /></span>`
+      : `<span class="home-match-avatar${i === goldenIdx ? ' golden' : ''}" style="background:${f.color}">${escapeHtml((f.name || '?')[0])}</span>`;
     const chips = x.slots.slice(0, HOME_MATCH_SLOTS_MAX).map(sl =>
       `<button type="button" class="home-match-slot" data-row="${i}" data-date="${sl.date}" title="${escapeHtml(homeMatchSlotLabel(sl))}">${escapeHtml(homeMatchSlotShort(sl))}</button>`).join('');
     const more = x.slots.length > HOME_MATCH_SLOTS_MAX ? `<button type="button" class="home-match-more" data-row="${i}">+${x.slots.length - HOME_MATCH_SLOTS_MAX}</button>` : '';
@@ -12872,9 +12968,8 @@ function renderHomeDash(){
   renderHomeMiniWidgets();
   const items = homeUpcomingAppointments();
   if(!items.length){
-    // 맨 위 버튼 이름이 상황에 따라 바뀌니(친구 추가하기/약속 잡기) 그 이름 그대로 안내
-    const ctaTitle = (document.getElementById('homePlanCtaTitle') || {}).textContent || '약속 잡기';
-    listEl.innerHTML = `<div class="home-empty">아직 잡힌 약속이 없어요. 위의 <b>${escapeHtml(ctaTitle)}</b>로 시작해 보세요.</div>`;
+    // 반 칸 카드라 짧게 - 회색 달력 아이콘 + "아직 없어요"
+    listEl.innerHTML = `<div class="home-empty home-upcoming-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>아직 없어요</div>`;
     return;
   }
   const shown = items.slice(0, HOME_UPCOMING_MAX);
