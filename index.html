@@ -22411,10 +22411,11 @@ function renderMonthSchedView(){
     // (예전엔 옆 칸까지 폭을 넓혀 하나로 이어진 막대처럼 그렸는데, 띠가 옆 칸을 침범해 보였음).
     // 같은 일정은 위의 레인 배정 덕분에 그 주 안에서 같은 줄에 나와서, 칸이 나뉘어도 이어지는 게 보임
     // 예약 가능 시간은 칩 대신 날짜 아래 작은 점으로 - 날마다 "가능" 칩이 박혀 있어서 약속·일정이 묻혔음
-    const hasAvail = events.some(ev => ev.type === 'available' && !ev.isPendingHold);
+    // 오늘 이미 다 지난 예약 가능 시간은 빼고 봄 - 아래 목록에서 빠지는데 점만 남아 있으면 눌러도 안 보여서 헷갈림
+    const availEvents = events.filter(ev => ev.type === 'available' && !ev.isPendingHold && availRangeFromNow(ev, cellDate));
+    const hasAvail = availEvents.length > 0;
     // 그룹에게만 연 예약 가능 시간이면 점 옆에 그 그룹 이모티콘도 (모든 친구에게 연 건 점만, 많으면 3개까지)
-    const availEmojis = [...new Set(events
-      .filter(ev => ev.type === 'available' && !ev.isPendingHold)
+    const availEmojis = [...new Set(availEvents
       .flatMap(ev => shownGroups(availFriendGroupIds(availableForOf(ev), ev.visibility)).map(groupEmojiOf)))].slice(0, 3);
     const availMarkHtml = hasAvail
       ? `<div class="month-avail-mark"><span class="month-avail-dot" title="예약 가능 시간 있음"></span>${availEmojis.length ? `<span class="month-avail-emoji">${escapeHtml(availEmojis.join(''))}</span>` : ''}</div>`
@@ -22592,7 +22593,11 @@ setInterval(() => {
   schedListLastPastEnd = pastEnd;
   const todayKey = dateKeyOf(TODAY);
   if(document.getElementById('scheduleView-day').classList.contains('active') && dateKeyOf(scheduleFocusDate) === todayKey) renderDayView();
-  if(document.getElementById('scheduleView-month').classList.contains('active') && dateKeyOf(monthSelectedDate) === todayKey) renderMonthSelectedPanel();
+  // 한달 보기는 오늘 칸의 점도 같이 맞춰야 해서 이번 달을 보고 있으면 칸까지 다시 그림
+  if(document.getElementById('scheduleView-month').classList.contains('active')){
+    if(schedViewYear === TODAY.getFullYear() && schedViewMonth === TODAY.getMonth()) renderMonthSchedView();
+    else if(dateKeyOf(monthSelectedDate) === todayKey) renderMonthSelectedPanel();
+  }
 }, 15 * 1000);
 
 function refreshActiveScheduleView(){
