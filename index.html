@@ -8352,92 +8352,92 @@
   .sched-friend.dragging .sched-friend-face{ box-shadow:0 8px 20px rgba(0,0,0,0.2); transform:scale(1.08); }
   /* 하루/주/달 + 그룹 칩 한 줄 */
   .sched-toolbar{ display:flex; align-items:center; gap:10px; margin-bottom:14px; min-width:0; }
-  #panel-schedule .sched-toolbar .segment-control{ flex-shrink:0; margin:0; padding:4px; gap:2px; border-radius:16px; background:#E6E3DE; }
-  body.dark-mode #panel-schedule .sched-toolbar .segment-control{ background:var(--hm-well); }
-  #panel-schedule .sched-toolbar .segment-btn{ flex:none; padding:8px 13px; border-radius:12px; font-size:14px; font-weight:600; color:var(--hm-dim); background:none; box-shadow:none; }
-  #panel-schedule .sched-toolbar .segment-btn.active{ background:var(--hm-card); color:var(--hm-ink); box-shadow:0 1px 4px rgba(0,0,0,0.06); }
-  #panel-schedule .sched-toolbar .meetup-chip-row{ flex:1; min-width:0; margin:0; padding:0; gap:8px; }
-  #panel-schedule .sched-toolbar .meetup-chip{ padding:9px 15px; border:none; background:var(--hm-card); color:var(--hm-ink); font-size:14px; font-weight:600; }
-  #panel-schedule .sched-toolbar .meetup-chip.active{ background:var(--hm-ink); color:var(--hm-card); }
+  #panel-schedule .sched-toolbar .segment-control, #friendCalendarView .sched-toolbar .segment-control{ flex-shrink:0; margin:0; padding:4px; gap:2px; border-radius:16px; background:#E6E3DE; }
+  body.dark-mode #panel-schedule .sched-toolbar .segment-control, body.dark-mode #friendCalendarView .sched-toolbar .segment-control{ background:var(--hm-well); }
+  #panel-schedule .sched-toolbar .segment-btn, #friendCalendarView .sched-toolbar .segment-btn{ flex:none; padding:8px 13px; border-radius:12px; font-size:14px; font-weight:600; color:var(--hm-dim); background:none; box-shadow:none; }
+  #panel-schedule .sched-toolbar .segment-btn.active, #friendCalendarView .sched-toolbar .segment-btn.active{ background:var(--hm-card); color:var(--hm-ink); box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  #panel-schedule .sched-toolbar .meetup-chip-row, #friendCalendarView .sched-toolbar .meetup-chip-row{ flex:1; min-width:0; margin:0; padding:0; gap:8px; }
+  #panel-schedule .sched-toolbar .meetup-chip, #friendCalendarView .sched-toolbar .meetup-chip{ padding:9px 15px; border:none; background:var(--hm-card); color:var(--hm-ink); font-size:14px; font-weight:600; }
+  #panel-schedule .sched-toolbar .meetup-chip.active, #friendCalendarView .sched-toolbar .meetup-chip.active{ background:var(--hm-ink); color:var(--hm-card); }
   /* 한달 보기 - 위쪽 "+ 일정 추가" 줄은 제목 옆 +가 같은 일을 해서 숨김 */
   #scheduleView-month > .week-color-settings-row{ display:none; }
   .month-cal-card{ background:var(--hm-card); border-radius:24px; padding:14px 8px 10px; }
-  #scheduleView-month .schedule-nav{ margin:0 6px 10px; }
-  #scheduleView-month .schedule-nav-label{ font-family:inherit; font-size:18px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
-  #scheduleView-month .schedule-nav button{ width:32px; height:32px; border:none; background:none; color:var(--hm-dim); font-size:22px; }
-  #scheduleView-month .weekday-row{ margin-bottom:0; }
-  #scheduleView-month .weekday-row span{ font-family:inherit; font-size:12.5px; color:var(--hm-dim); padding-bottom:8px; }
-  #scheduleView-month .weekday-row span:first-child{ color:#D9533F; }
-  #scheduleView-month .weekday-row span:last-child{ color:#3D7BD9; }
-  #monthSchedGrid{ gap:0; }
-  #monthSchedGrid .day-cell{ min-height:84px; padding:8px 2px 4px; border-radius:0; border-top:1px solid var(--hm-line); background:none; }
-  #monthSchedGrid .day-cell .month-date-num{ font-size:14px; font-weight:500; color:var(--hm-ink); width:26px; height:26px; line-height:26px; align-self:center; padding:0; }
-  #monthSchedGrid .day-cell:nth-child(7n+1) .month-date-num{ color:#D9533F; }
-  #monthSchedGrid .day-cell:nth-child(7n) .month-date-num{ color:#3D7BD9; }
-  #monthSchedGrid .day-cell.today .month-date-num{
+  #scheduleView-month .schedule-nav, #friendCalView-month .schedule-nav{ margin:0 6px 10px; }
+  #scheduleView-month .schedule-nav-label, #friendCalView-month .schedule-nav-label{ font-family:inherit; font-size:18px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  #scheduleView-month .schedule-nav button, #friendCalView-month .schedule-nav button{ width:32px; height:32px; border:none; background:none; color:var(--hm-dim); font-size:22px; }
+  #scheduleView-month .weekday-row, #friendCalView-month .weekday-row{ margin-bottom:0; }
+  #scheduleView-month .weekday-row span, #friendCalView-month .weekday-row span{ font-family:inherit; font-size:12.5px; color:var(--hm-dim); padding-bottom:8px; }
+  #scheduleView-month .weekday-row span:first-child, #friendCalView-month .weekday-row span:first-child{ color:#D9533F; }
+  #scheduleView-month .weekday-row span:last-child, #friendCalView-month .weekday-row span:last-child{ color:#3D7BD9; }
+  #monthSchedGrid, #friendMonthGrid{ gap:0; }
+  #monthSchedGrid .day-cell, #friendMonthGrid .day-cell{ min-height:84px; padding:8px 2px 4px; border-radius:0; border-top:1px solid var(--hm-line); background:none; }
+  #monthSchedGrid .day-cell .month-date-num, #friendMonthGrid .day-cell .month-date-num{ font-size:14px; font-weight:500; color:var(--hm-ink); width:26px; height:26px; line-height:26px; align-self:center; padding:0; }
+  #monthSchedGrid .day-cell:nth-child(7n+1) .month-date-num, #friendMonthGrid .day-cell:nth-child(7n+1) .month-date-num{ color:#D9533F; }
+  #monthSchedGrid .day-cell:nth-child(7n) .month-date-num, #friendMonthGrid .day-cell:nth-child(7n) .month-date-num{ color:#3D7BD9; }
+  #monthSchedGrid .day-cell.today .month-date-num, #friendMonthGrid .day-cell.today .month-date-num{
     display:inline-flex; align-items:center; justify-content:center; line-height:1; border-radius:50%;
     background:var(--hm-accent-soft); color:var(--hm-accent); font-weight:800; box-shadow:none;
   }
-  #monthSchedGrid .day-cell.selected-day{ outline:none; background:var(--hm-well); border-radius:12px; border-top-color:transparent; }
-  #monthSchedGrid .month-avail-dot{ background:var(--hm-accent); }
+  #monthSchedGrid .day-cell.selected-day, #friendMonthGrid .day-cell.selected-day{ outline:none; background:var(--hm-well); border-radius:12px; border-top-color:transparent; }
+  #monthSchedGrid .month-avail-dot, #friendMonthGrid .month-avail-dot{ background:var(--hm-accent); }
   /* 일정 칩 - 진한 색 칠 대신 연한 배경 + 진한 글씨 (색은 일정마다 정해진 색 그대로). 너무 옅으면 색끼리 헷갈려서 배경을 조금 진하게 */
-  #monthSchedGrid .month-event-label{ font-size:10px; font-weight:600; padding:2px 4px; border-radius:5px; text-align:left; line-height:1.45; }
+  #monthSchedGrid .month-event-label, #friendMonthGrid .month-event-label{ font-size:10px; font-weight:600; padding:2px 4px; border-radius:5px; text-align:left; line-height:1.45; }
   @supports (background:color-mix(in srgb, red 50%, white)){
-    #monthSchedGrid .month-event-label:not(.month-memo-label){
+    #monthSchedGrid .month-event-label:not(.month-memo-label), #friendMonthGrid .month-event-label:not(.month-memo-label){
       background:color-mix(in srgb, var(--ev) 28%, var(--hm-card)) !important;
       color:color-mix(in srgb, var(--ev) 60%, #1E1B18) !important;
     }
-    body.dark-mode #monthSchedGrid .month-event-label:not(.month-memo-label){
+    body.dark-mode #monthSchedGrid .month-event-label:not(.month-memo-label), body.dark-mode #friendMonthGrid .month-event-label:not(.month-memo-label){
       background:color-mix(in srgb, var(--ev) 38%, var(--hm-card)) !important;
       color:color-mix(in srgb, var(--ev) 55%, #FFFFFF) !important;
     }
   }
   /* 고른 날짜의 일정 - 흰 카드, 시작 시각을 연한 색 알약으로 */
-  #panel-schedule .month-selected-panel{ margin-top:14px; padding:18px 16px 10px; border:none; border-radius:24px; background:var(--hm-card); }
-  #panel-schedule .month-selected-header{ margin-bottom:8px; }
-  #panel-schedule .month-selected-title{ font-family:inherit; font-size:17px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
-  #panel-schedule .month-selected-open-btn{ padding:4px 0; background:none; color:var(--hm-accent); font-size:13.5px; font-weight:700; }
-  #panel-schedule .month-selected-row{ gap:12px; padding:10px 0; border-bottom:none; }
-  #panel-schedule .month-selected-dot{ display:none; }
-  #panel-schedule .month-selected-time{
+  #panel-schedule .month-selected-panel, #friendCalendarView .month-selected-panel{ margin-top:14px; padding:18px 16px 10px; border:none; border-radius:24px; background:var(--hm-card); }
+  #panel-schedule .month-selected-header, #friendCalendarView .month-selected-header{ margin-bottom:8px; }
+  #panel-schedule .month-selected-title, #friendCalendarView .month-selected-title{ font-family:inherit; font-size:17px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  #panel-schedule .month-selected-open-btn, #friendCalendarView .month-selected-open-btn{ padding:4px 0; background:none; color:var(--hm-accent); font-size:13.5px; font-weight:700; }
+  #panel-schedule .month-selected-row, #friendCalendarView .month-selected-row{ gap:12px; padding:10px 0; border-bottom:none; }
+  #panel-schedule .month-selected-dot, #friendCalendarView .month-selected-dot{ display:none; }
+  #panel-schedule .month-selected-time, #friendCalendarView .month-selected-time{
     width:auto; min-width:46px; padding:7px 10px; border-radius:12px; text-align:center; box-sizing:border-box;
     font-family:inherit; font-size:14px; font-weight:700; font-variant-numeric:tabular-nums;
     background:var(--hm-well); color:var(--hm-ink);
   }
   @supports (background:color-mix(in srgb, red 50%, white)){
-    #panel-schedule .month-selected-row .month-selected-time{ background:color-mix(in srgb, var(--ev) 16%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 60%, #1E1B18); }
-    body.dark-mode #panel-schedule .month-selected-row .month-selected-time{ background:color-mix(in srgb, var(--ev) 26%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 55%, #FFFFFF); }
+    #panel-schedule .month-selected-row .month-selected-time, #friendCalendarView .month-selected-row .month-selected-time{ background:color-mix(in srgb, var(--ev) 16%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 60%, #1E1B18); }
+    body.dark-mode #panel-schedule .month-selected-row .month-selected-time, body.dark-mode #friendCalendarView .month-selected-row .month-selected-time{ background:color-mix(in srgb, var(--ev) 26%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 55%, #FFFFFF); }
   }
-  #panel-schedule .month-selected-text{ font-size:16px; font-weight:700; color:var(--hm-ink); }
-  #panel-schedule .month-selected-range{ margin-top:2px; font-size:13px; color:var(--hm-dim); font-variant-numeric:tabular-nums; }
-  #panel-schedule .month-selected-row:has(.ev-info) .month-selected-time{ margin-top:2px; }
-  #panel-schedule .month-selected-edit, #panel-schedule .month-selected-delete{ width:28px; height:28px; border-radius:50%; background:none; color:var(--hm-dim); }
-  #panel-schedule .month-selected-edit svg, #panel-schedule .month-selected-delete svg{ width:14px; height:14px; }
-  #panel-schedule .month-selected-empty{ font-size:13px; color:var(--hm-dim); padding:8px 0 12px; }
+  #panel-schedule .month-selected-text, #friendCalendarView .month-selected-text{ font-size:16px; font-weight:700; color:var(--hm-ink); }
+  #panel-schedule .month-selected-range, #friendCalendarView .month-selected-range{ margin-top:2px; font-size:13px; color:var(--hm-dim); font-variant-numeric:tabular-nums; }
+  #panel-schedule .month-selected-row:has(.ev-info) .month-selected-time, #friendCalendarView .month-selected-row:has(.ev-info) .month-selected-time{ margin-top:2px; }
+  #panel-schedule .month-selected-edit, #panel-schedule .month-selected-delete, #friendCalendarView .month-selected-edit, #friendCalendarView .month-selected-delete{ width:28px; height:28px; border-radius:50%; background:none; color:var(--hm-dim); }
+  #panel-schedule .month-selected-edit svg, #panel-schedule .month-selected-delete svg, #friendCalendarView .month-selected-edit svg, #friendCalendarView .month-selected-delete svg{ width:14px; height:14px; }
+  #panel-schedule .month-selected-empty, #friendCalendarView .month-selected-empty{ font-size:13px; color:var(--hm-dim); padding:8px 0 12px; }
 
   /* 주 보기 - 한달 보기와 같은 흰 카드. 위쪽 "+ 일정 추가" 줄은 제목 옆 +가 같은 일을 해서 숨김 */
   #scheduleView-week > .week-color-settings-row{ display:none; }
   .week-cal-card{ background:var(--hm-card); border-radius:24px; padding:14px 10px 12px 6px; }
-  #scheduleView-week .schedule-nav{ margin:0 2px 12px 6px; }
-  #scheduleView-week .schedule-nav-label{ font-family:inherit; font-size:18px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
-  #scheduleView-week .schedule-nav button{ width:32px; height:32px; border:none; background:none; color:var(--hm-dim); font-size:22px; }
-  #weekGrid .week-cal-hour{ font-family:inherit; font-size:9px; color:var(--hm-dim); }
-  #weekGrid .week-cal-day-head{ font-family:inherit; font-size:10px; font-weight:600; color:var(--hm-dim); border-radius:10px; }
-  #weekGrid .week-cal-day:nth-child(6) .week-cal-day-head{ color:#3D7BD9; }
-  #weekGrid .week-cal-day:nth-child(7) .week-cal-day-head{ color:#D9533F; }
-  #weekGrid .week-cal-day-head.today{ background:var(--hm-accent-soft); color:var(--hm-accent); font-weight:800; }
-  #weekGrid .week-cal-day-body{
+  #scheduleView-week .schedule-nav, #friendCalView-week .schedule-nav{ margin:0 2px 12px 6px; }
+  #scheduleView-week .schedule-nav-label, #friendCalView-week .schedule-nav-label{ font-family:inherit; font-size:18px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  #scheduleView-week .schedule-nav button, #friendCalView-week .schedule-nav button{ width:32px; height:32px; border:none; background:none; color:var(--hm-dim); font-size:22px; }
+  #weekGrid .week-cal-hour, #friendWeekGrid .week-cal-hour{ font-family:inherit; font-size:9px; color:var(--hm-dim); }
+  #weekGrid .week-cal-day-head, #friendWeekGrid .week-cal-day-head{ font-family:inherit; font-size:10px; font-weight:600; color:var(--hm-dim); border-radius:10px; }
+  #weekGrid .week-cal-day:nth-child(6) .week-cal-day-head, #friendWeekGrid .week-cal-day:nth-child(6) .week-cal-day-head{ color:#3D7BD9; }
+  #weekGrid .week-cal-day:nth-child(7) .week-cal-day-head, #friendWeekGrid .week-cal-day:nth-child(7) .week-cal-day-head{ color:#D9533F; }
+  #weekGrid .week-cal-day-head.today, #friendWeekGrid .week-cal-day-head.today{ background:var(--hm-accent-soft); color:var(--hm-accent); font-weight:800; }
+  #weekGrid .week-cal-day-body, #friendWeekGrid .week-cal-day-body{
     border-left:1px solid var(--hm-line);
     background-image:repeating-linear-gradient(to bottom, var(--hm-line) 0, var(--hm-line) 1px, transparent 1px, transparent 32px);
     box-shadow:inset 0 -1px 0 var(--hm-line);
   }
-  #weekGrid .week-cal-block{ border-radius:6px; font-size:9px; }
+  #weekGrid .week-cal-block, #friendWeekGrid .week-cal-block{ border-radius:6px; font-size:9px; }
   @supports (background:color-mix(in srgb, red 50%, white)){
-    #weekGrid .week-cal-block:not(.pending):not(.linked):not(.avail):not(.travel){
+    #weekGrid .week-cal-block:not(.pending):not(.linked):not(.avail):not(.travel), #friendWeekGrid .week-cal-block:not(.pending):not(.linked):not(.avail):not(.travel){
       background:color-mix(in srgb, var(--ev) 18%, var(--hm-card)) !important;
       color:color-mix(in srgb, var(--ev) 60%, #1E1B18) !important;
     }
-    body.dark-mode #weekGrid .week-cal-block:not(.pending):not(.linked):not(.avail):not(.travel){
+    body.dark-mode #weekGrid .week-cal-block:not(.pending):not(.linked):not(.avail):not(.travel), body.dark-mode #friendWeekGrid .week-cal-block:not(.pending):not(.linked):not(.avail):not(.travel){
       background:color-mix(in srgb, var(--ev) 28%, var(--hm-card)) !important;
       color:color-mix(in srgb, var(--ev) 55%, #FFFFFF) !important;
     }
@@ -8445,41 +8445,48 @@
 
   /* 하루 보기 - 날짜를 크게, 일정은 흰 카드 + 시간을 연한 색 알약으로.
      위쪽 "+"는 제목 옆 +가 같은 일을 해서 숨김 (제목 옆 +가 이 버튼을 대신 눌러줌) */
-  #scheduleView-day .day-header-row{ align-items:center; margin-bottom:14px; }
-  #scheduleView-day .day-header-sub #dayViewLabel{ font-family:inherit; font-size:19px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
-  #scheduleView-day .day-header-sub.is-today #dayViewLabel{ color:var(--hm-ink); }
-  #scheduleView-day .day-today-chip{ padding:3px 9px; font-size:11.5px; background:var(--hm-card); color:var(--hm-dim); }
-  #scheduleView-day .day-today-chip.today{ background:var(--hm-accent-soft); color:var(--hm-accent); }
-  #scheduleView-day .day-goto-today-btn{ padding:3px 10px; font-size:11.5px; border:none; background:var(--hm-accent); color:#fff; }
-  #scheduleView-day .day-header-actions{ gap:8px; }
-  #scheduleView-day .day-header-actions button{ width:36px; height:36px; border:none; border-radius:50%; background:var(--hm-card); color:var(--hm-ink); font-size:20px; }
-  #scheduleView-day .day-header-actions button.voice-add-btn{ width:auto; padding:0 12px; border-radius:18px; font-size:12.5px; }
+  #scheduleView-day .day-header-row, #friendCalendarMain .day-header-row{ align-items:center; margin-bottom:14px; }
+  #scheduleView-day .day-header-sub #dayViewLabel, #friendCalendarMain .day-header-sub #friendCalDateNavLabel{ font-family:inherit; font-size:19px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  #scheduleView-day .day-header-sub.is-today #dayViewLabel, #friendCalendarMain .day-header-sub.is-today #friendCalDateNavLabel{ color:var(--hm-ink); }
+  #scheduleView-day .day-today-chip, #friendCalendarMain .day-today-chip{ padding:3px 9px; font-size:11.5px; background:var(--hm-card); color:var(--hm-dim); }
+  #scheduleView-day .day-today-chip.today, #friendCalendarMain .day-today-chip.today{ background:var(--hm-accent-soft); color:var(--hm-accent); }
+  #scheduleView-day .day-goto-today-btn, #friendCalendarMain .day-goto-today-btn{ padding:3px 10px; font-size:11.5px; border:none; background:var(--hm-accent); color:#fff; }
+  #scheduleView-day .day-header-actions, #friendCalendarMain .day-header-actions{ gap:8px; }
+  #scheduleView-day .day-header-actions button, #friendCalendarMain .day-header-actions button{ width:36px; height:36px; border:none; border-radius:50%; background:var(--hm-card); color:var(--hm-ink); font-size:20px; }
+  #scheduleView-day .day-header-actions button.voice-add-btn, #friendCalendarMain .day-header-actions button.voice-add-btn{ width:auto; padding:0 12px; border-radius:18px; font-size:12.5px; }
   #scheduleView-day #openEventFormBtn{ display:none; }
-  #dayEventList .day-event-card{ padding:16px 74px 14px 16px; border:none; border-radius:22px; background:var(--hm-card); }
-  #dayEventList .day-event-card.available{ box-shadow:inset 3px 0 0 var(--hm-accent); }
-  #dayEventList .day-event-card.pending-hold{ border:1px dashed #EAB308; background:#FEF9C3; }
-  #dayEventList .day-event-card.reservation-linked{ background:var(--hm-card); box-shadow:inset 3px 0 0 #F43F5E; }
-  body.dark-mode #dayEventList .day-event-card.pending-hold{ background:rgba(234,179,8,0.14); }
-  #dayEventList .day-event-time{
+  #dayEventList .day-event-card, #friendTodayList .day-event-card{ padding:16px 74px 14px 16px; border:none; border-radius:22px; background:var(--hm-card); }
+  #dayEventList .day-event-card.available, #friendTodayList .day-event-card.available{ box-shadow:inset 3px 0 0 var(--hm-accent); }
+  #dayEventList .day-event-card.pending-hold, #friendTodayList .day-event-card.pending-hold{ border:1px dashed #EAB308; background:#FEF9C3; }
+  #dayEventList .day-event-card.reservation-linked, #friendTodayList .day-event-card.reservation-linked{ background:var(--hm-card); box-shadow:inset 3px 0 0 #F43F5E; }
+  body.dark-mode #dayEventList .day-event-card.pending-hold, body.dark-mode #friendTodayList .day-event-card.pending-hold{ background:rgba(234,179,8,0.14); }
+  #dayEventList .day-event-time, #friendTodayList .day-event-time{
     display:inline-block; margin-bottom:8px; padding:5px 10px; border-radius:11px;
     font-family:inherit; font-size:13.5px; font-weight:700; font-variant-numeric:tabular-nums;
     background:var(--hm-well); color:var(--hm-ink);
   }
   @supports (background:color-mix(in srgb, red 50%, white)){
-    #dayEventList .day-event-card:not(.pending-hold) .day-event-time{ background:color-mix(in srgb, var(--ev) 16%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 60%, #1E1B18); }
-    body.dark-mode #dayEventList .day-event-card:not(.pending-hold) .day-event-time{ background:color-mix(in srgb, var(--ev) 26%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 55%, #FFFFFF); }
+    #dayEventList .day-event-card:not(.pending-hold) .day-event-time, #friendTodayList .day-event-card:not(.pending-hold) .day-event-time{ background:color-mix(in srgb, var(--ev) 16%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 60%, #1E1B18); }
+    body.dark-mode #dayEventList .day-event-card:not(.pending-hold) .day-event-time, body.dark-mode #friendTodayList .day-event-card:not(.pending-hold) .day-event-time{ background:color-mix(in srgb, var(--ev) 26%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 55%, #FFFFFF); }
   }
-  #dayEventList .day-event-title{ font-family:inherit; font-size:16px; font-weight:700; letter-spacing:-0.01em; color:var(--hm-ink); }
-  #dayEventList .day-event-card.pending-hold .day-event-title{ color:#78350F; }
-  body.dark-mode #dayEventList .day-event-card.pending-hold .day-event-title{ color:#FDE68A; }
-  #dayEventList .day-event-actions{ top:12px; right:12px; }
-  #dayEventList .day-event-edit, #dayEventList .day-event-delete, #dayEventList .day-event-goto-chat-icon{ width:30px; height:30px; border-radius:50%; color:var(--hm-dim); }
-  #dayEventList .day-event-goto-chat-icon{ color:var(--hm-accent); }
-  #dayEventList .day-event-tag{ padding:5px 11px; border:none; background:var(--hm-well); color:var(--hm-dim); font-size:11.5px; }
-  #dayEventList .day-event-tag.on{ background:var(--hm-accent-soft); color:var(--hm-accent); }
-  #dayEventList .day-event-tag.private-tag.on{ background:var(--hm-ink); color:var(--hm-card); }
-  #dayEventList .day-memo-card{ border-radius:18px; }
-  #dayEventList .day-event-empty{ padding:34px 0; border-radius:22px; background:var(--hm-card); color:var(--hm-dim); font-size:13.5px; }
+  #dayEventList .day-event-title, #friendTodayList .day-event-title{ font-family:inherit; font-size:16px; font-weight:700; letter-spacing:-0.01em; color:var(--hm-ink); }
+  #dayEventList .day-event-card.pending-hold .day-event-title, #friendTodayList .day-event-card.pending-hold .day-event-title{ color:#78350F; }
+  body.dark-mode #dayEventList .day-event-card.pending-hold .day-event-title, body.dark-mode #friendTodayList .day-event-card.pending-hold .day-event-title{ color:#FDE68A; }
+  #dayEventList .day-event-actions, #friendTodayList .day-event-actions{ top:12px; right:12px; }
+  #dayEventList .day-event-edit, #dayEventList .day-event-delete, #dayEventList .day-event-goto-chat-icon, #friendTodayList .day-event-edit, #friendTodayList .day-event-delete, #friendTodayList .day-event-goto-chat-icon{ width:30px; height:30px; border-radius:50%; color:var(--hm-dim); }
+  #dayEventList .day-event-goto-chat-icon, #friendTodayList .day-event-goto-chat-icon{ color:var(--hm-accent); }
+  #dayEventList .day-event-tag, #friendTodayList .day-event-tag{ padding:5px 11px; border:none; background:var(--hm-well); color:var(--hm-dim); font-size:11.5px; }
+  #dayEventList .day-event-tag.on, #friendTodayList .day-event-tag.on{ background:var(--hm-accent-soft); color:var(--hm-accent); }
+  #dayEventList .day-event-tag.private-tag.on, #friendTodayList .day-event-tag.private-tag.on{ background:var(--hm-ink); color:var(--hm-card); }
+  #dayEventList .day-memo-card, #friendTodayList .day-memo-card{ border-radius:18px; }
+  #dayEventList .day-event-empty, #friendTodayList .day-event-empty{ padding:34px 0; border-radius:22px; background:var(--hm-card); color:var(--hm-dim); font-size:13.5px; }
+  /* 친구 캘린더 - 내 캘린더와 같은 베이지 바탕 + 큰 제목 (위 규칙들에 친구 캘린더 id도 같이 걸어둠) */
+  .friend-calendar-view{ background:var(--hm-bg); color:var(--hm-ink); }
+  #friendCalendarView .friend-calendar-title{ font-family:inherit; font-size:26px; font-weight:800; letter-spacing:-0.03em; margin:2px 0 14px; }
+  #friendCalendarMain .friend-cal-datenav{ padding:0; gap:10px; }
+  #friendCalendarMain .friend-cal-datenav #friendCalDateNavLabel{ flex:none; text-align:left; }
+  #friendTodayList .day-event-card{ padding-right:16px; }
+  #friendCalendarView .month-selected-main .day-event-ask-btn{ align-self:flex-start; margin-top:8px; }
 
   /* 메모 - 노란 포스트잇처럼 (모서리 접힘 + 하루 보기는 테이프·그림자·살짝 기울임). 확정 대기 노란 카드와 헷갈리지 않게 */
   body{ --memo-paper:#FFE89A; --memo-fold:#E8BE3C; --memo-ink:#6B4A0A; }
@@ -9634,31 +9641,52 @@
       <div class="friend-cal-main active" id="friendCalendarMain">
         <!-- 예약하기: 앞으로 2주 중 친구가 열어둔 날을 한 줄로 - 누르면 그 날로 바로 감 (하루씩 넘기며 찾지 않게) -->
         <div class="friend-reserve-days" id="friendReserveDays" style="display:none;"></div>
-        <div class="friend-cal-datenav" id="friendCalDateNav">
-          <button type="button" id="friendCalDatePrevBtn">&#8249;</button>
-          <span id="friendCalDateNavLabel">-</span>
-          <button type="button" id="friendCalDateNextBtn">&#8250;</button>
-          <button type="button" id="friendCalDateTodayBtn">오늘</button>
-        </div>
+        <!-- 내 캘린더(하루/주/달)와 같은 모양 - 친구 일정으로만 바꿔서 보여줌 -->
+        <div class="sched-toolbar">
         <div class="segment-control" id="friendCalendarSegment">
           <button class="segment-btn active" data-view="today">하루</button>
-          <button class="segment-btn" data-view="week">일주일</button>
-          <button class="segment-btn" data-view="month">한달</button>
+          <button class="segment-btn" data-view="week">주</button>
+          <button class="segment-btn" data-view="month">달</button>
+        </div>
+        </div>
+        <!-- 하루 보기 날짜 줄 (내 하루 보기처럼 날짜 + 오늘/오늘로 + 이전/다음) -->
+        <div class="friend-cal-datenav day-header-row" id="friendCalDateNav">
+          <div class="day-header-sub" id="friendCalDateSub">
+            <span id="friendCalDateNavLabel">-</span>
+            <span class="day-today-chip" id="friendCalDayTodayChip"></span>
+            <button type="button" class="day-goto-today-btn" id="friendCalDateTodayBtn">오늘로</button>
+          </div>
+          <div class="day-header-actions">
+            <button type="button" id="friendCalDatePrevBtn" title="이전 날">&#8249;</button>
+            <button type="button" id="friendCalDateNextBtn" title="다음 날">&#8250;</button>
+          </div>
         </div>
         <div class="friend-cal-view active" id="friendCalView-today">
           <div id="friendTodayList"></div>
         </div>
         <div class="friend-cal-view" id="friendCalView-week">
+          <div class="week-cal-card">
+          <div class="schedule-nav">
+            <button type="button" id="friendWeekPrevBtn">&#8249;</button>
+            <div class="schedule-nav-label" id="friendWeekLabel">-</div>
+            <button type="button" id="friendWeekNextBtn">&#8250;</button>
+          </div>
           <div class="week-grid-wrap"><div class="week-grid" id="friendWeekGrid"></div></div>
+          </div>
         </div>
         <div class="friend-cal-view" id="friendCalView-month">
-          <div class="friend-month-nav">
+          <div class="month-cal-card">
+          <div class="schedule-nav">
             <button type="button" id="friendMonthPrevBtn">&#8249;</button>
-            <span id="friendMonthLabel">-</span>
+            <div class="schedule-nav-label" id="friendMonthLabel">-</div>
             <button type="button" id="friendMonthNextBtn">&#8250;</button>
           </div>
+          <div class="weekday-row">
+            <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
+          </div>
           <div class="day-grid month-sched-grid" id="friendMonthGrid"></div>
-          <div id="friendMonthSelectedPanel"></div>
+          </div>
+          <div class="month-selected-panel" id="friendMonthSelectedPanel"></div>
         </div>
         <div class="privacy-note-inline" id="friendCalPrivacyNote"></div>
       </div>
@@ -12525,7 +12553,7 @@ function openHomeMatchSlot(friendId, dateKey){
   openFriendCalendar(friendId, 'reserve');
   if(!dateKey || dateKey === toDateInputValue(TODAY)) return;
   friendDayFocusDate = parseDateInputValue(dateKey);
-  friendWeekFocusDate = getWeekStart(friendDayFocusDate);
+  friendWeekFocusDate = friendWeekStartOf(friendDayFocusDate);
   renderFriendCalDateNav();
   renderFriendToday();
   renderFriendWeek();
@@ -22757,7 +22785,7 @@ function attachCalendarSwipe(el, getButtons){
   ['scheduleView-week', 'weekPrev', 'weekNext'],
   ['scheduleView-month', 'monthSchedPrev', 'monthSchedNext'],
   ['friendCalView-today', 'friendCalDatePrevBtn', 'friendCalDateNextBtn'],
-  ['friendCalView-week', 'friendCalDatePrevBtn', 'friendCalDateNextBtn'],
+  ['friendCalView-week', 'friendWeekPrevBtn', 'friendWeekNextBtn'],
   ['friendCalView-month', 'friendMonthPrevBtn', 'friendMonthNextBtn'],
 ].forEach(([viewId, prevId, nextId]) => {
   attachCalendarSwipe(document.getElementById(viewId), () => [document.getElementById(prevId), document.getElementById(nextId)]);
@@ -23621,7 +23649,7 @@ function fetchFriendCacheOnce(tag, url, cache, key){
 // 프로필을 열 때 미리 이번주 일정을 받아둠 - "캘린더 보기"를 누르면 바로 보이게
 function prefetchFriendCalendar(friend){
   if(!friend || !friend.username || friend.id === DEMO_FRIEND.id || !authToken) return;
-  const start = getWeekStart(TODAY);
+  const start = friendWeekStartOf(TODAY);
   for(let i = 0; i < 7; i++){
     const d = new Date(start);
     d.setDate(d.getDate() + i);
@@ -23661,7 +23689,13 @@ function getFriendScheduleForRender(friend, dateObj){
 let activeFriendCalendarId = null;
 let friendCalendarMode = 'calendar'; // 'calendar'(전체 일정 구경) | 'reserve'(예약 가능한 시간만 정리해서)
 let friendDayFocusDate = new Date(TODAY); // "하루" 탭에서 보고 있는 날짜 - 하루씩 이동, 오늘 이전 불가
-let friendWeekFocusDate = getWeekStart(TODAY); // "일주일" 탭에서 보고 있는 주의 시작일(일요일) - 일주일씩 이동, 이번주 이전 불가
+// 친구 캘린더 주 보기도 내 주 보기처럼 월요일부터 (예전엔 일요일부터라 내 캘린더와 요일 순서가 달랐음)
+function friendWeekStartOf(date){
+  const d = new Date(date);
+  d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+  return d;
+}
+let friendWeekFocusDate = friendWeekStartOf(TODAY); // "주" 탭에서 보고 있는 주의 시작일(월요일) - 일주일씩 이동, 이번주 이전 불가
 let friendMonthFocusYear = TODAY.getFullYear(); // "한달" 탭에서 보고 있는 연도
 let friendMonthFocusMonth = TODAY.getMonth() + 1; // "한달" 탭에서 보고 있는 월(1~12) - 이번달 이전 불가
 let friendMonthSelectedDate = new Date(TODAY); // 한달 탭에서 선택된 날짜(하단 상세 패널용)
@@ -23673,7 +23707,7 @@ function openFriendCalendar(friendId, mode){
   activeFriendCalendarId = friendId;
   friendCalendarMode = mode === 'reserve' ? 'reserve' : 'calendar';
   friendDayFocusDate = new Date(TODAY);
-  friendWeekFocusDate = getWeekStart(TODAY);
+  friendWeekFocusDate = friendWeekStartOf(TODAY);
   friendMonthFocusYear = TODAY.getFullYear();
   friendMonthFocusMonth = TODAY.getMonth() + 1;
   friendMonthSelectedDate = new Date(TODAY);
@@ -23746,7 +23780,7 @@ async function jumpToFirstFriendOpenDay(friend){
   }
   if(firstKey === startKey) return;
   friendDayFocusDate = parseDateInputValue(firstKey);
-  friendWeekFocusDate = getWeekStart(friendDayFocusDate);
+  friendWeekFocusDate = friendWeekStartOf(friendDayFocusDate);
   renderFriendCalDateNav();
   renderFriendToday();
   renderFriendWeek();
@@ -23812,7 +23846,7 @@ document.getElementById('friendReserveDays').addEventListener('click', (e) => {
   const b = e.target.closest('.frd-day.open');
   if(!b) return;
   friendDayFocusDate = parseDateInputValue(b.dataset.key);
-  friendWeekFocusDate = getWeekStart(friendDayFocusDate);
+  friendWeekFocusDate = friendWeekStartOf(friendDayFocusDate);
   document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(x => x.classList.toggle('active', x.dataset.view === 'today'));
   document.querySelectorAll('#friendCalendarView .friend-cal-view').forEach(v => v.classList.remove('active'));
   document.getElementById('friendCalView-today').classList.add('active');
@@ -23825,15 +23859,24 @@ function renderFriendCalDateNav(){
   renderFriendReserveDays();
   const activeSegBtn = document.querySelector('#friendCalendarSegment .segment-btn.active');
   const activeView = (activeSegBtn && activeSegBtn.dataset.view) || 'today';
-  document.getElementById('friendCalDateNav').style.display = activeView === 'month' ? 'none' : '';
+  // 날짜 줄은 하루 보기에서만 - 주/달 보기는 내 캘린더처럼 흰 카드 맨 위에 이전/다음이 있음
+  document.getElementById('friendCalDateNav').style.display = activeView === 'today' ? '' : 'none';
   const label = document.getElementById('friendCalDateNavLabel');
   if(activeView === 'week'){
     const end = new Date(friendWeekFocusDate);
     end.setDate(end.getDate() + 6);
-    label.textContent = `${friendWeekFocusDate.getMonth()+1}/${friendWeekFocusDate.getDate()} - ${end.getMonth()+1}/${end.getDate()}`;
-    document.getElementById('friendCalDatePrevBtn').disabled = dateKeyNum(friendWeekFocusDate) <= dateKeyNum(getWeekStart(TODAY));
+    document.getElementById('friendWeekLabel').textContent =
+      `${friendWeekFocusDate.getMonth()+1}월 ${friendWeekFocusDate.getDate()}일 - ${end.getMonth()+1}월 ${end.getDate()}일`;
+    document.getElementById('friendWeekPrevBtn').disabled = dateKeyNum(friendWeekFocusDate) <= dateKeyNum(friendWeekStartOf(TODAY));
   } else if(activeView === 'today'){
-    label.textContent = `${friendDayFocusDate.getMonth()+1}월 ${friendDayFocusDate.getDate()}일 (${WEEKDAY_KO[friendDayFocusDate.getDay()]})`;
+    // 내 하루 보기와 같은 글자 ("10월 16일 금요일" + 오늘/내일/N일 후)
+    const dayYear = friendDayFocusDate.getFullYear() === TODAY.getFullYear() ? '' : `${friendDayFocusDate.getFullYear()}년 `;
+    label.textContent = `${dayYear}${friendDayFocusDate.getMonth()+1}월 ${friendDayFocusDate.getDate()}일 ${WEEKDAY_KO[friendDayFocusDate.getDay()]}요일`;
+    const diff = Math.round((new Date(friendDayFocusDate.getFullYear(), friendDayFocusDate.getMonth(), friendDayFocusDate.getDate()) - new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate())) / 86400000);
+    const chip = document.getElementById('friendCalDayTodayChip');
+    chip.textContent = diff === 0 ? '오늘' : diff === 1 ? '내일' : `${diff}일 후`;
+    chip.classList.toggle('today', diff === 0);
+    document.getElementById('friendCalDateTodayBtn').style.display = diff === 0 ? 'none' : '';
     // 오늘보다 이전으로는 못 가게 - 이미 오늘이면 이전 버튼을 비활성화
     document.getElementById('friendCalDatePrevBtn').disabled = dateKeyOf(friendDayFocusDate) === dateKeyOf(TODAY);
   }
@@ -23846,7 +23889,7 @@ function shiftFriendCalendarFocusDate(dir){
   if(activeView === 'week'){
     const next = new Date(friendWeekFocusDate);
     next.setDate(next.getDate() + dir * 7);
-    friendWeekFocusDate = (dateKeyNum(next) < dateKeyNum(getWeekStart(TODAY))) ? getWeekStart(TODAY) : next;
+    friendWeekFocusDate = (dateKeyNum(next) < dateKeyNum(friendWeekStartOf(TODAY))) ? friendWeekStartOf(TODAY) : next;
   } else {
     const next = new Date(friendDayFocusDate);
     next.setDate(next.getDate() + dir);
@@ -23859,9 +23902,11 @@ function shiftFriendCalendarFocusDate(dir){
 }
 document.getElementById('friendCalDatePrevBtn').addEventListener('click', () => shiftFriendCalendarFocusDate(-1));
 document.getElementById('friendCalDateNextBtn').addEventListener('click', () => shiftFriendCalendarFocusDate(1));
+document.getElementById('friendWeekPrevBtn').addEventListener('click', () => shiftFriendCalendarFocusDate(-1));
+document.getElementById('friendWeekNextBtn').addEventListener('click', () => shiftFriendCalendarFocusDate(1));
 document.getElementById('friendCalDateTodayBtn').addEventListener('click', () => {
   friendDayFocusDate = new Date(TODAY);
-  friendWeekFocusDate = getWeekStart(TODAY);
+  friendWeekFocusDate = friendWeekStartOf(TODAY);
   renderFriendCalDateNav();
   renderFriendToday();
   renderFriendWeek();
@@ -24088,10 +24133,11 @@ function renderFriendToday(){
     }
     const card = document.createElement('div');
     card.className = 'day-event-card friend-view' + (b.isBookable ? ' available' : '');
+    card.style.setProperty('--ev', b.isBookable ? 'var(--accent)' : colorForScheduleText(b.title || '일정')); // 시간 알약 색 (내 하루 보기와 같게)
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
     const overlap = mine.filter(x => x.s < b.endHour * 60 && x.e > b.startHour * 60);
     card.innerHTML = `
-      <div class="day-event-time">${String(b.startHour).padStart(2,'0')}:00-${String(b.endHour).padStart(2,'0')}:00</div>
+      <div class="day-event-time">${minutesToLabel(b.startHour * 60)}-${minutesToLabel(b.endHour * 60)}</div>
       <div class="day-event-title">${label}</div>
       ${overlap.length ? `<div class="day-event-overlap">내 일정과 겹쳐요 · ${overlap.map(x => escapeHtml(myRangeLabel(x))).join(', ')}</div>` : ''}
       ${(!b.isBookable && friendCalendarMode !== 'reserve') ? `<button type="button" class="day-event-ask-btn">${ICO.chatLi} 친구한테 물어보기</button>` : ''}
@@ -24112,7 +24158,7 @@ function renderFriendToday(){
 
 function renderFriendWeek(){
   const friend = FRIENDS.find(f => f.id === activeFriendCalendarId);
-  const weekStart = new Date(friendWeekFocusDate); // 일반적인 캘린더 주(일~토) - 요일 이동과 무관하게 항상 이 주의 일요일부터
+  const weekStart = new Date(friendWeekFocusDate); // 내 주 보기와 같은 주(월~일) - 요일 이동과 무관하게 항상 이 주의 월요일부터
   const wrap = document.getElementById('friendWeekGrid');
   wrap.className = 'week-cal-wrap';
   wrap.innerHTML = '';
@@ -24124,20 +24170,39 @@ function renderFriendWeek(){
     days.push(d);
   }
 
+  // 날마다 그릴 블록을 먼저 구해 둠 - 내 주 보기처럼 일정이 있는 시간대만 보이게(기본 9~22시) 범위를 정하려고
+  const dayInfos = days.map(d => {
+    const dayCached = isFriendScheduleCached(friend, d);
+    const sched = friend ? getFriendScheduleForRender(friend, d) : getFriendSchedule(activeFriendCalendarId, dateKeyOf(d));
+    const titles = friend ? getFriendTitlesForRender(friend, d) : null;
+    const busyArr = friend ? getFriendBusyForRender(friend, d) : null;
+    // 이 날짜 데이터가 아직 서버에서 도착 전이면, 있지도 않은 일정을 잠깐 지어내 보여주지 않고 그냥 빈 칸으로 둠
+    let blocks = dayCached ? groupFriendScheduleBlocks(HOURS, sched, busyArr, titles) : [];
+    // 예약하기 모드에서는 이미 지난 날짜/시간대 블록은 아예 목록에서 빼서 그리지도 않음
+    if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(d, b));
+    const isPast = dateKeyNum(d) < dateKeyNum(TODAY); // 이번주 안이라도 이미 지난 날짜는 예약 불가능하게
+    const mine = (friendCalendarMode === 'reserve' && !isPast) ? myBusyRangesForDate(d) : [];
+    const marks = HOURS.map(h => (blocks.some(b => h >= b.startHour && h < b.endHour)
+      || mine.some(m => m.s < (h + 1) * 60 && m.e > h * 60)) ? 'x' : '');
+    return { blocks, isPast, mine, marks };
+  });
+  const { minIdx, maxIdx } = computeVisibleHourRange(dayInfos.map(x => x.marks), 9, 22, HOURS);
+  const visibleHours = HOURS.slice(minIdx, maxIdx + 1);
+
   // 시간 라벨 컬럼 (내 주간뷰와 동일)
   const hourCol = document.createElement('div');
   hourCol.className = 'week-cal-hourcol';
   hourCol.appendChild(Object.assign(document.createElement('div'), { className: 'week-cal-headspacer' }));
-  HOURS.forEach(h => {
+  visibleHours.forEach(h => {
     const hourEl = document.createElement('div');
     hourEl.className = 'week-cal-hour';
     hourEl.textContent = `${h}시`;
     hourCol.appendChild(hourEl);
   });
-  // 맨 마지막 칸(23시)이 끝나는 경계선에 24시 라벨을 한 번 더 표시
+  // 맨 마지막 칸이 끝나는 경계선에 그 시각 라벨을 한 번 더 표시 (자정까지 닿았으면 24시)
   const endHourEl = document.createElement('div');
   endHourEl.className = 'week-cal-hour week-cal-hour-end';
-  endHourEl.textContent = '24시';
+  endHourEl.textContent = `${maxIdx >= HOURS.length - 1 ? 24 : HOURS[maxIdx + 1]}시`;
   hourCol.appendChild(endHourEl);
   wrap.appendChild(hourCol);
 
@@ -24145,7 +24210,7 @@ function renderFriendWeek(){
   const daysWrap = document.createElement('div');
   daysWrap.className = 'week-cal-days';
 
-  days.forEach(d => {
+  days.forEach((d, dayIdx) => {
     const dayCol = document.createElement('div');
     dayCol.className = 'week-cal-day';
 
@@ -24157,30 +24222,24 @@ function renderFriendWeek(){
 
     const body = document.createElement('div');
     body.className = 'week-cal-day-body';
-    body.style.height = (WEEK_ROW_H * HOURS.length) + 'px';
+    body.style.height = (WEEK_ROW_H * visibleHours.length) + 'px';
 
-    const isPast = dateKeyNum(d) < dateKeyNum(TODAY); // 이번주 안이라도 이미 지난 날짜는 예약 불가능하게
-    const dayCached = isFriendScheduleCached(friend, d);
-    const sched = friend ? getFriendScheduleForRender(friend, d) : getFriendSchedule(activeFriendCalendarId, dateKeyOf(d));
-    const titles = friend ? getFriendTitlesForRender(friend, d) : null;
-    const busyArr = friend ? getFriendBusyForRender(friend, d) : null;
-
-    // 이 날짜 데이터가 아직 서버에서 도착 전이면, 있지도 않은 일정을 잠깐 지어내 보여주지 않고 그냥 빈 칸으로 둠
-    let blocks = dayCached ? groupFriendScheduleBlocks(HOURS, sched, busyArr, titles) : [];
-    // 예약하기 모드에서는 이미 지난 날짜/시간대 블록은 아예 목록에서 빼서 그리지도 않음
-    if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(d, b));
+    const { blocks, isPast, mine } = dayInfos[dayIdx];
 
     blocks.forEach(b => {
       const startIdx = HOURS.indexOf(b.startHour);
       const endIdx = HOURS.indexOf(b.endHour - 1);
       const block = document.createElement('div');
-      block.className = 'week-cal-block' + (friendCalendarMode === 'reserve' ? ' fr-half' : '');
-      block.style.top = (startIdx * WEEK_ROW_H + 1) + 'px';
+      // 캘린더 구경에서는 내 주 보기와 같은 칸 모양 - 예약 가능은 연한 토마토 + 왼쪽 줄, 일정은 일정 색의 연한 칸
+      block.className = 'week-cal-block' + (friendCalendarMode === 'reserve' ? ' fr-half' : (b.isBookable ? ' avail' : ''));
+      block.style.top = ((startIdx - minIdx) * WEEK_ROW_H + 1) + 'px';
       block.style.height = ((endIdx - startIdx + 1) * WEEK_ROW_H - 2) + 'px';
       const label = b.title ? b.title : (b.isBookable ? '예약 가능' : '일정');
       block.style.background = b.isBookable ? 'var(--accent)' : colorForScheduleText(label);
-      if(block.style.background === AVAILABLE_EVENT_COLOR) block.style.color = 'var(--on-accent)';
-      block.textContent = label;
+      block.style.setProperty('--ev', block.style.background);
+      if(block.style.background === AVAILABLE_EVENT_COLOR && friendCalendarMode === 'reserve') block.style.color = 'var(--on-accent)';
+      // 칸이 좁아서 내 주 보기처럼 예약 가능은 짧게 "가능" (전체 이름은 title에)
+      block.textContent = (b.isBookable && friendCalendarMode !== 'reserve') ? '가능' : label;
       block.title = `${d.getMonth()+1}/${d.getDate()} ${b.startHour}:00-${b.endHour}:00 - ${label}`;
       if(b.isBookable && !isPast){
         if(friendCalendarMode === 'reserve'){
@@ -24191,7 +24250,6 @@ function renderFriendWeek(){
       } else if(!b.isBookable && friendCalendarMode !== 'reserve'){
         // 친구 일정 블록을 누르면 '친구한테 물어보기' 버튼이 있는 작은 팝업을 띄움
         block.style.cursor = 'pointer';
-        block.style.opacity = '0.7';
         block.addEventListener('click', (e) => { e.stopPropagation(); showFriendBlockAskPopover(block, friend, new Date(d), b); });
       } else {
         block.style.cursor = 'default';
@@ -24202,10 +24260,10 @@ function renderFriendWeek(){
 
     // 약속 잡기에서는 오른쪽 절반에 내 일정을 같이 그려서, 친구가 열어둔 시간 중 내가 되는 때를 한눈에 보게 함
     if(friendCalendarMode === 'reserve' && !isPast){
-      myBusyRangesForDate(d).forEach(r => {
+      mine.forEach(r => {
         const mb = document.createElement('div');
         mb.className = 'week-cal-block my-own';
-        mb.style.top = (r.s / 60 * WEEK_ROW_H + 1) + 'px';
+        mb.style.top = Math.max(0, (r.s / 60 - minIdx) * WEEK_ROW_H + 1) + 'px';
         mb.style.height = Math.max(10, (r.e - r.s) / 60 * WEEK_ROW_H - 2) + 'px';
         mb.textContent = r.title;
         mb.title = `내 일정 ${d.getMonth()+1}/${d.getDate()} ${myRangeLabel(r)}`;
@@ -24308,12 +24366,19 @@ function renderFriendMonthView(){
       // 서버는 한 시간 칸마다 바쁨/제목을 줌 - 그대로 세면 2시간짜리 일정 하나가 라벨 두 개("회의","회의")로,
       // 제목 없는 3시간 일정이 "바쁨 3개"로 보였음. 이어진 같은 일정은 아래 패널처럼 한 덩어리로 묶어서 셈
       // (예약 가능 시간과 겹친 바쁨 일정도 예전처럼 세도록 bookable은 빈 배열로 넘김)
+      // 내 한달 보기와 같은 모양 - 예약 가능 시간은 날짜 아래 점, 일정은 3개까지 칩(제목 없는 건 "일정"), 넘치면 +N개
       const busyBlocks = groupFriendScheduleBlocks(monthData.hours, [], dayInfo.busy, dayInfo.titles);
-      const titledBlocks = busyBlocks.filter(b => b.title);
-      const labels = titledBlocks.slice(0, 2).map(b => `<div class="month-event-label" style="background:${colorForScheduleText(b.title)};${textColorOnEventBg(colorForScheduleText(b.title))}">${escapeHtml(truncateForMonthLabel(b.title))}</div>`).join('');
-      const untitledBusy = busyBlocks.length - titledBlocks.length;
-      const moreHtml = untitledBusy > 0 ? `<div class="month-event-more">바쁨 ${untitledBusy}개</div>` : '';
-      markupExtra = labels + moreHtml;
+      const labels = busyBlocks.slice(0, 3).map(b => {
+        const text = b.title || '일정';
+        const bg = colorForScheduleText(text);
+        return `<div class="month-event-label" style="--ev:${bg};background:${bg};${textColorOnEventBg(bg)}">${escapeHtml(truncateForMonthLabel(text))}</div>`;
+      }).join('');
+      const moreHtml = busyBlocks.length > 3 ? `<div class="month-event-more">+${busyBlocks.length - 3}개</div>` : '';
+      const isTodayCell = dateKeyOf(cellDate) === dateKeyOf(TODAY);
+      const nowMin = isTodayCell ? (new Date().getHours() * 60 + new Date().getMinutes()) : -1;
+      const hasBookable = !isPast && monthData.hours.some((h, idx) => dayInfo.bookable[idx] && (!isTodayCell || (h + 1) * 60 > nowMin));
+      const availMarkHtml = hasBookable ? `<div class="month-avail-mark"><span class="month-avail-dot" title="예약 가능 시간 있음"></span></div>` : '';
+      markupExtra = availMarkHtml + labels + moreHtml;
     }
 
     cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${markupExtra}`;
@@ -24375,7 +24440,7 @@ function showFriendBlockAskPopover(anchorEl, friend, dateObj, block){
 function renderFriendMonthSelectedPanel(monthData){
   const panel = document.getElementById('friendMonthSelectedPanel');
   const dayInfo = monthData.days[friendMonthSelectedDate.getDate() - 1];
-  const dateLabel = `${friendMonthSelectedDate.getMonth()+1}월 ${friendMonthSelectedDate.getDate()}일 (${WEEKDAY_KO[friendMonthSelectedDate.getDay()]})`;
+  const dateLabel = `${friendMonthSelectedDate.getMonth()+1}월 ${friendMonthSelectedDate.getDate()}일 ${WEEKDAY_KO[friendMonthSelectedDate.getDay()]}요일`;
   const isPast = dateKeyNum(friendMonthSelectedDate) < dateKeyNum(TODAY);
 
   if(!dayInfo){ panel.innerHTML = ''; return; }
@@ -24389,20 +24454,31 @@ function renderFriendMonthSelectedPanel(monthData){
     if(isPast) blocks = blocks.map(b => ({ ...b, isBookable: false })); // 캘린더 구경 모드에서는 지난 날짜 일정도 보여주되 클릭(예약)은 못 하게
   }
 
+  // 내 한달 보기 아래 칸과 같은 모양 - 시작 시각 알약 + 제목 + 시간 범위
   const cardsHtml = blocks.map((b, i) => {
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
-    return `<div class="day-event-card friend-view${b.isBookable ? ' available clickable' : ''}" data-hour="${b.startHour}">
-      <div class="day-event-time">${String(b.startHour).padStart(2,'0')}:00-${String(b.endHour).padStart(2,'0')}:00</div>
-      <div class="day-event-title">${label}</div>
-      ${b.askable ? `<button type="button" class="day-event-ask-btn" data-idx="${i}">${ICO.chatLi} 친구한테 물어보기</button>` : ''}
+    const color = b.isBookable ? 'var(--accent)' : colorForScheduleText(b.title || '일정');
+    return `<div class="month-selected-row${b.isBookable ? ' clickable' : ''}" data-hour="${b.startHour}" style="--ev:${color}">
+      <span class="month-selected-time">${minutesToLabel(b.startHour * 60)}</span>
+      <span class="month-selected-main"><span class="month-selected-text">${label}</span><span class="month-selected-range">${minutesToLabel(b.startHour * 60)} – ${minutesToLabel(b.endHour * 60)}</span>
+      ${b.askable ? `<button type="button" class="day-event-ask-btn" data-idx="${i}">${ICO.chatLi} 친구한테 물어보기</button>` : ''}</span>
     </div>`;
   }).join('');
 
   panel.innerHTML = `
-    <div class="meetup-section-title" style="margin:10px 0 6px;">${dateLabel}</div>
-    ${blocks.length > 0 ? cardsHtml : `<div class="day-event-empty">${friendCalendarMode === 'reserve' ? '이 날은 예약 가능한 시간이 없어요.' : '이 날은 등록된 일정이 없어요.'}</div>`}
+    <div class="month-selected-header">
+      <div class="month-selected-title">${dateLabel}</div>
+      <button class="month-selected-open-btn" type="button" id="friendMonthSelectedOpenBtn">하루 일정 자세히 보기 &#8250;</button>
+    </div>
+    ${blocks.length > 0 ? cardsHtml : `<div class="month-selected-empty">${friendCalendarMode === 'reserve' ? '이 날은 예약 가능한 시간이 없어요.' : '등록된 일정이 없어요.'}</div>`}
   `;
-  panel.querySelectorAll('.day-event-card.clickable').forEach(card => {
+  // 내 캘린더처럼 그 날 하루 보기로 넘어감
+  document.getElementById('friendMonthSelectedOpenBtn').addEventListener('click', () => {
+    friendDayFocusDate = dateKeyNum(friendMonthSelectedDate) < dateKeyNum(TODAY) ? new Date(TODAY) : new Date(friendMonthSelectedDate);
+    friendWeekFocusDate = friendWeekStartOf(friendDayFocusDate);
+    document.querySelector('#friendCalendarSegment .segment-btn[data-view="today"]').click();
+  });
+  panel.querySelectorAll('.month-selected-row.clickable').forEach(card => {
     card.style.cursor = 'pointer';
     const hour = parseInt(card.dataset.hour, 10);
     if(friendCalendarMode === 'reserve'){
@@ -24946,7 +25022,7 @@ document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(btn => 
 
     if(btn.dataset.view === 'week'){
       // 일주일 탭에 들어갈 때마다 항상 이번주부터 다시 보여줌 (이전에 다른 주로 이동해뒀어도 초기화)
-      friendWeekFocusDate = getWeekStart(TODAY);
+      friendWeekFocusDate = friendWeekStartOf(TODAY);
       renderFriendWeek();
       loadFriendScheduleForFocusWindow();
     } else if(btn.dataset.view === 'month'){
@@ -30995,7 +31071,7 @@ function openCalShare(share, isMine, ownerFriend){
     openFriendCalendar(ownerFriend.id, 'calendar');
   }
   friendDayFocusDate = new Date(dateObj);
-  friendWeekFocusDate = getWeekStart(dateObj);
+  friendWeekFocusDate = friendWeekStartOf(dateObj);
   friendMonthFocusYear = dateObj.getFullYear();
   friendMonthFocusMonth = dateObj.getMonth() + 1;
   friendMonthSelectedDate = new Date(dateObj);
@@ -33464,10 +33540,31 @@ document.getElementById('schedFriendStrip').addEventListener('click', (e) => {
   const btn = e.target.closest('.sched-friend[data-friend-id]');
   if(!btn || schedFriendEditing) return;
   openFriendCalendar(btn.dataset.friendId, 'calendar');
-  // 내 캘린더에서 보던 화면(주/달) 그대로 친구 캘린더도 열어줌 - 일은 원래대로 오늘 화면
+  // 내 캘린더에서 보던 화면(하루/주/달)과 날짜 그대로 친구 캘린더도 열어줌 - 친구 캘린더는 지난 날로 못 가서 오늘 이전이면 오늘로
   const myView = document.querySelector('#scheduleSegment .segment-btn.active')?.dataset.view;
   if(myView === 'week' || myView === 'month'){
     document.querySelector(`#friendCalendarSegment .segment-btn[data-view="${myView}"]`)?.click();
+  }
+  const focus = dateKeyNum(scheduleFocusDate) < dateKeyNum(TODAY) ? new Date(TODAY) : new Date(scheduleFocusDate);
+  if(myView === 'month'){
+    const thisMonth = TODAY.getFullYear() * 12 + TODAY.getMonth();
+    if(schedViewYear * 12 + schedViewMonth >= thisMonth){
+      friendMonthFocusYear = schedViewYear;
+      friendMonthFocusMonth = schedViewMonth + 1;
+      // 내 달 보기에서 고른 날짜가 이 달이면 그 날을, 아니면 1일(이번 달이면 오늘)을 골라 둠
+      const sameMonth = monthSelectedDate.getFullYear() === schedViewYear && monthSelectedDate.getMonth() === schedViewMonth;
+      friendMonthSelectedDate = sameMonth ? new Date(monthSelectedDate)
+        : (schedViewYear * 12 + schedViewMonth === thisMonth ? new Date(TODAY) : new Date(schedViewYear, schedViewMonth, 1));
+      renderFriendMonthView();
+      loadFriendScheduleForFocusWindow();
+    }
+  } else {
+    friendDayFocusDate = focus;
+    friendWeekFocusDate = friendWeekStartOf(focus);
+    renderFriendCalDateNav();
+    renderFriendToday();
+    renderFriendWeek();
+    loadFriendScheduleForFocusWindow();
   }
 });
 // "순서"를 누른 동안은 바로, 평소엔 꾹 눌러서(0.35초) 집어 들고 좌우로 끌기
