@@ -3615,7 +3615,7 @@
   /* 약속 장소가 여러 개(1차, 2차...)면 한 줄씩 - 장소를 누르면 그 장소만 변경, 옆 삭제는 그 장소만 삭제 */
   .chat-pinned-schedule .pin-places{ display:flex; flex-direction:column; gap:6px; width:100%; }
   .chat-pinned-schedule .pin-place-row{ display:flex; align-items:stretch; gap:6px; }
-  .chat-pinned-schedule .pin-place-row .pin-set-loc{ flex:1; min-width:0; }
+  .chat-pinned-schedule .pin-place-row .pin-set-loc{ flex:1; min-width:0; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
   .chat-pinned-schedule .pin-place-order{ font-size:10.5px; font-weight:800; color:var(--text-dim); }
 
   .past-appt-list{
@@ -6144,6 +6144,13 @@
   .app-confirm-title{ font-size:15.5px; font-weight:800; margin-bottom:8px; }
   .app-confirm-msg{ font-size:13px; color:var(--text-dim); line-height:1.5; white-space:pre-line; margin-bottom:16px; }
   .app-confirm-msg b{ color:var(--text); }
+  /* 약속 장소 순서 바꾸기 - 옮길 자리(1차, 2차...) 고르는 버튼들 */
+  .app-confirm-order-list{ display:flex; flex-direction:column; gap:6px; margin-top:10px; white-space:normal; }
+  .app-confirm-order-list button{
+    padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:var(--surface-2);
+    color:var(--text); font-size:13.5px; text-align:left; cursor:pointer;
+  }
+  .app-confirm-order-list button b{ color:var(--accent); margin-right:4px; }
   .app-confirm-btns{ display:flex; gap:8px; }
   .app-confirm-btns button{
     flex:1; padding:11px 0; border-radius:12px; border:1px solid var(--line);
@@ -11765,6 +11772,12 @@ function connectRealtimeSocket(){
       const refreshed = await tryRefreshAccessToken();
       if(refreshed) realtimeSocket.connect();
     }
+  });
+
+  // 상대가 약속 장소 순서(1차, 2차...)를 바꿨으면 그 방 핀을 다시 불러옴
+  realtimeSocket.on('pinsChanged', ({ roomId }) => {
+    const room = roomId && CHAT_ROOMS[roomId];
+    if(room) loadPinsFromServer(roomId, room);
   });
 
   realtimeSocket.on('newMessage', ({ roomId, message }) => {
@@ -26922,6 +26935,65 @@ function meetPlaceOrderLabel(idx){
   return `${idx + 1}차`;
 }
 
+// 약속 장소를 꾹 누르면 몇 차로 옮길지 고르는 창 - 고른 순서(0부터)를 돌려주고, 취소하면 null
+async function pickMeetPlaceOrder(places, fromIdx){
+  const yesBtn = document.getElementById('appConfirmYes');
+  const msgEl = document.getElementById('appConfirmMsg');
+  let picked = null;
+  const onPick = (e) => {
+    const b = e.target.closest('[data-order-idx]');
+    if(!b) return;
+    picked = parseInt(b.dataset.orderIdx, 10);
+    closeAppConfirm(true);
+  };
+  const shown = appConfirm({
+    title: '장소 순서 바꾸기',
+    html: `"${escapeHtml(places[fromIdx].location || '')}"을(를) 몇 차로 옮길까요?
+      <span class="app-confirm-order-list">${places.map((p, i) => i === fromIdx ? '' :
+        `<button type="button" data-order-idx="${i}"><b>${meetPlaceOrderLabel(i)}</b> ${escapeHtml(p.location || '')} 자리</button>`).join('')}</span>`,
+    noText: '취소',
+  });
+  yesBtn.style.display = 'none';
+  msgEl.addEventListener('click', onPick);
+  await shown;
+  yesBtn.style.display = '';
+  msgEl.removeEventListener('click', onPick);
+  return picked;
+}
+// 장소 하나를 toIdx 차로 옮김 - 핀 자리는 그대로 두고 장소 내용만 새 순서대로 옮겨 담음 (서버도 똑같이)
+async function moveMeetPlace(roomId, places, fromIdx, toIdx){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || fromIdx === toIdx) return;
+  const ordered = places.slice();
+  ordered.splice(toIdx, 0, ordered.splice(fromIdx, 1)[0]);
+  const fields = ['location', 'locationAddress', 'locationLat', 'locationLon'];
+  const snap = places.map(p => Object.fromEntries(fields.map(f => [f, p[f]])));
+  const restore = () => places.forEach((p, i) => Object.assign(p, snap[i]));
+  const src = ordered.map(p => snap[places.indexOf(p)]);
+  places.forEach((p, i) => Object.assign(p, src[i]));
+  renderPinnedSchedule();
+  if(!authToken || !room.isRealRoom) return;
+  if(places.some(p => !p.serverId)){
+    restore();
+    renderPinnedSchedule();
+    showToast('잠시 후 다시 시도해주세요.');
+    return;
+  }
+  try {
+    const data = await apiRequest(`/chats/${roomId}/pins/place-order`, {
+      method: 'PATCH',
+      body: JSON.stringify({ slots: places.map(p => p.serverId), order: ordered.map(p => p.serverId) }),
+    });
+    try { localStorage.setItem(pinsCacheKey(roomId), JSON.stringify(data.pins || [])); } catch(e){}
+    showToast(`"${snap[fromIdx].location}"을(를) ${meetPlaceOrderLabel(toIdx)}로 옮겼어요.`);
+  } catch(err){
+    console.error('[pins] reorder failed:', err);
+    restore();
+    renderPinnedSchedule();
+    showToast('순서를 바꾸지 못했어요. 다시 시도해주세요.');
+  }
+}
+
 // 장소 삭제 버튼 - 바로 지우지 않고 한 번 더 물어봄
 function confirmRemovePlace(placePin){
   return appConfirm({
@@ -29693,9 +29765,40 @@ function renderPinnedSchedule(){
     }
 
     // 장소를 누르면 카카오맵에서 그 장소를 엶 (바꾸고 싶으면 삭제 후 "+ 장소 추가")
+    // 장소가 2곳 이상이면 꾹 눌러서 순서(1차, 2차...)를 바꿀 수 있음 - 꾹 누른 직후 손 뗄 때의 클릭은 무시
     card.querySelectorAll('.pin-set-loc').forEach(btn => {
+      const idx = parseInt(btn.dataset.placeIdx, 10);
+      let pressTimer = null;
+      let pressed = false;
+      const canReorder = multi && !pinPast;
+      const openReorder = async () => {
+        pressed = true;
+        if(navigator.vibrate) navigator.vibrate(15);
+        const toIdx = await pickMeetPlaceOrder(places, idx);
+        pressed = false;
+        if(toIdx !== null) moveMeetPlace(activeChatRoomId, places, idx, toIdx);
+      };
+      const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+      if(canReorder){
+        btn.addEventListener('touchstart', () => {
+          pressed = false;
+          cancelPress();
+          pressTimer = setTimeout(() => { pressTimer = null; openReorder(); }, 500);
+        }, { passive: true });
+        btn.addEventListener('touchmove', cancelPress, { passive: true });
+        btn.addEventListener('touchend', cancelPress);
+        btn.addEventListener('touchcancel', cancelPress);
+      }
+      btn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if(!canReorder) return;
+        // 안드로이드는 꾹 누르면 이 이벤트가 먼저 올 수 있어서 같은 처리를 해둠
+        if(pressTimer){ cancelPress(); openReorder(); }
+        else if(!pressed) openReorder();
+      });
       btn.addEventListener('click', () => {
-        const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
+        if(pressed){ pressed = false; return; }
+        const placePin = places[idx];
         if(placePin) openPlaceInKakaoMap(placePin.location, placePin.locationAddress, placePin.locationLat, placePin.locationLon);
       });
     });
