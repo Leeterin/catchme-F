@@ -8380,6 +8380,106 @@
                linear-gradient(225deg, transparent 8.5px, var(--memo-paper) 8.5px);
   }
   #panel-schedule .month-memo-row .month-selected-text, #panel-schedule .month-memo-row .memo-check{ color:var(--memo-ink); }
+
+  /* ===================== 앱 전체 새 디자인 (홈·캘린더와 같은 밋집 무드: 베이지 바탕 + 흰 카드 + 토마토색) =====================
+     앱 곳곳이 쓰는 공통 색 변수(--bg, --surface, --accent ...)를 홈 색으로 바꿔서 설정·일정 추가·친구·채팅·커뮤니티까지 한 번에 맞춤.
+     기능(버튼·id·data-*)은 그대로, 모양만 */
+  body, body.dark-mode{
+    --bg:var(--hm-bg); --surface:var(--hm-card); --surface-2:var(--hm-well); --line:var(--hm-line);
+    --text:var(--hm-ink); --text-dim:var(--hm-dim); --mask:var(--hm-line);
+    --accent:var(--hm-accent); --accent-soft:var(--hm-accent-soft); --on-accent:#FFFFFF;
+  }
+  /* 연한 칸(--surface-2)은 베이지 바탕 위에서도 보이게 바탕보다 한 톤 진하게 (예전 회색 칸과 같은 관계) */
+  body{ --surface-2:#EAE7E1; --sky-rgb:200,96,60; }
+  body.dark-mode{ --sky-rgb:224,122,82; }
+  body.tab-not-home, body.dark-mode.tab-not-home{ background:var(--hm-bg); }
+  /* 켜고 끄는 스위치 - 켜면 토마토색으로 채우고 흰 손잡이 (아이폰처럼) */
+  .toggle{ border:none; background:var(--hm-line); }
+  body.dark-mode .toggle{ background:var(--hm-well); }
+  .toggle .knob{ top:3px; left:3px; background:#FFFFFF; box-shadow:0 1px 3px rgba(0,0,0,0.18); }
+  .toggle.on, body.dark-mode .toggle.on{ background:var(--hm-accent); }
+  .toggle.on .knob{ left:21px; background:#FFFFFF; }
+  /* 주 버튼 - 둥글게 */
+  .profile-chat-btn{ border-radius:18px; font-weight:800; }
+  /* 하단 탭 바 - 흰 알약 (다크 모드는 따뜻한 짙은 회색) */
+  .bottom-nav{ border-color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.78); box-shadow:0 10px 30px rgba(60,40,20,0.14), inset 0 1px 0 rgba(255,255,255,0.6); }
+  body.dark-mode .bottom-nav{ background:rgba(40,38,36,0.78); border-color:rgba(255,255,255,0.08); }
+  .nav-indicator{ background:var(--hm-accent-soft); box-shadow:none; }
+  body.dark-mode .nav-indicator{ background:var(--hm-accent-soft); box-shadow:none; }
+  .bottom-nav.dragging .nav-indicator, body.dark-mode .bottom-nav.dragging .nav-indicator{ background:var(--hm-accent-soft); }
+  /* 확인 창·작은 창 - 둥근 흰 카드 */
+  .mini-confirm-overlay{ background:rgba(38,35,31,0.42); }
+  .mini-confirm-card{ border-radius:26px; padding:24px 20px 20px; box-shadow:0 16px 40px rgba(60,40,20,0.2); }
+  .mini-confirm-title{ font-size:16.5px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  .mini-confirm-btn{ padding:13px; border-radius:16px; font-size:14px; background:var(--hm-well); color:var(--hm-ink); }
+  .mini-confirm-close{ width:30px; height:30px; border-radius:50%; background:var(--hm-well); }
+
+  /* 설정 - 테두리 없는 둥근 흰 카드, 아이콘 칸은 연한 토마토 */
+  #settingsView .schedule-nav-label{ font-size:18px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  .settings-group, .settings-profile-card{ border:none; border-radius:22px; box-shadow:none; background:var(--hm-card); }
+  .settings-group .settings-menu-icon{ width:34px; height:34px; border-radius:11px; background:var(--hm-accent-soft); color:var(--hm-accent); }
+  .settings-group .settings-menu-label{ font-weight:600; }
+  .settings-profile-avatar{ background:var(--hm-accent-soft); color:var(--hm-accent); }
+
+  /* 내 프로필 - 회색 뉴모피즘 대신 베이지 바탕 + 흰 카드 (입력칸은 연한 베이지) */
+  body:has(#myProfileView[style*="block"]), body.dark-mode:has(#myProfileView[style*="block"]){ background:var(--hm-bg); }
+  #myProfileView, body.dark-mode #myProfileView{ --neu-bg:var(--hm-card); --neu-ink:var(--hm-ink); --neu-dim:var(--hm-dim); }
+  #myProfileView .edit-icon-btn, #myProfileView .mp-pill-btn{ background:var(--hm-card); box-shadow:none; }
+  #myProfileView .profile-avatar-lg{ background:var(--hm-accent-soft); color:var(--hm-accent); border-color:var(--hm-card); box-shadow:none; }
+  #myProfileView .mp-card{ border-radius:24px; box-shadow:none; }
+  #myProfileView .mp-info-row{ background:var(--hm-well); box-shadow:none; border-radius:16px; }
+  #myProfileView .mp-input-group .search-input{ background:var(--hm-well); box-shadow:none; border-radius:14px; }
+  #myProfileView .visibility-toggle{ background:var(--hm-card); box-shadow:none; }
+  #myProfileView .visibility-toggle.on{ background:var(--hm-accent-soft); color:var(--hm-accent); box-shadow:none; }
+  #myProfileView .edit-icon-btn:active, #myProfileView .mp-pill-btn:active, #myProfileView #mpSaveBtn:active{ box-shadow:none; opacity:0.85; }
+  #myProfileView #mpSaveBtn{ background:var(--hm-accent); color:#FFFFFF; border-radius:18px; box-shadow:none; }
+
+  /* 일정 추가·수정 - 베이지 바탕 위 흰 입력칸, 고르는 버튼은 고르면 토마토색 */
+  #eventFormView{ background:var(--hm-bg); }
+  #eventFormView .event-form-header{ font-size:18px; font-weight:800; letter-spacing:-0.02em; }
+  #eventFormView .mp-input-group > label{ font-size:12.5px; font-weight:600; color:var(--hm-dim); }
+  #eventFormView .search-input, #eventFormView .date-picker-btn, #eventFormView .time-picker-btn, #eventFormView .event-color-toggle{
+    border:none; border-radius:16px; background:var(--hm-card); color:var(--hm-ink);
+  }
+  #eventFormView .search-input:focus{ box-shadow:0 0 0 2px var(--hm-accent-soft); }
+  #eventFormView .event-type-btn, #eventFormView .repeat-mode-btn{ border:none; border-radius:14px; background:var(--hm-card); color:var(--hm-dim); }
+  #eventFormView .event-type-btn.active, #eventFormView .event-type-btn.active[data-type="available"], #eventFormView .repeat-mode-btn.active{ background:var(--hm-accent); color:#FFFFFF; }
+  #eventFormView .date-picker-btn, #eventFormView .time-picker-btn{ padding:12px 14px; font-size:14.5px; font-weight:600; }
+  #eventFormView .visibility-pick-btn{ border:none; padding:8px 14px; border-radius:999px; background:var(--hm-card); color:var(--hm-dim); font-size:13px; }
+  #eventFormView .visibility-pick-btn.on{ background:var(--hm-accent-soft); color:var(--hm-accent); }
+  #eventFormView .visibility-pick-btn.private.on{ background:var(--hm-ink); color:var(--hm-card); }
+  #eventFormView .event-form-footer{ background:var(--hm-bg); border-top:none; }
+
+  /* 장소 추천 - 리뷰 카드·내 리뷰 프로필·위치 버튼을 흰 카드로 */
+  .feed-post-card{ border:none; border-radius:22px; background:var(--hm-card); padding:15px 16px; margin-bottom:12px; }
+  .feed-post-card.sponsored{ border:1px solid #F59E0B; background:linear-gradient(180deg, rgba(245,158,11,0.08), var(--hm-card) 40%); }
+  .feed-review-profile-card{ border-radius:22px; background:var(--hm-card); padding:12px 14px; }
+  .location-btn{ border:none; background:var(--hm-card); padding:9px 14px; font-size:13px; }
+
+  /* 채팅방 - 상대 말풍선은 흰색, 내 말풍선은 토마토색 */
+  .msg-row.other .msg-bubble{ background:var(--hm-card); }
+  .msg-bubble{ border-radius:18px; font-size:13.5px; padding:10px 13px; }
+  .chat-input-row{ border-color:transparent; background:var(--hm-card); }
+
+  /* 친구·채팅 목록 - 줄들을 흰 카드 하나로 묶음 (소제목 사이마다 카드가 나뉨) */
+  #friendsListContainer .placeholder-row, #chatListContainer .placeholder-row{
+    padding:12px 14px; background:var(--hm-card); border-bottom:1px solid var(--hm-line);
+  }
+  #friendsListContainer .placeholder-row:first-child, #friendsListContainer :not(.placeholder-row) + .placeholder-row,
+  #chatListContainer .placeholder-row:first-child, #chatListContainer :not(.placeholder-row) + .placeholder-row{ border-top-left-radius:22px; border-top-right-radius:22px; }
+  #friendsListContainer .placeholder-row:not(:has(+ .placeholder-row)), #chatListContainer .placeholder-row:not(:has(+ .placeholder-row)){
+    border-bottom:none; border-bottom-left-radius:22px; border-bottom-right-radius:22px; margin-bottom:14px;
+  }
+  #friendsListContainer .placeholder-avatar, #chatListContainer .placeholder-avatar{ width:44px; height:44px; font-size:15px; }
+  #friendsListContainer .meetup-section-title{ margin:4px 4px 8px; font-size:13px; font-weight:700; color:var(--hm-dim); }
+  /* 제목 옆 버튼 - 캘린더처럼 동그란 버튼 (+는 토마토색) */
+  .friends-header .add-friend-btn, #panel-chat .new-chat-wrap > .icon-btn{
+    width:42px; height:42px; border-radius:50%; border:none !important; box-shadow:none;
+  }
+  .friends-header .add-friend-btn#openGroupsBtn, #panel-chat .new-chat-wrap > .icon-btn{ background:#E6E3DE !important; color:var(--hm-ink) !important; }
+  body.dark-mode .friends-header .add-friend-btn#openGroupsBtn, body.dark-mode #panel-chat .new-chat-wrap > .icon-btn{ background:var(--hm-well) !important; }
+  .friends-header .add-friend-btn svg, #panel-chat .new-chat-wrap > .icon-btn svg{ width:20px; height:20px; }
+  .friends-header .add-friend-btn#addFriendBtn{ font-size:24px; font-weight:500; }
 </style>
 </head>
 <body class="app-booting">
