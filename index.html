@@ -3508,9 +3508,14 @@
     flex-direction:column;
     align-items:stretch;
     gap:8px;
-    margin-bottom:10px;
     flex-shrink:0;
+    /* 자리를 차지하지 않고 채팅 위에 카드만 떠 있게 - 카드 둘레 띠가 채팅을 가리지 않도록 */
+    position:relative;
+    z-index:5;
+    height:0;
+    overflow:visible;
   }
+  .chat-pinned-schedule > *{ flex-shrink:0; }
   .chat-pinned-schedule .pin-header-row{
     display:flex;
     align-items:center;
