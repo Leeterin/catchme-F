@@ -8005,6 +8005,9 @@
   #homeDash .home-avail-status{ color:var(--neu-dim); }
   /* 한달 캘린더 - 예약 가능 시간 있는 날은 날짜 아래 작은 점 */
   .month-avail-dot{ display:block; width:5px; height:5px; border-radius:50%; background:var(--accent); margin:2px auto 3px; }
+  .month-avail-mark{ display:flex; align-items:center; justify-content:center; gap:2px; height:11px; margin:2px 0 3px; }
+  .month-avail-mark .month-avail-dot{ flex-shrink:0; margin:0; }
+  .month-avail-emoji{ font-size:9px; line-height:1; white-space:nowrap; overflow:hidden; }
   /* 이모티콘 대신 쓰는 라인 아이콘 */
   svg.li{ display:inline-block; flex-shrink:0; }
   .place-review-tag .em svg.li, .feed-review-tag svg.li{ width:15px; height:15px; }
@@ -22409,6 +22412,13 @@ function renderMonthSchedView(){
     // 같은 일정은 위의 레인 배정 덕분에 그 주 안에서 같은 줄에 나와서, 칸이 나뉘어도 이어지는 게 보임
     // 예약 가능 시간은 칩 대신 날짜 아래 작은 점으로 - 날마다 "가능" 칩이 박혀 있어서 약속·일정이 묻혔음
     const hasAvail = events.some(ev => ev.type === 'available' && !ev.isPendingHold);
+    // 그룹에게만 연 예약 가능 시간이면 점 옆에 그 그룹 이모티콘도 (모든 친구에게 연 건 점만, 많으면 3개까지)
+    const availEmojis = [...new Set(events
+      .filter(ev => ev.type === 'available' && !ev.isPendingHold)
+      .flatMap(ev => shownGroups(availFriendGroupIds(availableForOf(ev), ev.visibility)).map(groupEmojiOf)))].slice(0, 3);
+    const availMarkHtml = hasAvail
+      ? `<div class="month-avail-mark"><span class="month-avail-dot" title="예약 가능 시간 있음"></span>${availEmojis.length ? `<span class="month-avail-emoji">${escapeHtml(availEmojis.join(''))}</span>` : ''}</div>`
+      : '';
     const labelEvents = shownEvents.filter(ev => ev.type !== 'available' || ev.isPendingHold);
     const labelsHtml = labelEvents.map(ev => {
       const bg = ev.isPendingHold ? '#F59E0B' : colorForEvent(ev);
@@ -22428,7 +22438,7 @@ function renderMonthSchedView(){
       `<div class="month-event-label month-memo-label">${escapeHtml(truncateForMonthLabel(memo.text.split('\n')[0]))}</div>`
     ).join('');
 
-    cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${hasAvail ? '<span class="month-avail-dot" title="예약 가능 시간 있음"></span>' : ''}${memoHtml}${labelsHtml}${moreHtml}`;
+    cell.innerHTML = `<div class="month-date-num">${dateNum}</div>${availMarkHtml}${memoHtml}${labelsHtml}${moreHtml}`;
     cell.addEventListener('click', () => {
       monthSelectedDate = cellDate;
       renderMonthSchedView();
