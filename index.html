@@ -31839,6 +31839,9 @@ let chatSwipeReplyAt = 0;
 
 function sendChatMessage(){
   const input = document.getElementById('chatInput');
+  // 한글을 조합하던 중에 전송하면 마지막 글자가 키보드에 남아 있다가 비운 입력칸에 다시 들어가서
+  // 다음 메시지 앞에 붙었음("미나" 보내면 다음이 "나아"). 포커스를 잠깐 뺐다 돌려서 조합을 먼저 끝냄
+  if(document.activeElement === input){ input.blur(); input.focus({ preventScroll: true }); }
   const typed = input.value.trim();
   if((!typed && !pendingCalShare) || !activeChatRoomId) return;
   // 친구 캘린더에서 붙여온 일정이 있으면 카드로 같이 보냄
