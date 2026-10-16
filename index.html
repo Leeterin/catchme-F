@@ -10914,6 +10914,18 @@ function goBackOrClose(closeFn){
     closeFn();
   }
 }
+// 팝업의 확인/선택 버튼에서 사용 - 팝업을 먼저 닫고 그 다음에 next를 실행.
+// 팝업이 맨 위에 쌓여 있으면 history.back()으로 닫고 popstate가 끝난 뒤에 next를 실행해서,
+// next가 다른 화면을 열거나 닫아도 히스토리 순서가 안 꼬이게 함 (링크로 시간 물어보기 팝업과 같은 방식)
+function closeViewThen(closeFn, next){
+  if(viewCloseStack[viewCloseStack.length - 1] === closeFn){
+    window.addEventListener('popstate', () => setTimeout(next, 0), { once: true });
+    history.back();
+  } else {
+    closeFn();
+    next();
+  }
+}
 // 뒤로가기로 다시 보이는 화면은 왼쪽에서 들어오게 (앞으로 갈 때는 오른쪽에서) - 화면이 바뀐 직후 잠깐만 붙임
 function markNavBack(){
   document.body.classList.add('nav-back');
@@ -12077,7 +12089,7 @@ function connectRealtimeSocket(){
     room.messages = room.messages.filter(m => m.type !== 'location-recommend');
     scheduleChatCacheSave(roomId);
     if(activeChatRoomId === roomId){
-      if(document.getElementById('activeRecommendOverlay').classList.contains('show')) closeActiveRecommendSheet();
+      if(document.getElementById('activeRecommendOverlay').classList.contains('show')) dismissView(closeActiveRecommendSheet);
       renderActiveRecommendBar();
       if(room.messages.length !== before) renderChatMessages();
     }
@@ -18277,6 +18289,7 @@ function openReviewProfileSetupOverlay(onDone, isEdit){
   document.getElementById('reviewProfileSetupSaveBtn').textContent = isEdit ? '저장하기' : '만들고 계속하기';
   document.getElementById('reviewProfileSetupSkipBtn').textContent = isEdit ? '취소' : '나중에';
   document.getElementById('reviewProfileSetupOverlay').classList.add('show');
+  pushViewState(closeReviewProfileSetupOverlay); // 폰 뒤로가기로 이 창부터 닫히게
 }
 
 function closeReviewProfileSetupOverlay(){
@@ -18333,14 +18346,12 @@ document.getElementById('reviewProfileSetupSaveBtn').addEventListener('click', (
   myProfileData.reviewAvatarUrl = reviewProfileSetupDraftAvatarUrl;
   saveReviewProfileToServer();
   renderFeedReviewProfileCard();
-  closeReviewProfileSetupOverlay();
-  if(callback) callback();
+  closeViewThen(closeReviewProfileSetupOverlay, () => { if(callback) callback(); });
 });
 document.getElementById('reviewProfileSetupSkipBtn').addEventListener('click', () => {
   try { localStorage.setItem(reviewProfileSkipKey(), '1'); } catch(_){}
   const callback = reviewProfileSetupPendingCallback;
-  closeReviewProfileSetupOverlay();
-  if(callback) callback();
+  closeViewThen(closeReviewProfileSetupOverlay, () => { if(callback) callback(); });
 });
 
 // 리뷰용 프로필(닉네임/사진)이나 실명 프로필 사진을 바꾼 뒤, 이미 불러와 둔 내 글들의 작성자 정보도 새 값으로 바꾸고
@@ -18480,12 +18491,14 @@ function renderReviewerLevelInfoList(){
 function openReviewerLevelInfoOverlay(){
   renderReviewerLevelInfoList();
   document.getElementById('reviewerLevelInfoOverlay').classList.add('show');
+  pushViewState(closeReviewerLevelInfoOverlay); // 폰 뒤로가기로 이 창부터 닫히게
 }
-document.getElementById('reviewerLevelInfoCloseBtn').addEventListener('click', () => {
+function closeReviewerLevelInfoOverlay(){
   document.getElementById('reviewerLevelInfoOverlay').classList.remove('show');
-});
+}
+document.getElementById('reviewerLevelInfoCloseBtn').addEventListener('click', () => goBackOrClose(closeReviewerLevelInfoOverlay));
 document.getElementById('reviewerLevelInfoOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'reviewerLevelInfoOverlay') document.getElementById('reviewerLevelInfoOverlay').classList.remove('show');
+  if(e.target.id === 'reviewerLevelInfoOverlay') goBackOrClose(closeReviewerLevelInfoOverlay);
 });
 // 뱃지는 "내 리뷰 프로필" 카드 안에 있어서, 그냥 두면 카드 클릭(리뷰 모아보기 열기)이 같이 눌림 -
 // stopPropagation으로 뱃지를 눌렀을 땐 등급표만 뜨게 분리함
@@ -20561,19 +20574,19 @@ function openScheduleOverlapConfirm(message, action){
   pendingOverlapAction = action;
   document.getElementById('scheduleOverlapConfirmTitle').textContent = message;
   document.getElementById('scheduleOverlapConfirmOverlay').classList.add('show');
+  pushViewState(closeScheduleOverlapConfirm); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeScheduleOverlapConfirm(){
   pendingOverlapAction = null;
   document.getElementById('scheduleOverlapConfirmOverlay').classList.remove('show');
 }
-document.getElementById('scheduleOverlapConfirmNoBtn').addEventListener('click', closeScheduleOverlapConfirm);
+document.getElementById('scheduleOverlapConfirmNoBtn').addEventListener('click', () => goBackOrClose(closeScheduleOverlapConfirm));
 document.getElementById('scheduleOverlapConfirmOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'scheduleOverlapConfirmOverlay') closeScheduleOverlapConfirm();
+  if(e.target.id === 'scheduleOverlapConfirmOverlay') goBackOrClose(closeScheduleOverlapConfirm);
 });
 document.getElementById('scheduleOverlapConfirmYesBtn').addEventListener('click', () => {
   const action = pendingOverlapAction;
-  closeScheduleOverlapConfirm();
-  if(action) action();
+  closeViewThen(closeScheduleOverlapConfirm, () => { if(action) action(); });
 });
 
 // 반복 일정 수정 - 저장을 누르면 "이 일정만 / 반복 일정 전체"를 고르게 함 (onChoose('this' | 'all'))
@@ -20583,6 +20596,7 @@ function openRecurringEditChoice(onChoose){
   document.getElementById('recurringEditChoiceTitle').textContent =
     `반복되는 일정이에요. ${scheduleFocusDate.getMonth() + 1}월 ${scheduleFocusDate.getDate()}일 일정만 수정할까요?`;
   document.getElementById('recurringEditChoiceOverlay').classList.add('show');
+  pushViewState(closeRecurringEditChoice); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeRecurringEditChoice(){
   recurringEditChoiceAction = null;
@@ -20591,13 +20605,12 @@ function closeRecurringEditChoice(){
 ['recurringEditThisBtn', 'recurringEditAllBtn'].forEach(id => {
   document.getElementById(id).addEventListener('click', () => {
     const action = recurringEditChoiceAction;
-    closeRecurringEditChoice();
-    if(action) action(id === 'recurringEditThisBtn' ? 'this' : 'all');
+    closeViewThen(closeRecurringEditChoice, () => { if(action) action(id === 'recurringEditThisBtn' ? 'this' : 'all'); });
   });
 });
-document.getElementById('recurringEditCancelBtn').addEventListener('click', closeRecurringEditChoice);
+document.getElementById('recurringEditCancelBtn').addEventListener('click', () => goBackOrClose(closeRecurringEditChoice));
 document.getElementById('recurringEditChoiceOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'recurringEditChoiceOverlay') closeRecurringEditChoice();
+  if(e.target.id === 'recurringEditChoiceOverlay') goBackOrClose(closeRecurringEditChoice);
 });
 
 function openDeleteConfirmOverlay(){
@@ -20611,6 +20624,7 @@ function openDeleteConfirmOverlay(){
     ? `반복되는 일정이에요. ${scheduleFocusDate.getMonth() + 1}월 ${scheduleFocusDate.getDate()}일 일정만 삭제할까요?`
     : '일정을 삭제할까요?';
   document.getElementById('deleteConfirmOverlay').classList.add('show');
+  pushViewState(closeDeleteConfirmOverlay); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeDeleteConfirmOverlay(){
   document.getElementById('deleteConfirmOverlay').classList.remove('show');
@@ -20639,7 +20653,7 @@ function deleteEventOccurrence(ev, dateObj){
 
 document.getElementById('recurringDeleteTriggerBtn').addEventListener('click', openDeleteConfirmOverlay);
 document.getElementById('deleteConfirmOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'deleteConfirmOverlay') closeDeleteConfirmOverlay();
+  if(e.target.id === 'deleteConfirmOverlay') goBackOrClose(closeDeleteConfirmOverlay);
 });
 document.getElementById('recurringDeleteAllBtn').addEventListener('click', () => {
   if(!editingEventId) return;
@@ -24481,12 +24495,13 @@ function openMyScheduleQuickPreview(dateObj){
     `).join('');
   }
   document.getElementById('myScheduleQuickPreviewOverlay').classList.add('show');
+  pushViewState(closeMyScheduleQuickPreview); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeMyScheduleQuickPreview(){
   document.getElementById('myScheduleQuickPreviewOverlay').classList.remove('show');
 }
 document.getElementById('myScheduleQuickPreviewOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'myScheduleQuickPreviewOverlay') closeMyScheduleQuickPreview();
+  if(e.target.id === 'myScheduleQuickPreviewOverlay') goBackOrClose(closeMyScheduleQuickPreview);
 });
 
 // 엘리먼트를 꾹 누르고 있으면(약 480ms) onLongPress를 실행하고, 짧게 누르고 뗐으면 원래의 클릭 동작(onClick)이 그대로 실행되게 함
@@ -27663,14 +27678,15 @@ function openReportModal(targetType, targetId){
   document.querySelectorAll('#reportReasonList input[name="reportReason"]').forEach(r => r.checked = false);
   document.getElementById('reportDetailInput').value = '';
   document.getElementById('reportOverlay').classList.add('show');
+  pushViewState(closeReportModal); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeReportModal(){
   pendingReportTarget = null;
   document.getElementById('reportOverlay').classList.remove('show');
 }
-document.getElementById('reportCancelBtn').addEventListener('click', closeReportModal);
+document.getElementById('reportCancelBtn').addEventListener('click', () => goBackOrClose(closeReportModal));
 document.getElementById('reportOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'reportOverlay') closeReportModal();
+  if(e.target.id === 'reportOverlay') goBackOrClose(closeReportModal);
 });
 document.getElementById('reportSubmitBtn').addEventListener('click', async () => {
   if(!pendingReportTarget) return;
@@ -27685,7 +27701,7 @@ document.getElementById('reportSubmitBtn').addEventListener('click', async () =>
       method: 'POST',
       body: JSON.stringify({ targetType: pendingReportTarget.targetType, targetId: pendingReportTarget.targetId, reason: checked.value, detail: detail || null }),
     });
-    closeReportModal();
+    dismissView(closeReportModal);
     showToast('신고가 접수됐어요. 검토 후 조치할게요.');
   } catch(err){
     showToast(err.message);
@@ -27952,6 +27968,7 @@ function openCancelConfirm(action, title, opts = {}){
   okBtn.textContent = opts.okLabel || (opts.keepAvail ? '그냥 삭제하기' : '네');
   okBtn.classList.toggle('danger', opts.danger !== false);
   document.getElementById('reservationCancelConfirmOverlay').classList.add('show');
+  pushViewState(closeReservationCancelConfirm); // 폰 뒤로가기로 이 창부터 닫히게
 }
 // "6월 3일 (화)" + "14:00-15:00" 같은 라벨의 시작 시각이 이미 지났는지
 function isLabelTimePast(dateLabel, timeLabel){
@@ -27966,16 +27983,15 @@ function closeReservationCancelConfirm(){
   pendingCancelAction = null;
   document.getElementById('reservationCancelConfirmOverlay').classList.remove('show');
 }
-document.getElementById('reservationCancelConfirmNoBtn').addEventListener('click', closeReservationCancelConfirm);
+document.getElementById('reservationCancelConfirmNoBtn').addEventListener('click', () => goBackOrClose(closeReservationCancelConfirm));
 document.getElementById('reservationCancelConfirmOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'reservationCancelConfirmOverlay') closeReservationCancelConfirm();
+  if(e.target.id === 'reservationCancelConfirmOverlay') goBackOrClose(closeReservationCancelConfirm);
 });
 // 취소하면서 이 시간을 "예약 가능"으로 다시 남겨둘지(keepAvailable=true), 그냥 삭제만 할지(false)를
 // 사용자가 직접 고르게 함 - 꽉 채워서 예약했다가 취소해도 예약 가능이 안 돌아오던 문제를 사용자 선택으로 해결
 function runPendingCancel(keepAvailable){
   const action = pendingCancelAction;
-  closeReservationCancelConfirm();
-  if(action) action(keepAvailable);
+  closeViewThen(closeReservationCancelConfirm, () => { if(action) action(keepAvailable); });
 }
 document.getElementById('reservationCancelConfirmKeepBtn').addEventListener('click', () => runPendingCancel(true));
 document.getElementById('reservationCancelConfirmDeleteBtn').addEventListener('click', () => runPendingCancel(false));
@@ -32978,7 +32994,7 @@ function applyRecommendCardToActive(roomId, mapped){
     };
   } else if(room.activeRecommend && room.activeRecommend.requestId === mapped.requestId){
     room.activeRecommend = null;
-    if(document.getElementById('activeRecommendOverlay').classList.contains('show')) closeActiveRecommendSheet();
+    if(document.getElementById('activeRecommendOverlay').classList.contains('show')) dismissView(closeActiveRecommendSheet);
   }
   if(activeChatRoomId === roomId){
     renderActiveRecommendBar();
@@ -33010,13 +33026,15 @@ function openActiveRecommendSheet(){
   const room = activeChatRoomId ? CHAT_ROOMS[activeChatRoomId] : null;
   if(!room || !room.activeRecommend) return;
   renderActiveRecommendSheet();
+  if(document.getElementById('activeRecommendOverlay').classList.contains('show')) return; // 이미 떠 있으면 내용만 새로 그림
   document.getElementById('activeRecommendOverlay').classList.add('show');
+  pushViewState(closeActiveRecommendSheet); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeActiveRecommendSheet(){
   document.getElementById('activeRecommendOverlay').classList.remove('show');
 }
 document.getElementById('activeRecommendOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'activeRecommendOverlay') closeActiveRecommendSheet();
+  if(e.target.id === 'activeRecommendOverlay') goBackOrClose(closeActiveRecommendSheet);
 });
 
 function renderActiveRecommendSheet(){
@@ -33047,16 +33065,15 @@ function renderActiveRecommendSheet(){
       <button type="button" class="mini-confirm-btn" id="activeRecCloseBtn">닫기</button>
     </div>
   `;
-  document.getElementById('activeRecCloseBtn').addEventListener('click', closeActiveRecommendSheet);
+  document.getElementById('activeRecCloseBtn').addEventListener('click', () => goBackOrClose(closeActiveRecommendSheet));
   document.getElementById('activeRecRespondBtn').addEventListener('click', () => {
-    closeActiveRecommendSheet();
-    promptLocationRecommendResponse(roomId, a.requestId, a.mode);
+    closeViewThen(closeActiveRecommendSheet, () => promptLocationRecommendResponse(roomId, a.requestId, a.mode));
   });
   const completeBtn = document.getElementById('activeRecCompleteBtn');
   if(completeBtn) completeBtn.addEventListener('click', async () => {
     try {
       await apiRequest(`/chats/location-recommend/${a.requestId}/complete`, { method: 'POST' });
-      closeActiveRecommendSheet();
+      dismissView(closeActiveRecommendSheet);
     } catch(err){ showToast(err.message); }
   });
   const cancelBtn = document.getElementById('activeRecCancelBtn');
@@ -33096,6 +33113,10 @@ async function startLocationRecommend(roomId){
   document.querySelector('#recommendModeList input[value="FAIR"]').checked = true;
   document.getElementById('recommendModeOverlay').classList.add('show');
   document.getElementById('recommendModeNextBtn').dataset.roomId = roomId;
+  pushViewState(closeRecommendMode); // 폰 뒤로가기로 이 창부터 닫히게
+}
+function closeRecommendMode(){
+  document.getElementById('recommendModeOverlay').classList.remove('show');
 }
 // 채팅 + 패널의 "장소" - 상단 약속 카드의 "+ 장소 추가"와 같은 화면(지도 검색/핀 + 모임 장소 추천받기 + 후보 제안).
 // 여기서는 항상 새 약속의 장소를 정함(후보 번호 1번부터, 정해지면 날짜 미정 약속 카드가 새로 생김).
@@ -33121,6 +33142,7 @@ function openDateAsk(roomId){
   dateAskState = { roomId, year: TODAY.getFullYear(), month: TODAY.getMonth() + 1, selected: null };
   renderDateAsk();
   document.getElementById('dateAskOverlay').classList.add('show');
+  pushViewState(closeDateAsk); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closeDateAsk(){
   dateAskState = null;
@@ -33168,12 +33190,11 @@ document.getElementById('dateAskGrid').addEventListener('click', (e) => {
 document.getElementById('dateAskSendBtn').addEventListener('click', () => {
   const st = dateAskState;
   if(!st || !st.selected) return;
-  closeDateAsk();
-  sendDateAsk(st.roomId, st.selected);
+  closeViewThen(closeDateAsk, () => sendDateAsk(st.roomId, st.selected));
 });
-document.getElementById('dateAskCancelBtn').addEventListener('click', closeDateAsk);
+document.getElementById('dateAskCancelBtn').addEventListener('click', () => goBackOrClose(closeDateAsk));
 document.getElementById('dateAskOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'dateAskOverlay') closeDateAsk();
+  if(e.target.id === 'dateAskOverlay') goBackOrClose(closeDateAsk);
 });
 
 async function sendDateAsk(roomId, dateKey){
@@ -33318,6 +33339,7 @@ let placeChoiceAction = null;
 function openPlaceChoice(roomId, onPickDirect){
   placeChoiceAction = { roomId, onPickDirect };
   document.getElementById('placeChoiceOverlay').classList.add('show');
+  pushViewState(closePlaceChoice); // 폰 뒤로가기로 이 창부터 닫히게
 }
 function closePlaceChoice(){
   placeChoiceAction = null;
@@ -33325,17 +33347,15 @@ function closePlaceChoice(){
 }
 document.getElementById('placeChoiceRecommendBtn').addEventListener('click', () => {
   const action = placeChoiceAction;
-  closePlaceChoice();
-  if(action) startLocationRecommend(action.roomId);
+  closeViewThen(closePlaceChoice, () => { if(action) startLocationRecommend(action.roomId); });
 });
 document.getElementById('placeChoiceDirectBtn').addEventListener('click', () => {
   const action = placeChoiceAction;
-  closePlaceChoice();
-  if(action && action.onPickDirect) action.onPickDirect();
+  closeViewThen(closePlaceChoice, () => { if(action && action.onPickDirect) action.onPickDirect(); });
 });
-document.getElementById('placeChoiceCancelBtn').addEventListener('click', closePlaceChoice);
+document.getElementById('placeChoiceCancelBtn').addEventListener('click', () => goBackOrClose(closePlaceChoice));
 document.getElementById('placeChoiceOverlay').addEventListener('click', (e) => {
-  if(e.target.id === 'placeChoiceOverlay') closePlaceChoice();
+  if(e.target.id === 'placeChoiceOverlay') goBackOrClose(closePlaceChoice);
 });
 
 // 추천 카드에서 "내가 이미 출발지를 냈는지" 서버에 한 번만 물어보고 기억함 (카드에는 인원 수만 있어서)
@@ -33350,15 +33370,12 @@ async function fetchLocationRecommendMyStatus(requestId){
     console.error('[location-recommend] status failed:', err);
   }
 }
-document.getElementById('recommendModeCancelBtn').addEventListener('click', () => {
-  document.getElementById('recommendModeOverlay').classList.remove('show');
-});
+document.getElementById('recommendModeCancelBtn').addEventListener('click', () => goBackOrClose(closeRecommendMode));
 document.getElementById('recommendModeNextBtn').addEventListener('click', () => {
   const roomId = document.getElementById('recommendModeNextBtn').dataset.roomId;
   const mode = document.querySelector('#recommendModeList input[name="recommendMode"]:checked').value;
-  document.getElementById('recommendModeOverlay').classList.remove('show');
 
-  openDepartureLocationPicker({
+  closeViewThen(closeRecommendMode, () => openDepartureLocationPicker({
     title: '내 출발지 입력',
     showSaved: true,
     requireCustomName: false,
@@ -33399,7 +33416,7 @@ document.getElementById('recommendModeNextBtn').addEventListener('click', () => 
         showToast(err.message);
       }
     },
-  });
+  }));
 });
 
 // 채팅방의 장소 추천 카드에서 "내 출발지 입력하기"를 누르면 입력창을 띄움 (이미 냈으면 다시 내서 바꿀 수 있음)
