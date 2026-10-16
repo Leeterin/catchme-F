@@ -8188,7 +8188,7 @@
   }
   /* 위쪽 막대가 고정이라 원래 상단 줄 대신 그 높이(38px 버튼 + 위아래 12px)만큼 띄워서 첫 위젯과 [−]가 가리지 않게 */
   body.home-editing .topbar{ display:none; }
-  body.home-editing #homeDash{ margin-top:calc(62px + 18px + env(safe-area-inset-top)); }
+  body.home-editing #homeDash:not(.home-widget-preview){ margin-top:calc(62px + 18px + env(safe-area-inset-top)); }
   .home-edit-add, .home-edit-done{ border:none; font-family:inherit; cursor:pointer; }
   .home-edit-add{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--hm-card); color:var(--hm-ink); }
   .home-edit-done{ padding:9px 18px; border-radius:999px; background:var(--hm-accent); color:#fff; font-size:14px; font-weight:700; }
