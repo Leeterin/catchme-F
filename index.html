@@ -8622,6 +8622,22 @@
   }
   #panel-schedule .month-memo-row .month-selected-text, #panel-schedule .month-memo-row .memo-check{ color:var(--memo-ink); }
 
+  /* 누구랑 잡힌 약속 칸 - 메모처럼 오른쪽 위 모서리를 접어서 다른 일정보다 눈에 띄게 (진한 빨강 칸 + 접힌 귀퉁이).
+     모서리는 잘라내고(clip-path) 그 자리에 접힌 면을 그려서, 칸 뒤 바탕색이 뭐든 자연스럽게 보임 */
+  .appt-fold{ --fold:8px; --fold-c:#BE123C; clip-path:polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%); }
+  .appt-fold::after{
+    content:''; position:absolute; top:0; right:0; width:var(--fold); height:var(--fold); pointer-events:none;
+    background:linear-gradient(45deg, var(--fold-c) 50%, transparent 50%); border-bottom-left-radius:2px;
+  }
+  #monthSchedGrid .month-event-label.appt-fold, #friendMonthGrid .month-event-label.appt-fold{
+    --fold:6px; position:relative; background:#F43F5E !important; color:#FFFFFF !important; font-weight:700;
+  }
+  #weekGrid .week-cal-block.appt-fold, #friendWeekGrid .week-cal-block.appt-fold{ font-weight:700; }
+  #dayEventList .day-event-card.appt-fold, #friendTodayList .day-event-card.appt-fold{ --fold:18px; --fold-c:#FB7185; background:#FFE4E8; }
+  body.dark-mode #dayEventList .day-event-card.appt-fold, body.dark-mode #friendTodayList .day-event-card.appt-fold{ --fold-c:#9F1239; background:rgba(244,63,94,0.18); }
+  #dayEventList .day-event-card.appt-fold .day-event-title, #friendTodayList .day-event-card.appt-fold .day-event-title{ color:#BE123C; }
+  body.dark-mode #dayEventList .day-event-card.appt-fold .day-event-title, body.dark-mode #friendTodayList .day-event-card.appt-fold .day-event-title{ color:#FDA4AF; }
+
   /* ===================== 앱 전체 새 디자인 (홈·캘린더와 같은 밋집 무드: 베이지 바탕 + 흰 카드 + 토마토색) =====================
      앱 곳곳이 쓰는 공통 색 변수(--bg, --surface, --accent ...)를 홈 색으로 바꿔서 설정·일정 추가·친구·채팅·커뮤니티까지 한 번에 맞춤.
      기능(버튼·id·data-*)은 그대로, 모양만 */
@@ -19312,7 +19328,7 @@ function renderDayView(){
     const card = document.createElement('div');
     card.className = 'day-event-card'
       + (ev.type === 'available' ? ' available' : '')
-      + (isLinked ? ' reservation-linked' : '');
+      + (isLinked ? ' reservation-linked appt-fold' : '');
     card.style.setProperty('--ev', colorForEvent(ev)); // 시간 알약 색 (CSS에서 씀)
 
     const actionsHtml = isLinked
@@ -22778,7 +22794,7 @@ function renderWeekView(){
         const blockHeightPx = (blockRange.endMin - blockRange.startMin) / 60 * WEEK_ROW_H;
 
         const block = document.createElement('div');
-        block.className = 'week-cal-block' + (isPending ? ' pending' : '') + (isLinked ? ' linked' : '')
+        block.className = 'week-cal-block' + (isPending ? ' pending' : '') + (isLinked ? ' linked appt-fold' : '')
           + (matchedEv && matchedEv.type === 'available' && !isPending && !isLinked && !matchedEv.color ? ' avail' : '');
         block.style.top = (blockTopPx + 1) + 'px';
         block.style.height = (blockHeightPx - 2) + 'px';
@@ -23031,7 +23047,7 @@ function renderMonthSchedView(){
       // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 짧게 보여줌
       // (누구에게 열린 시간인지 알 수 있게 "가능"/"💼가능"/그룹 이모티콘들/"💼업무")
       const label = ev.type === 'available' ? availableShortFor(availableForOf(ev), ev.visibility) : ev.title;
-      return `<div class="month-event-label" style="--ev:${bg};background:${bg};${textColorOnEventBg(bg)}${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
+      return `<div class="month-event-label${ev.isReservationLinked ? ' appt-fold' : ''}" style="--ev:${bg};background:${bg};${textColorOnEventBg(bg)}${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
     const hiddenCount = events.filter(ev => ev.type !== 'available' || ev.isPendingHold).length - labelEvents.length;
     const moreHtml = hiddenCount > 0
@@ -24737,7 +24753,7 @@ function renderFriendToday(){
       return;
     }
     const card = document.createElement('div');
-    card.className = 'day-event-card friend-view' + (b.isBookable ? ' available' : '');
+    card.className = 'day-event-card friend-view' + (b.isBookable ? ' available' : '') + (b.withMe ? ' reservation-linked appt-fold' : '');
     card.style.setProperty('--ev', b.isBookable ? 'var(--accent)' : friendBlockColor(b)); // 시간 알약 색 (내 하루 보기와 같게)
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
     const overlap = mine.filter(x => x.s < b.endHour * 60 && x.e > b.startHour * 60);
@@ -24837,7 +24853,7 @@ function renderFriendWeek(){
       const endIdx = HOURS.indexOf(b.endHour - 1);
       const block = document.createElement('div');
       // 캘린더 구경에서는 내 주 보기와 같은 칸 모양 - 예약 가능은 연한 토마토 + 왼쪽 줄, 일정은 일정 색의 연한 칸
-      block.className = 'week-cal-block' + (friendCalendarMode === 'reserve' ? ' fr-half' : (b.isBookable ? ' avail' : ''));
+      block.className = 'week-cal-block' + (friendCalendarMode === 'reserve' ? ' fr-half' : (b.isBookable ? ' avail' : (b.withMe ? ' linked appt-fold' : '')));
       block.style.top = ((startIdx - minIdx) * WEEK_ROW_H + 1) + 'px';
       block.style.height = ((endIdx - startIdx + 1) * WEEK_ROW_H - 2) + 'px';
       const label = b.title ? b.title : (b.isBookable ? '예약 가능' : '일정');
@@ -24859,7 +24875,7 @@ function renderFriendWeek(){
         block.addEventListener('click', (e) => { e.stopPropagation(); showFriendBlockAskPopover(block, friend, new Date(d), b); });
       } else {
         block.style.cursor = 'default';
-        block.style.opacity = '0.7';
+        if(!b.withMe || friendCalendarMode === 'reserve') block.style.opacity = '0.7'; // 나랑 잡은 약속은 흐리게 하지 않고 눈에 띄게
       }
       body.appendChild(block);
     });
@@ -24977,7 +24993,7 @@ function renderFriendMonthView(){
       const labels = busyBlocks.slice(0, 3).map(b => {
         const text = b.title || '일정';
         const bg = friendBlockColor(b);
-        return `<div class="month-event-label" style="--ev:${bg};background:${bg};${textColorOnEventBg(bg)}">${escapeHtml(truncateForMonthLabel(text))}</div>`;
+        return `<div class="month-event-label${b.withMe ? ' appt-fold' : ''}" style="--ev:${bg};background:${bg};${textColorOnEventBg(bg)}">${escapeHtml(truncateForMonthLabel(text))}</div>`;
       }).join('');
       const moreHtml = busyBlocks.length > 3 ? `<div class="month-event-more">+${busyBlocks.length - 3}개</div>` : '';
       const isTodayCell = dateKeyOf(cellDate) === dateKeyOf(TODAY);
