@@ -30929,7 +30929,10 @@ function renderChatMessages(){
               applyReservationUpdate(m, data.message);
               await loadPinsFromServer(activeChatRoomId, room);
               loadScheduleFromServer(); // 확정되면서 서버에서 정리된 "예약 가능" 등이 내 캘린더에도 바로 반영되게
-              if(m.location) addHotplaceNoticeMessage(activeChatRoomId, m.location, m.locationLat, m.locationLon);
+              // 장소가 있으면 서버가 "근처에서 만나요" 알림을 만들어 줌(상대방에게도 감) - 그걸 그대로 씀.
+              // 예전 서버라 안 오면 내 화면에만 임시 카드
+              if(data.notice) replaceHotplaceNoticeForPin(room, mapServerLocationNoticeMessage(data.notice));
+              else if(m.location) addHotplaceNoticeMessage(activeChatRoomId, m.location, m.locationLat, m.locationLon);
               renderChatMessages();
               renderChatList();
             } catch(err){
