@@ -3049,6 +3049,22 @@
     -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 40px), transparent 100%);
     mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 40px), transparent 100%);
   }
+  /* 다른 화면들도 맨 위(상태표시줄 자리)를 채팅방 헤더처럼 반투명 + 블러로 - 내용이 밑으로 지나가며 흐리게 비침.
+     헤더 버튼을 흐리게 하지 않도록 상태표시줄 높이 + 조금만 덮고 아래로 서서히 옅어지게. 채팅방은 자기 헤더 블러가 있어서 뺌 */
+  body::before{
+    content:'';
+    position:fixed;
+    left:0; right:0; top:0;
+    height:calc(env(safe-area-inset-top, 0px) + 20px);
+    z-index:9000;
+    pointer-events:none;
+    background:color-mix(in srgb, var(--bg) 18%, transparent);
+    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 20px), transparent 100%);
+    mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 20px), transparent 100%);
+  }
+  body.chat-open::before{ display:none; }
   .chat-room-header .profile-back{ padding:0; font-size:20px; }
   .chat-room-avatar{
     width:34px;height:34px;border-radius:50%;
