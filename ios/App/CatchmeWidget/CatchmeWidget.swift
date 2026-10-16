@@ -533,10 +533,11 @@ struct CatchmeTodayWidget: Widget {
 
 @main
 struct CatchmeWidgets: WidgetBundle {
+    // 위젯 고르는 화면은 이 순서대로 넘어가서, 달력을 맨 앞에 둠 (약속 위젯이 먼저 나오면 달력이 없는 줄 앎)
     var body: some Widget {
-        CatchmeWidget()
         CatchmeMonthWidget()
         CatchmeTodayWidget()
+        CatchmeWidget()
     }
 }
 
