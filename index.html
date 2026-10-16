@@ -8816,6 +8816,72 @@
   }
   #createFeedPostBtn.feed-write-fab svg{ width:13px; height:13px; }
   #createFeedPostBtn.feed-write-fab:active{ background:var(--mz-tomato-deep) !important; }
+
+  /* ---------------- 모션: 화면 전환·팝업·메뉴·버튼 누름 ----------------
+     원래 transform을 쓰는 요소(가운데 정렬된 채팅방 등)와 겹치지 않게 transform 대신 따로 노는 translate·scale 속성만 씀.
+     position:fixed 자식이 있는 화면(탭 전체, 리뷰 목록 등)은 움직이면 그 자식 위치가 잠깐 틀어져서 흐려졌다 나타나기만 함 */
+  @keyframes mzFadeIn{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes mzScreenIn{ from{ opacity:0; translate:22px 0; } to{ opacity:1; translate:none; } }
+  @keyframes mzScreenBack{ from{ opacity:0; translate:-22px 0; } to{ opacity:1; translate:none; } }
+  @keyframes mzRiseIn{ from{ opacity:0; translate:0 14px; } to{ opacity:1; translate:none; } }
+  @keyframes mzPopIn{ from{ opacity:0; scale:.92; } to{ opacity:1; scale:none; } }
+  @keyframes mzSheetUp{ from{ translate:0 100%; } to{ translate:none; } }
+  @keyframes mzMenuIn{ from{ opacity:0; translate:0 -4px; scale:.96; } to{ opacity:1; translate:none; scale:none; } }
+  @keyframes mzNavPop{ 0%{ scale:1; } 40%{ scale:1.18; } 100%{ scale:1; } }
+  @keyframes mzPressIn{ from{ scale:1; } to{ scale:var(--mz-press, .95); } }
+  @keyframes mzPressOut{ from{ scale:var(--mz-press, .95); } to{ scale:1; } }
+
+  /* 움직임 줄이기를 켠 폰에서는 전부 끔 */
+  @media (prefers-reduced-motion: no-preference){
+  /* 탭 바꾸기, 홈·내 프로필·설정 - 흐려졌다 나타남 */
+  .tab-panel.active, #homeDash, #calendarCard, #myProfileView, #settingsView,
+  .friends-list-view.active, .chat-list-view.active, .settings-list-view.active, #feedListView.active, .meetup-list-view.active,
+  .search-list-view.active, .suggest-list-view.active, .schedule-view.active, .friend-cal-view.active, .hotplace-pane.active{
+    animation:mzFadeIn .22s ease;
+  }
+  /* 한 단계 안쪽 화면(프로필, 그룹, 상세 등) - 오른쪽에서 살짝 밀려 들어옴, 뒤로가기는 왼쪽에서 */
+  .friend-profile-view.active, .friend-search-view.active, .person-profile-view.active, .friend-reserve-view.active,
+  .settings-detail-view.active, .feed-create-view.active, .meetup-create-view.active, .meetup-detail-view.active,
+  .meetup-reserve-view.active, .friend-groups-view.active, .friend-group-detail-view.active,
+  #feedPlaceDetailView.active, #feedTagView.active, #feedAuthorView.active,
+  .chat-room-view.active, .calendar-match-view.active, .event-form-view.active, .friend-calendar-view.active{
+    animation:mzScreenIn .26s cubic-bezier(.2,.8,.3,1);
+  }
+  body.nav-back :is(.friend-profile-view, .friend-search-view, .person-profile-view, .friend-reserve-view,
+    .settings-detail-view, .feed-create-view, .meetup-create-view, .meetup-detail-view, .meetup-reserve-view,
+    .friend-groups-view, .friend-group-detail-view, #feedPlaceDetailView, #feedTagView, #feedAuthorView,
+    .chat-room-view, .calendar-match-view, .event-form-view, .friend-calendar-view).active{
+    animation-name:mzScreenBack;
+  }
+  /* 손가락으로 밀어서 뒤로가는 중에는 화면이 이미 손을 따라 움직이니 밑에 깔리는 화면은 그대로 */
+  body.feed-swipe-active .tab-panel *, body:has(.chat-room-view.swiping) .tab-panel *, body:has(.chat-room-view.swiping) .tab-panel{ animation:none !important; }
+  /* 확인 창·선택 창 - 배경은 흐려지고 카드는 톡 튀어나옴 */
+  .mini-confirm-overlay.show, .app-confirm-overlay:not([hidden]), .custom-picker-overlay, .image-preview-overlay.show,
+  .week-block-sheet-overlay:not([hidden]), .home-widget-overlay.show, .feed-share-overlay.show,
+  .place-detail-map-overlay.show, .hotplace-overlay.show, .location-picker-full.show{
+    animation:mzFadeIn .18s ease;
+  }
+  .invite-overlay.show{ animation:mzRiseIn .26s cubic-bezier(.2,.8,.3,1); }
+  .mini-confirm-overlay.show > .mini-confirm-card, .app-confirm-overlay:not([hidden]) > .app-confirm-card,
+  .custom-picker-overlay > .custom-picker-card, .image-preview-overlay.show img{
+    animation:mzPopIn .24s cubic-bezier(.2,1.1,.4,1);
+  }
+  /* 아래에서 올라오는 창 */
+  .week-block-sheet-overlay:not([hidden]) > .week-block-sheet, .home-widget-overlay.show > .home-widget-sheet{
+    animation:mzSheetUp .3s cubic-bezier(.2,.9,.3,1);
+  }
+  /* 점 세 개·정렬 같은 작은 메뉴 */
+  .sort-dropdown-menu.open, .chat-members-dropdown.open, .chat-extra-dropdown.open, .chat-row-menu.show,
+  .feed-detail-kebab-menu.open, .location-dropdown.open, .location-suggest-list.show, .chat-search-bar.open, .match-conditions.open{
+    animation:mzMenuIn .16s ease-out; transform-origin:top right;
+  }
+  /* 하단 탭 - 고른 아이콘이 한 번 통 튐 */
+  .nav-item.active svg{ animation:mzNavPop .32s cubic-bezier(.3,1.4,.5,1); }
+  /* 버튼·누를 수 있는 줄을 누르는 동안 살짝 들어감 (누를 수 있는 걸 스크립트가 찾아 붙임 - setupPressMotion) */
+  .mz-pressing{ animation:mzPressIn .1s ease-out forwards; }
+  .mz-released{ animation:mzPressOut .2s cubic-bezier(.3,1.5,.5,1); }
+
+  }
 </style>
 </head>
 <body class="app-booting">
@@ -10803,6 +10869,7 @@ window.addEventListener('popstate', () => {
   }
   const closeFn = viewCloseStack.pop();
   if(closeFn){
+    markNavBack();
     try { closeFn(); } catch(err){ console.error('[뒤로가기] 화면 닫기 실패:', err); }
   }
   // 스택이 비어있으면 특별히 막지 않아서, 앱 첫 화면에서 뒤로가기를 누르면 정상적으로 앱을 벗어남
@@ -10814,9 +10881,67 @@ function goBackOrClose(closeFn){
   if(viewCloseStack.length > 0){
     history.back();
   } else {
+    markNavBack();
     closeFn();
   }
 }
+// 뒤로가기로 다시 보이는 화면은 왼쪽에서 들어오게 (앞으로 갈 때는 오른쪽에서) - 화면이 바뀐 직후 잠깐만 붙임
+function markNavBack(){
+  document.body.classList.add('nav-back');
+  clearTimeout(markNavBack._timer);
+  markNavBack._timer = setTimeout(() => document.body.classList.remove('nav-back'), 350);
+}
+
+// 버튼이나 누를 수 있는 줄·카드를 누르는 동안 살짝 들어갔다가, 떼면 통 튀며 돌아옴 (모든 화면 공통)
+// 끌어서 옮기는 곳(주간 캘린더, 하단 탭, 홈 편집, 말풍선 밀기 등)과 원래 눌림 효과가 있는 버튼은 건드리지 않음
+(function setupPressMotion(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const SKIP = 'input, textarea, select, [contenteditable="true"], .bottom-nav, .msg-row, .global-toast, .week-cal-wrap, .custom-picker-card, .levelup-overlay';
+  const OWN_PRESS = '.nav-item, #chatImageBtn, .chat-plus-item, #chatSendBtn, .plan-earliest-card, .week-cal-block-delete, .neu-round';
+  let cur = null, sx = 0, sy = 0;
+  function findTarget(t){
+    if(!(t instanceof Element) || t.closest(SKIP) || document.body.classList.contains('home-editing')) return null;
+    let el = t.closest('button, a[href], [role="button"], .toggle');
+    if(!el){
+      // 버튼 태그가 아닌 줄·카드는 커서가 손가락인 가장 바깥 요소로 (안쪽 글자들은 커서를 물려받기만 함)
+      if(getComputedStyle(t).cursor !== 'pointer') return null;
+      el = t;
+      while(el.parentElement && el.parentElement !== document.body && getComputedStyle(el.parentElement).cursor === 'pointer') el = el.parentElement;
+    }
+    if(el.disabled || el.closest(OWN_PRESS)) return null;
+    const cs = getComputedStyle(el);
+    if(cs.display === 'inline' || (cs.animationName !== 'none' && !el.classList.contains('mz-released'))) return null;
+    const r = el.getBoundingClientRect();
+    if(!r.width || r.height > window.innerHeight * 0.45) return null;
+    // 큰 줄·카드는 아주 살짝, 작은 아이콘 버튼은 조금 더
+    el.style.setProperty('--mz-press', (r.width > 240 || r.height > 120) ? '.985' : (r.width < 56 ? '.9' : '.95'));
+    return el;
+  }
+  function release(){
+    if(!cur) return;
+    const el = cur; cur = null;
+    el.classList.remove('mz-pressing');
+    el.classList.add('mz-released');
+    const done = () => { el.classList.remove('mz-released'); el.removeEventListener('animationend', done); };
+    el.addEventListener('animationend', done);
+    setTimeout(done, 300);
+  }
+  document.addEventListener('pointerdown', (e) => {
+    release();
+    if(!e.isPrimary || e.button > 0) return;
+    const el = findTarget(e.target);
+    if(!el) return;
+    cur = el; sx = e.clientX; sy = e.clientY;
+    el.classList.remove('mz-released');
+    el.classList.add('mz-pressing');
+  }, true);
+  document.addEventListener('pointermove', (e) => {
+    if(cur && Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy) > 10) release();
+  }, true);
+  document.addEventListener('pointerup', release, true);
+  document.addEventListener('pointercancel', release, true);
+  document.addEventListener('scroll', release, true);
+})();
 
 function showToast(message, duration = 2400){
   const el = document.getElementById('globalToast');
