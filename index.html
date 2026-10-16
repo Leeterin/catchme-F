@@ -35740,7 +35740,7 @@ function selectTimeOptionDirect(roomId, msg, optionIndex){
   touchRoom(roomId);
   if(activeChatRoomId === roomId){ renderChatMessages(); renderPinnedSchedule(); }
   renderChatList();
-  if(settingsState.notif_message) showToast(`${room.name}님이 시간을 선택해서 약속이 확정됐어요!`);
+  if(settingsState.notif_message && !room.muted) showToast(`${room.name}님이 시간을 선택해서 약속이 확정됐어요!`);
 }
 
 // 1:1 데모 채팅방에서 여러 후보를 제안하면, 실제로는 상대가 고르는 것이라 내 쪽에서 할 일은 없음 -
@@ -35809,7 +35809,7 @@ function checkTimeOptionsConsensus(roomId, msg){
   });
   touchRoom(roomId);
   if(activeChatRoomId === roomId) renderPinnedSchedule();
-  if(settingsState.notif_message) showToast('모두 같은 시간에 투표해서 확정됐어요!');
+  if(settingsState.notif_message && !room.muted) showToast('모두 같은 시간에 투표해서 확정됐어요!');
 }
 
 // 채팅방 헤더를 누르고 있으면 메시지 목록이 맨 위까지 계속 스크롤됨 (오래된 대화 빨리 보기)
