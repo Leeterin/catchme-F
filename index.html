@@ -6605,6 +6605,15 @@
     cursor:pointer;
   }
   .group-list-row:last-child{ border-bottom:none; }
+  .group-list-row.open{ border-bottom:none; }
+  .group-list-more{
+    flex-shrink:0; width:34px; height:34px; border:none; border-radius:10px; background:none;
+    color:var(--text-dim); font-size:20px; line-height:1; cursor:pointer; padding:0;
+  }
+  .group-list-row.open .group-list-more{ background:var(--accent-soft); color:var(--accent); }
+  #friendGroupsListContainer .group-edit-panel{
+    padding:12px 12px 4px; margin:0 0 10px; border:1px solid var(--line); border-radius:16px; background:var(--surface-2);
+  }
   .group-list-avatar{
     width:38px;
     height:38px;
@@ -9391,6 +9400,8 @@
     <div class="friend-group-detail-view" id="friendGroupDetailView">
       <button class="profile-back back-standalone" id="groupDetailBackBtn" aria-label="뒤로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
       <div class="friend-calendar-title" id="groupDetailTitle" style="margin-bottom:10px;">그룹</div>
+      <!-- 그룹 수정 칸 - 그룹 목록에서 점 세 개를 누르면 그 줄 아래로 옮겨서 바로 고치게 함 -->
+      <div class="group-edit-panel" id="groupEditPanel">
       <div class="mp-input-group">
         <label>이모티콘 · 그룹 이름 <span style="font-weight:400;color:var(--text-dim);">(이모티콘은 캘린더의 예약 가능 시간에 붙어요)</span></label>
         <div class="group-emoji-grid" id="groupEmojiGrid" style="margin-bottom:10px;"></div>
@@ -9405,6 +9416,7 @@
         <div id="groupMemberCheckList"></div>
       </div>
       <button type="button" id="deleteGroupBtn" style="width:100%;margin-top:10px;padding:11px;border:none;background:none;color:var(--text-dim);font-size:12.5px;font-family:'Inter',sans-serif;cursor:pointer;">그룹 삭제</button>
+      </div>
     </div>
 
     <div class="friend-search-view" id="friendSearchView">
@@ -23358,8 +23370,10 @@ document.getElementById('manageGroupsFromProfileBtn').addEventListener('click', 
 // 친구 그룹 관리 (인스타 "친한 친구"처럼 이름 붙여 만드는 그룹 - 목록/만들기/이름변경/멤버선택/삭제)
 // ============================================================
 let groupsOpenedFromProfile = false;
+let editingGroupId = null; // 그룹 목록에서 수정 칸이 펼쳐진 그룹
 function openFriendGroupsView(){
   groupsOpenedFromProfile = document.getElementById('friendProfileView').classList.contains('active');
+  editingGroupId = null;
   renderFriendGroupsList();
   document.getElementById('friendsListView').classList.remove('active');
   document.getElementById('friendProfileView').classList.remove('active');
@@ -23384,6 +23398,9 @@ document.getElementById('groupsBackBtn').addEventListener('click', () => goBackO
 
 function renderFriendGroupsList(){
   const container = document.getElementById('friendGroupsListContainer');
+  const editPanel = document.getElementById('groupEditPanel');
+  document.getElementById('friendGroupDetailView').appendChild(editPanel); // 목록을 다시 그려도 수정 칸(입력 중인 값)은 남게 먼저 빼둠
+  if(!MY_GROUPS.some(g => g.id === editingGroupId)) editingGroupId = null;
   container.innerHTML = '';
   if(MY_GROUPS.length === 0){
     container.innerHTML = `<div class="day-event-empty">아직 만든 그룹이 없어요. 위에서 그룹을 만들어보세요.</div>`;
@@ -23395,9 +23412,18 @@ function renderFriendGroupsList(){
     row.innerHTML = `
       <div class="group-list-avatar">${escapeHtml(group.emoji || group.name[0] || '?')}</div>
       <div class="group-list-text"><b>${escapeHtml(group.name)}</b><span>멤버 ${group.memberIds.length}명</span></div>
+      <button type="button" class="group-list-more" aria-label="그룹 수정">⋯</button>
     `;
-    row.addEventListener('click', () => openFriendGroupDetail(group.id));
+    // 줄이나 점 세 개를 누르면 이 화면에서 바로 수정 칸이 펼쳐짐 (다시 누르면 접힘)
+    row.addEventListener('click', () => {
+      if(editingGroupId === group.id){ editingGroupId = null; renderFriendGroupsList(); }
+      else openFriendGroupDetail(group.id);
+    });
     container.appendChild(row);
+    if(group.id === editingGroupId){
+      row.classList.add('open');
+      container.appendChild(editPanel);
+    }
   });
 }
 
@@ -23513,7 +23539,6 @@ document.getElementById('homeGroupManageBtn').addEventListener('click', () => {
   jumpToView(() => { showTab('friends'); openFriendGroupsView(); });
 });
 
-let editingGroupId = null;
 function openFriendGroupDetail(groupId){
   const group = MY_GROUPS.find(g => g.id === groupId);
   if(!group) return;
@@ -23523,10 +23548,8 @@ function openFriendGroupDetail(groupId){
   document.getElementById('groupEmojiInput').value = group.emoji || '';
   renderGroupEmojiGrid('groupEmojiGrid', 'groupEmojiInput');
   renderGroupMemberCheckList(group);
-
-  document.getElementById('friendGroupsView').classList.remove('active');
-  document.getElementById('friendGroupDetailView').classList.add('active');
-  pushViewState(closeFriendGroupDetailView);
+  renderFriendGroupsList(); // 따로 화면을 열지 않고 그룹 목록에서 그 줄 아래로 펼침
+  document.getElementById('groupEditPanel').scrollIntoView({ block: 'nearest' });
 }
 function closeFriendGroupDetailView(){
   document.getElementById('friendGroupDetailView').classList.remove('active');
@@ -23571,13 +23594,16 @@ document.getElementById('groupMemberCheckList').addEventListener('click', async 
   group.memberIds = willAdd ? [...group.memberIds, friendId] : group.memberIds.filter(id => id !== friendId);
   if(friend) friend.groupIds = willAdd ? [...(friend.groupIds || []), group.id] : (friend.groupIds || []).filter(id => id !== group.id);
   toggle.classList.toggle('on', willAdd);
+  renderFriendGroupsList(); // 목록의 멤버 수도 바로
 
   try {
     await apiRequest(`/friends/groups/${group.id}/members`, { method: 'PUT', body: JSON.stringify({ friendIds: group.memberIds }) });
+    renderHomeGroupCard();
   } catch(err){
     group.memberIds = previousGroupMemberIds; // 실패하면 되돌림
     if(friend) friend.groupIds = previousFriendGroupIds;
     toggle.classList.toggle('on', !willAdd);
+    renderFriendGroupsList();
     showToast(err.message);
   }
 });
@@ -23598,6 +23624,7 @@ document.getElementById('renameGroupBtn').addEventListener('click', async () => 
     resyncAllScheduleEvents(); // 캘린더의 예약 가능 이름에 붙은 그룹 이름/이모티콘도 바로 바뀌게
     refreshActiveScheduleView();
     renderHomeGroupCard();
+    renderFriendGroupsList(); // 목록의 이름/이모티콘도 바로
     showToast('그룹을 저장했어요.');
   } catch(err){
     group.name = previous; // 실패하면 되돌림
@@ -23606,6 +23633,7 @@ document.getElementById('renameGroupBtn').addEventListener('click', async () => 
     document.getElementById('renameGroupInput').value = previous;
     document.getElementById('groupEmojiInput').value = previousEmoji || '';
     renderGroupEmojiGrid('groupEmojiGrid', 'groupEmojiInput');
+    renderFriendGroupsList();
     showToast(err.message);
   }
 });
@@ -23613,6 +23641,8 @@ document.getElementById('renameGroupBtn').addEventListener('click', async () => 
 document.getElementById('deleteGroupBtn').addEventListener('click', async () => {
   const group = MY_GROUPS.find(g => g.id === editingGroupId);
   if(!group || !authToken) return;
+  // 목록에서 바로 지울 수 있게 되면서 잘못 누르는 일이 없게 한 번 물어봄
+  if(!(await appConfirm({ title: '그룹 삭제', html: `"${escapeHtml(group.name)}" 그룹을 삭제할까요?`, yesText: '삭제', noText: '취소' }))) return;
 
   try {
     await apiRequest(`/friends/groups/${group.id}`, { method: 'DELETE' });
@@ -23627,8 +23657,7 @@ document.getElementById('deleteGroupBtn').addEventListener('click', async () => 
       }
     });
     showToast(`"${group.name}" 그룹을 삭제했어요.`);
-    document.getElementById('friendGroupDetailView').classList.remove('active');
-    document.getElementById('friendGroupsView').classList.add('active');
+    editingGroupId = null;
     renderFriendGroupsList();
   } catch(err){
     showToast(err.message);
