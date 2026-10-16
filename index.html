@@ -9021,7 +9021,7 @@
     <!-- 예약 가능 시간 빠르게 열기 입구 - 항상 보이게 둬서 열어둔 기간이 지나 비었을 때도 바로 다시 열 수 있게 함 -->
     <button type="button" class="quick-avail-entry" id="quickAvailEntryBtn">
       <span class="quick-avail-entry-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-      <span class="quick-avail-entry-text"><b id="quickAvailEntryTitle">예약 가능 시간 빠르게 열기</b><small id="quickAvailEntryStatus">요일별 시간만 정하면 4주 동안 반복해서 열 수 있어요</small></span>
+      <span class="quick-avail-entry-text"><b id="quickAvailEntryTitle">예약 가능 시간 빠르게 열기</b><small id="quickAvailEntryStatus">요일별로 시간만 정하면 바로 열려요</small></span>
       <span class="quick-avail-entry-go">빠르게 열기</span>
     </button>
     <!-- 하루/주/달 고르기 + 그룹 필터 칩을 한 줄에 -->
@@ -9737,7 +9737,7 @@
       <button type="button" class="mini-confirm-close" id="quickAvailCloseBtn" aria-label="닫기">&times;</button>
       <div class="mini-confirm-title" style="margin-bottom:6px;">보통 언제 시간 돼요?</div>
       <div class="avail-first-tip" data-avail-first-tip style="display:none;"><b><svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg> 예약 가능 시간을 공유하면</b>내 전체 일정은 공개하지 않고, 만날 수 있는 시간만 다른 사람에게 보여줄 수 있어요.</div>
-      <div class="qa-repeat" id="quickAvailRepeatRow">
+      <div class="qa-repeat" id="quickAvailRepeatRow" style="display:none;"><!-- 4주 반복은 빼기로 함 - 빠르게 열기는 늘 보고 있는 주만 엶 -->
         <button type="button" class="qa-switch" id="quickAvailRepeatSwitch" role="switch" aria-checked="false"><span>4주 반복</span><i></i></button>
       </div>
       <p class="quick-avail-desc" id="quickAvailDesc"></p>
@@ -33310,7 +33310,8 @@ function closeQuickAvailCuts(cutsByDow, tabKey){
 }
 function openQuickAvail(){
   // 지금 열려 있는 시간을 탭(대상)마다 막대로 보여줌 - 여기서 줄이거나 끄면 그 대상에게 닫히고, 늘리면 열림
-  try { quickAvailRepeat = localStorage.getItem(QUICK_REPEAT_KEY) === 'month' ? 'month' : 'once'; } catch(e) { quickAvailRepeat = 'once'; }
+  // 4주 반복은 뺐음 - 일정 추가 화면에서 켜 둔 반복 설정이 여기로 넘어오지 않게 늘 보고 있는 주만
+  quickAvailRepeat = 'once';
   quickAvailWeek = 0;
   quickAvailTabs = quickBuildTabs();
   quickAvailWeekTabs = { 0: quickAvailTabs };
@@ -33348,7 +33349,7 @@ function renderQuickAvailEntry(){
   // 이미 열어둔 사람에겐 큰 배너가 달력을 밀어내기만 해서, 한 줄짜리로 줄임
   document.getElementById('quickAvailEntryBtn').classList.toggle('compact', n > 0);
   document.getElementById('quickAvailEntryTitle').textContent = n > 0 ? `앞으로 2주 중 ${n}일 열어둠` : '아직 열어둔 시간이 없어요';
-  el.textContent = '요일만 정하면 4주 반복';
+  el.textContent = '요일별로 시간만 정하면 바로 열려요';
 }
 document.getElementById('quickAvailEntryBtn').addEventListener('click', openQuickAvail);
 // 캘린더 제목 옆 아이콘 - 불러오기는 설정의 "캘린더 불러오기"와 같고, +는 지금 보고 있는 보기(하루/주/달)의 일정 추가 버튼을 그대로 누름
