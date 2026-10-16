@@ -8487,6 +8487,14 @@
   #friendCalendarMain .friend-cal-datenav #friendCalDateNavLabel{ flex:none; text-align:left; }
   #friendTodayList .day-event-card{ padding-right:16px; }
   #friendCalendarView .month-selected-main .day-event-ask-btn{ align-self:flex-start; margin-top:8px; }
+  /* 내 캘린더 탭의 친구 프사로 열면 덮는 화면 없이 내 캘린더 자리에서 바로 친구 일정으로 바뀜 (제목은 위 "내 캘린더" 자리에) */
+  .friend-calendar-view.inline{ position:static; top:auto; bottom:auto; left:auto; width:auto; max-width:none; transform:none; z-index:auto; overflow:visible; padding:0; background:transparent; }
+  .friend-calendar-view.inline > .profile-back, #friendCalendarView.inline .friend-calendar-title{ display:none; }
+  #friendCalendarView.inline.active ~ .sched-toolbar, #friendCalendarView.inline.active ~ .schedule-view, #panel-schedule.friend-cal-on #firstEventCard{ display:none !important; }
+  /* 약속 요청 입력은 예전처럼 화면 전체로 */
+  #friendCalendarView.inline .friend-reserve-view.active{ position:fixed; top:0; bottom:0; left:50%; width:100%; max-width:420px; transform:translateX(-50%); z-index:2800; overflow-y:auto; padding:20px 18px; padding-top:calc(20px + env(safe-area-inset-top)); box-sizing:border-box; background:var(--hm-bg); }
+  .sched-friend.on .sched-friend-face{ box-shadow:0 0 0 2px var(--hm-accent); }
+  .sched-friend.on .sched-friend-name{ color:var(--hm-accent); font-weight:800; }
 
   /* 메모 - 노란 포스트잇처럼 (모서리 접힘 + 하루 보기는 테이프·그림자·살짝 기울임). 확정 대기 노란 카드와 헷갈리지 않게 */
   body{ --memo-paper:#FFE89A; --memo-fold:#E8BE3C; --memo-ink:#6B4A0A; }
@@ -12174,6 +12182,12 @@ const panels = {
 let currentTopTab = null; // 지금 보고 있는 아래 탭 (null = 메인 캘린더)
 function showTab(tabKey){
   exitHomeEdit(); // 홈 편집 중에 다른 화면으로 가면 편집은 끝냄
+  // 내 캘린더 자리에 친구 일정을 띄워둔 채로 탭을 옮기면, 돌아왔을 때는 내 캘린더부터
+  if(isFriendCalInline()){
+    document.getElementById('friendCalendarView').classList.remove('active');
+    closeFriendBlockAskPopover();
+    syncSchedFriendMode();
+  }
   currentTopTab = tabKey;
   profileReturnToChat = null; // 다른 탭으로 옮기면 "프로필 닫으면 채팅방으로" 상태는 버림
   document.body.classList.remove('chat-open');
@@ -22701,7 +22715,7 @@ function refreshActiveScheduleView(){
 // ---------- 서브탭 전환 ----------
 function switchScheduleView(view){
   renderQuickAvailEntry();
-  document.querySelectorAll('#panel-schedule .segment-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('#scheduleSegment .segment-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('#panel-schedule .schedule-view').forEach(v => v.classList.remove('active'));
   document.getElementById('scheduleView-' + view).classList.add('active');
 
@@ -23701,16 +23715,51 @@ let friendMonthFocusMonth = TODAY.getMonth() + 1; // "한달" 탭에서 보고 �
 let friendMonthSelectedDate = new Date(TODAY); // 한달 탭에서 선택된 날짜(하단 상세 패널용)
 let friendMonthDataCache = {}; // "username::YYYY-M" -> { hours, days } (한달 데이터 - 매번 다시 안 받아오게 캐싱)
 
-function openFriendCalendar(friendId, mode){
+// 내 캘린더 탭의 친구 프사로 열면(opts.inline) 새 화면을 띄우지 않고 내 캘린더 자리에 바로 끼워 넣음
+// - 다른 곳(친구 프로필/채팅)에서 열면 원래 자리로 돌려놓고 예전처럼 덮는 화면으로
+const friendCalHomeMark = document.createComment('friendCalendarView');
+document.getElementById('friendCalendarView').before(friendCalHomeMark);
+function placeFriendCalendarView(inline){
+  const view = document.getElementById('friendCalendarView');
+  view.classList.toggle('inline', inline);
+  if(inline){
+    const strip = document.getElementById('schedFriendStrip');
+    if(strip.nextSibling !== view) strip.after(view);
+  } else if(friendCalHomeMark.nextSibling !== view){
+    friendCalHomeMark.after(view);
+  }
+}
+function isFriendCalInline(){
+  const view = document.getElementById('friendCalendarView');
+  return view.classList.contains('active') && view.classList.contains('inline');
+}
+// 위 제목("내 캘린더" <-> "민수님의 캘린더")과 프사 줄 선택 표시를 지금 상태에 맞춤
+function syncSchedFriendMode(){
+  const inline = isFriendCalInline();
+  const friend = inline ? FRIENDS.find(f => f.id === activeFriendCalendarId) : null;
+  const title = document.querySelector('#panel-schedule .sched-title');
+  title.firstChild.nodeValue = friend ? `${friend.name}님의 캘린더` : '내 캘린더';
+  title.querySelector('.sched-head-actions').style.display = friend ? 'none' : '';
+  document.getElementById('panel-schedule').classList.toggle('friend-cal-on', !!friend);
+  document.querySelectorAll('#schedFriendStrip .sched-friend').forEach(b => {
+    b.classList.toggle('on', friend ? b.dataset.friendId === friend.id : b.classList.contains('sched-friend-me'));
+  });
+}
+
+function openFriendCalendar(friendId, mode, opts = {}){
   const friend = FRIENDS.find(f => f.id === friendId);
   if(!friend) return;
+  const wasInline = isFriendCalInline();
   activeFriendCalendarId = friendId;
   friendCalendarMode = mode === 'reserve' ? 'reserve' : 'calendar';
-  friendDayFocusDate = new Date(TODAY);
-  friendWeekFocusDate = friendWeekStartOf(TODAY);
-  friendMonthFocusYear = TODAY.getFullYear();
-  friendMonthFocusMonth = TODAY.getMonth() + 1;
-  friendMonthSelectedDate = new Date(TODAY);
+  const inline = !!opts.inline && friendCalendarMode === 'calendar';
+  const initView = ['week', 'month'].includes(opts.view) ? opts.view : 'today';
+  const dayDate = opts.dayDate ? new Date(opts.dayDate) : new Date(TODAY);
+  friendDayFocusDate = dayDate;
+  friendWeekFocusDate = opts.weekStart ? new Date(opts.weekStart) : friendWeekStartOf(dayDate);
+  friendMonthFocusYear = opts.monthYear || TODAY.getFullYear();
+  friendMonthFocusMonth = opts.monthMonth || TODAY.getMonth() + 1;
+  friendMonthSelectedDate = opts.monthSelected ? new Date(opts.monthSelected) : new Date(TODAY);
   friendReserveOpenKeys = null;
 
   // 이전 조회 결과는 바로 보여주고, 뒤에서 최신 데이터를 새로 받아와 다시 그림
@@ -23723,20 +23772,25 @@ function openFriendCalendar(friendId, mode){
   document.getElementById('friendCalendarBackBtn').style.display = '';
   document.getElementById('friendCalendarTitle').style.display = '';
   // 독립 오버레이라서 밑에 어느 탭(친구/채팅)이 있든 그 위에 그대로 뜸 - 다른 화면을 숨길 필요 없음
+  placeFriendCalendarView(inline);
   document.getElementById('friendCalendarView').classList.add('active');
   document.getElementById('friendReserveView').classList.remove('active');
   document.getElementById('friendCalendarMain').classList.add('active');
 
-  document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(b => b.classList.toggle('active', b.dataset.view === 'today'));
+  // 처음부터 보여줄 보기(하루/주/달)로 바로 그림 - 하루로 그렸다가 다시 바꾸면 한 번 깜빡였음
+  document.querySelectorAll('#friendCalendarSegment .segment-btn').forEach(b => b.classList.toggle('active', b.dataset.view === initView));
   document.querySelectorAll('#friendCalendarView .friend-cal-view').forEach(v => v.classList.remove('active'));
-  document.getElementById('friendCalView-today').classList.add('active');
+  document.getElementById('friendCalView-' + initView).classList.add('active');
 
   renderFriendCalDateNav();
   renderFriendCalPrivacyNote();
-  renderFriendToday();
-  renderFriendWeek();
+  if(initView === 'month') renderFriendMonthView();
+  else if(initView === 'week') renderFriendWeek();
+  else { renderFriendToday(); renderFriendWeek(); }
   loadFriendScheduleForFocusWindow();
-  pushViewState(closeFriendCalendar);
+  syncSchedFriendMode();
+  // 내 캘린더 안에서 다른 친구로 바꿀 때는 뒤로가기 기록을 더 쌓지 않음 - 뒤로가기 한 번이면 내 캘린더로
+  if(!(inline && wasInline)) pushViewState(closeFriendCalendar);
   if(friendCalendarMode === 'reserve') jumpToFirstFriendOpenDay(friend);
 }
 
@@ -23919,6 +23973,7 @@ function closeFriendCalendar(){
   document.getElementById('friendCalendarView').classList.remove('active');
   calendarOpenedFromChat = null;
   closeFriendBlockAskPopover();
+  syncSchedFriendMode();
   // 독립 오버레이라서 그냥 닫기만 하면, 밑에 있던 화면(친구 프로필이든 채팅방이든)이 그대로 보임 - 따로 다시 열어줄 필요 없음
 }
 
@@ -29968,6 +30023,7 @@ function restoreScreenBeforeFriendAsk(snap){
   snap.displays.forEach(([sel, val]) => { document.querySelector(sel).style.display = val; });
   document.body.classList.toggle('chat-open', snap.chatOpen);
   document.getElementById('friendCalendarView').classList.add('active');
+  syncSchedFriendMode();
 }
 let chatReturnToCalendar = null; //캘린더의 "채팅에서 확인"으로 들어온 경우, 뒤로가기 시 돌아갈 캘린더 상태(뷰/날짜)를 기억해둠
 
@@ -30011,7 +30067,7 @@ function goToReservationChat(roomId){
     showToast('연결된 채팅방을 찾을 수 없어요.');
     return;
   }
-  const activeSegBtn2 = document.querySelector('#panel-schedule .segment-btn.active');
+  const activeSegBtn2 = document.querySelector('#scheduleSegment .segment-btn.active');
   const activeView = (activeSegBtn2 && activeSegBtn2.dataset.view) || 'day';
   const returnDate = new Date(scheduleFocusDate);
   showTab('chat'); // 여기서 이전에 남아있을 수 있는 상태를 먼저 정리함
@@ -33516,7 +33572,13 @@ function renderSchedFriendStrip(){
   strip.style.display = friends.length ? '' : 'none';
   if(friends.length < 2) schedFriendEditing = false;
   strip.classList.toggle('editing', schedFriendEditing);
-  strip.innerHTML = friends.map(f => `
+  // 맨 앞 "나" - 친구 일정을 보다가 누르면 내 캘린더로 돌아옴
+  const myImg = myProfileData.profileImageUrl;
+  strip.innerHTML = (friends.length ? `<button type="button" class="sched-friend sched-friend-me" aria-label="내 캘린더 보기">
+      <span class="sched-friend-face"${myImg ? '' : ` style="background:${myProfileData.color || 'var(--hm-accent-soft)'}"`}>${myImg ? `<img src="${escapeHtml(myImg)}" alt="" draggable="false" />` : MASCOT_AVATAR_SVG}</span>
+      <span class="sched-friend-name">나</span>
+    </button>` : '')
+    + friends.map(f => `
     <button type="button" class="sched-friend" data-friend-id="${escapeHtml(f.id)}" aria-label="${escapeHtml(f.name)}님 캘린더 보기">
       <span class="sched-friend-face"${f.avatar ? '' : ` style="background:${f.color}"`}>${f.avatar ? `<img src="${f.avatar}" alt="" draggable="false" />` : MASCOT_AVATAR_SVG}</span>
       <span class="sched-friend-name">${escapeHtml(f.name)}</span>
@@ -33528,6 +33590,7 @@ function renderSchedFriendStrip(){
       <span class="sched-friend-name">${schedFriendEditing ? '완료' : '순서'}</span>
     </button>` : '');
   strip.querySelectorAll('.sched-friend[data-friend-id]').forEach(attachSchedFriendDrag);
+  syncSchedFriendMode();
 }
 document.getElementById('schedFriendStrip').addEventListener('click', (e) => {
   if(schedFriendSuppressClick) return;
@@ -33537,36 +33600,55 @@ document.getElementById('schedFriendStrip').addEventListener('click', (e) => {
     if(schedFriendEditing) showToast('프사를 끌어서 순서를 바꿔요');
     return;
   }
-  const btn = e.target.closest('.sched-friend[data-friend-id]');
-  if(!btn || schedFriendEditing) return;
-  openFriendCalendar(btn.dataset.friendId, 'calendar');
-  // 내 캘린더에서 보던 화면(하루/주/달)과 날짜 그대로 친구 캘린더도 열어줌 - 친구 캘린더는 지난 날로 못 가서 오늘 이전이면 오늘로
-  const myView = document.querySelector('#scheduleSegment .segment-btn.active')?.dataset.view;
-  if(myView === 'week' || myView === 'month'){
-    document.querySelector(`#friendCalendarSegment .segment-btn[data-view="${myView}"]`)?.click();
+  if(schedFriendEditing) return;
+  // "나"를 누르거나 보고 있는 친구를 한 번 더 누르면 내 캘린더로
+  if(e.target.closest('.sched-friend-me') || e.target.closest('.sched-friend.on[data-friend-id]')){
+    if(isFriendCalInline()) goBackOrClose(closeFriendCalendar);
+    return;
   }
+  const btn = e.target.closest('.sched-friend[data-friend-id]');
+  if(!btn) return;
+  openFriendCalendar(btn.dataset.friendId, 'calendar', schedFriendOpenOpts());
+});
+// 새 화면을 띄우지 않고 내 캘린더 자리에서 바로 친구 일정으로 - 내가 보던 화면(하루/주/달)과 날짜 그대로.
+// 이미 다른 친구 일정을 보는 중이면 그 화면·날짜 그대로 친구만 바꿈. 친구 캘린더는 지난 날로 못 가서 오늘 이전이면 오늘로
+function schedFriendOpenOpts(){
+  if(isFriendCalInline()){
+    const view = document.querySelector('#friendCalendarSegment .segment-btn.active')?.dataset.view || 'today';
+    return { inline: true, view, dayDate: friendDayFocusDate, weekStart: friendWeekFocusDate, monthYear: friendMonthFocusYear, monthMonth: friendMonthFocusMonth, monthSelected: friendMonthSelectedDate };
+  }
+  const myView = document.querySelector('#scheduleSegment .segment-btn.active')?.dataset.view;
   const focus = dateKeyNum(scheduleFocusDate) < dateKeyNum(TODAY) ? new Date(TODAY) : new Date(scheduleFocusDate);
+  const opts = { inline: true, view: myView === 'week' || myView === 'month' ? myView : 'today', dayDate: focus };
   if(myView === 'month'){
     const thisMonth = TODAY.getFullYear() * 12 + TODAY.getMonth();
     if(schedViewYear * 12 + schedViewMonth >= thisMonth){
-      friendMonthFocusYear = schedViewYear;
-      friendMonthFocusMonth = schedViewMonth + 1;
+      opts.monthYear = schedViewYear;
+      opts.monthMonth = schedViewMonth + 1;
       // 내 달 보기에서 고른 날짜가 이 달이면 그 날을, 아니면 1일(이번 달이면 오늘)을 골라 둠
       const sameMonth = monthSelectedDate.getFullYear() === schedViewYear && monthSelectedDate.getMonth() === schedViewMonth;
-      friendMonthSelectedDate = sameMonth ? new Date(monthSelectedDate)
+      opts.monthSelected = sameMonth ? monthSelectedDate
         : (schedViewYear * 12 + schedViewMonth === thisMonth ? new Date(TODAY) : new Date(schedViewYear, schedViewMonth, 1));
-      renderFriendMonthView();
-      loadFriendScheduleForFocusWindow();
     }
-  } else {
-    friendDayFocusDate = focus;
-    friendWeekFocusDate = friendWeekStartOf(focus);
-    renderFriendCalDateNav();
-    renderFriendToday();
-    renderFriendWeek();
-    loadFriendScheduleForFocusWindow();
   }
-});
+  return opts;
+}
+// 손가락이 닿는 순간 그 친구의 보일 범위 일정을 미리 받기 시작 - 손을 뗐을 때 이미 와 있게
+document.getElementById('schedFriendStrip').addEventListener('pointerdown', (e) => {
+  const btn = e.target.closest('.sched-friend[data-friend-id]');
+  if(!btn || schedFriendEditing) return;
+  const friend = FRIENDS.find(f => f.id === btn.dataset.friendId);
+  if(!friend || !friend.username || friend.id === DEMO_FRIEND.id || !authToken) return;
+  const o = schedFriendOpenOpts();
+  if(o.view === 'month'){
+    loadFriendMonthData(friend, o.monthYear || TODAY.getFullYear(), o.monthMonth || TODAY.getMonth() + 1);
+  } else if(o.view === 'week'){
+    const start = o.weekStart || friendWeekStartOf(o.dayDate);
+    for(let i = 0; i < 7; i++){ const d = new Date(start); d.setDate(d.getDate() + i); ensureFriendScheduleLoaded(friend, d); }
+  } else {
+    ensureFriendScheduleLoaded(friend, o.dayDate);
+  }
+}, { passive: true });
 // "순서"를 누른 동안은 바로, 평소엔 꾹 눌러서(0.35초) 집어 들고 좌우로 끌기
 function attachSchedFriendDrag(item){
   let pressTimer = null, startX = 0, startY = 0;
