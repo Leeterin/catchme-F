@@ -2,7 +2,7 @@ import WidgetKit
 import SwiftUI
 
 // 캐치미 홈 화면 위젯 - 다가오는 약속을 크기별로 보여줌
-// 소: 바로 다음 약속 1개 / 중: 3개 / 대: 다음 약속 크게 + 4개 더
+// 소: 오늘부터 7일 일정 / 중: 약속 3개 / 대: 다음 약속 크게 + 4개 더
 // 데이터는 앱(웹 화면)이 CatchmeWidgetPlugin으로 App Group에 넣어둔 JSON을 읽음
 
 let appGroup = "group.com.meetzip.app"
@@ -71,6 +71,31 @@ struct Entry: TimelineEntry {
     let date: Date
     let loggedIn: Bool
     let items: [WidgetItem]
+    var week: [WeekEvent] = []   // 소 위젯용 - 오늘부터 7일 일정
+}
+
+// 일주일 일정 한 줄 (날짜 + 일정)
+struct WeekEvent: Hashable {
+    let day: Date
+    let ev: CalEvent
+}
+
+// 오늘부터 7일 동안의 일정 - 예약 가능 시간은 빼고, 오늘 이미 끝난 일정도 뺌
+func weekEvents(from payload: WidgetPayload?, now: Date) -> [WeekEvent] {
+    let cal = Calendar.current
+    var map: [String: [CalEvent]] = [:]
+    for d in payload?.days ?? [] { map[d.key] = d.events }
+    let today = cal.startOfDay(for: now)
+    let nowMin = Double(cal.component(.hour, from: now) * 60 + cal.component(.minute, from: now))
+    var out: [WeekEvent] = []
+    for i in 0..<7 {
+        guard let day = cal.date(byAdding: .day, value: i, to: today) else { continue }
+        let evs = (map[dayKey(day)] ?? [])
+            .filter { $0.kind != "avail" && (i > 0 || $0.endMin > nowMin) }
+            .sorted { $0.startMin < $1.startMin }
+        out += evs.map { WeekEvent(day: day, ev: $0) }
+    }
+    return out
 }
 
 struct Provider: TimelineProvider {
@@ -80,7 +105,11 @@ struct Provider: TimelineProvider {
     ]
 
     func placeholder(in context: Context) -> Entry {
-        Entry(date: Date(), loggedIn: true, items: Provider.sample)
+        let today = Calendar.current.startOfDay(for: Date())
+        return Entry(date: Date(), loggedIn: true, items: Provider.sample, week: [
+            WeekEvent(day: today, ev: CalEvent(title: "민지", startMin: 1080, endMin: 1260, kind: "appt", color: nil)),
+            WeekEvent(day: today.addingTimeInterval(86400 * 3), ev: CalEvent(title: "대학 동기 모임", startMin: 720, endMin: 840, kind: "event", color: nil)),
+        ])
     }
 
     func getSnapshot(in context: Context, completion: @escaping (Entry) -> Void) {
@@ -98,6 +127,11 @@ struct Provider: TimelineProvider {
         let cal = Calendar.current
         var moments: [Date] = [now]
         for item in payload?.items ?? [] where item.expiresAt > now { moments.append(item.expiresAt) }
+        // 오늘 일정이 끝나는 시각마다 (소 위젯 일주일 일정에서 빼려고)
+        for ev in payload?.days?.first(where: { $0.key == dayKey(now) })?.events ?? [] {
+            let end = cal.startOfDay(for: now).addingTimeInterval(ev.endMin * 60)
+            if end > now { moments.append(end) }
+        }
         for d in 1...7 {
             if let midnight = cal.date(byAdding: .day, value: d, to: cal.startOfDay(for: now)) { moments.append(midnight) }
         }
@@ -108,7 +142,8 @@ struct Provider: TimelineProvider {
     func makeEntry(at date: Date, payload: WidgetPayload?) -> Entry {
         Entry(date: date,
               loggedIn: payload?.loggedIn ?? false,
-              items: (payload?.items ?? []).filter { $0.expiresAt > date })
+              items: (payload?.items ?? []).filter { $0.expiresAt > date },
+              week: weekEvents(from: payload, now: date))
     }
 }
 
@@ -129,32 +164,44 @@ struct NoAppointmentView: View {
     }
 }
 
+// 소: 오늘부터 7일 일정 - 시간순 (3개 + 나머지는 개수)
 struct SmallView: View {
     let entry: Entry
     var body: some View {
-        if let item = entry.items.first {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text("다음 약속").font(.system(size: 11, weight: .bold)).foregroundColor(.secondary)
-                    Spacer()
-                    Text(dDayLabel(item.day, now: entry.date))
-                        .font(.system(size: 10, weight: .heavy)).foregroundColor(.white)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Capsule().fill(accent))
+        let events = entry.week
+        let limit = 3
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("일주일").font(.system(size: 15, weight: .heavy)).foregroundColor(accent)
+                Spacer()
+                if !events.isEmpty {
+                    Text("\(events.count)개").font(.system(size: 11, weight: .bold)).foregroundColor(accent)
                 }
-                Spacer(minLength: 0)
-                Text(dayLabel(item.day, now: entry.date)).font(.system(size: 15, weight: .bold)).foregroundColor(accent)
-                Text(item.title).font(.system(size: 24, weight: .heavy)).lineLimit(2).minimumScaleFactor(0.7)
-                if !item.timeLabel.isEmpty {
-                    Text(item.timeLabel).font(.system(size: 15, weight: .semibold)).foregroundColor(.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                }
-                Text(item.places.isEmpty ? "장소 미정" : item.places)
-                    .font(.system(size: 13)).foregroundColor(.secondary).lineLimit(1)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        } else {
-            NoAppointmentView(loggedIn: entry.loggedIn)
+            if events.isEmpty {
+                Spacer(minLength: 0)
+                Text(entry.loggedIn ? "7일 안에 일정이 없어요" : "로그인하면\n일정이 보여요").font(.system(size: 14, weight: .bold))
+                Text("탭해서 앱 열기").font(.system(size: 11, weight: .semibold)).foregroundColor(accent)
+            } else {
+                ForEach(Array(events.prefix(limit).enumerated()), id: \.offset) { _, w in
+                    HStack(spacing: 7) {
+                        RoundedRectangle(cornerRadius: 2).fill(eventColor(w.ev)).frame(width: 4)
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text(w.ev.title).font(.system(size: 14, weight: .bold)).lineLimit(1).minimumScaleFactor(0.8)
+                            Text("\(dayLabel(w.day, now: entry.date)) \(minLabel(w.ev.startMin))")
+                                .font(.system(size: 12, weight: .medium)).foregroundColor(.secondary).lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                if events.count > limit {
+                    Text("+\(events.count - limit)개 더").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary)
+                }
+            }
+            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -559,7 +606,7 @@ struct CatchmeWidget: Widget {
             CatchmeWidgetView(entry: entry).widgetBackground()
         }
         .configurationDisplayName("다가오는 약속")
-        .description("확정된 약속을 날짜순으로 보여줘요.")
+        .description("작은 크기는 일주일 일정, 중간·큰 크기는 확정된 약속을 보여줘요.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
