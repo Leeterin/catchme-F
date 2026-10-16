@@ -20416,6 +20416,12 @@ function formAvailBounds(dk, ranges, idx, lo, hi){
     if(o.e <= r.s) lo = Math.max(lo, o.e);
     else if(o.s >= r.e) hi = Math.min(hi, o.s);
   });
+  // 이미 연 시간을 고칠 때도 시작을 빗금(지난 시간) 쪽으로 끌어 늘리지 못하게 - 원래부터 지난 시간에 걸쳐 있던 막대는 그 시작보다 앞으로만 못 감
+  if(editingEventId){
+    const pastEnd = formAvailPastEnd(dk);
+    lo = Math.max(lo, Math.min(r.s, pastEnd));
+    if(r.e <= pastEnd) hi = Math.min(hi, r.e); // 다 지난 막대는 끝도 빗금 쪽으로 못 늘림
+  }
   return { lo, hi };
 }
 function formAvailPct(min){ return (min - formAvailAxis.s) / (formAvailAxis.e - formAvailAxis.s) * 100; }
