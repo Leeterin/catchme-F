@@ -4714,7 +4714,7 @@
   #panel-schedule.home-clean-mode > .desc,
   #panel-schedule.home-clean-mode #scheduleSegment,
   #panel-schedule.home-clean-mode .week-color-settings-row,
-  #panel-schedule.home-clean-mode #quickAvailEntryBtn{
+  #panel-schedule.home-clean-mode #schedFriendStrip{
     display:none !important;
   }
   #panel-schedule.home-clean-mode::before{
@@ -8334,6 +8334,22 @@
   #panel-schedule .quick-avail-entry .quick-avail-entry-text b{ display:block; font-size:15px; font-weight:800; letter-spacing:-0.02em; }
   #panel-schedule .quick-avail-entry .quick-avail-entry-text small{ margin-top:3px; font-size:12.5px; font-weight:400; color:var(--hm-dim); }
   #panel-schedule .quick-avail-entry-go{ padding:9px 13px; border-radius:13px; background:var(--hm-accent); color:#fff; font-size:13.5px; font-weight:700; white-space:nowrap; }
+  /* 캘린더 탭 친구 프사 줄 - 옆으로 넘겨 보기 */
+  .sched-friend-strip{ display:flex; gap:14px; overflow-x:auto; padding:2px 2px 4px; margin:0 -2px 14px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  .sched-friend-strip::-webkit-scrollbar{ display:none; }
+  .sched-friend{
+    flex-shrink:0; width:60px; display:flex; flex-direction:column; align-items:center; gap:6px; padding:0; border:none; background:none; color:var(--hm-ink); cursor:pointer;
+    user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; position:relative;
+  }
+  .sched-friend-face{ width:56px; height:56px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:var(--hm-card); color:var(--hm-dim); }
+  .sched-friend-face img{ width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; }
+  .sched-friend-face svg:not(.mascot-avatar){ width:22px; height:22px; }
+  .sched-friend-name{ max-width:100%; font-size:12px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sched-friend-edit .sched-friend-name{ color:var(--hm-dim); }
+  .sched-friend-strip.editing .sched-friend[data-friend-id]{ touch-action:none; cursor:grab; }
+  .sched-friend-strip.editing .sched-friend[data-friend-id] .sched-friend-face{ box-shadow:0 0 0 2px var(--hm-accent); }
+  .sched-friend.dragging{ z-index:2; }
+  .sched-friend.dragging .sched-friend-face{ box-shadow:0 8px 20px rgba(0,0,0,0.2); transform:scale(1.08); }
   /* 하루/주/달 + 그룹 칩 한 줄 */
   .sched-toolbar{ display:flex; align-items:center; gap:10px; margin-bottom:14px; min-width:0; }
   #panel-schedule .sched-toolbar .segment-control{ flex-shrink:0; margin:0; padding:4px; gap:2px; border-radius:16px; background:#E6E3DE; }
@@ -9035,12 +9051,8 @@
         <button type="button" class="first-event-import" id="firstEventImportBtn">캘린더 불러오기</button>
       </div>
     </div>
-    <!-- 예약 가능 시간 빠르게 열기 입구 - 항상 보이게 둬서 열어둔 기간이 지나 비었을 때도 바로 다시 열 수 있게 함 -->
-    <button type="button" class="quick-avail-entry" id="quickAvailEntryBtn">
-      <span class="quick-avail-entry-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-      <span class="quick-avail-entry-text"><b id="quickAvailEntryTitle">예약 가능 시간 빠르게 열기</b><small id="quickAvailEntryStatus">요일별로 시간만 정하면 바로 열려요</small></span>
-      <span class="quick-avail-entry-go">빠르게 열기</span>
-    </button>
+    <!-- 친구 프사 한 줄 - 누르면 그 친구 캘린더, 꾹 눌러 끌거나 "순서"를 누르면 순서 바꾸기 (예약 가능 시간 빠르게 열기는 홈/친구 탭에서) -->
+    <div class="sched-friend-strip" id="schedFriendStrip" style="display:none;"></div>
     <!-- 하루/주/달 고르기 + 그룹 필터 칩을 한 줄에 -->
     <div class="sched-toolbar">
     <div class="segment-control" id="scheduleSegment">
@@ -33394,29 +33406,120 @@ function openQuickAvail(){
   ov.classList.add('show');
   pushViewState(closeQuickAvail);
 }
-// 시간표 탭 입구에 지금 얼마나 열려 있는지 보여줌 - 다 떨어졌으면 빨갛게 알려서 다시 열게 함
+// 캘린더 탭 맨 위 - 처음 쓰는 사람에겐 "첫 일정 추가", 그리고 친구 프사 한 줄
 function renderQuickAvailEntry(){
-  const el = document.getElementById('quickAvailEntryStatus');
-  if(!el) return;
-  let n;
   try {
-    // 아직 일정이 하나도 없으면 "첫 일정 추가"만 보여줌 - 예약 가능 시간은 일정을 넣어본 뒤에 발견하게
+    // 아직 일정이 하나도 없으면 "첫 일정 추가"를 보여줌
     const fresh = !SCHEDULE_EVENTS.length;
     document.getElementById('firstEventCard').style.display = fresh ? '' : 'none';
     if(fresh) document.getElementById('firstEventImportBtn').textContent = deviceCalendarPlugin() ? '휴대폰 캘린더 불러오기' : '캘린더 불러오기';
-    document.getElementById('quickAvailEntryBtn').style.display = fresh ? 'none' : '';
-    const end = new Date(TODAY);
-    end.setDate(end.getDate() + 13);
-    n = myAvailableDayCount(TODAY, end);
   } catch(e){ return; } // 앱 시작 직후(변수들이 아직 준비 전)에 불려도 조용히 넘어감
-  // 빨간 경고는 홈 카드 한 곳에서만 - 여기는 버튼 설명이라 담담하게 안내만 함
-  el.classList.remove('warn');
-  // 이미 열어둔 사람에겐 큰 배너가 달력을 밀어내기만 해서, 한 줄짜리로 줄임
-  document.getElementById('quickAvailEntryBtn').classList.toggle('compact', n > 0);
-  document.getElementById('quickAvailEntryTitle').textContent = n > 0 ? `앞으로 2주 중 ${n}일 열어둠` : '아직 열어둔 시간이 없어요';
-  el.textContent = '요일별로 시간만 정하면 바로 열려요';
+  renderSchedFriendStrip();
 }
-document.getElementById('quickAvailEntryBtn').addEventListener('click', openQuickAvail);
+
+// ---------- 캘린더 탭 친구 프사 줄 ----------
+// 순서는 이 폰에 기억함 (저장된 순서에 없는 새 친구는 원래 목록 순서대로 뒤에 붙음)
+function loadSchedFriendOrder(){
+  try { const v = JSON.parse(localStorage.getItem('catchme_sched_friend_order') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; }
+}
+function orderedSchedFriends(){
+  const friends = groupableFriends();
+  const order = loadSchedFriendOrder();
+  const rank = id => { const i = order.indexOf(id); return i < 0 ? order.length + friends.findIndex(f => f.id === id) : i; };
+  return friends.slice().sort((a, b) => rank(a.id) - rank(b.id));
+}
+let schedFriendEditing = false;
+let schedFriendDrag = null;
+let schedFriendSuppressClick = false;
+function renderSchedFriendStrip(){
+  const strip = document.getElementById('schedFriendStrip');
+  if(!strip) return;
+  const friends = orderedSchedFriends();
+  strip.style.display = friends.length ? '' : 'none';
+  if(friends.length < 2) schedFriendEditing = false;
+  strip.classList.toggle('editing', schedFriendEditing);
+  strip.innerHTML = friends.map(f => `
+    <button type="button" class="sched-friend" data-friend-id="${escapeHtml(f.id)}" aria-label="${escapeHtml(f.name)}님 캘린더 보기">
+      <span class="sched-friend-face"${f.avatar ? '' : ` style="background:${f.color}"`}>${f.avatar ? `<img src="${f.avatar}" alt="" draggable="false" />` : MASCOT_AVATAR_SVG}</span>
+      <span class="sched-friend-name">${escapeHtml(f.name)}</span>
+    </button>`).join('')
+    + (friends.length > 1 ? `<button type="button" class="sched-friend sched-friend-edit" id="schedFriendEditBtn">
+      <span class="sched-friend-face">${schedFriendEditing
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg>'}</span>
+      <span class="sched-friend-name">${schedFriendEditing ? '완료' : '순서'}</span>
+    </button>` : '');
+  strip.querySelectorAll('.sched-friend[data-friend-id]').forEach(attachSchedFriendDrag);
+}
+document.getElementById('schedFriendStrip').addEventListener('click', (e) => {
+  if(schedFriendSuppressClick) return;
+  if(e.target.closest('#schedFriendEditBtn')){
+    schedFriendEditing = !schedFriendEditing;
+    renderSchedFriendStrip();
+    if(schedFriendEditing) showToast('프사를 끌어서 순서를 바꿔요');
+    return;
+  }
+  const btn = e.target.closest('.sched-friend[data-friend-id]');
+  if(!btn || schedFriendEditing) return;
+  openFriendCalendar(btn.dataset.friendId, 'calendar');
+});
+// "순서"를 누른 동안은 바로, 평소엔 꾹 눌러서(0.35초) 집어 들고 좌우로 끌기
+function attachSchedFriendDrag(item){
+  let pressTimer = null, startX = 0, startY = 0;
+  const clearPress = () => { if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } };
+  const begin = (e) => {
+    const strip = item.parentElement;
+    schedFriendDrag = { item, strip, pointerId: e.pointerId, grabX: startX - item.getBoundingClientRect().left };
+    item.classList.add('dragging');
+    try{ item.setPointerCapture(e.pointerId); }catch(_){}
+    if(navigator.vibrate) try{ navigator.vibrate(15); }catch(_){}
+  };
+  item.addEventListener('contextmenu', e => e.preventDefault());
+  item.addEventListener('pointerdown', (e) => {
+    if(e.pointerType === 'mouse' && e.button !== 0) return;
+    startX = e.clientX; startY = e.clientY;
+    clearPress();
+    if(schedFriendEditing){ e.preventDefault(); begin(e); return; }
+    pressTimer = setTimeout(() => { pressTimer = null; begin(e); }, 350);
+  });
+  item.addEventListener('pointermove', (e) => {
+    if(pressTimer && Math.hypot(e.clientX - startX, e.clientY - startY) > 8){ clearPress(); return; }
+    const d = schedFriendDrag;
+    if(!d || d.item !== item || e.pointerId !== d.pointerId) return;
+    e.preventDefault();
+    // 손가락이 옆 프사의 가운데를 넘으면 자리를 바꿈
+    const items = [...d.strip.querySelectorAll('.sched-friend[data-friend-id]')];
+    const idx = items.indexOf(item);
+    const prev = items[idx - 1], next = items[idx + 1];
+    if(prev){ const r = prev.getBoundingClientRect(); if(e.clientX < r.left + r.width / 2) d.strip.insertBefore(item, prev); }
+    if(next){ const r = next.getBoundingClientRect(); if(e.clientX > r.left + r.width / 2) d.strip.insertBefore(item, next.nextSibling); }
+    // 끝에 가까우면 줄을 같이 밀어줌
+    const sr = d.strip.getBoundingClientRect();
+    if(e.clientX < sr.left + 24) d.strip.scrollLeft -= 8;
+    else if(e.clientX > sr.right - 24) d.strip.scrollLeft += 8;
+    // 집어 든 프사는 손가락을 따라감
+    item.style.transform = '';
+    const left = item.getBoundingClientRect().left;
+    item.style.transform = `translateX(${e.clientX - d.grabX - left}px)`;
+  });
+  const end = () => {
+    clearPress();
+    const d = schedFriendDrag;
+    if(!d || d.item !== item) return;
+    schedFriendDrag = null;
+    item.classList.remove('dragging');
+    item.style.transform = '';
+    // 끌고 난 뒤 손을 떼면서 생기는 클릭으로 캘린더가 열리지 않게
+    schedFriendSuppressClick = true;
+    setTimeout(() => { schedFriendSuppressClick = false; }, 300);
+    const order = [...d.strip.querySelectorAll('.sched-friend[data-friend-id]')].map(x => x.dataset.friendId);
+    try { localStorage.setItem('catchme_sched_friend_order', JSON.stringify(order)); } catch(_){}
+  };
+  item.addEventListener('pointerup', end);
+  item.addEventListener('pointercancel', end);
+}
+// 집어 든 동안은 화면이 스크롤되지 않게 (iOS는 touchmove를 막아야 함)
+document.addEventListener('touchmove', (e) => { if(schedFriendDrag) e.preventDefault(); }, { passive: false });
 // 캘린더 제목 옆 아이콘 - 불러오기는 설정의 "캘린더 불러오기"와 같고, +는 지금 보고 있는 보기(하루/주/달)의 일정 추가 버튼을 그대로 누름
 document.getElementById('schedHeadImportBtn').addEventListener('click', () => openCalImport('schedule_header'));
 document.getElementById('schedHeadAddBtn').addEventListener('click', () => {
