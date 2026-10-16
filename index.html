@@ -22209,7 +22209,9 @@ function renderWeekView(){
 
         // 블록의 실제 분 단위 시작/종료 - 매칭된 실제 일정이 있으면 그 정확한 시각을 쓰고(예: 9시10분~10시면
         // 그만큼만 작게 표시), 못 찾은 드문 경우엔 예전처럼 정시 경계로 계산함
-        const blockRange = matchedEv ? getEventDisplayRangeForDate(matchedEv, d) : { startMin: DAY_HOURS[i] * 60, endMin: (DAY_HOURS[j] + 1) * 60 };
+        // 오늘 예약 가능 시간은 한달·하루 보기처럼 이미 지난 부분을 빼고 그림 - 다 지났으면 칸을 아예 안 그림
+        const blockRange = matchedEv ? availRangeFromNow(matchedEv, d) : { startMin: DAY_HOURS[i] * 60, endMin: (DAY_HOURS[j] + 1) * 60 };
+        if(!blockRange){ i = j + 1; continue; }
         const blockTopPx = (blockRange.startMin / 60 - minIdx) * WEEK_ROW_H;
         const blockHeightPx = (blockRange.endMin - blockRange.startMin) / 60 * WEEK_ROW_H;
 
