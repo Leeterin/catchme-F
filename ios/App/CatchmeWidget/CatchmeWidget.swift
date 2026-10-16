@@ -2,7 +2,7 @@ import WidgetKit
 import SwiftUI
 
 // 캐치미 홈 화면 위젯 - 다가오는 약속을 크기별로 보여줌
-// 소: 바로 다음 약속 1개 / 중: 3개 / 대: 다음 약속 크게 + 5개 더
+// 소: 바로 다음 약속 1개 / 중: 3개 / 대: 다음 약속 크게 + 4개 더
 // 데이터는 앱(웹 화면)이 CatchmeWidgetPlugin으로 App Group에 넣어둔 JSON을 읽음
 
 let appGroup = "group.com.meetzip.app"
@@ -143,13 +143,13 @@ struct SmallView: View {
                         .background(Capsule().fill(accent))
                 }
                 Spacer(minLength: 0)
-                Text(dayLabel(item.day, now: entry.date)).font(.system(size: 13, weight: .bold)).foregroundColor(accent)
-                Text(item.title).font(.system(size: 18, weight: .heavy)).lineLimit(1)
+                Text(dayLabel(item.day, now: entry.date)).font(.system(size: 15, weight: .bold)).foregroundColor(accent)
+                Text(item.title).font(.system(size: 24, weight: .heavy)).lineLimit(2).minimumScaleFactor(0.7)
                 if !item.timeLabel.isEmpty {
-                    Text(item.timeLabel).font(.system(size: 12, weight: .semibold)).foregroundColor(.secondary).lineLimit(1)
+                    Text(item.timeLabel).font(.system(size: 15, weight: .semibold)).foregroundColor(.secondary).lineLimit(1).minimumScaleFactor(0.8)
                 }
                 Text(item.places.isEmpty ? "장소 미정" : item.places)
-                    .font(.system(size: 11)).foregroundColor(.secondary).lineLimit(1)
+                    .font(.system(size: 13)).foregroundColor(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
@@ -164,12 +164,12 @@ struct Row: View {
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
             Text(dayLabel(item.day, now: now))
-                .font(.system(size: 12, weight: .bold)).foregroundColor(accent)
-                .frame(width: 44, alignment: .leading)
+                .font(.system(size: 14, weight: .bold)).foregroundColor(accent)
+                .frame(width: 52, alignment: .leading)
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.title).font(.system(size: 14, weight: .bold)).lineLimit(1)
+                Text(item.title).font(.system(size: 17, weight: .bold)).lineLimit(1).minimumScaleFactor(0.8)
                 Text([item.timeLabel, item.places.isEmpty ? "장소 미정" : item.places].filter { !$0.isEmpty }.joined(separator: " · "))
-                    .font(.system(size: 11)).foregroundColor(.secondary).lineLimit(1)
+                    .font(.system(size: 13)).foregroundColor(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
         }
@@ -180,9 +180,9 @@ struct Header: View {
     let count: Int
     var body: some View {
         HStack {
-            Text("다가오는 약속").font(.system(size: 13, weight: .heavy))
+            Text("다가오는 약속").font(.system(size: 14, weight: .heavy))
             Spacer()
-            Text("\(count)개").font(.system(size: 11, weight: .bold)).foregroundColor(accent)
+            Text("\(count)개").font(.system(size: 12, weight: .bold)).foregroundColor(accent)
         }
     }
 }
@@ -193,7 +193,7 @@ struct MediumView: View {
         if entry.items.isEmpty {
             NoAppointmentView(loggedIn: entry.loggedIn)
         } else {
-            VStack(alignment: .leading, spacing: 7) {
+            VStack(alignment: .leading, spacing: 6) {
                 Header(count: entry.items.count)
                 ForEach(entry.items.prefix(3), id: \.self) { Row(item: $0, now: entry.date) }
                 Spacer(minLength: 0)
@@ -211,18 +211,18 @@ struct LargeView: View {
                 // 바로 다음 약속은 크게
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
-                        Text(dayLabel(first.day, now: entry.date)).font(.system(size: 13, weight: .bold)).foregroundColor(accent)
+                        Text(dayLabel(first.day, now: entry.date)).font(.system(size: 15, weight: .bold)).foregroundColor(accent)
                         Spacer()
-                        Text(dDayLabel(first.day, now: entry.date)).font(.system(size: 11, weight: .heavy)).foregroundColor(accent)
+                        Text(dDayLabel(first.day, now: entry.date)).font(.system(size: 13, weight: .heavy)).foregroundColor(accent)
                     }
-                    Text(first.title).font(.system(size: 20, weight: .heavy)).lineLimit(1)
+                    Text(first.title).font(.system(size: 26, weight: .heavy)).lineLimit(1).minimumScaleFactor(0.7)
                     Text([first.timeLabel, first.places.isEmpty ? "장소 미정" : first.places].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.system(size: 12, weight: .medium)).foregroundColor(.secondary).lineLimit(2)
+                        .font(.system(size: 15, weight: .medium)).foregroundColor(.secondary).lineLimit(2)
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 14).fill(accent.opacity(0.12)))
-                ForEach(entry.items.dropFirst().prefix(5), id: \.self) { Row(item: $0, now: entry.date) }
+                ForEach(entry.items.dropFirst().prefix(4), id: \.self) { Row(item: $0, now: entry.date) }
                 Spacer(minLength: 0)
             }
         } else {
@@ -247,9 +247,10 @@ extension View {
     // iOS 17부터는 위젯 배경을 containerBackground로 지정해야 함
     @ViewBuilder func widgetBackground() -> some View {
         if #available(iOSApplicationExtension 17.0, *) {
-            containerBackground(Color(UIColor.systemBackground), for: .widget)
+            // 기본 여백(16)이 넓어서 일정 칸이 작아짐 - 6씩 줄여 내용을 크게
+            padding(-6).containerBackground(Color(UIColor.systemBackground), for: .widget)
         } else {
-            padding().background(Color(UIColor.systemBackground))
+            padding(10).background(Color(UIColor.systemBackground))
         }
     }
 }
@@ -358,7 +359,7 @@ struct CalLoggedOutView: View {
     }
 }
 
-// 한달 달력 - 중: 날짜 + 색 점 / 대: 날짜 + 일정 이름 2개까지
+// 한달 달력 - 칸에 들어가는 만큼 일정 이름을 넣고, 칸이 작으면 색 점
 struct MonthView: View {
     @Environment(\.widgetFamily) var family
     let entry: CalEntry
@@ -373,15 +374,15 @@ struct MonthView: View {
         let large = family == .systemLarge
         let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
 
-        VStack(spacing: large ? 4 : 2) {
+        VStack(spacing: large ? 2 : 1) {
             HStack {
-                Text("\(cal.component(.month, from: now))월").font(.system(size: large ? 16 : 13, weight: .heavy))
+                Text("\(cal.component(.month, from: now))월").font(.system(size: large ? 17 : 14, weight: .heavy))
                 Spacer()
                 Text("MEETZIP").font(.system(size: 10, weight: .heavy)).foregroundColor(accent)
             }
             HStack(spacing: 0) {
                 ForEach(0..<7, id: \.self) { i in
-                    Text(weekdays[i]).font(.system(size: 9, weight: .bold))
+                    Text(weekdays[i]).font(.system(size: 10, weight: .bold))
                         .foregroundColor(i == 0 ? .red : .secondary)
                         .frame(maxWidth: .infinity)
                 }
@@ -414,41 +415,52 @@ struct MonthCell: View {
     var body: some View {
         let busy = events.filter { $0.kind != "avail" }
         let hasAvail = events.contains { $0.kind == "avail" }
-        VStack(spacing: 1) {
-            Text("\(n)")
-                .font(.system(size: large ? 11 : 10, weight: isToday ? .heavy : .semibold))
-                .foregroundColor(isToday ? .white : (isSunday ? .red : .primary))
-                .frame(width: large ? 18 : 16, height: large ? 18 : 16)
-                .background(Circle().fill(isToday ? accent : Color.clear))
-            if large {
-                ForEach(Array(busy.prefix(2).enumerated()), id: \.offset) { _, ev in
-                    Text(ev.title).font(.system(size: 7.5, weight: .semibold)).foregroundColor(.white)
-                        .lineLimit(1).padding(.horizontal, 1)
-                        .frame(maxWidth: .infinity)
-                        .background(RoundedRectangle(cornerRadius: 2).fill(eventColor(ev)))
-                }
-                if busy.count > 2 {
-                    Text("+\(busy.count - 2)").font(.system(size: 7, weight: .bold)).foregroundColor(.secondary)
-                } else if hasAvail {
-                    Circle().fill(accent).frame(width: 4, height: 4)
-                }
-            } else {
-                // 일정은 색 점, 예약 가능한 날은 테두리 점
-                HStack(spacing: 2) {
-                    ForEach(Array(busy.prefix(3).enumerated()), id: \.offset) { _, ev in
-                        Circle().fill(eventColor(ev)).frame(width: 3.5, height: 3.5)
+        let numSize: CGFloat = large ? 17 : 15
+        // 칸 높이에 들어가는 만큼 일정 이름을 크게 넣음 (안 들어가면 색 점)
+        GeometryReader { geo in
+            let chipH: CGFloat = large ? 14 : 12
+            let room = Int((geo.size.height - numSize - 1) / (chipH + 1))
+            let slots = busy.count > room ? max(room - 1, 0) : room
+            VStack(spacing: 1) {
+                Text("\(n)")
+                    .font(.system(size: large ? 12 : 11, weight: isToday ? .heavy : .semibold))
+                    .foregroundColor(isToday ? .white : (isSunday ? .red : .primary))
+                    .frame(width: numSize, height: numSize)
+                    .background(Circle().fill(isToday ? accent : Color.clear))
+                if room >= 1 {
+                    ForEach(Array(busy.prefix(slots).enumerated()), id: \.offset) { _, ev in
+                        Text(ev.title).font(.system(size: large ? 10.5 : 9, weight: .bold)).foregroundColor(.white)
+                            .lineLimit(1).minimumScaleFactor(0.75).padding(.horizontal, 1)
+                            .frame(maxWidth: .infinity).frame(height: chipH)
+                            .background(RoundedRectangle(cornerRadius: 3).fill(eventColor(ev)))
                     }
-                    if hasAvail && busy.count < 3 { Circle().stroke(accent, lineWidth: 1).frame(width: 3.5, height: 3.5) }
+                    if busy.count > slots {
+                        Text("+\(busy.count - slots)").font(.system(size: large ? 10 : 9, weight: .bold)).foregroundColor(.secondary)
+                            .frame(height: chipH)
+                    } else if hasAvail && busy.count < room {
+                        Circle().fill(accent).frame(width: 5, height: 5)
+                    }
+                } else {
+                    // 일정은 색 점, 예약 가능한 날은 테두리 점
+                    HStack(spacing: 2) {
+                        ForEach(Array(busy.prefix(3).enumerated()), id: \.offset) { _, ev in
+                            Circle().fill(eventColor(ev)).frame(width: 5, height: 5)
+                        }
+                        if hasAvail && busy.count < 3 { Circle().stroke(accent, lineWidth: 1).frame(width: 5, height: 5) }
+                    }
+                    .frame(height: 5)
                 }
-                .frame(height: 4)
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.horizontal, 1)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 }
 
-// 오늘 일정 - 시간순 목록 (소 3개 / 중 4개 / 대 9개)
+// 오늘 일정 - 시간순 목록 (소 3개 / 중 3개 / 대 7개)
 struct TodayView: View {
     @Environment(\.widgetFamily) var family
     let entry: CalEntry
@@ -458,13 +470,13 @@ struct TodayView: View {
         let cal = Calendar.current
         let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
         let events = entry.events(on: now)
-        let limit = family == .systemSmall ? 3 : (family == .systemMedium ? 4 : 9)
+        let limit = family == .systemSmall ? 3 : (family == .systemMedium ? 3 : 7)
 
         VStack(alignment: .leading, spacing: family == .systemSmall ? 5 : 7) {
             HStack(alignment: .firstTextBaseline) {
-                Text("오늘").font(.system(size: 13, weight: .heavy)).foregroundColor(accent)
+                Text("오늘").font(.system(size: 15, weight: .heavy)).foregroundColor(accent)
                 Text("\(cal.component(.month, from: now))/\(cal.component(.day, from: now)) \(weekdays[cal.component(.weekday, from: now) - 1])")
-                    .font(.system(size: 12, weight: .bold)).foregroundColor(.secondary)
+                    .font(.system(size: 13, weight: .bold)).foregroundColor(.secondary)
                 Spacer()
                 if family != .systemSmall && !events.isEmpty {
                     Text("\(events.count)개").font(.system(size: 11, weight: .bold)).foregroundColor(accent)
@@ -493,11 +505,11 @@ struct TodayRow: View {
     let compact: Bool
     var body: some View {
         HStack(spacing: 7) {
-            RoundedRectangle(cornerRadius: 2).fill(eventColor(ev)).frame(width: 3)
+            RoundedRectangle(cornerRadius: 2).fill(eventColor(ev)).frame(width: 4)
             VStack(alignment: .leading, spacing: 0) {
-                Text(ev.title).font(.system(size: compact ? 12 : 13, weight: .bold)).lineLimit(1)
+                Text(ev.title).font(.system(size: compact ? 14 : 17, weight: .bold)).lineLimit(1).minimumScaleFactor(0.8)
                 Text("\(minLabel(ev.startMin))~\(minLabel(ev.endMin))")
-                    .font(.system(size: compact ? 10 : 11, weight: .medium)).foregroundColor(.secondary).lineLimit(1)
+                    .font(.system(size: compact ? 12 : 13, weight: .medium)).foregroundColor(.secondary).lineLimit(1)
             }
             Spacer(minLength: 0)
         }
