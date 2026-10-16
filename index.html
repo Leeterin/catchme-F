@@ -8925,8 +8925,10 @@
     .chat-room-view, .calendar-match-view, .event-form-view, .friend-calendar-view).active.mz-back-in{
     animation-name:mzScreenBack;
   }
-  /* 손가락으로 밀어서 뒤로가는 중에는 화면이 이미 손을 따라 움직이니 밑에 깔리는 화면은 그대로 */
-  body.feed-swipe-active .tab-panel *, body:has(.chat-room-view.swiping) .tab-panel *, body:has(.chat-room-view.swiping) .tab-panel{ animation:none !important; }
+  /* 손가락으로 밀어서 뒤로가는 중에는 화면이 이미 손을 따라 움직이니 밑에 깔리는 화면은 그대로.
+     animation:none으로 끄면 밀기가 끝나고 풀리는 순간 나타나기 애니메이션(투명→보임)이 처음부터 다시 돌아서
+     밑 화면이 하얗게 번쩍였음 - 길이만 0으로 해서 바로 끝난 걸로 치면 풀려도 다시 안 돎 */
+  body.feed-swipe-active .tab-panel *, body:has(.chat-room-view.swiping) .tab-panel *, body:has(.chat-room-view.swiping) .tab-panel{ animation-duration:0s !important; animation-delay:0s !important; }
   /* 확인 창·선택 창 - 배경은 흐려지고 카드는 톡 튀어나옴 */
   .mini-confirm-overlay.show, .app-confirm-overlay:not([hidden]), .custom-picker-overlay, .image-preview-overlay.show,
   .week-block-sheet-overlay:not([hidden]), .home-widget-overlay.show, .feed-share-overlay.show,
