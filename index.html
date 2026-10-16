@@ -517,6 +517,8 @@
     flex-shrink:0;
     overflow:hidden;
   }
+  /* 사진 없는 프로필 - 밋집 마스코트(집 캐릭터). 동그라미 배경색은 각 사람 색 그대로 */
+  .mascot-avatar{ width:100%; height:100%; display:block; border-radius:50%; }
   .placeholder-avatar img,
   .profile-avatar-lg img{
     width:100%;
@@ -8539,6 +8541,8 @@
   #myProfileView, body.dark-mode #myProfileView{ --neu-bg:var(--hm-card); --neu-ink:var(--hm-ink); --neu-dim:var(--hm-dim); }
   #myProfileView .edit-icon-btn, #myProfileView .mp-pill-btn{ background:var(--hm-card); box-shadow:none; }
   #myProfileView .profile-avatar-lg{ background:var(--hm-accent-soft); color:var(--hm-accent); border-color:var(--hm-card); box-shadow:none; }
+  /* 사진 없을 때 내 프로필 마스코트 - 연한 배경에선 흰 집이 안 보여서 진한 포인트색 위에 그림 */
+  #myProfileView .profile-avatar-lg:has(.mascot-avatar), .settings-profile-avatar:has(.mascot-avatar){ background:var(--hm-accent); }
   #myProfileView .mp-card{ border-radius:24px; box-shadow:none; }
   #myProfileView .mp-info-row{ background:var(--hm-well); box-shadow:none; border-radius:16px; }
   #myProfileView .mp-input-group .search-input{ background:var(--hm-well); box-shadow:none; border-radius:14px; }
@@ -11891,6 +11895,8 @@ function minutesAgo(n){
 const WEEKDAY_KO = ["일","월","화","수","목","금","토"];
 
 // ---------- 채팅(예약/제안/장소/핫플 등)에서 쓰는 라인 아이콘 (이모지 대체용) ----------
+// 사진 없는 프로필에 그리는 밋집 마스코트 - 흰 집 캐릭터, 배경은 그 사람 색
+const MASCOT_AVATAR_SVG = '<svg class="mascot-avatar" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 21 L85 50 Q88 54 83 55 H17 Q12 54 15 50 Z" fill="#fff" fill-opacity=".55"/><rect x="65" y="25" width="9" height="15" rx="2.5" fill="#fff" fill-opacity=".55"/><rect x="23" y="47" width="54" height="64" rx="13" fill="#fff"/><circle cx="40" cy="67" r="4.6" fill="#33364A"/><circle cx="60" cy="67" r="4.6" fill="#33364A"/><circle cx="41.6" cy="65.3" r="1.5" fill="#fff"/><circle cx="61.6" cy="65.3" r="1.5" fill="#fff"/><ellipse cx="32" cy="76" rx="5" ry="3.2" fill="#FF8FA3" fill-opacity=".55"/><ellipse cx="68" cy="76" rx="5" ry="3.2" fill="#FF8FA3" fill-opacity=".55"/><path d="M45 75 Q50 80 55 75" fill="none" stroke="#33364A" stroke-width="3" stroke-linecap="round"/></svg>';
 const ICO = {
   // 이모티콘 대신 쓰는 라인 아이콘 (글자 크기를 따라감)
   carLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><path d="M3 12h18"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>',
@@ -12544,7 +12550,7 @@ function renderHomeFriendMatches(){
     const f = x.friend;
     const avatar = f.avatar
       ? `<span class="home-match-avatar${i === goldenIdx ? ' golden' : ''}"><img src="${f.avatar}" alt="" /></span>`
-      : `<span class="home-match-avatar${i === goldenIdx ? ' golden' : ''}" style="background:${f.color}">${escapeHtml((f.name || '?')[0])}</span>`;
+      : `<span class="home-match-avatar${i === goldenIdx ? ' golden' : ''}" style="background:${f.color}">${MASCOT_AVATAR_SVG}</span>`;
     const chips = x.slots.slice(0, HOME_MATCH_SLOTS_MAX).map(sl =>
       `<button type="button" class="home-match-slot" data-row="${i}" data-date="${sl.date}" title="${escapeHtml(homeMatchSlotLabel(sl))}">${escapeHtml(homeMatchSlotShort(sl))}</button>`).join('');
     const more = x.slots.length > HOME_MATCH_SLOTS_MAX ? `<button type="button" class="home-match-more" data-row="${i}">+${x.slots.length - HOME_MATCH_SLOTS_MAX}</button>` : '';
@@ -12932,7 +12938,7 @@ function renderHomeMiniWidgets(){
   const friends = groupableFriends();
   const faces = friends.slice(0, 4).map(f => f.avatar
     ? `<span class="hp-face"><img src="${f.avatar}" alt="" /></span>`
-    : `<span class="hp-face" style="background:${f.color}">${escapeHtml((f.name || '?')[0])}</span>`).join('');
+    : `<span class="hp-face" style="background:${f.color}">${MASCOT_AVATAR_SVG}</span>`).join('');
   document.getElementById('homeFriendsCard').innerHTML = `
     <span class="hm-mini-label">친구</span>
     <b class="hm-mini-big">${friends.length}<small>명</small></b>
@@ -13256,7 +13262,7 @@ function renderHomePlanCta(){
   document.getElementById('homePlanCtaGo').textContent = HOME_PLAN_CTA[mode].go;
   const faces = FRIENDS.slice(0, HOME_PLAN_FACES_MAX).map(f => f.avatar
     ? `<span class="hp-face"><img src="${f.avatar}" alt="" /></span>`
-    : `<span class="hp-face" style="background:${f.color}">${escapeHtml((f.name || '?')[0])}</span>`).join('');
+    : `<span class="hp-face" style="background:${f.color}">${MASCOT_AVATAR_SVG}</span>`).join('');
   document.getElementById('homePlanCtaFaces').innerHTML = faces + '<span class="hp-face hp-face-add">+</span>';
 }
 document.getElementById('homePlanCta').addEventListener('click', () => {
@@ -13566,7 +13572,7 @@ function renderSettingsMenu(){
   const profile = document.createElement('div');
   profile.className = 'settings-profile-card';
   profile.innerHTML = `
-    <div class="settings-profile-avatar">${img ? `<img src="${escapeHtml(img)}" alt="" />` : escapeHtml(name[0])}</div>
+    <div class="settings-profile-avatar">${img ? `<img src="${escapeHtml(img)}" alt="" />` : MASCOT_AVATAR_SVG}</div>
     <div class="settings-profile-text"><b>${escapeHtml(name)}</b><span>@${escapeHtml(myProfileData.id || '')} · 계정·로그인</span></div>
     <div class="settings-menu-chevron">&#8250;</div>`;
   profile.addEventListener('click', () => openSettingsDetail('account'));
@@ -13680,7 +13686,7 @@ async function renderBlockedList(){
       const row = document.createElement('div');
       row.className = 'search-result-row';
       row.innerHTML = `
-        <div class="placeholder-avatar" style="background:${colorForFriendId(user.id)}">${escapeHtml(user.name[0])}</div>
+        <div class="placeholder-avatar" style="background:${colorForFriendId(user.id)}">${MASCOT_AVATAR_SVG}</div>
         <div class="search-result-info"><b>${escapeHtml(user.name)}</b><span>@${escapeHtml(user.username)}</span></div>
         <button type="button" class="search-add-btn" data-username="${escapeHtml(user.username)}">차단 해제</button>
       `;
@@ -14451,7 +14457,7 @@ function renderMeetupDetail(){
 
   const participantsHtml = meetup.participants.map(p => `
     <div class="meetup-participant-row">
-      <div class="placeholder-avatar" style="background:${p.color}">${escapeHtml(p.name[0])}</div>
+      <div class="placeholder-avatar" style="background:${p.color}">${MASCOT_AVATAR_SVG}</div>
       <div class="placeholder-text"><b>${escapeHtml(p.name)}</b>${p.intro ? `<span>${escapeHtml(p.intro)}</span>` : ''}</div>
     </div>
   `).join('');
@@ -14672,7 +14678,7 @@ async function renderMeetupRequests(){
     }
     body.innerHTML = requests.map(r => `
       <div class="meetup-request-row" data-user-id="${r.userId}">
-        <div class="placeholder-avatar" style="background:${colorForFriendId(r.userId)}">${r.hasAvatar ? `<img loading="lazy" src="${cachedAvatarUrl(r.userId)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />` : escapeHtml(r.name[0])}</div>
+        <div class="placeholder-avatar" style="background:${colorForFriendId(r.userId)}">${r.hasAvatar ? `<img loading="lazy" src="${cachedAvatarUrl(r.userId)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />` : MASCOT_AVATAR_SVG}</div>
         <div class="meetup-request-info"><b>${escapeHtml(r.name)}</b><div class="bio">@${escapeHtml(r.username)}</div>${r.intro ? `<div class="bio" style="margin-top:2px;">${escapeHtml(r.intro)}</div>` : ''}</div>
         <div class="meetup-request-actions">
           <button class="meetup-request-approve-btn" data-action="approve">수락</button>
@@ -15024,7 +15030,7 @@ function feedSelfReviewAvatarHtml(){
   if(img){
     return `<div class="placeholder-avatar"><img loading="lazy" src="${img}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
   }
-  return `<div class="placeholder-avatar" style="background:${myProfileData.color}">${escapeHtml(name[0])}</div>`;
+  return `<div class="placeholder-avatar" style="background:${myProfileData.color}">${MASCOT_AVATAR_SVG}</div>`;
 }
 
 // 작성자 이름/등급뱃지를 누르면, 그 사람이 지금까지 쓴 리뷰를 전부 모아서 보여줌 - 내 이름을 눌렀거나
@@ -15262,7 +15268,7 @@ function renderFeedSavedView(container, q){
 }
 
 // 게시물 작성자 아바타 - 리뷰용 사진을 따로 설정해뒀으면 그걸, 아니면 실명 프로필 사진을,
-// 그것도 없으면 다른 곳과 동일하게 이름(리뷰 닉네임 우선) 첫 글자 이니셜을 색상 원으로 보여줌 (목록 카드/상세보기 공용)
+// 그것도 없으면 다른 곳과 동일하게 색상 원에 밋집 마스코트를 보여줌 (목록 카드/상세보기 공용)
 function feedAuthorAvatarHtml(author){
   if(author && author.hasReviewAvatar){
     return `<div class="placeholder-avatar"><img loading="lazy" src="${cachedReviewAvatarUrl(author.id)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
@@ -15271,9 +15277,7 @@ function feedAuthorAvatarHtml(author){
     return `<div class="placeholder-avatar"><img loading="lazy" src="${cachedAvatarUrl(author.id)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>`;
   }
   const key = author ? (author.username || author.id) : '?';
-  const displayName = feedAuthorDisplayName(author);
-  const initial = displayName ? displayName[0] : '?';
-  return `<div class="placeholder-avatar" style="background:${colorForFriendId(key)}">${escapeHtml(initial)}</div>`;
+  return `<div class="placeholder-avatar" style="background:${colorForFriendId(key)}">${MASCOT_AVATAR_SVG}</div>`;
 }
 
 // 게시물 하나를 카드로 그림 - 인스타그램 피드처럼 사진이 먼저 크게 나오고, 그 아래 작성자/장소태그/별점/한줄소개 순
@@ -15816,8 +15820,8 @@ function openFeedShareFriendPicker(post){
   const roomUsernames = new Set(rooms.map(([, r]) => r.counterpartUsername).filter(Boolean));
   const friendsNoRoom = FRIENDS.filter(f => !roomUsernames.has(f.username));
   feedShareTargets = [
-    ...rooms.map(([id, r]) => ({ key: 'room:' + id, name: r.name || '채팅방', avatar: r.avatar, color: r.color, initial: r.initial || (r.name || '')[0] || '', count: r.isGroup && r.members ? r.members.length : 0 })),
-    ...friendsNoRoom.map(f => ({ key: 'friend:' + f.id, name: f.name || '', avatar: f.avatar, color: f.color, initial: (f.name || '')[0] || '' })),
+    ...rooms.map(([id, r]) => ({ key: 'room:' + id, name: r.name || '채팅방', avatar: r.avatar, color: r.color, initial: r.initial || (r.name || '')[0] || '', person: !r.isGroup, count: r.isGroup && r.members ? r.members.length : 0 })),
+    ...friendsNoRoom.map(f => ({ key: 'friend:' + f.id, name: f.name || '', avatar: f.avatar, color: f.color, initial: (f.name || '')[0] || '', person: true })),
   ];
   renderFeedShareTargets();
   updateFeedShareCompose();
@@ -15833,7 +15837,7 @@ function renderFeedShareTargets(){
   }
   list.innerHTML = shown.map(t => `
     <div class="fss-cell${feedShareSelected.has(t.key) ? ' selected' : ''}" data-key="${escapeHtml(t.key)}">
-      <div class="fss-avatar" style="${t.avatar ? '' : `background:${t.color || 'var(--accent)'};`}">${t.avatar ? `<img src="${t.avatar}" alt="" />` : escapeHtml(t.initial)}</div>
+      <div class="fss-avatar" style="${t.avatar ? '' : `background:${t.color || 'var(--accent)'};`}">${t.avatar ? `<img src="${t.avatar}" alt="" />` : (t.person ? MASCOT_AVATAR_SVG : escapeHtml(t.initial))}</div>
       <div class="fss-name">${escapeHtml(t.name)}${t.count ? ` <span style="color:var(--text-dim);">${t.count}</span>` : ''}</div>
     </div>
   `).join('');
@@ -17554,7 +17558,7 @@ function renderMyProfile(){
     avatar.innerHTML = `<img src="${myProfileData.profileImageUrl}" alt="프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
   } else {
     avatar.innerHTML = '';
-    avatar.textContent = myProfileData.name[0];
+    avatar.innerHTML = MASCOT_AVATAR_SVG;
     avatar.style.background = ''; // 색은 CSS - 밝은 화면 하늘색, 다크 모드 회색
   }
 
@@ -18007,7 +18011,7 @@ function renderFeedReviewProfileCard(){
     avatarEl.innerHTML = `<img src="${myProfileData.reviewAvatarUrl || myProfileData.profileImageUrl}" alt="리뷰용 프로필" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
   } else {
     avatarEl.innerHTML = '';
-    avatarEl.textContent = (myProfileData.reviewNickname || myProfileData.name || '?')[0];
+    avatarEl.innerHTML = MASCOT_AVATAR_SVG;
     avatarEl.style.background = myProfileData.color;
   }
 }
@@ -22854,7 +22858,7 @@ function renderIncomingFriendRequests(){
     const card = document.createElement('div');
     card.className = 'suggest-card';
     card.innerHTML = `
-      <div class="placeholder-avatar" style="background:${user.color}">${escapeHtml(user.name[0])}</div>
+      <div class="placeholder-avatar" style="background:${user.color}">${MASCOT_AVATAR_SVG}</div>
       <div class="suggest-info">
         <div class="suggest-name-row"><b>${escapeHtml(user.name)}</b></div>
         <span class="bio">${escapeHtml(user.bio)}</span>
@@ -23003,7 +23007,7 @@ function renderFriendsList(){
       const row = document.createElement('div');
       row.className = 'placeholder-row';
       row.style.opacity = '0.6';
-      const avatarInner = req.avatar ? `<img loading="lazy" src="${req.avatar}" alt="${escapeHtml(req.name)}" />` : escapeHtml(req.name[0]);
+      const avatarInner = req.avatar ? `<img loading="lazy" src="${req.avatar}" alt="${escapeHtml(req.name)}" />` : MASCOT_AVATAR_SVG;
       row.innerHTML = `
         <div class="placeholder-avatar" style="${req.avatar ? '' : `background:${req.color}`}">${avatarInner}</div>
         <div class="placeholder-text" style="flex:1;"><b>${escapeHtml(req.name)}</b><span>수락 대기 중</span></div>
@@ -23055,7 +23059,7 @@ function renderFriendsList(){
     row.className = 'placeholder-row';
     const avatarInner = friend.avatar
       ? `<img loading="lazy" src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />`
-      : escapeHtml(friend.name[0]);
+      : MASCOT_AVATAR_SVG;
     // 오른쪽: 이번 주 서로 겹치게 열어둔 첫 시간(홈 "시간 맞는 친구"와 같은 데이터) + 바로 약속 잡기 버튼
     const slot = friendListMatchLabel(friend);
     row.innerHTML = `
@@ -23111,7 +23115,7 @@ function renderFriendsTopParts(){
     const hours = Math.round(mins / 6) / 10;
     meEl.innerHTML = `
       <button type="button" class="fl-me-card" id="friendsMeCardBtn">
-        <span class="placeholder-avatar fl-me-avatar"${img ? '' : ` style="background:${myProfileData.color || 'var(--hm-accent-soft)'}"`}>${img ? `<img src="${img}" alt="" />` : escapeHtml(name[0])}</span>
+        <span class="placeholder-avatar fl-me-avatar"${img ? '' : ` style="background:${myProfileData.color || 'var(--hm-accent-soft)'}"`}>${img ? `<img src="${img}" alt="" />` : MASCOT_AVATAR_SVG}</span>
         <span class="placeholder-text" style="flex:1;"><b>${escapeHtml(name)} <small>나</small></b><span>${days.length ? `${escapeHtml(days.join('·'))} 열어둠` : '이번 주 열어둔 시간이 없어요'}</span></span>
         <span class="fl-slot${days.length ? '' : ' off'}">${days.length ? `${hours}시간` : '시간 열기'}</span>
       </button>`;
@@ -23150,7 +23154,7 @@ function openFriendProfile(friendId){
     avatarEl.innerHTML = `<img src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />`;
   } else {
     avatarEl.style.background = friend.color;
-    avatarEl.innerHTML = escapeHtml(friend.name[0]);
+    avatarEl.innerHTML = MASCOT_AVATAR_SVG;
   }
   document.getElementById('profileName').textContent = friend.name;
   document.getElementById('profileStatus').textContent = friend.status;
@@ -23476,7 +23480,7 @@ function renderGroupMemberCheckList(group){
   FRIENDS.forEach(friend => {
     const row = document.createElement('div');
     row.className = 'group-member-row';
-    const avatarInner = friend.avatar ? `<img loading="lazy" src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />` : escapeHtml(friend.name[0]);
+    const avatarInner = friend.avatar ? `<img loading="lazy" src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />` : MASCOT_AVATAR_SVG;
     row.innerHTML = `
       <div class="placeholder-avatar" style="${friend.avatar ? '' : `background:${friend.color}`}">${avatarInner}</div>
       <div class="placeholder-text" style="flex:1;"><b>${escapeHtml(friend.name)}</b><span>${escapeHtml(friend.status)}</span></div>
@@ -25150,7 +25154,7 @@ async function renderSearchResults(query){
       const incoming = INCOMING_FRIEND_REQUESTS.find(f => f.id === user.id);
       const btnLabel = isFriend ? '친구' : requested ? '요청됨' : incoming ? '수락' : '친구 요청';
       row.innerHTML = `
-        <div class="placeholder-avatar" style="background:${colorForFriendId(user.id)}">${escapeHtml(user.name[0])}</div>
+        <div class="placeholder-avatar" style="background:${colorForFriendId(user.id)}">${MASCOT_AVATAR_SVG}</div>
         <div class="search-result-info"><b>${escapeHtml(user.name)}</b><span>@${escapeHtml(user.username)}</span></div>
         <button type="button" class="search-add-btn" style="margin-left:auto;flex-shrink:0;" ${isFriend || requested ? 'disabled' : ''}>${btnLabel}</button>
       `;
@@ -25212,7 +25216,7 @@ function openPersonProfile(user, context, viewPrefix){
       avatarEl.innerHTML = `<img src="${user.avatar}" alt="${escapeHtml(user.name)}" />`;
     } else {
       avatarEl.style.background = user.color || colorForFriendId(user.id);
-      avatarEl.textContent = user.name[0];
+      avatarEl.innerHTML = MASCOT_AVATAR_SVG;
     }
   } else {
     document.getElementById(prefix + 'ProfileAvatar').innerHTML = `<img src="${avatarUrl(user)}" alt="${escapeHtml(user.name)}" />`;
@@ -25394,7 +25398,7 @@ async function renderSuggestions(){
       card.style.cursor = 'pointer';
       const avatarInner = user.hasAvatar
         ? `<img loading="lazy" src="${cachedAvatarUrl(user.id)}" alt="${escapeHtml(user.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`
-        : escapeHtml(user.name[0]);
+        : MASCOT_AVATAR_SVG;
       // 서버는 개인정보 보호를 위해 대략적인 거리만 줌 (0.5km 단위, 1km 안쪽은 1)
       const distanceLabel = user.distanceKm <= 1 ? '1km 이내' : `약 ${user.distanceKm.toFixed(1)}km`;
       card.innerHTML = `
@@ -28740,8 +28744,8 @@ function renderChatList(){
     const avatarInner = room.avatar
       ? `<img loading="lazy" src="${room.avatar}" alt="${escapeHtml(room.name)}" />`
       : stackMembers.length === 2
-        ? stackMembers.map(m => `<span class="cl-stack-face" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="" />` : escapeHtml((m.name || '?')[0])}</span>`).join('')
-        : escapeHtml(room.initial);
+        ? stackMembers.map(m => `<span class="cl-stack-face" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="" />` : MASCOT_AVATAR_SVG}</span>`).join('')
+        : (room.isGroup ? escapeHtml(room.initial) : MASCOT_AVATAR_SVG);
     const unreadBadge = room.unreadCount > 0
       ? `<span class="cl-unread">${room.unreadCount > 99 ? '99+' : room.unreadCount}</span>`
       : '';
@@ -29650,7 +29654,7 @@ function openChatRoom(id, opts){
     avatarEl.innerHTML = `<img src="${room.avatar}" alt="${escapeHtml(room.name)}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" />`;
   } else {
     avatarEl.style.background = room.color;
-    avatarEl.innerHTML = escapeHtml(room.initial);
+    avatarEl.innerHTML = room.isGroup ? escapeHtml(room.initial) : MASCOT_AVATAR_SVG;
   }
   document.getElementById('chatRoomName').textContent = room.name;
   // 1:1 방 상단의 상대 프로필은 눌러도 아무 일 없게 (그룹방만 눌러서 멤버 목록 보기)
@@ -30012,7 +30016,7 @@ function buildMsgAvatarEl(room, m, show){
     el.appendChild(img);
   } else {
     el.style.background = color || 'var(--text-dim)';
-    el.textContent = room.isGroup ? (name.trim().charAt(0) || '?') : (room.initial || name.charAt(0) || '?');
+    el.innerHTML = MASCOT_AVATAR_SVG;
   }
   return el;
 }
@@ -30771,7 +30775,7 @@ function buildPostShareCardEl(share){
   const avatarStyle = avatarSrc ? '' : `background:${colorForFriendId(share.authorId || share.author || '?')};`;
   card.innerHTML = `
     <div class="psc-head">
-      <div class="psc-avatar" style="${avatarStyle}">${avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="" loading="lazy" />` : escapeHtml((share.author || '?')[0])}</div>
+      <div class="psc-avatar" style="${avatarStyle}">${avatarSrc ? `<img src="${escapeHtml(avatarSrc)}" alt="" loading="lazy" />` : MASCOT_AVATAR_SVG}</div>
       <div class="psc-author"></div>
     </div>
     ${photoOk ? `<img class="psc-photo" src="${escapeHtml(share.photo)}" alt="" loading="lazy" />` : ''}
@@ -31778,7 +31782,7 @@ function buildChatSearchAvatar(avatar, color, name){
     el.appendChild(img);
   } else {
     el.style.background = color || 'var(--text-dim)';
-    el.textContent = (name || '?').trim().charAt(0) || '?';
+    el.innerHTML = MASCOT_AVATAR_SVG;
   }
   return el;
 }
@@ -31955,7 +31959,7 @@ function openInviteMembersView(roomId){
     ? '<div class="search-empty">초대할 수 있는 친구가 없어요. 친구가 모두 이 채팅방에 있어요.</div>'
     : candidates.map(f => `
       <div class="search-result-row" style="cursor:pointer;" data-username="${escapeHtml(f.username)}">
-        <div class="placeholder-avatar" style="background:${f.color}">${escapeHtml(f.name[0])}</div>
+        <div class="placeholder-avatar" style="background:${f.color}">${MASCOT_AVATAR_SVG}</div>
         <div class="search-result-info"><b>${escapeHtml(f.name)}</b><span>@${escapeHtml(f.username)}</span></div>
       </div>
     `).join('');
@@ -32012,7 +32016,7 @@ function openNewGroupView(mode){
   } else {
     list.innerHTML = realFriends.map(f => `
       <div class="search-result-row" style="cursor:pointer;" data-username="${escapeHtml(f.username)}">
-        <div class="placeholder-avatar" style="background:${f.color}">${escapeHtml(f.name[0])}</div>
+        <div class="placeholder-avatar" style="background:${f.color}">${MASCOT_AVATAR_SVG}</div>
         <div class="search-result-info"><b>${escapeHtml(f.name)}</b><span>@${escapeHtml(f.username)}</span></div>
       </div>
     `).join('');
@@ -32117,7 +32121,7 @@ function openGroupMembersView(roomId, refreshOnly){
       <div class="search-result-info"><b>친구 초대하기</b><span>이 채팅방에 친구를 추가해요</span></div>
     </div>` : '') + room.members.map((m, idx) => `
     <div class="search-result-row" style="cursor:pointer;" data-idx="${idx}">
-      <div class="placeholder-avatar" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="${escapeHtml(m.name)}" />` : escapeHtml(m.name[0])}</div>
+      <div class="placeholder-avatar" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="${escapeHtml(m.name)}" />` : MASCOT_AVATAR_SVG}</div>
       <div class="search-result-info"><b>${escapeHtml(m.name)}</b>${m.name === '나' ? '<span>나</span>' : '<span>탭해서 프로필 보기</span>'}</div>
     </div>
   `).join('');
@@ -32154,7 +32158,7 @@ function openGroupMemberProfile(member){
   } else {
     avatarEl.innerHTML = '';
     avatarEl.style.background = member.color;
-    avatarEl.textContent = member.name[0];
+    avatarEl.innerHTML = MASCOT_AVATAR_SVG;
   }
   document.getElementById('groupMemberProfileName').textContent = member.name;
 
@@ -35416,7 +35420,7 @@ function planOptionHtml(o){
 function planFriendAvatarHtml(f){
   return f.avatar
     ? `<span class="plan-friend-avatar" style="background-image:url('${escapeHtml(f.avatar)}')"></span>`
-    : `<span class="plan-friend-avatar" style="background:${escapeHtml(f.color || 'var(--accent)')}">${escapeHtml((f.name || '?').slice(0, 1))}</span>`;
+    : `<span class="plan-friend-avatar" style="background:${escapeHtml(f.color || 'var(--accent)')}">${MASCOT_AVATAR_SVG}</span>`;
 }
 const PLAN_LINK_OPTION = {
   id: 'link',
