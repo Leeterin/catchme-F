@@ -8212,13 +8212,20 @@
   }
   .home-widget-sheet-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; font-size:17px; }
   .home-widget-close{ border:none; background:none; font-size:26px; line-height:1; color:var(--hm-dim); cursor:pointer; }
-  .home-widget-gallery{ display:flex; flex-direction:column; gap:8px; }
+  .home-widget-gallery{ display:grid; grid-template-columns:1fr 1fr; gap:16px 12px; align-items:start; }
+  .home-widget-gallery .home-empty{ grid-column:1 / -1; }
+  /* 위젯 미리보기 - 홈에 놓였을 때 모습 그대로 (반 칸은 한 칸, 한 줄은 두 칸 차지) */
+  .home-widget-tile{ display:flex; flex-direction:column; gap:8px; min-width:0; }
+  .home-widget-tile.wide{ grid-column:1 / -1; }
+  .home-widget-pick{ display:block; width:100%; padding:0; border:none; background:none; text-align:left; font:inherit; color:inherit; cursor:pointer; }
+  .home-widget-pick:active{ opacity:.8; }
+  .home-widget-preview#homeDash{ display:flex; margin:0; gap:0; pointer-events:none; max-height:260px; overflow:hidden; border-radius:22px; }
+  .home-widget-preview#homeDash > *{ flex:1 1 100%; }
+  .home-widget-tile-foot{ display:flex; align-items:center; gap:8px; padding:0 4px; }
+  .home-widget-tile-foot .home-widget-info b{ font-size:13.5px; }
+  .home-widget-tile-foot .home-widget-info small{ font-size:11.5px; }
+  .home-widget-tile-foot .home-widget-add{ padding:6px 12px; font-size:12.5px; }
   .home-widget-gallery .home-empty{ color:var(--hm-dim); font-size:13px; padding:12px 0; }
-  .home-widget-item{ display:flex; align-items:center; gap:12px; padding:12px; border-radius:18px; background:var(--hm-card); }
-  .home-widget-thumb{ flex-shrink:0; width:48px; height:48px; display:flex; align-items:center; }
-  .home-widget-thumb i{ display:block; height:26px; border-radius:7px; background:var(--hm-accent-soft); border:1.5px solid var(--hm-accent); box-sizing:border-box; }
-  .home-widget-thumb.small i{ width:26px; margin:0 auto; }
-  .home-widget-thumb.wide i{ width:48px; }
   .home-widget-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .home-widget-info b{ font-size:14.5px; }
   .home-widget-info small{ font-size:12px; color:var(--hm-dim); }
@@ -13080,17 +13087,30 @@ function endHomeWidgetDrag(){
     if(e.target.id === 'homeWidgetOverlay') goBackOrClose(closeHomeWidgetGallery);
   });
 })();
-// 위젯 추가 - 지금 홈에 없는 위젯만 (크기 그림: 반 칸 / 한 줄)
+// 위젯 추가 - 지금 홈에 없는 위젯만, 홈에 놓였을 때 모습 그대로 미리 보여 줌
+// (홈 카드 CSS가 전부 #homeDash 아래에 걸려 있어 미리보기 틀도 같은 id를 씀 - 진짜 홈이 문서에서 먼저라 getElementById는 진짜를 찾음)
 function openHomeWidgetGallery(){
   const list = document.getElementById('homeWidgetGallery');
   const off = HOME_SECTIONS.filter(x => isHomeSectionHidden(x.key));
   list.innerHTML = off.length ? off.map(x => `
-    <div class="home-widget-item">
-      <span class="home-widget-thumb ${x.size}"><i></i></span>
-      <span class="home-widget-info"><b>${escapeHtml(x.label)}</b><small>${escapeHtml(x.desc)} · ${x.size === 'small' ? '반 칸' : '한 줄'}</small></span>
-      <button type="button" class="home-widget-add" data-key="${x.key}">추가</button>
+    <div class="home-widget-tile ${x.size}">
+      <button type="button" class="home-widget-pick" data-key="${x.key}" aria-label="${escapeHtml(x.label)} 추가"><div class="home-widget-preview" id="homeDash" inert></div></button>
+      <div class="home-widget-tile-foot">
+        <span class="home-widget-info"><b>${escapeHtml(x.label)}</b><small>${escapeHtml(x.desc)}</small></span>
+        <button type="button" class="home-widget-add" data-key="${x.key}">추가</button>
+      </div>
     </div>`).join('') : '<div class="home-empty">홈에 모든 위젯이 있어요. 빼고 싶은 위젯은 −를 눌러요.</div>';
-  list.querySelectorAll('.home-widget-add').forEach(btn => btn.addEventListener('click', () => {
+  const dash = document.getElementById('homeDash');
+  list.querySelectorAll('.home-widget-pick').forEach(pick => {
+    const card = dash && dash.querySelector(`:scope > [data-home-key="${pick.dataset.key}"]`);
+    if(!card) return;
+    const copy = card.cloneNode(true);
+    copy.classList.remove('home-section-off', 'dragging');
+    copy.removeAttribute('data-home-key'); // 홈 편집·순서 저장이 미리보기를 진짜 위젯으로 세지 않게
+    copy.querySelectorAll('.home-edit-x').forEach(x => x.remove());
+    pick.firstElementChild.appendChild(copy);
+  });
+  list.querySelectorAll('.home-widget-add, .home-widget-pick').forEach(btn => btn.addEventListener('click', () => {
     goBackOrClose(closeHomeWidgetGallery);
     addHomeWidget(btn.dataset.key);
   }));
@@ -13099,6 +13119,7 @@ function openHomeWidgetGallery(){
 }
 function closeHomeWidgetGallery(){
   document.getElementById('homeWidgetOverlay').classList.remove('show');
+  document.getElementById('homeWidgetGallery').innerHTML = ''; // 미리보기 복사본(같은 id)을 남겨 두지 않음
 }
 
 function renderHomeDash(){
