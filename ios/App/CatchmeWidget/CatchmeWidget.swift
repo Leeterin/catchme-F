@@ -549,7 +549,9 @@ struct MonthCell: View {
     }
 }
 
-// 일주일 달력 (중) - 이번 주 일~토 한 줄, 칸이 높아서 일정 이름이 더 많이 들어감
+// 일주일 달력 (중) - 이번 주 일~토 한 줄. 칸마다 요일·날짜를 위에 두고 세로 선으로 나눔
+let mzGrid = Color(red: 0xE6 / 255, green: 0xE3 / 255, blue: 0xDA / 255)
+
 struct WeekView: View {
     let entry: CalEntry
 
@@ -558,35 +560,77 @@ struct WeekView: View {
         let now = entry.date
         let today = cal.startOfDay(for: now)
         let sunday = cal.date(byAdding: .day, value: -(cal.component(.weekday, from: today) - 1), to: today) ?? today
-        let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
 
         VStack(spacing: 0) {
             HStack {
                 Text("\(cal.component(.month, from: now))월")
-                    .font(.system(size: 13, weight: .heavy)).foregroundColor(mzInk)
+                    .font(.system(size: 14, weight: .heavy)).foregroundColor(mzInk)
                 Spacer()
                 Text("MEETZIP").font(.system(size: 9, weight: .heavy)).foregroundColor(mzTomato)
             }
-            .padding(.horizontal, 4)
-            .padding(.bottom, 3)
-            HStack(spacing: 0) {
-                ForEach(0..<7, id: \.self) { i in
-                    Text(weekdays[i]).font(.system(size: 9, weight: .medium))
-                        .foregroundColor(i == 0 ? mzSun : (i == 6 ? mzSat : mzGray))
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(.bottom, 2)
-            mzDivider.frame(height: 1)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 8)
             HStack(spacing: 0) {
                 ForEach(0..<7, id: \.self) { col in
+                    if col > 0 { mzGrid.frame(width: 1) }
                     if let day = cal.date(byAdding: .day, value: col, to: sunday) {
-                        MonthCell(n: cal.component(.day, from: day), isToday: cal.isDate(day, inSameDayAs: now), col: col, events: entry.events(on: day))
+                        WeekCell(n: cal.component(.day, from: day), isToday: cal.isDate(day, inSameDayAs: now), col: col, events: entry.events(on: day))
                     }
                 }
             }
             .frame(maxHeight: .infinity)
         }
+    }
+}
+
+struct WeekCell: View {
+    let n: Int
+    let isToday: Bool
+    let col: Int
+    let events: [CalEvent]
+
+    static let chipH: CGFloat = 13
+    static let headH: CGFloat = 32
+
+    var body: some View {
+        let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
+        let busy = events.filter { $0.kind != "avail" }
+        let hasAvail = events.contains { $0.kind == "avail" }
+        let dayColor = col == 0 ? mzSun : (col == 6 ? mzSat : mzGray)
+        let numColor = isToday ? mzTomato : (col == 0 ? mzSun : (col == 6 ? mzSat : mzInk))
+        GeometryReader { geo in
+            let room = max(Int((geo.size.height - Self.headH - 4) / (Self.chipH + 2)), 0)
+            let slots = busy.count > room ? max(room - 1, 0) : room
+            VStack(spacing: 2) {
+                Text(weekdays[col]).font(.system(size: 9, weight: .medium)).foregroundColor(dayColor)
+                    .frame(height: 11)
+                Text("\(n)")
+                    .font(.system(size: 11, weight: isToday ? .heavy : .semibold))
+                    .foregroundColor(numColor)
+                    .frame(width: 18, height: 18)
+                    .background(Circle().fill(isToday ? mzTomatoLight : Color.clear))
+                    .padding(.bottom, 2)
+                ForEach(Array(busy.prefix(slots).enumerated()), id: \.offset) { _, ev in
+                    Text(ev.title).font(.system(size: 9, weight: .semibold)).foregroundColor(pastelInk(ev))
+                        .lineLimit(1).fixedSize()
+                        .frame(width: max(geo.size.width - 8, 0), height: Self.chipH, alignment: .leading)
+                        .clipped()
+                        .padding(.horizontal, 3)
+                        .background(RoundedRectangle(cornerRadius: 4).fill(pastelBg(ev)))
+                }
+                if busy.count > slots {
+                    Text("+\(busy.count - slots)").font(.system(size: 9, weight: .medium)).foregroundColor(mzGray)
+                        .frame(height: Self.chipH)
+                } else if hasAvail {
+                    Circle().fill(mzTomato).frame(width: 4, height: 4).padding(.top, 2)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+        }
+        .padding(.horizontal, 1)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 }
 
