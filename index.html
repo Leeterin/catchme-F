@@ -3623,7 +3623,9 @@
     touch-action:none; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
   }
   .chat-pinned-schedule .pin-place-row.pin-row-shift{ transition:transform .15s ease; }
-  .chat-pinned-schedule .pin-place-row.pin-row-dragging{ position:relative; z-index:2; }
+  .chat-pinned-schedule .pin-place-row.pin-row-dragging{ position:relative; z-index:2; background:none; }
+  /* 끄는 동안 줄 전체가 아니라 장소 카드만 살짝 떠 보이게 */
+  .chat-pinned-schedule .pin-place-row.pin-row-dragging .pin-set-loc{ box-shadow:0 4px 12px rgba(0,0,0,.15); }
   .chat-pinned-schedule .pin-place-row.pin-row-dragging .pin-drag-handle{ color:var(--accent); cursor:grabbing; }
   .chat-pinned-schedule .pin-place-order{ font-size:10.5px; font-weight:800; color:var(--text-dim); }
 
