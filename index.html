@@ -19182,24 +19182,25 @@ let formColor = null; // 이 일정 하나에만 쓸 색("#RRGGBB") - null이면
 
 // ---------- 색 라벨 10개 ----------
 // 색은 정해 둔 10가지로 고정하고 이름만 내가 바꿈 (일정에는 색만 저장 - 라벨 이름을 바꾸면 그 색 일정 모두 새 이름으로 보임)
-// 한 달 보기의 연한 파스텔 칩과 무드를 맞춘 차분한 색 - 비슷해 보이던 로즈(코랄과 겹침)·블루베리(하늘·라벤더와 겹침)는 빼고 올리브·그레이로 채움, 하늘과 비슷했던 민트는 네이비로 바꿈
+// 한 달 보기의 연한 파스텔 칩으로 깔려도 색이 서로 헷갈리지 않게, 색 계열이 겹치지 않는 10가지 (계열마다 하나씩)
 const EVENT_COLOR_LABELS = [
-  { color: '#E8836B', name: '코랄' },
-  { color: '#EFA46A', name: '살구' },
-  { color: '#E0BC5A', name: '레몬' },
-  { color: '#8FB878', name: '세이지' },
-  { color: '#5E6E9E', name: '네이비' },
-  { color: '#78A6D6', name: '하늘' },
-  { color: '#8E9AA8', name: '그레이' },
-  { color: '#AE93D4', name: '라벤더' },
-  { color: '#A9A46B', name: '올리브' },
-  { color: '#A88B78', name: '모카' },
+  { color: '#E25B5B', name: '딸기' },
+  { color: '#F2953C', name: '오렌지' },
+  { color: '#EDCB3A', name: '레몬' },
+  { color: '#6FB36A', name: '초록' },
+  { color: '#4F5FA8', name: '남색' },
+  { color: '#5FAEE3', name: '하늘' },
+  { color: '#8A8F98', name: '회색' },
+  { color: '#9B6FD6', name: '보라' },
+  { color: '#E86FB5', name: '핑크' },
+  { color: '#9A6E52', name: '초코' },
 ];
 // 예전 라벨 색들 - 이 색으로 저장된 일정은 같은 자리의 새 색으로 바꿔 보여 줌 (수정해서 저장하면 새 색으로 저장됨)
 const LEGACY_EVENT_COLOR_SETS = [
   ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#14B8A6', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#78716C'], // 처음 원색
   ['#E8836B', '#EFA46A', '#E0BC5A', '#8FB878', '#6DB5AE', '#78A6D6', '#8C93D2', '#AE93D4', '#DE8FAE', '#A88B78'], // 로즈·블루베리가 있던 파스텔
   ['#E5675C', '#F2994A', '#EBC53F', '#8CC063', '#3FB5A3', '#4FA3E3', '#6C78D9', '#A97BDB', '#E86FB0', '#9C7B66'], // 잠깐 쓴 진한 파스텔
+  ['#E8836B', '#EFA46A', '#E0BC5A', '#8FB878', '#5E6E9E', '#78A6D6', '#8E9AA8', '#AE93D4', '#A9A46B', '#A88B78'], // 올리브·그레이·네이비가 있던 파스텔
 ];
 function migrateEventColor(hex){
   if(!hex) return hex;
