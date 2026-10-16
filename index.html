@@ -5647,6 +5647,8 @@
   .qa-busy{ position:absolute; top:3px; bottom:3px; min-width:10px; box-sizing:border-box; border-radius:5px; background:rgba(120,120,128,.38); pointer-events:none; z-index:2; }
   .qa-busy.soft{ background:none; border:1.5px dashed rgba(120,120,128,.8); }
   .qa-busy.once{ background:rgba(120,120,128,.18); }
+  /* 오늘 이미 지난 시간 - 빗금으로 막아서 지금 시간부터만 열 수 있게 */
+  .qa-past{ position:absolute; top:0; bottom:0; left:0; border-radius:8px 0 0 8px; background:repeating-linear-gradient(-45deg, rgba(120,120,128,.45) 0 2px, transparent 2px 6px), rgba(120,120,128,.18); pointer-events:none; z-index:2; }
   .qa-bar{ z-index:1; }
   .qa-handle{ z-index:3; }
   .qa-info{ margin:6px 8px 0; padding:7px 9px; border-radius:8px; background:var(--surface-2); font-size:12px; line-height:1.45; color:var(--text); }
@@ -5694,6 +5696,7 @@
   .qa-legend i{ display:inline-block; width:12px; height:8px; margin-right:3px; border-radius:2px; vertical-align:-1px; background:rgba(120,120,128,.38); }
   .qa-legend i.soft{ background:none; border:1.2px dashed rgba(120,120,128,.8); }
   .qa-legend i.once{ background:rgba(120,120,128,.18); }
+  .qa-legend i.past{ background:repeating-linear-gradient(-45deg, rgba(120,120,128,.55) 0 1.5px, transparent 1.5px 4px), rgba(120,120,128,.18); }
   .qa-axis{ position:relative; height:16px; margin:6px 8px 0; font-size:10px; color:var(--text-dim); }
   .qa-axis span{ position:absolute; transform:translateX(-50%); white-space:nowrap; }
   .quick-avail-hint{ font-size:11px; color:var(--text-dim); line-height:1.45; margin:10px 0 12px; text-align:center; }
@@ -20372,9 +20375,19 @@ function formAvailBusyFor(d){
   });
   return { busy, other };
 }
-// 막대를 못 놓는 곳 - 내 일정(회색). 겹쳐도 예약 받는 일정(점선)과 이미 연 시간은 막지 않음
+// 오늘이면 이미 지난 시간의 끝(지금을 5분 단위로 올림), 다른 날은 0 - 빗금으로 막아서 지금 시간부터만 열 수 있게
+function formAvailPastEnd(dk){
+  if(dk !== dateKeyOf(TODAY)) return 0;
+  const now = new Date();
+  return Math.min(24 * 60, Math.ceil((now.getHours() * 60 + now.getMinutes()) / QUICK_AVAIL_STEP) * QUICK_AVAIL_STEP);
+}
+// 막대를 못 놓는 곳 - 내 일정(회색)과 오늘 지난 시간(빗금). 겹쳐도 예약 받는 일정(점선)과 이미 연 시간은 막지 않음
+// (이미 연 시간을 고칠 때는 지난 시간을 잘라내지 않음 - 원래 시간이 줄어들지 않게)
 function formAvailHardBusy(dk){
-  return quickMergeRanges(formAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft).map(b => ({ s: b.s, e: b.e })));
+  const hard = formAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft).map(b => ({ s: b.s, e: b.e }));
+  const pastEnd = editingEventId ? 0 : formAvailPastEnd(dk);
+  if(pastEnd > 0) hard.push({ s: 0, e: pastEnd });
+  return quickMergeRanges(hard);
 }
 // 일정과 겹친 부분은 잘라내고 30분 안 되는 조각은 버림
 function formAvailFitRanges(dk, ranges){
@@ -20486,6 +20499,8 @@ function renderFormAvailBars(){
     const busyHtml = busy.filter(b => b.e > formAvailAxis.s && b.s < formAvailAxis.e)
       .map(b => `<i class="qa-busy${b.soft ? ' soft' : ''}" style="${formAvailBarStyle(b)}"></i>`).join('');
     const otherHtml = quickMergeRanges(other).map(r => `<i class="qa-other" style="${formAvailBarStyle(r)}"></i>`).join('');
+    const pastEnd = formAvailPastEnd(dk);
+    const pastHtml = pastEnd > formAvailAxis.s ? `<i class="qa-past" style="${formAvailBarStyle({ s: 0, e: pastEnd })}"></i>` : '';
     const bars = ranges.map((r, i) => {
       const cs = r.s < formAvailAxis.s, ce = r.e > formAvailAxis.e;
       return `<div class="qa-bar${cs ? ' clip-s' : ''}${ce ? ' clip-e' : ''}" data-fa-bar="${dk}|${i}" style="${formAvailBarStyle(r)}">`
@@ -20499,14 +20514,15 @@ function renderFormAvailBars(){
         ${on ? `<button type="button" class="qa-add" data-fa-add="${dk}" aria-label="${label} 시간 더 넣기">+</button>` : ''}
       </div>
       ${editing >= 0 ? formAvailEditHtml(dk, editing) : ''}
-      <div class="qa-track" data-fa-track="${dk}">${grid}${otherHtml}${bars}${busyHtml}</div>
+      <div class="qa-track" data-fa-track="${dk}">${grid}${otherHtml}${bars}${busyHtml}${pastHtml}</div>
       ${formAvailInfo && formAvailInfo.dk === dk ? formAvailInfoHtml(dk, formAvailInfo.min) : ''}
     </div>`;
   }).join('');
   html += `<div class="qa-axis">${labelTicks.map(h => `<span style="left:${formAvailPct(h * 60)}%">${h}시</span>`).join('')}</div>`;
   const anyBusy = info.some(x => x.busy.some(b => !b.soft)), anySoft = info.some(x => x.busy.some(b => b.soft)), anyOther = info.some(x => x.other.length);
-  if(anyBusy || anySoft || anyOther){
-    html += `<div class="qa-legend">${anyBusy ? '<span><i></i>내 일정</span>' : ''}${anySoft ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>이미 연 시간</span>' : ''}</div>`;
+  const anyPast = info.some(x => formAvailPastEnd(x.dk) > formAvailAxis.s);
+  if(anyBusy || anySoft || anyOther || anyPast){
+    html += `<div class="qa-legend">${anyPast ? '<span><i class="past"></i>지난 시간</span>' : ''}${anyBusy ? '<span><i></i>내 일정</span>' : ''}${anySoft ? '<span><i class="soft"></i>겹쳐도 예약 받는 일정</span>' : ''}${anyOther ? '<span><i class="other"></i>이미 연 시간</span>' : ''}</div>`;
   }
   document.getElementById('formAvailRows').innerHTML = html;
 }
@@ -20696,6 +20712,7 @@ function formAvailMinAt(track, clientX){
         return;
       }
       formAvailInfo = null;
+      if(dr.tap && !editingEventId && min < formAvailPastEnd(dr.dk)){ showToast('이미 지난 시간이에요. 지금 이후 시간을 눌러 주세요.'); return; }
       if(dr.tap){ formAvailAddRange(dr.dk, min); renderFormAvailBars(); return; }
       formAvailEdit = { dk: dr.dk, idx: dr.idx };
       renderFormAvailBars();
@@ -20946,6 +20963,8 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     Object.keys(openRanges).sort().forEach(dk => {
       if(dk < todayKey) return;
       const hard = formAvailBusyFor(parseDateInputValue(dk)).busy.filter(b => !b.soft);
+      const pastEnd = editingEventId ? 0 : formAvailPastEnd(dk); // 화면을 열어둔 사이 지난 시간도 빼고 엶
+      if(pastEnd > 0) hard.push({ s: 0, e: pastEnd });
       subtractMinuteRanges(quickMergeRanges(openRanges[dk]), hard)
         .filter(r => r.e - r.s >= QUICK_AVAIL_MIN_LEN)
         .forEach(r => availFineTuneBlocks.push({ dateKey: dk, startMin: r.s, endMin: r.e }));
