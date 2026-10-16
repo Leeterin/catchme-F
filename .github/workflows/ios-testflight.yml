@@ -56,7 +56,24 @@ jobs:
       - name: API 키 파일 만들기
         env:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          RAW_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          RAW_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          # 폰에서 붙여넣으면 앞뒤에 공백·줄바꿈이 붙을 수 있어서 지운다
+          KEY_ID=$(printf '%s' "$RAW_KEY_ID" | tr -d ' \t\r\n')
+          ISSUER_ID=$(printf '%s' "$RAW_ISSUER_ID" | tr -d ' \t\r\n')
+          echo "::add-mask::$KEY_ID"
+          echo "::add-mask::$ISSUER_ID"
+          if ! [[ "$KEY_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            echo "::error::APP_STORE_CONNECT_KEY_ID 형식이 틀려요(지금 ${#KEY_ID}글자). AuthKey_ 뒤 영문 대문자·숫자 10글자만 넣어 주세요."
+            exit 1
+          fi
+          if ! [[ "$ISSUER_ID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+            echo "::error::APP_STORE_CONNECT_ISSUER_ID 형식이 틀려요(지금 ${#ISSUER_ID}글자). App Store Connect API 화면 맨 위 Issuer ID(하이픈 4개, 36글자)를 넣어 주세요."
+            exit 1
+          fi
+          echo "ASC_KEY_ID=$KEY_ID" >> "$GITHUB_ENV"
+          echo "ASC_ISSUER_ID=$ISSUER_ID" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/keys"
           # 폰에서 붙여넣으면 줄바꿈이 빠지거나 BEGIN/END 줄이 없을 수 있어서, 키 본문만 뽑아 PEM 형식으로 다시 만든다
           BODY=$(printf '%s' "$APP_STORE_CONNECT_API_KEY" | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \t\r\n')
@@ -70,6 +87,25 @@ jobs:
             echo "::error::APP_STORE_CONNECT_API_KEY 값이 올바른 .p8 키가 아니에요. AuthKey_XXXX.p8 파일 내용 전체를 다시 넣어 주세요."
             exit 1
           fi
+
+      - name: Apple 로그인 확인
+        run: |
+          # 키 세 개가 짝이 맞는지 App Store Connect API를 직접 불러서 확인한다
+          python3 -m pip install --quiet --break-system-packages pyjwt cryptography 2>/dev/null || python3 -m pip install --quiet pyjwt cryptography
+          TOKEN=$(python3 -c "
+          import jwt, time, os
+          key = open(os.environ['RUNNER_TEMP'] + '/keys/AuthKey.p8').read()
+          now = int(time.time())
+          print(jwt.encode({'iss': os.environ['ASC_ISSUER_ID'], 'iat': now, 'exp': now + 600, 'aud': 'appstoreconnect-v1'}, key, algorithm='ES256', headers={'kid': os.environ['ASC_KEY_ID']}))
+          ")
+          echo "::add-mask::$TOKEN"
+          CODE=$(curl -s -o "$RUNNER_TEMP/asc.json" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" 'https://api.appstoreconnect.apple.com/v1/apps?limit=1')
+          if [ "$CODE" != "200" ]; then
+            cat "$RUNNER_TEMP/asc.json"; echo
+            echo "::error::Apple 로그인 실패($CODE). 키 ID·Issuer ID·.p8 파일이 같은 키에서 나온 건지, 개인 키가 아니라 '팀 키'인지 확인해 주세요."
+            exit 1
+          fi
+          echo "Apple 로그인 확인 완료"
 
       - name: 빌드 번호·버전 정하기
         id: ver
@@ -94,8 +130,8 @@ jobs:
             -archivePath "$RUNNER_TEMP/App.xcarchive" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             CURRENT_PROJECT_VERSION=${{ steps.ver.outputs.build }} \
             ${{ steps.ver.outputs.version_arg }}
 
@@ -120,8 +156,8 @@ jobs:
             -exportPath "$RUNNER_TEMP/export" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
-            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
           echo "빌드 ${{ steps.ver.outputs.build }} 업로드 완료. App Store Connect에서 처리되면 TestFlight에 나타나요." >> "$GITHUB_STEP_SUMMARY"
 
       - name: API 키 지우기
