@@ -19182,25 +19182,32 @@ let formColor = null; // 이 일정 하나에만 쓸 색("#RRGGBB") - null이면
 
 // ---------- 색 라벨 10개 ----------
 // 색은 정해 둔 10가지로 고정하고 이름만 내가 바꿈 (일정에는 색만 저장 - 라벨 이름을 바꾸면 그 색 일정 모두 새 이름으로 보임)
-// 한 달 보기의 연한 파스텔 칩과 무드를 맞춘 차분한 색 (진한 원색은 뺌)
+// 한 달 보기의 연한 파스텔 칩과 무드를 맞추되, 칩으로 옅게 깔려도 서로 확실히 구분되게 색상 간격을 넓힌 10가지
 const EVENT_COLOR_LABELS = [
-  { color: '#E8836B', name: '코랄' },
-  { color: '#EFA46A', name: '살구' },
-  { color: '#E0BC5A', name: '머스타드' },
-  { color: '#8FB878', name: '세이지' },
-  { color: '#6DB5AE', name: '민트' },
-  { color: '#78A6D6', name: '하늘' },
-  { color: '#8C93D2', name: '블루베리' },
-  { color: '#AE93D4', name: '라벤더' },
-  { color: '#DE8FAE', name: '로즈' },
-  { color: '#A88B78', name: '모카' },
+  { color: '#E5675C', name: '토마토' },
+  { color: '#F2994A', name: '귤' },
+  { color: '#EBC53F', name: '레몬' },
+  { color: '#8CC063', name: '연두' },
+  { color: '#3FB5A3', name: '민트' },
+  { color: '#4FA3E3', name: '하늘' },
+  { color: '#6C78D9', name: '블루베리' },
+  { color: '#A97BDB', name: '라벤더' },
+  { color: '#E86FB0', name: '핑크' },
+  { color: '#9C7B66', name: '모카' },
 ];
-// 예전 원색 라벨 - 이 색으로 저장된 일정은 같은 자리의 새 색으로 바꿔 보여 줌 (수정해서 저장하면 새 색으로 저장됨)
-const LEGACY_EVENT_COLOR_LABELS = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#14B8A6', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#78716C'];
+// 예전 라벨 색들 - 이 색으로 저장된 일정은 같은 자리의 새 색으로 바꿔 보여 줌 (수정해서 저장하면 새 색으로 저장됨)
+const LEGACY_EVENT_COLOR_SETS = [
+  ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#14B8A6', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#78716C'], // 처음 원색
+  ['#E8836B', '#EFA46A', '#E0BC5A', '#8FB878', '#6DB5AE', '#78A6D6', '#8C93D2', '#AE93D4', '#DE8FAE', '#A88B78'], // 구분이 약했던 파스텔
+];
 function migrateEventColor(hex){
   if(!hex) return hex;
-  const i = LEGACY_EVENT_COLOR_LABELS.indexOf(String(hex).toUpperCase());
-  return i < 0 ? hex : EVENT_COLOR_LABELS[i].color;
+  const h = String(hex).toUpperCase();
+  for(const set of LEGACY_EVENT_COLOR_SETS){
+    const i = set.indexOf(h);
+    if(i >= 0) return EVENT_COLOR_LABELS[i].color;
+  }
+  return hex;
 }
 const COLOR_LABEL_NAME_MAX = 12;
 // 내가 바꾼 이름 (빈칸이면 기본 이름) - 서버 설정에 저장하고, 폰에도 기억해 둠
