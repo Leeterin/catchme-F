@@ -292,12 +292,12 @@ struct CatchmeWidgetView: View {
 
 extension View {
     // iOS 17부터는 위젯 배경을 containerBackground로 지정해야 함
-    @ViewBuilder func widgetBackground() -> some View {
+    @ViewBuilder func widgetBackground(_ bg: Color = Color(UIColor.systemBackground)) -> some View {
         if #available(iOSApplicationExtension 17.0, *) {
             // 기본 여백(16)이 넓어서 일정 칸이 작아짐 - 6씩 줄여 내용을 크게
-            padding(-6).containerBackground(Color(UIColor.systemBackground), for: .widget)
+            padding(-6).containerBackground(bg, for: .widget)
         } else {
-            padding(10).background(Color(UIColor.systemBackground))
+            padding(10).background(bg)
         }
     }
 }
@@ -406,9 +406,40 @@ struct CalLoggedOutView: View {
     }
 }
 
-// 한달 달력 - 칸에 들어가는 만큼 일정 이름을 넣고, 칸이 작으면 색 점
+// 한달 달력 - 앱 캘린더와 같은 모양 (흰 바탕, 연한 색 칩 + 진한 글씨, 일 빨강·토 파랑, 오늘은 연한 토마토 동그라미)
+// 글씨 크기는 칸마다 줄이지 않고 모두 같게 - 길면 칸 끝에서 잘림
+let mzInk = Color(red: 0x2C / 255, green: 0x2C / 255, blue: 0x2A / 255)
+let mzGray = Color(red: 0x88 / 255, green: 0x87 / 255, blue: 0x80 / 255)
+let mzTomato = Color(red: 0xD8 / 255, green: 0x5A / 255, blue: 0x30 / 255)
+let mzTomatoLight = Color(red: 0xFA / 255, green: 0xEC / 255, blue: 0xE7 / 255)
+let mzDivider = Color(red: 0xF1 / 255, green: 0xEF / 255, blue: 0xE8 / 255)
+let mzSun = Color(red: 0xD9 / 255, green: 0x53 / 255, blue: 0x3F / 255)
+let mzSat = Color(red: 0x3D / 255, green: 0x7B / 255, blue: 0xD9 / 255)
+
+func eventRGB(_ ev: CalEvent) -> (Double, Double, Double) {
+    let fallback: String
+    switch ev.kind {
+    case "avail": fallback = "#38BDF8"
+    case "appt": fallback = "#F43F5E"
+    case "pending": fallback = "#F59E0B"
+    default: fallback = "#8B5CF6"
+    }
+    let hex = (ev.color ?? fallback).replacingOccurrences(of: "#", with: "")
+    let v = UInt32(hex, radix: 16) ?? 0x8B5CF6
+    return (Double((v >> 16) & 0xFF) / 255, Double((v >> 8) & 0xFF) / 255, Double(v & 0xFF) / 255)
+}
+
+// 앱의 color-mix와 같은 비율 - 배경은 일정 색 28% + 흰색, 글씨는 일정 색 60% + #1E1B18
+func pastelBg(_ ev: CalEvent) -> Color {
+    let (r, g, b) = eventRGB(ev)
+    return Color(red: r * 0.28 + 0.72, green: g * 0.28 + 0.72, blue: b * 0.28 + 0.72)
+}
+func pastelInk(_ ev: CalEvent) -> Color {
+    let (r, g, b) = eventRGB(ev)
+    return Color(red: r * 0.6 + 0.4 * 0x1E / 255, green: g * 0.6 + 0.4 * 0x1B / 255, blue: b * 0.6 + 0.4 * 0x18 / 255)
+}
+
 struct MonthView: View {
-    @Environment(\.widgetFamily) var family
     let entry: CalEntry
 
     var body: some View {
@@ -418,31 +449,36 @@ struct MonthView: View {
         let firstWeekday = cal.component(.weekday, from: monthStart) - 1
         let daysInMonth = cal.range(of: .day, in: .month, for: monthStart)?.count ?? 30
         let weeks = (firstWeekday + daysInMonth + 6) / 7
-        let large = family == .systemLarge
         let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
 
-        VStack(spacing: large ? 2 : 1) {
+        VStack(spacing: 0) {
             HStack {
-                Text("\(cal.component(.month, from: now))월").font(.system(size: large ? 17 : 14, weight: .heavy))
+                Text("\(cal.component(.year, from: now))년 \(cal.component(.month, from: now))월")
+                    .font(.system(size: 13, weight: .heavy)).foregroundColor(mzInk)
                 Spacer()
-                Text("MEETZIP").font(.system(size: 10, weight: .heavy)).foregroundColor(accent)
+                Text("MEETZIP").font(.system(size: 9, weight: .heavy)).foregroundColor(mzTomato)
             }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 3)
             HStack(spacing: 0) {
                 ForEach(0..<7, id: \.self) { i in
-                    Text(weekdays[i]).font(.system(size: 10, weight: .bold))
-                        .foregroundColor(i == 0 ? .red : .secondary)
+                    Text(weekdays[i]).font(.system(size: 9, weight: .medium))
+                        .foregroundColor(i == 0 ? mzSun : (i == 6 ? mzSat : mzGray))
                         .frame(maxWidth: .infinity)
                 }
             }
+            .padding(.bottom, 2)
             ForEach(0..<weeks, id: \.self) { w in
-                HStack(spacing: 0) {
-                    ForEach(0..<7, id: \.self) { col in
-                        let n = w * 7 + col - firstWeekday + 1
-                        if n >= 1 && n <= daysInMonth, let day = cal.date(byAdding: .day, value: n - 1, to: monthStart) {
-                            MonthCell(n: n, isToday: cal.isDate(day, inSameDayAs: now), isSunday: col == 0,
-                                      events: entry.events(on: day), large: large)
-                        } else {
-                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack(spacing: 0) {
+                    mzDivider.frame(height: 1)
+                    HStack(spacing: 0) {
+                        ForEach(0..<7, id: \.self) { col in
+                            let n = w * 7 + col - firstWeekday + 1
+                            if n >= 1 && n <= daysInMonth, let day = cal.date(byAdding: .day, value: n - 1, to: monthStart) {
+                                MonthCell(n: n, isToday: cal.isDate(day, inSameDayAs: now), col: col, events: entry.events(on: day))
+                            } else {
+                                Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
                         }
                     }
                 }
@@ -455,47 +491,52 @@ struct MonthView: View {
 struct MonthCell: View {
     let n: Int
     let isToday: Bool
-    let isSunday: Bool
+    let col: Int
     let events: [CalEvent]
-    let large: Bool
+
+    static let fontSize: CGFloat = 9
+    static let numSize: CGFloat = 16
+    static let chipH: CGFloat = 12
 
     var body: some View {
         let busy = events.filter { $0.kind != "avail" }
         let hasAvail = events.contains { $0.kind == "avail" }
-        let numSize: CGFloat = large ? 17 : 15
-        // 칸 높이에 들어가는 만큼 일정 이름을 크게 넣음 (안 들어가면 색 점)
+        let numColor = isToday ? mzTomato : (col == 0 ? mzSun : (col == 6 ? mzSat : mzInk))
+        // 칸 높이에 들어가는 만큼 일정 이름을 넣음 (안 들어가면 색 점)
         GeometryReader { geo in
-            let chipH: CGFloat = large ? 14 : 12
-            let room = Int((geo.size.height - numSize - 1) / (chipH + 1))
+            let room = Int((geo.size.height - Self.numSize - 2) / (Self.chipH + 1))
             let slots = busy.count > room ? max(room - 1, 0) : room
             VStack(spacing: 1) {
                 Text("\(n)")
-                    .font(.system(size: large ? 12 : 11, weight: isToday ? .heavy : .semibold))
-                    .foregroundColor(isToday ? .white : (isSunday ? .red : .primary))
-                    .frame(width: numSize, height: numSize)
-                    .background(Circle().fill(isToday ? accent : Color.clear))
+                    .font(.system(size: 10, weight: isToday ? .heavy : .medium))
+                    .foregroundColor(numColor)
+                    .frame(width: Self.numSize, height: Self.numSize)
+                    .background(Circle().fill(isToday ? mzTomatoLight : Color.clear))
+                    .padding(.top, 1)
                 if room >= 1 {
                     ForEach(Array(busy.prefix(slots).enumerated()), id: \.offset) { _, ev in
-                        Text(ev.title).font(.system(size: large ? 10.5 : 9, weight: .bold)).foregroundColor(.white)
-                            .lineLimit(1).minimumScaleFactor(0.75).padding(.horizontal, 1)
-                            .frame(maxWidth: .infinity).frame(height: chipH)
-                            .background(RoundedRectangle(cornerRadius: 3).fill(eventColor(ev)))
+                        Text(ev.title).font(.system(size: Self.fontSize, weight: .semibold)).foregroundColor(pastelInk(ev))
+                            .lineLimit(1).fixedSize()
+                            .padding(.horizontal, 3)
+                            .frame(maxWidth: .infinity, alignment: .leading).frame(height: Self.chipH)
+                            .clipped()
+                            .background(RoundedRectangle(cornerRadius: 4).fill(pastelBg(ev)))
                     }
                     if busy.count > slots {
-                        Text("+\(busy.count - slots)").font(.system(size: large ? 10 : 9, weight: .bold)).foregroundColor(.secondary)
-                            .frame(height: chipH)
+                        Text("+\(busy.count - slots)").font(.system(size: Self.fontSize, weight: .medium)).foregroundColor(mzGray)
+                            .frame(height: Self.chipH)
                     } else if hasAvail && busy.count < room {
-                        Circle().fill(accent).frame(width: 5, height: 5)
+                        Circle().fill(mzTomato).frame(width: 4, height: 4)
                     }
                 } else {
-                    // 일정은 색 점, 예약 가능한 날은 테두리 점
+                    // 일정은 색 점, 예약 가능한 날은 토마토 점
                     HStack(spacing: 2) {
                         ForEach(Array(busy.prefix(3).enumerated()), id: \.offset) { _, ev in
-                            Circle().fill(eventColor(ev)).frame(width: 5, height: 5)
+                            Circle().fill(pastelInk(ev)).frame(width: 4, height: 4)
                         }
-                        if hasAvail && busy.count < 3 { Circle().stroke(accent, lineWidth: 1).frame(width: 5, height: 5) }
+                        if hasAvail && busy.count < 3 { Circle().fill(mzTomato).frame(width: 4, height: 4) }
                     }
-                    .frame(height: 5)
+                    .frame(height: 4)
                 }
                 Spacer(minLength: 0)
             }
@@ -569,7 +610,10 @@ struct CatchmeMonthWidget: Widget {
         StaticConfiguration(kind: "CatchmeMonth", provider: CalProvider()) { entry in
             Group {
                 if entry.loggedIn { MonthView(entry: entry) } else { CalLoggedOutView() }
-            }.widgetBackground()
+            }
+            // 앱 캘린더처럼 다크 모드에서도 흰 바탕
+            .environment(\.colorScheme, .light)
+            .widgetBackground(.white)
         }
         .configurationDisplayName("한달 달력")
         .description("이번 달 일정과 예약 가능한 날을 보여줘요.")
