@@ -13621,7 +13621,29 @@ function buildWidgetPayload(){
       places: roomMeetPlaces(x.room, x.pin).map(p => p.location).join(' → '),
     };
   });
-  return { loggedIn: true, items };
+  return { loggedIn: true, items, days: buildWidgetCalendarDays() };
+}
+// 한달 달력 / 오늘 일정 위젯용 - 이번 달 1일부터 다음 달 말일까지 날짜별 일정 (앱을 안 열어도 다음 달로 넘어가면 바로 보이게)
+// 그룹 필터는 안 걸고 전부 넣음. 오늘 이미 지난 예약 가능 시간은 위젯이 그릴 때 시각 기준으로 뺌
+function buildWidgetCalendarDays(){
+  const days = [];
+  const start = new Date(TODAY.getFullYear(), TODAY.getMonth(), 1);
+  const end = new Date(TODAY.getFullYear(), TODAY.getMonth() + 2, 0);
+  for(let d = new Date(start); d <= end; d = addDaysToDate(d, 1)){
+    const events = getEventsForDate(d).map(ev => {
+      const r = getEventDisplayRangeForDate(ev, d);
+      const color = colorForEvent(ev);
+      return {
+        title: ev.type === 'available' ? '예약 가능' : (ev.title || '일정'),
+        startMin: r.startMin,
+        endMin: r.endMin,
+        kind: ev.isPendingHold ? 'pending' : ev.type === 'available' ? 'avail' : ev.isReservationLinked ? 'appt' : 'event',
+        color: /^#[0-9a-f]{6}$/i.test(color) ? color : null,
+      };
+    });
+    if(events.length) days.push({ key: dateKeyOf(d), events });
+  }
+  return days;
 }
 function syncWidgetData(){
   if(!widgetPlugin()) return;
