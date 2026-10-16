@@ -3027,10 +3027,18 @@
     display:flex;
     align-items:center;
     gap:10px;
-    margin-bottom:14px;
-    margin-top:calc(20px + env(safe-area-inset-top));
+    /* 카카오톡처럼 메시지가 헤더 밑으로 지나가며 흐리게 비치도록 - 반투명 배경 + 블러 (높이는 아래 .chat-messages 끌어올리기와 맞춰야 함) */
+    height:calc(64px + env(safe-area-inset-top));
+    box-sizing:border-box;
+    padding:calc(20px + env(safe-area-inset-top)) 18px 10px;
+    margin:0 -18px 4px;
+    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter:blur(20px) saturate(160%);
+    -webkit-backdrop-filter:blur(20px) saturate(160%);
     flex-shrink:0;
     position:relative;
+    z-index:6;
   }
   .chat-room-header .profile-back{ padding:0; font-size:20px; }
   .chat-room-avatar{
@@ -3886,6 +3894,13 @@
     -ms-overflow-style:none;
   }
   .chat-messages::-webkit-scrollbar{ display:none; width:0; height:0; }
+  /* 헤더 바로 아래면 메시지 목록을 헤더 밑까지 끌어올려 블러 너머로 비치게 (검색창·추천 막대가 사이에 있으면 그대로) */
+  .chat-active-recommend-bar[hidden] + .chat-messages{
+    margin-top:calc(-68px - env(safe-area-inset-top));
+    padding-top:calc(72px + env(safe-area-inset-top));
+    scroll-padding-top:calc(72px + env(safe-area-inset-top));
+  }
+  .chat-search-bar.open ~ .chat-messages{ margin-top:0; padding-top:4px; scroll-padding-top:0; }
   /* 메시지가 적어도 위가 아니라 입력창 바로 위(맨 아래)부터 쌓이게 - 카카오톡처럼 (justify-content:flex-end는 스크롤이 깨져서 margin-top:auto로) */
   .chat-messages > :first-child{ margin-top:auto; }
 
