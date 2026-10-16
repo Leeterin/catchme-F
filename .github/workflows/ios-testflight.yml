@@ -58,7 +58,18 @@ jobs:
           APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
         run: |
           mkdir -p "$RUNNER_TEMP/keys"
-          printf '%s' "$APP_STORE_CONNECT_API_KEY" > "$RUNNER_TEMP/keys/AuthKey.p8"
+          # 폰에서 붙여넣으면 줄바꿈이 빠지거나 BEGIN/END 줄이 없을 수 있어서, 키 본문만 뽑아 PEM 형식으로 다시 만든다
+          BODY=$(printf '%s' "$APP_STORE_CONNECT_API_KEY" | sed -e 's/-----[A-Z ]*-----//g' | tr -d ' \t\r\n')
+          {
+            echo '-----BEGIN PRIVATE KEY-----'
+            printf '%s' "$BODY" | fold -w 64
+            echo
+            echo '-----END PRIVATE KEY-----'
+          } > "$RUNNER_TEMP/keys/AuthKey.p8"
+          if ! openssl pkey -in "$RUNNER_TEMP/keys/AuthKey.p8" -noout 2>/dev/null; then
+            echo "::error::APP_STORE_CONNECT_API_KEY 값이 올바른 .p8 키가 아니에요. AuthKey_XXXX.p8 파일 내용 전체를 다시 넣어 주세요."
+            exit 1
+          fi
 
       - name: 빌드 번호·버전 정하기
         id: ver
