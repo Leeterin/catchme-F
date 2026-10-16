@@ -11322,6 +11322,7 @@ function handleSessionExpired(){
   authToken = null;
   refreshTokenValue = null;
   currentUser = null;
+  homeScheduleLoaded = false; // 다시 로그인하면 그 계정 일정을 받은 뒤에 위젯을 채움
   try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
   clearSavedSession();
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
@@ -11336,6 +11337,7 @@ async function performLogout(){
   authToken = null;
   refreshTokenValue = null;
   currentUser = null;
+  homeScheduleLoaded = false; // 다시 로그인하면 그 계정 일정을 받은 뒤에 위젯을 채움
   try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
   clearSavedSession();
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
@@ -13739,6 +13741,9 @@ function buildWidgetCalendarDays(){
 }
 function syncWidgetData(){
   if(!widgetPlugin()) return;
+  // 로그인 상태인데 서버 일정을 아직 못 받았으면(앱 켠 직후 등) 빈 일정으로 위젯을 덮어쓰지 않음
+  // (예전엔 받아오기 전에 홈이 그려지면서 빈 달력이 넘어가, 위젯 일정이 통째로 사라졌음)
+  if(authToken && !homeScheduleLoaded) return;
   clearTimeout(widgetSyncTimer);
   widgetSyncTimer = setTimeout(() => {
     try {
