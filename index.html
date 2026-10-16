@@ -9885,6 +9885,7 @@
   <!-- 예약 취소 확인 팝업 -->
   <div class="chat-row-menu" id="chatRowMenu">
     <div class="chat-row-menu-option" id="chatRowMenuPinOption">채팅방 상단에 고정하기</div>
+    <div class="chat-row-menu-option" id="chatRowMenuMuteOption">알림 끄기</div>
     <div class="chat-row-menu-option" id="chatRowMenuLeaveOption" style="color:var(--cta);">채팅방 나가기</div>
     <div class="chat-row-menu-option" id="chatRowMenuDeleteOption" style="color:#e5484d;font-weight:700;">채팅방 삭제하기</div>
   </div>
@@ -29465,6 +29466,7 @@ function openChatRowMenu(roomId, anchorBtn, keepOpen){
   }
   chatRowMenuRoomId = roomId;
   document.getElementById('chatRowMenuPinOption').textContent = room.pinned ? '상단 고정 해제하기' : '채팅방 상단에 고정하기';
+  document.getElementById('chatRowMenuMuteOption').textContent = room.muted ? '알림 켜기' : '알림 끄기';
 
   menu.classList.add('show');
   const rect = anchorBtn.getBoundingClientRect();
@@ -29483,6 +29485,12 @@ document.getElementById('chatRowMenuPinOption').addEventListener('click', () => 
   room.pinned = !room.pinned;
   renderChatList();
   showToast(room.pinned ? '채팅방을 상단에 고정했어요.' : '상단 고정을 해제했어요.');
+});
+
+document.getElementById('chatRowMenuMuteOption').addEventListener('click', () => {
+  const roomId = chatRowMenuRoomId;
+  closeChatRowMenu();
+  toggleRoomMute(roomId);
 });
 
 document.getElementById('chatRowMenuLeaveOption').addEventListener('click', () => {
@@ -32890,10 +32898,14 @@ document.getElementById('extraInviteOption').addEventListener('click', (e) => {
   if(activeChatRoomId) openInviteMembersView(activeChatRoomId);
 });
 
-document.getElementById('extraMuteOption').addEventListener('click', async (e) => {
+document.getElementById('extraMuteOption').addEventListener('click', (e) => {
   e.stopPropagation();
   document.getElementById('chatExtraDropdown').classList.remove('open');
-  const roomId = activeChatRoomId;
+  toggleRoomMute(activeChatRoomId);
+});
+
+// 이 방 알림 끄기/켜기 - 채팅방 안 메뉴와 채팅 목록 메뉴가 같이 씀
+async function toggleRoomMute(roomId){
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
 
@@ -32911,7 +32923,7 @@ document.getElementById('extraMuteOption').addEventListener('click', async (e) =
       showToast(err.message);
     }
   }
-});
+}
 
 document.getElementById('chatExtraBtn').addEventListener('click', (e) => {
   e.stopPropagation();
