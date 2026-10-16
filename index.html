@@ -8706,11 +8706,11 @@
   /* 리뷰 카드 - 위는 사진(없으면 카테고리 색 + 아이콘) 꽉 채움, 왼쪽 아래 작성자 칩, 아래는 이름·별점·주소·한줄·버튼 */
   #feedListContainer .feed-review-card{ padding:0; overflow:hidden; border-radius:22px; margin-bottom:14px; }
   #feedListContainer .feed-ig-photos{ margin:0; height:180px; }
-  /* 사진은 잘리지 않게 풀샷으로 - 칸 비율은 첫 사진 비율(--feed-hero-ratio, setFeedHeroRatio가 넣음)에 맞추고,
-     너무 길쭉한 세로 사진만 4:5까지로 제한. 다른 비율의 사진은 그 칸 안에 비율 그대로 넣음 */
-  #feedListContainer .feed-ig-photos:not(.feed-ig-noimg){ height:auto; aspect-ratio:var(--feed-hero-ratio, 4 / 3); }
+  /* 사진 칸은 모든 카드가 같은 4:5 규격 - 가로 사진은 잘리지 않게 위아래 여백, 세로 사진은 칸을 꽉 채움(.feed-hero-fill, setFeedHeroFit이 넣음) */
+  #feedListContainer .feed-ig-photos:not(.feed-ig-noimg){ height:auto; aspect-ratio:4 / 5; }
   #feedListContainer .feed-review-photos-hero, #feedListContainer .feed-review-photos-hero img{ height:100%; }
   #feedListContainer .feed-review-photos-hero img{ object-fit:contain; background:var(--surface-2); }
+  #feedListContainer .feed-review-photos-hero img.feed-hero-fill{ object-fit:cover; }
   .feed-ig-noimg{ display:flex; align-items:center; justify-content:center; background:#C38D68; color:#FFFFFF; }
   .feed-ig-noimg[data-cat="cafe"]{ background:#A8B4A0; }
   .feed-ig-noimg[data-cat="experience"]{ background:#A9A3C4; }
@@ -15296,8 +15296,8 @@ function renderFeedPostCard(post, container){
   card.className = 'feed-post-card feed-post-hero feed-review-card';
   card.style.cursor = 'pointer';
   card.innerHTML = feedPostCardHtml(post);
-  // 이미 본 사진이면 비율을 알고 있으니 처음부터 그 크기로 (사진이 도착하고 칸 크기가 바뀌지 않게)
-  if(post.photos && post.photos[0]) setFeedHeroRatio(card.querySelector('.feed-ig-photos'), feedPhotoRatioCache.get(post.photos[0]));
+  // 이미 본 사진이면 비율을 알고 있으니 처음부터 맞는 방식으로 (사진이 도착하고 모양이 바뀌지 않게)
+  card.querySelectorAll('.feed-review-photos-hero img').forEach(img => setFeedHeroFit(img, feedPhotoRatioCache.get(img.getAttribute('src'))));
   container.appendChild(card);
   wireFeedPostCard(card, post);
   // 좋아요/댓글/수정/삭제/신고 버튼이 아닌, 카드의 나머지 부분을 누르면 상세보기로 들어감
@@ -15944,16 +15944,16 @@ document.addEventListener('load', (e) => {
   const img = e.target;
   if(img && img.tagName === 'IMG' && img.naturalWidth && img.naturalHeight){
     feedPhotoRatioCache.set(img.getAttribute('src'), img.naturalWidth / img.naturalHeight);
-    // 리뷰 목록 카드의 첫 사진이면 카드 사진 칸을 그 비율로 맞춤
-    if(img.parentElement && img.parentElement.classList.contains('feed-review-photos-hero') && img === img.parentElement.firstElementChild){
-      setFeedHeroRatio(img.closest('.feed-ig-photos'), img.naturalWidth / img.naturalHeight);
+    // 리뷰 목록 카드 사진이면 세로/가로에 맞춰 채우는 방식을 정함
+    if(img.parentElement && img.parentElement.classList.contains('feed-review-photos-hero')){
+      setFeedHeroFit(img, img.naturalWidth / img.naturalHeight);
     }
   }
 }, true);
-// 리뷰 목록 카드 사진 칸 비율 - 첫 사진 비율 그대로 (세로로 너무 긴 사진만 4:5로 제한, 아주 납작한 파노라마는 2:1까지)
-function setFeedHeroRatio(photosEl, ratio){
-  if(!photosEl || !(ratio > 0)) return;
-  photosEl.style.setProperty('--feed-hero-ratio', String(Math.min(2, Math.max(0.8, ratio))));
+// 리뷰 목록 카드 사진 - 세로 사진은 4:5 칸을 꽉 채우고, 가로 사진은 잘리지 않게 위아래 여백
+function setFeedHeroFit(img, ratio){
+  if(!img || !(ratio > 0)) return;
+  img.classList.toggle('feed-hero-fill', ratio < 1);
 }
 // 상세 내용을 다시 그렸을 때(수정 후 등) 사진 크기를 지금 한 번, 사진이 도착할 때마다 다시 맞춤
 function relayoutFeedDetailPhotosWhenLoaded(container){
