@@ -1904,6 +1904,14 @@
     text-overflow:ellipsis;
     margin-top:1px;
   }
+  /* 장소 모아보기 그리드만 - 정사각형 3열 대신 2열로 크게, 사진은 올린 비율 그대로(안 자름) 위아래로 이어 붙임
+     (작성자 리뷰 모아보기 그리드는 그대로) */
+  #feedTagListContainer.feed-tag-grid{ display:block; columns:2; column-gap:6px; }
+  #feedTagListContainer .feed-tag-grid-cell{ break-inside:avoid; margin-bottom:6px; border-radius:10px; }
+  #feedTagListContainer .feed-tag-grid-photo{ aspect-ratio:auto; }
+  #feedTagListContainer .feed-tag-grid-photo img{ height:auto; }
+  #feedTagListContainer .feed-tag-grid-photo .feed-tag-grid-noimg{ aspect-ratio:1; }
+  #feedTagListContainer .feed-tag-grid-info{ padding:5px 7px 7px; }
   /* 장소 모아보기 - 세로형(리스트) 보기: 썸네일 + 작성자/별점/한줄평을 한 줄씩 세로로 나열 */
   .feed-tag-list{
     display:flex;
@@ -15937,9 +15945,10 @@ function relayoutFeedDetailPhotosWhenLoaded(container){
   container.querySelectorAll('.feed-detail-photos img').forEach(img => img.addEventListener('load', () => layoutFeedDetailPhotos(container)));
   layoutFeedDetailPhotos(container);
 }
-// 상세 사진 크기 - 사진은 항상 한 번에 한 장씩, 화면 너비에 꽉 차게 (옆으로 넘겨야 다음 사진이 나옴).
-// 높이는 첫 번째 사진 비율에 맞추고, 다른 비율의 사진은 그 틀에 맞게 가장자리를 잘라서 채움.
-// 사진이 하나면 원래 비율 그대로 화면 너비에 맞춤 (너무 길쭉한 세로 사진만 높이를 제한)
+// 상세 사진 크기 - 사진은 항상 한 번에 한 장씩, 화면 너비만큼의 칸에 하나씩 (옆으로 넘겨야 다음 사진이 나옴).
+// 사진이 여러 장이면 칸 높이는 사진들 중 가장 긴 사진에 맞춰 모두 같게 하고, 각 사진은 칸 안에 올린 비율 그대로
+// 안 자르고 넣음 (높이가 같으니 넘겨도 아래 내용이 안 밀림). 사진이 하나면 원래 비율 그대로 화면 너비에 맞춤
+// (너무 길쭉한 세로 사진만 높이를 제한)
 function layoutFeedDetailPhotos(container){
   const row = container.querySelector('.feed-detail-photos');
   if(!row) return;
@@ -15954,12 +15963,14 @@ function layoutFeedDetailPhotos(container){
   if(imgs.length === 1){
     H = ratios[0] > 0 ? Math.min(W / ratios[0], maxH) : W * 0.75;
   } else if(row.dataset.lockedH){
-    // 사진이 여러 장이면 처음 정한 높이를 끝까지 유지 - 늦게 도착한 사진 때문에 높이가 바뀌면 보던 사진 크기가 달라짐
+    // 높이가 한 번 정해지면 끝까지 유지 - 늦게 도착한 사진 때문에 높이가 바뀌면 아래 내용이 밀림
     H = parseFloat(row.dataset.lockedH);
   } else {
-    // 첫 사진 비율로 높이를 정함 (아주 납작한 파노라마도 너무 얇아지지 않게 최소 높이)
-    H = ratios[0] > 0 ? Math.max(W * 0.55, Math.min(W / ratios[0], maxH)) : W;
-    if(ratios[0] > 0) row.dataset.lockedH = String(H);
+    // 크기를 아는 사진들 중 가장 긴 사진 높이로 (아주 납작한 파노라마만 있어도 너무 얇아지지 않게 최소 높이)
+    const known = ratios.filter(r => r > 0);
+    H = known.length ? Math.max(W * 0.55, ...known.map(r => Math.min(W / r, maxH))) : W;
+    // 사진 크기를 다 알았거나, 기다리다 다 보여주기로 했으면 그 높이로 고정
+    if(known.length === ratios.length || row.dataset.revealAll === '1') row.dataset.lockedH = String(H);
   }
   // 크기를 바꿔도 보던 위치는 그대로 (사진이 늦게 와서 다시 맞출 때 옆으로 튀지 않게)
   const scrollLeft = row.scrollLeft;
@@ -15967,6 +15978,8 @@ function layoutFeedDetailPhotos(container){
     const r = ratios[i] || 3 / 4;
     img.style.height = Math.round(H) + 'px';
     img.style.width = Math.round(imgs.length === 1 ? Math.min(W, H * r) : W) + 'px';
+    // 여러 장일 땐 칸(W x H)에 사진을 자르지 않고 비율 그대로 넣음 (남는 곳은 배경색)
+    img.style.objectFit = imgs.length === 1 ? '' : 'contain';
   });
   if(row.scrollLeft !== scrollLeft) row.scrollLeft = scrollLeft;
   // 앞에서부터 크기를 다 아는 사진까지만 보여줌 (그 앞 사진 크기가 안 바뀌니 더 이상 안 밀림)
@@ -15976,7 +15989,7 @@ function layoutFeedDetailPhotos(container){
   imgs.forEach((img, i) => img.classList.toggle('size-pending', !revealAll && firstUnknown !== -1 && i >= firstUnknown));
   if(firstUnknown !== -1 && !revealAll && !row.dataset.revealTimer){
     row.dataset.revealTimer = '1';
-    setTimeout(() => { row.dataset.revealAll = '1'; imgs.forEach(img => img.classList.remove('size-pending')); }, 800);
+    setTimeout(() => { row.dataset.revealAll = '1'; layoutFeedDetailPhotos(container); imgs.forEach(img => img.classList.remove('size-pending')); }, 800);
   }
 }
 function showFeedPostDetailView(){
