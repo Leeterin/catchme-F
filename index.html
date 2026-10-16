@@ -18639,6 +18639,17 @@ function nextVisibilityOnClick(vis, clickedVis, clickedGroupId){
   return { groupIds: nextGroupIds, private: false };
 }
 
+// 오늘 예약 가능 시간은 이미 지난 부분을 빼고 보여줌 (지금을 5분 단위로 올린 시각부터) - 일정 목록 표시용, 저장된 시간은 그대로
+// 다 지났으면 null - 목록에서 뺌. 서버도 지난 시간 예약 요청은 막음
+function availRangeFromNow(ev, dateObj){
+  const r = getEventDisplayRangeForDate(ev, dateObj);
+  if(ev.type !== 'available') return r;
+  const pastEnd = formAvailPastEnd(dateKeyOf(dateObj));
+  if(pastEnd <= r.startMin) return r;
+  if(pastEnd >= r.endMin) return null;
+  return { startMin: pastEnd, endMin: r.endMin };
+}
+
 // ---------- 하루 보기 ----------
 function renderDayView(){
   // 올해면 연도는 빼서 짧게 - 오른쪽 버튼들(이전/다음/음성/+)과 한 줄에 있어서 "화요 / 일"처럼 글자 중간에서 줄이 바뀌었음
@@ -18647,7 +18658,7 @@ function renderDayView(){
     `${dayYear}${scheduleFocusDate.getMonth()+1}월 ${scheduleFocusDate.getDate()}일 ${WEEKDAY_KO[scheduleFocusDate.getDay()]}요일`;
   renderDayTodayIndicator();
 
-  const events = filterEventsByScheduleGroup(getEventsForDate(scheduleFocusDate));
+  const events = filterEventsByScheduleGroup(getEventsForDate(scheduleFocusDate)).filter(ev => availRangeFromNow(ev, scheduleFocusDate));
   const list = document.getElementById('dayEventList');
   list.innerHTML = '';
 
@@ -18672,7 +18683,7 @@ function renderDayView(){
   }
 
   events.forEach(ev => {
-    const disp = getEventDisplayRangeForDate(ev, scheduleFocusDate);
+    const disp = availRangeFromNow(ev, scheduleFocusDate);
     if(ev.isPendingHold){
       // 예약 요청 보내고 상대 응답을 기다리는 중 - 수정/삭제/공개설정 없이 상태만 보여줌 (채팅에서 취소하면 자동으로 사라짐)
       const pendingCard = document.createElement('div');
@@ -22432,7 +22443,7 @@ function renderMonthSchedView(){
 
 function renderMonthSelectedPanel(){
   const panel = document.getElementById('monthSelectedPanel');
-  const events = filterEventsByScheduleGroup(getEventsForDate(monthSelectedDate));
+  const events = filterEventsByScheduleGroup(getEventsForDate(monthSelectedDate)).filter(ev => availRangeFromNow(ev, monthSelectedDate));
   const dateLabel = `${monthSelectedDate.getMonth()+1}월 ${monthSelectedDate.getDate()}일 ${WEEKDAY_KO[monthSelectedDate.getDay()]}요일`;
 
   const selMemos = getMemosForDate(monthSelectedDate);
@@ -22451,7 +22462,7 @@ function renderMonthSelectedPanel(){
         const isSpecial = ev.isPendingHold || ev.isReservationLinked; // 이 둘은 채팅에서만 관리되는 일정이라 여기서 수정/삭제 안 함
         // 확정된 약속 + 아직 응답 기다리는 예약 요청 모두, 누르면 그 채팅방으로 이동
         const goesToChat = !!ev.sourceChatRoomId && (ev.isReservationLinked || ev.isPendingHold);
-        const disp = getEventDisplayRangeForDate(ev, monthSelectedDate);
+        const disp = availRangeFromNow(ev, monthSelectedDate);
         return `
         <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''} style="--ev:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}">
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}"></span>
@@ -22563,6 +22574,17 @@ function renderAgendaList(containerId, entries){
 }
 
 // 지금 보고 있는 일정 화면(하루/일주일/한달)이 뭐든 알아서 그 화면만 다시 그림 - 다른 뷰의 +버튼으로 추가/수정/삭제했을 때 씀
+// 캘린더를 켜 둔 채 시간이 지나면 오늘 예약 가능 시간 목록도 지금 시각에 맞춰 다시 그림 (5분 단위가 바뀔 때만)
+let schedListLastPastEnd = -1;
+setInterval(() => {
+  const pastEnd = formAvailPastEnd(dateKeyOf(new Date()));
+  if(pastEnd === schedListLastPastEnd) return;
+  schedListLastPastEnd = pastEnd;
+  const todayKey = dateKeyOf(TODAY);
+  if(document.getElementById('scheduleView-day').classList.contains('active') && dateKeyOf(scheduleFocusDate) === todayKey) renderDayView();
+  if(document.getElementById('scheduleView-month').classList.contains('active') && dateKeyOf(monthSelectedDate) === todayKey) renderMonthSelectedPanel();
+}, 15 * 1000);
+
 function refreshActiveScheduleView(){
   renderQuickAvailEntry();
   if(document.getElementById('scheduleView-day').classList.contains('active')) renderDayView();
