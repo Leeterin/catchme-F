@@ -12668,7 +12668,8 @@ function renderHomePending(){
   // 받은 친구 요청도 같이 - 예전엔 아래 친구 탭 숫자로만 보여서 놓치기 쉬웠음
   const friendReqs = (typeof INCOMING_FRIEND_REQUESTS !== 'undefined' ? INCOMING_FRIEND_REQUESTS : [])
     .map(u => ({ kind: 'friendRequest', user: u }));
-  const items = friendReqs.concat(homePendingItems.filter(x => CHAT_ROOMS[x.roomId]));
+  const items = friendReqs.concat(homePendingItems.filter(x => CHAT_ROOMS[x.roomId]
+    && !(x.kind === 'reservation' && x.start && new Date(x.start).getTime() < Date.now()))); // 시간이 지난 약속 요청은 자동 취소라 답할 필요 없음
   card.style.display = items.length ? '' : 'none';
   if(!items.length){ listEl.innerHTML = ''; return; }
   listEl.innerHTML = items.slice(0, 5).map((x, i) => {
@@ -18858,6 +18859,7 @@ function syncMemoDeleteToServer(memo){
 }
 
 // 로그인 직후 서버에 저장된(하루짜리) 일정들을 불러와 SCHEDULE_EVENTS에 합침
+const autoWithdrawCheckedRoomIds = new Set(); // 지난 요청 자동 취소를 이미 확인한 방
 async function loadScheduleFromServer(){
   if(!authToken) return;
   const start = new Date(TODAY); start.setDate(start.getDate() - 30);
@@ -18937,6 +18939,16 @@ async function loadScheduleFromServer(){
         return;
       }
       SCHEDULE_EVENTS.push({ id: 'ev' + (scheduleEventIdCounter++), serverId: sev.id, ...fields });
+    });
+    // 시간이 지났는데 아직 "예약중..."인 홀드가 있으면, 그 방의 지난 요청을 알아서 취소하러 감 (방마다 한 번만)
+    data.events.forEach(sev => {
+      if(!sev.isPendingHold || !sev.sourceChatRoomId || new Date(sev.startTime) >= new Date()) return;
+      if(autoWithdrawCheckedRoomIds.has(sev.sourceChatRoomId)) return;
+      const room = CHAT_ROOMS[sev.sourceChatRoomId];
+      if(!room || !room.isRealRoom) return;
+      autoWithdrawCheckedRoomIds.add(sev.sourceChatRoomId);
+      if(room._loaded) autoWithdrawExpiredReservations(sev.sourceChatRoomId, room);
+      else loadRoomMessagesFromServer(sev.sourceChatRoomId, room, false);
     });
     resyncAllScheduleEvents();
     if(typeof refreshActiveScheduleView === 'function') refreshActiveScheduleView();
@@ -26753,6 +26765,28 @@ function cancelLocationSuggest(msg){
 
 // ---------- 예약 취소 ----------
 
+// 상대가 답하지 않은 채 약속 시간이 지난 "내가 보낸 요청"은 알아서 취소(철회)함 - 철회 API를 그대로 재사용
+// (같은 요청을 여러 번 보내지 않게 한 번 시도한 건 기억해둠)
+const autoWithdrawnReservationIds = new Set();
+function autoWithdrawExpiredReservations(roomId, room){
+  if(!room || !authToken) return;
+  const now = Date.now();
+  const targets = (room.messages || []).filter(m => m.type === 'reservation' && m.who === 'me' && m.status === 'pending'
+    && m._serverId && m.startMs && m.startMs < now && !autoWithdrawnReservationIds.has(m._serverId));
+  if(!targets.length) return;
+  targets.forEach(m => autoWithdrawnReservationIds.add(m._serverId));
+  Promise.all(targets.map(m => apiRequest(`/chats/messages/${m._serverId}/withdraw`, { method: 'POST' })
+    .then(data => { Object.assign(m, mapServerReservationMessage(data.message)); return true; })
+    .catch(err => { console.error('[auto withdraw]', err); return false; })))
+    .then(results => {
+      if(!results.some(Boolean)) return;
+      saveChatCache(roomId, room.messages);
+      loadScheduleFromServer(); // 서버에서 정리된 "예약중..." 홀드를 내 캘린더에도 반영
+      if(activeChatRoomId === roomId) renderChatMessages();
+      renderChatList();
+    });
+}
+
 // 아직 상대가 수락/거절하기 전, 내가 보낸 요청을 스스로 철회
 function withdrawReservation(m){
   if(m._timeoutId) clearTimeout(m._timeoutId);
@@ -29554,6 +29588,7 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
     if(!keepOlder.length) room._historyComplete = data.messages.length < CHAT_SERVER_PAGE;
     room._loaded = true;
     saveChatCache(id, room.messages);
+    autoWithdrawExpiredReservations(id, room);
     // 이미 화면에 있는 대화와 똑같으면 다시 그리지 않음 - 방에 들어가자마자 한 번 더 깜빡이며 다시 그려지던 것 방지
     const changed = chatMessagesSignature(room.messages) !== before;
     if(activeChatRoomId === id){
@@ -29861,9 +29896,9 @@ function renderChatMessages(){
     if(m.type === 'reservation'){
       // 답을 못 받은 채 약속 시간이 지난 요청은 수락/거절 버튼 대신 "시간이 지났어요"로 (서버도 지난 요청은 수락을 막음)
       const expired = m.status === 'pending' && m.startMs && m.startMs < Date.now();
-      const statusLabel = expired ? '시간이 지났어요' : m.status === 'confirmed' ? '약속 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
+      const statusLabel = expired ? '시간이 지나 취소됐어요' : m.status === 'confirmed' ? '약속 확정됨' : (m.status === 'declined' ? '거절됨' : (m.status === 'cancelled' ? '취소됨' : (m.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
       const showActions = m.who === 'other' && m.status === 'pending' && !expired;
-      const showWithdraw = m.who === 'me' && m.status === 'pending';
+      const showWithdraw = m.who === 'me' && m.status === 'pending' && !expired;
       const showConfirmedExtras = m.status === 'confirmed';
       const cardHtml = `
         <div class="reservation-card">
