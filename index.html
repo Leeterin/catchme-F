@@ -8480,6 +8480,56 @@
   body.dark-mode .friends-header .add-friend-btn#openGroupsBtn, body.dark-mode #panel-chat .new-chat-wrap > .icon-btn{ background:var(--hm-well) !important; }
   .friends-header .add-friend-btn svg, #panel-chat .new-chat-wrap > .icon-btn svg{ width:20px; height:20px; }
   .friends-header .add-friend-btn#addFriendBtn{ font-size:24px; font-weight:500; }
+
+  /* 친구·채팅 목록 시안 - 검색칸, 내 카드, 칩, 오른쪽 시간 칩, 다가오는 약속 카드 */
+  .fl-count{ color:var(--hm-dim); font-weight:700; margin-left:2px; }
+  .fl-search{ display:flex; align-items:center; gap:10px; height:48px; padding:0 16px; margin:0 0 14px; border-radius:18px; background:var(--hm-card); color:var(--hm-dim); }
+  .fl-search input{ flex:1; min-width:0; border:none; outline:none; background:transparent; font:inherit; font-size:15px; color:var(--hm-ink); -webkit-appearance:none; appearance:none; }
+  .fl-search input::placeholder{ color:var(--hm-dim); }
+  .fl-search input::-webkit-search-cancel-button{ opacity:0.5; }
+  .fl-me-card, .cl-next-card{ display:flex; align-items:center; gap:14px; width:100%; margin:0 0 14px; padding:14px 18px; border:none; border-radius:22px; background:var(--hm-card); color:var(--hm-ink); font:inherit; text-align:left; cursor:pointer; }
+  .fl-me-card .placeholder-avatar{ width:48px; height:48px; font-size:16px; flex-shrink:0; }
+  .fl-me-card .placeholder-avatar img{ width:100%; height:100%; border-radius:50%; object-fit:cover; }
+  .fl-me-card .placeholder-text b small{ font-size:12.5px; font-weight:600; color:var(--hm-dim); margin-left:2px; }
+  .fl-chips{ display:flex; gap:8px; overflow-x:auto; margin:0 0 14px; padding:1px 0; scrollbar-width:none; }
+  .fl-chips:empty{ display:none; }
+  .fl-chips::-webkit-scrollbar{ display:none; }
+  .fl-chip{ flex-shrink:0; height:36px; padding:0 15px; border:none; border-radius:999px; background:var(--hm-card); color:var(--hm-ink); font:inherit; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .fl-chip.on{ background:var(--hm-ink); color:var(--hm-bg); }
+  .fl-slot{ flex-shrink:0; padding:4px 8px; border-radius:8px; background:var(--hm-accent-soft); color:var(--hm-accent); font-size:12.5px; font-weight:700; white-space:nowrap; }
+  .fl-slot.off{ background:transparent; color:var(--hm-dim); font-weight:500; padding:4px 0; }
+  .fl-plan-btn{ flex-shrink:0; width:42px; height:42px; display:flex; align-items:center; justify-content:center; border:none; border-radius:14px; background:var(--hm-well); color:var(--hm-accent); cursor:pointer; }
+  #friendsListContainer .placeholder-row, #chatListContainer .placeholder-row{ gap:12px; padding:14px 16px; }
+  #friendsListContainer .placeholder-avatar, #chatListContainer .placeholder-avatar{ width:48px; height:48px; font-size:16px; font-weight:800; flex-shrink:0; }
+  #friendsListContainer .placeholder-text b, #chatListContainer .placeholder-text b, .fl-me-card .placeholder-text b{ font-size:15.5px; font-weight:800; color:var(--hm-ink); }
+  #friendsListContainer .placeholder-text span, #chatListContainer .placeholder-text span, .fl-me-card .placeholder-text span{ font-size:13px; color:var(--hm-dim); margin-top:3px; }
+  .fl-invite-card{ display:flex; align-items:center; gap:14px; width:100%; margin:0 0 14px; padding:14px 18px; border:1.5px solid #DDD8D1; border-radius:22px; background:transparent; color:var(--hm-ink); font:inherit; text-align:left; cursor:pointer; }
+  body.dark-mode .fl-invite-card{ border-color:var(--hm-line); }
+  .fl-invite-card > svg:last-child{ color:var(--hm-dim); flex-shrink:0; }
+  .fl-invite-text{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .fl-invite-text b{ font-size:15px; font-weight:800; }
+  .fl-invite-text small{ font-size:12.5px; color:var(--hm-dim); }
+  /* 채팅 - 다가오는 약속 카드 */
+  .cl-next-date{ display:flex; flex-direction:column; align-items:center; min-width:34px; padding-right:14px; border-right:1.5px dashed var(--hm-line); flex-shrink:0; }
+  .cl-next-date small{ font-size:12px; color:var(--hm-dim); }
+  .cl-next-date b{ font-size:24px; font-weight:800; color:var(--hm-accent); line-height:1.1; }
+  .cl-next-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .cl-next-info b{ font-size:15.5px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cl-next-info small{ font-size:13px; color:var(--hm-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* 채팅 목록 줄 - 시간/안 읽음, 꼬리표, 단톡 겹친 얼굴 */
+  .cl-meta{ display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; align-self:flex-start; padding-top:2px; }
+  .cl-time{ font-size:12px; color:var(--hm-dim); white-space:nowrap; }
+  .cl-unread{ min-width:22px; height:22px; padding:0 7px; border-radius:11px; background:var(--hm-accent); color:#fff; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .cl-count{ font-size:14px; font-weight:700; color:var(--hm-dim); }
+  .cl-tag{ display:inline-block; margin-right:6px; padding:1px 7px; border-radius:6px; background:var(--hm-accent-soft); color:var(--hm-accent); font-style:normal; font-size:12px; font-weight:700; vertical-align:1px; }
+  .cl-tag.gray{ background:var(--hm-well); color:var(--hm-ink); }
+  #chatListContainer .placeholder-avatar.cl-stack{ position:relative; background:transparent; overflow:visible; }
+  .cl-stack-face{ position:absolute; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:800; color:var(--hm-ink); overflow:hidden; }
+  .cl-stack-face:first-child{ left:0; top:0; }
+  .cl-stack-face:last-child{ right:0; bottom:0; box-shadow:0 0 0 2px var(--hm-card); }
+  .cl-stack-face img{ width:100%; height:100%; object-fit:cover; }
+  #chatListContainer .chat-row-menu-btn{ width:22px; margin-left:-6px; color:var(--hm-dim); opacity:0.6; flex-shrink:0; }
+  #panel-chat .new-chat-wrap > .icon-btn{ background:var(--hm-accent) !important; color:#fff !important; }
 </style>
 </head>
 <body class="app-booting">
@@ -9006,7 +9056,7 @@
     <div class="friends-list-view active" id="friendsListView">
       <div class="friends-header">
         <div>
-          <h2>친구</h2>
+          <h2>친구 <span class="fl-count" id="friendsCountLabel"></span></h2>
           <p class="desc">함께 약속을 잡을 친구들이에요.</p>
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0;">
@@ -9015,6 +9065,9 @@
         </div>
       </div>
       <div id="incomingFriendRequestsContainer"></div>
+      <label class="fl-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input type="search" id="friendsFilterInput" placeholder="이름, 아이디로 찾기" autocomplete="off" /></label>
+      <div id="friendsMeCard"></div>
+      <div class="fl-chips" id="friendsGroupChips"></div>
       <div id="friendsListContainer"></div>
     </div>
 
@@ -9780,6 +9833,8 @@
           </div>
         </div>
       </div>
+      <div id="chatNextApptCard"></div>
+      <div class="fl-chips" id="chatFilterChips"></div>
       <div id="chatListContainer"></div>
     </div>
 
@@ -11866,6 +11921,7 @@ function showTab(tabKey){
       document.getElementById('friendGroupDetailView').classList.remove('active');
       document.getElementById('friendsListView').classList.add('active');
       renderFriendsList();
+      loadHomeFriendMatches();
     }
     if(tabKey === 'chat'){
       // 채팅방이 열려있었다면 닫고 항상 채팅 목록(첫 화면)부터 보여줌
@@ -12159,6 +12215,7 @@ async function loadHomeFriendMatches(force){
     homeMatchData = { error: true, friends: [] };
   }
   renderHomeFriendMatches();
+  if(currentTopTab === 'friends') renderFriendsList(); // 친구 목록 오른쪽의 겹치는 시간도 같은 데이터
 }
 // 친구 한 명의 겹치는 시간을 칩 목록으로 - 오늘 이미 지난 시간은 빼고, 오늘 진행 중이면 지금 이후만
 function homeMatchSlotsOf(entry){
@@ -22588,23 +22645,104 @@ function renderFriendsList(){
     container.appendChild(friendsHeading);
   }
 
+  renderFriendsTopParts();
   if(FRIENDS.length === 0 && OUTGOING_FRIEND_REQUESTS.length === 0){
     container.insertAdjacentHTML('beforeend', `<div class="search-empty">아직 친구가 없어요. 위의 + 버튼으로 아이디를 검색해 추가해요.</div>${friendInviteBoxHtml()}`);
   }
-  FRIENDS.forEach(friend => {
+  // 위쪽 검색칸(이름/아이디)과 그룹 칩으로 거른 친구만
+  const q = (friendsListQuery || '').trim().toLowerCase().replace(/^@/, '');
+  const group = MY_GROUPS.find(g => g.id === friendsListGroupId);
+  const shownFriends = FRIENDS.filter(f => (!group || (f.groupIds || []).includes(group.id))
+    && (!q || (f.name || '').toLowerCase().includes(q) || (f.username || '').toLowerCase().includes(q)));
+  if(FRIENDS.length && !shownFriends.length){
+    container.insertAdjacentHTML('beforeend', `<div class="search-empty">${q ? '찾는 친구가 없어요.' : '이 그룹에 친구가 없어요.'}</div>`);
+  }
+  shownFriends.forEach(friend => {
     const row = document.createElement('div');
     row.className = 'placeholder-row';
     const avatarInner = friend.avatar
       ? `<img loading="lazy" src="${friend.avatar}" alt="${escapeHtml(friend.name)}" />`
       : escapeHtml(friend.name[0]);
+    // 오른쪽: 이번 주 서로 겹치게 열어둔 첫 시간(홈 "시간 맞는 친구"와 같은 데이터) + 바로 약속 잡기 버튼
+    const slot = friendListMatchLabel(friend);
     row.innerHTML = `
       <div class="placeholder-avatar" style="${friend.avatar ? '' : `background:${friend.color}`}">${avatarInner}</div>
-      <div class="placeholder-text"><b>${escapeHtml(friend.name)}${renderMeetBadgeChip(friend)}</b><span>${escapeHtml(friend.status)}</span></div>
+      <div class="placeholder-text" style="flex:1;"><b>${escapeHtml(friend.name)}${renderMeetBadgeChip(friend)}</b><span>${escapeHtml(friend.status)}</span></div>
+      ${slot ? `<span class="fl-slot${slot.on ? '' : ' off'}">${escapeHtml(slot.text)}</span>` : ''}
+      <button type="button" class="fl-plan-btn" aria-label="${escapeHtml(friend.name)}님과 약속 잡기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><path d="M21 12V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h7"/><path d="M16 2v4M8 2v4M3 10h18M19 16v6M16 19h6"/></svg></button>
     `;
     row.addEventListener('click', () => openFriendProfile(friend.id));
+    row.querySelector('.fl-plan-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPlanStart(friend.id); // 친구 프로필의 [약속 잡기]와 같은 흐름
+    });
     container.appendChild(row);
   });
+  // 친구가 있을 때도 맨 아래에 링크 초대 (가입 안 한 친구에게 약속 링크 보내기 - 기존 초대 흐름 그대로)
+  if(FRIENDS.length){
+    container.insertAdjacentHTML('beforeend', `
+      <button type="button" class="fl-invite-card" data-friend-invite="link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        <span class="fl-invite-text"><b>링크로 친구 초대</b><small>가입 없이 되는 시간을 골라줘요</small></span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+      </button>`);
+  }
 }
+// ---------- 친구 목록 위쪽: 친구 수, 내 카드(이번 주 열어둔 시간), 그룹 칩 ----------
+var friendsListQuery = '';
+var friendsListGroupId = null; // null = 전체 (var: 이 줄보다 먼저 목록이 그려져도 안 터지게)
+function friendListMatchLabel(friend){
+  if(!homeMatchData || homeMatchData.error || !homeMatchData.myAvailability) return null;
+  const entry = (homeMatchData.friends || []).find(x => x.userId === friend.id);
+  const slots = entry ? homeMatchSlotsOf(entry) : [];
+  return slots.length ? { on: true, text: homeMatchSlotShort(slots[0]) } : { on: false, text: '겹치는 시간 없음' };
+}
+function renderFriendsTopParts(){
+  document.getElementById('friendsCountLabel').textContent = FRIENDS.length ? FRIENDS.length : '';
+  // 내 카드 - 앞으로 7일 중 내가 열어둔 요일과 총 시간 (누르면 예약 가능 시간 빠르게 열기)
+  const meEl = document.getElementById('friendsMeCard');
+  if(!authToken){ meEl.innerHTML = ''; }
+  else {
+    const days = [];
+    let mins = 0;
+    for(let i = 0; i < 7; i++){
+      const d = new Date(TODAY);
+      d.setDate(d.getDate() + i);
+      const avail = getEventsForDate(d).filter(e => e.type === 'available');
+      if(!avail.length) continue;
+      days.push(i === 0 ? '오늘' : WEEKDAY_KO[d.getDay()]);
+      avail.forEach(e => { const r = getEventDisplayRangeForDate(e, d); mins += Math.max(0, r.endMin - r.startMin); });
+    }
+    const name = myProfileData.name || '나';
+    const img = myProfileData.profileImageUrl;
+    const hours = Math.round(mins / 6) / 10;
+    meEl.innerHTML = `
+      <button type="button" class="fl-me-card" id="friendsMeCardBtn">
+        <span class="placeholder-avatar fl-me-avatar"${img ? '' : ` style="background:${myProfileData.color || 'var(--hm-accent-soft)'}"`}>${img ? `<img src="${img}" alt="" />` : escapeHtml(name[0])}</span>
+        <span class="placeholder-text" style="flex:1;"><b>${escapeHtml(name)} <small>나</small></b><span>${days.length ? `${escapeHtml(days.join('·'))} 열어둠` : '이번 주 열어둔 시간이 없어요'}</span></span>
+        <span class="fl-slot${days.length ? '' : ' off'}">${days.length ? `${hours}시간` : '시간 열기'}</span>
+      </button>`;
+    document.getElementById('friendsMeCardBtn').addEventListener('click', () => openQuickAvail());
+  }
+  // 그룹 칩 - 전체 + 내가 만든 친구 그룹 (그룹을 누르면 그 그룹 친구만)
+  if(friendsListGroupId && !MY_GROUPS.some(g => g.id === friendsListGroupId)) friendsListGroupId = null;
+  const chipsEl = document.getElementById('friendsGroupChips');
+  chipsEl.innerHTML = !FRIENDS.length ? '' : [`<button type="button" class="fl-chip${friendsListGroupId ? '' : ' on'}" data-group="">전체 ${FRIENDS.length}</button>`]
+    .concat(MY_GROUPS.map(g => {
+      const n = FRIENDS.filter(f => (f.groupIds || []).includes(g.id)).length;
+      return `<button type="button" class="fl-chip${friendsListGroupId === g.id ? ' on' : ''}" data-group="${escapeHtml(g.id)}">${g.emoji ? escapeHtml(g.emoji) + ' ' : ''}${escapeHtml(g.name)} ${n}</button>`;
+    })).join('');
+}
+document.getElementById('friendsGroupChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.fl-chip');
+  if(!chip) return;
+  friendsListGroupId = chip.dataset.group || null;
+  renderFriendsList();
+});
+document.getElementById('friendsFilterInput').addEventListener('input', (e) => {
+  friendsListQuery = e.target.value;
+  renderFriendsList();
+});
 renderFriendsList();
 renderIncomingFriendRequests();
 updateFriendsNavBadge();
@@ -28102,44 +28240,62 @@ function renderChatList(){
     return (b.lastActivity || 0) - (a.lastActivity || 0);
   });
 
+  // 맨 위 다가오는 약속 카드 + [전체/안 읽음/약속 있는 방] 칩
+  const upcoming = homeUpcomingAppointments();
+  renderChatListTopParts(upcoming, sortedEntries);
   // 채팅이 하나도 없을 때 텅 빈 화면 대신 뭘 하면 되는지 알려줌
   if(!sortedEntries.length){
     container.innerHTML = `<div class="search-empty" style="padding:28px 8px;text-align:center;line-height:1.6;">아직 채팅이 없어요.<br/>친구에게 약속을 신청하면 채팅방이 자동으로 생겨요.<br/><button type="button" class="search-add-btn" id="chatEmptyPlanBtn" style="margin-top:12px;">약속 잡기</button></div>`;
     document.getElementById('chatEmptyPlanBtn').addEventListener('click', () => { if(authToken) openPlanStart(); });
     return;
   }
+  const apptRoomIds = new Set(upcoming.map(x => x.roomId));
+  const shownEntries = sortedEntries.filter(([id, room]) => chatListFilter === 'unread' ? room.unreadCount > 0
+    : chatListFilter === 'appt' ? apptRoomIds.has(id) : true);
+  if(!shownEntries.length){
+    container.innerHTML = `<div class="search-empty" style="padding:28px 8px;text-align:center;">${chatListFilter === 'unread' ? '안 읽은 채팅이 없어요.' : '다가오는 약속이 있는 채팅방이 없어요.'}</div>`;
+    return;
+  }
 
-  sortedEntries.forEach(([id, room]) => {
+  shownEntries.forEach(([id, room]) => {
     const last = room.messages[room.messages.length - 1];
     let previewText = '';
+    let previewTag = null; // 약속/장소 관련 메시지는 앞에 작은 꼬리표 ("장소 제안" 등)
     // 미리보기 만들다가 한 방에서 에러가 나도 나머지 채팅방은 목록에 다 보이도록 방마다 따로 감쌈
     try {
     if(last){
       if(last.type === 'reservation'){
         const statusLabel = last.status === 'confirmed' ? '약속 확정됨' : (last.status === 'declined' ? '거절됨' : (last.status === 'cancelled' ? '취소됨' : (last.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
-        previewText = `${ICO.calendar} 약속 요청 (${statusLabel})`;
+        previewTag = '약속 요청';
+        previewText = statusLabel;
       } else if(last.type === 'location-suggest'){
         const statusLabel = last.status === 'confirmed' ? '장소로 확정됨' : (last.status === 'cancelled' ? '제안 취소됨' : '제안됨');
-        previewText = `${ICO.pin} 장소 제안 - ${escapeHtml(last.place)} (${statusLabel})`;
+        previewTag = '장소 제안';
+        previewText = `${escapeHtml(last.place)}${last.status === 'confirmed' || last.status === 'cancelled' ? ` (${statusLabel})` : ''}`;
       } else if(last.type === 'location-fixed'){
-        previewText = `${ICO.check} 장소 확정 - ${escapeHtml(last.place)}`;
+        previewTag = '장소 확정';
+        previewText = escapeHtml(last.place);
       } else if(last.type === 'time-suggest'){
-        previewText = `${ICO.calendar} ${last.dateLabel} ${last.timeLabel} 제안`;
+        previewTag = { text: '시간 제안', gray: true };
+        previewText = `${last.dateLabel} ${last.timeLabel}`;
       } else if(last.type === 'time-options-suggest'){
         // 채팅 목록(/chats)의 마지막 메시지 미리보기에는 후보 목록(options)이 빈 배열로 와서,
         // 후보가 없을 때도 터지지 않게 해야 함 (예전엔 여기서 에러가 나서 이 방 아래의 채팅방들이 전부 안 보였음)
+        previewTag = { text: '시간 투표', gray: true };
         if(last.status === 'confirmed'){
           const winning = last.options.find(o => o.votes.length >= getTotalParticipants(room)) || last.options[0];
-          previewText = winning ? `${ICO.check} ${winning.dateLabel} ${winning.timeLabel}로 확정` : `${ICO.check} 약속 시간이 확정됐어요`;
+          previewText = winning ? `${winning.dateLabel} ${winning.timeLabel}로 확정` : '약속 시간이 확정됐어요';
         } else if(last.status === 'cancelled'){
-          previewText = `${ICO.x} 약속이 취소됨`;
+          previewText = '약속이 취소됨';
         } else {
-          previewText = last.options.length ? `${ICO.calendar} 시간 후보 ${last.options.length}개 제안` : `${ICO.calendar} 시간 후보 투표`;
+          previewText = last.options.length ? `후보 ${last.options.length}개` : '시간 후보 투표';
         }
       } else if(last.type === 'location-recommend'){
-        previewText = `${ICO.pin} ${escapeHtml(last.status === 'COMPLETED' ? `모임 장소 추천 결과${last.areaName ? ' - ' + last.areaName : ''}` : (last.status === 'CANCELLED' ? '모임 장소 추천 취소됨' : '모임 장소 추천 - 출발지 입력 중'))}`;
+        previewTag = '장소 추천';
+        previewText = escapeHtml(last.status === 'COMPLETED' ? `추천 결과${last.areaName ? ' - ' + last.areaName : ''}` : (last.status === 'CANCELLED' ? '추천 취소됨' : '출발지 입력 중'));
       } else if(last.type === 'hotplace'){
-        previewText = `${ICO.pin} ${escapeHtml(last.location)} 근처 핫플 보기`;
+        previewTag = '핫플';
+        previewText = `${escapeHtml(last.location)} 근처`;
       } else if(last.type === 'system-notice'){
         previewText = systemNoticeHTML(last);
       } else if(last.type === 'image'){
@@ -28152,25 +28308,33 @@ function renderChatList(){
       console.error('[chat list preview]', err);
       previewText = '';
     }
-    const noPrefixTypes = last && (last.type === 'hotplace' || last.type === 'system-notice');
+    // 꼬리표가 붙는 메시지와 알림은 보낸 사람 없이, 보통 메시지는 내가 보냈을 때만 "나:"
+    const noPrefixTypes = last && (previewTag || last.type === 'system-notice');
+    const tagObj = typeof previewTag === 'string' ? { text: previewTag } : previewTag;
     const preview = last
-      ? (noPrefixTypes ? previewText : `${last.who === 'me' ? '나' : escapeHtml(room.name)}: ${previewText}`)
+      ? `${tagObj ? `<em class="cl-tag${tagObj.gray ? ' gray' : ''}">${tagObj.text}</em>` : ''}${noPrefixTypes || last.who !== 'me' ? '' : '나: '}${previewText}`
       : '대화를 시작해보세요';
 
     const row = document.createElement('div');
     row.className = 'placeholder-row chat-row-with-menu';
+    // 단톡방에 사진이 없으면 멤버 두 명 얼굴을 겹쳐서
+    const stackMembers = !room.avatar && room.isGroup && room.members
+      ? room.members.filter(m => !currentUser || m.userId !== currentUser.id).slice(0, 2) : [];
     const avatarInner = room.avatar
       ? `<img loading="lazy" src="${room.avatar}" alt="${escapeHtml(room.name)}" />`
-      : escapeHtml(room.initial);
+      : stackMembers.length === 2
+        ? stackMembers.map(m => `<span class="cl-stack-face" style="${m.avatar ? '' : `background:${m.color}`}">${m.avatar ? `<img loading="lazy" src="${m.avatar}" alt="" />` : escapeHtml((m.name || '?')[0])}</span>`).join('')
+        : escapeHtml(room.initial);
     const unreadBadge = room.unreadCount > 0
-      ? `<span class="nav-badge" style="position:static;flex-shrink:0;">${room.unreadCount > 9 ? '9+' : room.unreadCount}</span>`
+      ? `<span class="cl-unread">${room.unreadCount > 99 ? '99+' : room.unreadCount}</span>`
       : '';
+    const memberCount = room.isGroup && room.members && room.members.length ? ` <small class="cl-count">${room.members.length}</small>` : '';
     const mutedIcon = room.muted ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11" style="vertical-align:-1px;margin-left:3px;opacity:0.55;"><path d="M11 5 6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>' : '';
     const nameLabel = (room.pinned ? `${ICO.pushpin} ${escapeHtml(room.name)}` : escapeHtml(room.name)) + mutedIcon;
     row.innerHTML = `
-      <div class="placeholder-avatar" style="${room.avatar ? '' : `background:${room.color}`}">${avatarInner}</div>
-      <div class="placeholder-text" style="flex:1;"><b>${nameLabel}</b><span>${preview}</span></div>
-      ${unreadBadge}
+      <div class="placeholder-avatar${stackMembers.length === 2 ? ' cl-stack' : ''}" style="${room.avatar || stackMembers.length === 2 ? '' : `background:${room.color}`}">${avatarInner}</div>
+      <div class="placeholder-text" style="flex:1;"><b>${nameLabel}${memberCount}</b><span>${preview}</span></div>
+      <div class="cl-meta"><span class="cl-time">${chatListTimeLabel(room.lastActivity)}</span>${unreadBadge}</div>
       <button type="button" class="chat-row-menu-btn" title="더보기">⋮</button>
     `;
     // 꾹 누르면 바로 열리지 않고 메뉴(고정/나가기/삭제)가 뜸 - 그 직후 손 뗄 때의 클릭은 무시
@@ -28212,6 +28376,53 @@ function renderChatList(){
     container.appendChild(row);
   });
 }
+
+// ---------- 채팅 목록 위쪽: 다가오는 약속 카드 + 필터 칩 ----------
+var chatListFilter = 'all'; // all | unread | appt (var: 이 줄보다 먼저 목록이 그려져도 안 터지게)
+function chatListTimeLabel(ms){
+  if(!ms) return '';
+  const d = new Date(ms);
+  const now = new Date();
+  const dayDiff = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400e3);
+  if(dayDiff <= 0) return `${d.getHours() < 12 ? '오전' : '오후'} ${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}`;
+  if(dayDiff === 1) return '어제';
+  return d.getFullYear() === now.getFullYear() ? `${d.getMonth() + 1}/${d.getDate()}` : `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+}
+function renderChatListTopParts(upcoming, sortedEntries){
+  const cardEl = document.getElementById('chatNextApptCard');
+  const next = upcoming[0];
+  if(next){
+    const d = next.pin.dateObj;
+    const places = roomMeetPlaces(next.room, next.pin).map(p => p.location);
+    cardEl.innerHTML = `
+      <button type="button" class="cl-next-card" id="chatNextApptBtn">
+        <span class="cl-next-date"><small>${WEEKDAY_KO[d.getDay()]}</small><b>${d.getDate()}</b></span>
+        <span class="cl-next-info">
+          <b>${escapeHtml([next.room.name || '약속', next.pin.timeLabel].filter(Boolean).join(' · '))}</b>
+          <small>${escapeHtml(places.length ? places.join(' → ') : '장소 정하는 중')}</small>
+        </span>
+        <span class="fl-slot">${escapeHtml(homeDdayLabel(d))}</span>
+      </button>`;
+    document.getElementById('chatNextApptBtn').addEventListener('click', () => {
+      // 채팅방을 밑에 깔고 약속 상세를 띄움 (닫으면 그 채팅방)
+      openChatRoom(next.roomId);
+      openAppointmentDetailView(next.roomId, next.pin.id);
+    });
+  } else {
+    cardEl.innerHTML = '';
+  }
+  const chipsEl = document.getElementById('chatFilterChips');
+  if(!sortedEntries.length){ chipsEl.innerHTML = ''; return; }
+  const unread = sortedEntries.reduce((n, [, r]) => n + (r.unreadCount > 0 ? r.unreadCount : 0), 0);
+  chipsEl.innerHTML = [['all', '전체'], ['unread', `안 읽음${unread ? ' ' + (unread > 99 ? '99+' : unread) : ''}`], ['appt', '약속 있는 방']]
+    .map(([k, label]) => `<button type="button" class="fl-chip${(chatListFilter || 'all') === k ? ' on' : ''}" data-filter="${k}">${label}</button>`).join('');
+}
+document.getElementById('chatFilterChips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.fl-chip');
+  if(!chip) return;
+  chatListFilter = chip.dataset.filter;
+  renderChatList();
+});
 
 // ---------- 채팅 목록 각 방의 "⋮" 메뉴 (상단 고정 / 나가기) ----------
 let chatRowMenuRoomId = null;
