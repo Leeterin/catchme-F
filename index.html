@@ -8197,6 +8197,92 @@
   .home-widget-info b{ font-size:14.5px; }
   .home-widget-info small{ font-size:12px; color:var(--hm-dim); }
   .home-widget-add{ flex-shrink:0; border:none; padding:8px 14px; border-radius:999px; background:var(--hm-accent); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  /* ===================== 캘린더 탭 새 디자인 (홈과 같은 밋집: 베이지 바탕 + 흰 카드 + 토마토색) =====================
+     기능(버튼·id·data-*)은 그대로, 모양만. 내 캘린더(#panel-schedule)에만 적용 - 친구 캘린더는 그대로 */
+  body:has(#panel-schedule.active), body.dark-mode:has(#panel-schedule.active){ background:var(--hm-bg); }
+  #panel-schedule{ color:var(--hm-ink); }
+  #panel-schedule .sched-title{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .sched-head-actions{ display:flex; gap:10px; flex-shrink:0; }
+  .sched-head-btn{
+    width:42px; height:42px; border:none; border-radius:50%; padding:0; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; background:#E6E3DE; color:var(--hm-ink);
+  }
+  body.dark-mode .sched-head-btn{ background:var(--hm-well); }
+  .sched-head-btn svg{ width:21px; height:21px; }
+  .sched-head-btn.add{ background:var(--hm-accent); color:#fff; }
+  /* 예약 가능 시간 입구 - 흰 카드 + 오른쪽 토마토 "빠르게 열기" */
+  #panel-schedule .quick-avail-entry, #panel-schedule .quick-avail-entry.compact{
+    gap:12px; padding:14px 14px 14px 12px; border:none; border-radius:22px; background:var(--hm-card); color:var(--hm-ink); margin-bottom:14px;
+  }
+  #panel-schedule .quick-avail-entry .quick-avail-entry-ico{ display:flex; width:44px; height:44px; border-radius:14px; background:var(--hm-accent-soft); color:var(--hm-accent); }
+  #panel-schedule .quick-avail-entry .quick-avail-entry-ico svg{ width:22px; height:22px; }
+  #panel-schedule .quick-avail-entry .quick-avail-entry-text b{ display:block; font-size:15px; font-weight:800; letter-spacing:-0.02em; }
+  #panel-schedule .quick-avail-entry .quick-avail-entry-text small{ margin-top:3px; font-size:12.5px; font-weight:400; color:var(--hm-dim); }
+  #panel-schedule .quick-avail-entry-go{ padding:9px 13px; border-radius:13px; background:var(--hm-accent); color:#fff; font-size:13.5px; font-weight:700; white-space:nowrap; }
+  /* 하루/주/달 + 그룹 칩 한 줄 */
+  .sched-toolbar{ display:flex; align-items:center; gap:10px; margin-bottom:14px; min-width:0; }
+  #panel-schedule .sched-toolbar .segment-control{ flex-shrink:0; margin:0; padding:4px; gap:2px; border-radius:16px; background:#E6E3DE; }
+  body.dark-mode #panel-schedule .sched-toolbar .segment-control{ background:var(--hm-well); }
+  #panel-schedule .sched-toolbar .segment-btn{ flex:none; padding:8px 13px; border-radius:12px; font-size:14px; font-weight:600; color:var(--hm-dim); background:none; box-shadow:none; }
+  #panel-schedule .sched-toolbar .segment-btn.active{ background:var(--hm-card); color:var(--hm-ink); box-shadow:0 1px 4px rgba(0,0,0,0.06); }
+  #panel-schedule .sched-toolbar .meetup-chip-row{ flex:1; min-width:0; margin:0; padding:0; gap:8px; }
+  #panel-schedule .sched-toolbar .meetup-chip{ padding:9px 15px; border:none; background:var(--hm-card); color:var(--hm-ink); font-size:14px; font-weight:600; }
+  #panel-schedule .sched-toolbar .meetup-chip.active{ background:var(--hm-ink); color:var(--hm-card); }
+  /* 한달 보기 - 위쪽 "+ 일정 추가" 줄은 제목 옆 +가 같은 일을 해서 숨김 */
+  #scheduleView-month > .week-color-settings-row{ display:none; }
+  .month-cal-card{ background:var(--hm-card); border-radius:24px; padding:14px 8px 10px; }
+  #scheduleView-month .schedule-nav{ margin:0 6px 10px; }
+  #scheduleView-month .schedule-nav-label{ font-family:inherit; font-size:18px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  #scheduleView-month .schedule-nav button{ width:32px; height:32px; border:none; background:none; color:var(--hm-dim); font-size:22px; }
+  #scheduleView-month .weekday-row{ margin-bottom:0; }
+  #scheduleView-month .weekday-row span{ font-family:inherit; font-size:12.5px; color:var(--hm-dim); padding-bottom:8px; }
+  #scheduleView-month .weekday-row span:first-child{ color:#D9533F; }
+  #scheduleView-month .weekday-row span:last-child{ color:#3D7BD9; }
+  #monthSchedGrid{ gap:0; }
+  #monthSchedGrid .day-cell{ min-height:84px; padding:8px 2px 4px; border-radius:0; border-top:1px solid var(--hm-line); background:none; }
+  #monthSchedGrid .day-cell .month-date-num{ font-size:14px; font-weight:500; color:var(--hm-ink); width:26px; height:26px; line-height:26px; align-self:center; padding:0; }
+  #monthSchedGrid .day-cell:nth-child(7n+1) .month-date-num{ color:#D9533F; }
+  #monthSchedGrid .day-cell:nth-child(7n) .month-date-num{ color:#3D7BD9; }
+  #monthSchedGrid .day-cell.today .month-date-num{
+    display:inline-flex; align-items:center; justify-content:center; line-height:1; border-radius:50%;
+    background:var(--hm-accent-soft); color:var(--hm-accent); font-weight:800; box-shadow:none;
+  }
+  #monthSchedGrid .day-cell.selected-day{ outline:none; background:var(--hm-well); border-radius:12px; border-top-color:transparent; }
+  #monthSchedGrid .month-avail-dot{ background:var(--hm-accent); }
+  /* 일정 칩 - 진한 색 칠 대신 연한 배경 + 진한 글씨 (색은 일정마다 정해진 색 그대로) */
+  #monthSchedGrid .month-event-label{ font-size:10px; font-weight:600; padding:2px 4px; border-radius:5px; text-align:left; line-height:1.45; }
+  @supports (background:color-mix(in srgb, red 50%, white)){
+    #monthSchedGrid .month-event-label:not(.month-memo-label){
+      background:color-mix(in srgb, var(--ev) 16%, var(--hm-card)) !important;
+      color:color-mix(in srgb, var(--ev) 60%, #1E1B18) !important;
+    }
+    body.dark-mode #monthSchedGrid .month-event-label:not(.month-memo-label){
+      background:color-mix(in srgb, var(--ev) 26%, var(--hm-card)) !important;
+      color:color-mix(in srgb, var(--ev) 55%, #FFFFFF) !important;
+    }
+  }
+  /* 고른 날짜의 일정 - 흰 카드, 시작 시각을 연한 색 알약으로 */
+  #panel-schedule .month-selected-panel{ margin-top:14px; padding:18px 16px 10px; border:none; border-radius:24px; background:var(--hm-card); }
+  #panel-schedule .month-selected-header{ margin-bottom:8px; }
+  #panel-schedule .month-selected-title{ font-family:inherit; font-size:17px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
+  #panel-schedule .month-selected-open-btn{ padding:4px 0; background:none; color:var(--hm-accent); font-size:13.5px; font-weight:700; }
+  #panel-schedule .month-selected-row{ gap:12px; padding:10px 0; border-bottom:none; }
+  #panel-schedule .month-selected-dot{ display:none; }
+  #panel-schedule .month-selected-time{
+    width:auto; min-width:46px; padding:7px 10px; border-radius:12px; text-align:center; box-sizing:border-box;
+    font-family:inherit; font-size:14px; font-weight:700; font-variant-numeric:tabular-nums;
+    background:var(--hm-well); color:var(--hm-ink);
+  }
+  @supports (background:color-mix(in srgb, red 50%, white)){
+    #panel-schedule .month-selected-row .month-selected-time{ background:color-mix(in srgb, var(--ev) 16%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 60%, #1E1B18); }
+    body.dark-mode #panel-schedule .month-selected-row .month-selected-time{ background:color-mix(in srgb, var(--ev) 26%, var(--hm-card)); color:color-mix(in srgb, var(--ev) 55%, #FFFFFF); }
+  }
+  #panel-schedule .month-selected-text{ font-size:16px; font-weight:700; color:var(--hm-ink); }
+  #panel-schedule .month-selected-range{ margin-top:2px; font-size:13px; color:var(--hm-dim); font-variant-numeric:tabular-nums; }
+  #panel-schedule .month-selected-row:has(.ev-info) .month-selected-time{ margin-top:2px; }
+  #panel-schedule .month-selected-edit, #panel-schedule .month-selected-delete{ width:28px; height:28px; border-radius:50%; background:none; color:var(--hm-dim); }
+  #panel-schedule .month-selected-edit svg, #panel-schedule .month-selected-delete svg{ width:14px; height:14px; }
+  #panel-schedule .month-selected-empty{ font-size:13px; color:var(--hm-dim); padding:8px 0 12px; }
 </style>
 </head>
 <body class="app-booting">
@@ -8439,7 +8525,11 @@
 
   <!-- 시간표 패널 -->
   <div class="tab-panel" id="panel-schedule">
-    <h2>내 캘린더</h2>
+    <h2 class="sched-title">내 캘린더<span class="sched-head-actions">
+      <!-- 제목 옆 아이콘 - 이미 있는 "캘린더 불러오기"와 지금 보기의 "일정 추가"를 그대로 엶 -->
+      <button type="button" class="sched-head-btn" id="schedHeadImportBtn" title="캘린더 불러오기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 19h14"/></svg></button>
+      <button type="button" class="sched-head-btn add" id="schedHeadAddBtn" title="일정 추가"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+    </span></h2>
     <p class="desc">내 일정과 '예약 가능 시간'을 관리해요.</p>
 
     <!-- 처음 쓰는 사람(내 일정 0개)에겐 예약 가능 시간 입구 대신 이것만 - 가입하자마자 첫 일정부터 넣게 함 -->
@@ -8454,18 +8544,21 @@
     <!-- 예약 가능 시간 빠르게 열기 입구 - 항상 보이게 둬서 열어둔 기간이 지나 비었을 때도 바로 다시 열 수 있게 함 -->
     <button type="button" class="quick-avail-entry" id="quickAvailEntryBtn">
       <span class="quick-avail-entry-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-      <span class="quick-avail-entry-text"><b>예약 가능 시간 빠르게 열기</b><small id="quickAvailEntryStatus">요일별 시간만 정하면 4주 동안 반복해서 열 수 있어요</small></span>
-      <span class="quick-avail-entry-go">&rsaquo;</span>
+      <span class="quick-avail-entry-text"><b id="quickAvailEntryTitle">예약 가능 시간 빠르게 열기</b><small id="quickAvailEntryStatus">요일별 시간만 정하면 4주 동안 반복해서 열 수 있어요</small></span>
+      <span class="quick-avail-entry-go">빠르게 열기</span>
     </button>
+    <!-- 하루/주/달 고르기 + 그룹 필터 칩을 한 줄에 -->
+    <div class="sched-toolbar">
     <div class="segment-control" id="scheduleSegment">
       <button class="segment-btn active" data-view="day">하루</button>
-      <button class="segment-btn" data-view="week">일주일</button>
-      <button class="segment-btn" data-view="month">한달</button>
+      <button class="segment-btn" data-view="week">주</button>
+      <button class="segment-btn" data-view="month">달</button>
     </div>
 
     <!-- 친구 그룹별로 내 스케쥴 필터링 - 만든 그룹이 없으면 숨김. 그룹 하나를 고르면 하루/일주일/한달
          보기 전부에서, 그 그룹에게 공개로 설정해둔 일정만 걸러서 보여줌 -->
     <div class="meetup-chip-row" id="scheduleGroupFilterRow" style="display:none;"></div>
+    </div>
 
     <!-- 하루 보기 -->
     <div class="schedule-view active" id="scheduleView-day">
@@ -8509,18 +8602,21 @@
 
     <!-- 한달 보기 -->
     <div class="schedule-view" id="scheduleView-month">
+      <div class="week-color-settings-row" style="justify-content:flex-end;">
+        <button id="monthAddEventBtn" class="schedule-add-btn wide" title="일정 추가">+ 일정 추가</button>
+      </div>
+      <!-- 달력은 흰 카드 하나에 (이전/다음 달 + 요일 + 날짜) -->
+      <div class="month-cal-card">
       <div class="schedule-nav">
         <button id="monthSchedPrev">&#8249;</button>
         <div class="schedule-nav-label" id="monthSchedLabel">-</div>
         <button id="monthSchedNext">&#8250;</button>
       </div>
-      <div class="week-color-settings-row" style="justify-content:flex-end;">
-        <button id="monthAddEventBtn" class="schedule-add-btn wide" title="일정 추가">+ 일정 추가</button>
-      </div>
       <div class="weekday-row">
         <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
       </div>
       <div class="day-grid month-sched-grid" id="monthSchedGrid"></div>
+      </div>
       <div class="month-selected-panel" id="monthSelectedPanel"></div>
     </div>
 
@@ -21736,7 +21832,7 @@ function renderMonthSchedView(){
       // 한달 칸은 좁아서 "예약 가능"이 "예약 가"로 잘리므로, 예약 가능 띠는 짧게 보여줌
       // (누구에게 열린 시간인지 알 수 있게 "가능"/"💼가능"/그룹 이모티콘들/"💼업무")
       const label = ev.type === 'available' ? availableShortFor(availableForOf(ev), ev.visibility) : ev.title;
-      return `<div class="month-event-label" style="background:${bg};${textColorOnEventBg(bg)}${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
+      return `<div class="month-event-label" style="--ev:${bg};background:${bg};${textColorOnEventBg(bg)}${ev.isPendingHold ? '' : availWorkStripeStyle(ev)}">${escapeHtml(truncateForMonthLabel(label))}</div>`;
     }).join('');
     const hiddenCount = events.filter(ev => ev.type !== 'available' || ev.isPendingHold).length - labelEvents.length;
     const moreHtml = hiddenCount > 0
@@ -21785,10 +21881,10 @@ function renderMonthSelectedPanel(){
         const goesToChat = !!ev.sourceChatRoomId && (ev.isReservationLinked || ev.isPendingHold);
         const disp = getEventDisplayRangeForDate(ev, monthSelectedDate);
         return `
-        <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''}>
+        <div class="month-selected-row${goesToChat ? ' clickable' : ''}" data-ev="${ev.id}" ${goesToChat ? `data-room="${ev.sourceChatRoomId}"` : ''} style="--ev:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}">
           <span class="month-selected-dot" style="background:${ev.isPendingHold ? '#F59E0B' : colorForEvent(ev)}"></span>
-          <span class="month-selected-time">${minutesToLabel(disp.startMin)}-${minutesToLabel(disp.endMin)}</span>
-          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span>${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<span class="month-selected-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${travelRouteLinkHtml(ev.travel, monthSelectedDate, disp.startMin)}</span>` : ''}${eventPlaceNoteHtml(ev)}</span>
+          <span class="month-selected-time">${minutesToLabel(disp.startMin)}</span>
+          <span class="month-selected-main"><span class="month-selected-text">${escapeHtml(ev.title)}</span><span class="month-selected-range">${minutesToLabel(disp.startMin)} – ${minutesToLabel(disp.endMin)}</span>${ev.travel && ev.travel.minutes && disp.startMin === ev.startMin ? `<span class="month-selected-travel">${travelModeIcon(ev.travel)} 이동 ${ev.travel.minutes}분 · ${minutesToLabel(Math.max(0, disp.startMin - ev.travel.minutes))} 출발${travelRouteLinkHtml(ev.travel, monthSelectedDate, disp.startMin)}</span>` : ''}${eventPlaceNoteHtml(ev)}</span>
           ${goesToChat ? `<span class="month-selected-chat-hint">채팅에서 확인 &#8250;</span>` : ''}
           ${isSpecial ? '' : `
           <span class="month-selected-row-actions">
@@ -32461,11 +32557,16 @@ function renderQuickAvailEntry(){
   el.classList.remove('warn');
   // 이미 열어둔 사람에겐 큰 배너가 달력을 밀어내기만 해서, 한 줄짜리로 줄임
   document.getElementById('quickAvailEntryBtn').classList.toggle('compact', n > 0);
-  el.textContent = n > 0
-    ? `예약 가능 시간: 앞으로 2주 중 ${n}일 열려 있어요 · 더 열기`
-    : '아직 열어둔 시간이 없어요 · 요일별 시간만 정하면 4주 동안 반복해서 열 수 있어요';
+  document.getElementById('quickAvailEntryTitle').textContent = n > 0 ? `앞으로 2주 중 ${n}일 열어둠` : '아직 열어둔 시간이 없어요';
+  el.textContent = '요일만 정하면 4주 반복';
 }
 document.getElementById('quickAvailEntryBtn').addEventListener('click', openQuickAvail);
+// 캘린더 제목 옆 아이콘 - 불러오기는 설정의 "캘린더 불러오기"와 같고, +는 지금 보고 있는 보기(하루/주/달)의 일정 추가 버튼을 그대로 누름
+document.getElementById('schedHeadImportBtn').addEventListener('click', () => openCalImport('schedule_header'));
+document.getElementById('schedHeadAddBtn').addEventListener('click', () => {
+  const addBtn = document.querySelector('#panel-schedule .schedule-view.active #openEventFormBtn, #panel-schedule .schedule-view.active .schedule-add-btn');
+  if(addBtn) addBtn.click(); else openEventForm();
+});
 document.getElementById('firstEventAddBtn').addEventListener('click', () => {
   scheduleFocusDate = new Date(TODAY);
   openEventForm();
