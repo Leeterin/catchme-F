@@ -4239,25 +4239,26 @@
   .post-share-card .psc-loc{ font-size:11.5px; color:var(--text-dim); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .post-share-card .psc-note{ font-size:13px; line-height:1.4; margin-top:6px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; white-space:pre-line; word-break:break-word; }
   /* 날짜 먼저 물어보기("20일 어때요?") 카드 - 좋아요 하면 같은 카드에서 바로 시간·장소 정하기 */
+  /* 모양은 약속 요청 카드(.reservation-card)와 같게 */
   .date-ask-card{
     min-width:200px;
     text-align:left;
     border:1px solid var(--line);
     background:var(--surface);
     color:var(--text);
-    border-radius:12px;
-    padding:10px 12px;
+    border-radius:14px;
+    padding:12px 13px;
   }
-  .date-ask-card .dac-head{ font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
-  .date-ask-card .dac-date{ font-size:15px; font-weight:700; cursor:pointer; }
-  .date-ask-card .dac-desc{ font-size:12px; color:var(--text-dim); margin-top:3px; }
-  .date-ask-card .dac-actions{ display:flex; gap:6px; margin-top:9px; }
+  .date-ask-card .dac-head{ display:flex; align-items:center; gap:4px; font-family:'Space Grotesk',sans-serif; font-size:12.5px; font-weight:700; color:var(--text); margin-bottom:6px; }
+  .date-ask-card .dac-date{ font-size:14px; font-weight:600; cursor:pointer; text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
+  .date-ask-card .dac-desc{ font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .date-ask-card .dac-actions{ display:flex; gap:8px; margin-top:10px; }
   .date-ask-card .dac-btn{
-    flex:1; padding:8px 6px; border:none; border-radius:9px;
-    background:var(--surface-2); color:var(--text);
-    font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;
+    flex:1; padding:8px; border:1px solid var(--line); border-radius:9px;
+    background:var(--surface-2); color:var(--text-dim);
+    font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:700; cursor:pointer;
   }
-  .date-ask-card .dac-btn.primary{ background:var(--accent); color:var(--on-accent); }
+  .date-ask-card .dac-btn.primary{ background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
   .date-ask-card.done .dac-head{ color:#16A34A; }
   .date-ask-card.off .dac-date{ color:var(--text-dim); text-decoration:line-through; }
   /* 날짜 고르기 창 - 한 달 달력에서 하루 고르기 */
@@ -27560,15 +27561,24 @@ function withdrawReservation(m){
   if(m._timeoutId) clearTimeout(m._timeoutId);
 
   if(m._serverId){
+    const roomId = activeChatRoomId;
     apiRequest(`/chats/messages/${m._serverId}/withdraw`, { method: 'POST' })
       .then(data => {
-        Object.assign(m, mapServerReservationMessage(data.message));
+        // 버튼을 그릴 때 잡아둔 m이 방을 다시 불러오면서 옛날 사본이 됐을 수 있음 - 지금 방에 있는 같은 메시지도 고치고 저장
+        applyReservationUpdate(m, data.message);
+        const room = CHAT_ROOMS[roomId];
+        if(room) saveChatCache(roomId, room.messages);
         loadScheduleFromServer(); // 서버에서 정리된 "예약중..." 홀드를 내 캘린더에도 바로 반영
         renderChatMessages();
         renderChatList();
         showToast('약속 요청을 취소했어요.');
       })
-      .catch(err => showToast(err.message));
+      .catch(err => {
+        showToast(err.message);
+        // 이미 처리된 요청이면 화면이 옛날 상태인 것 - 서버에서 다시 받아옴
+        const room = CHAT_ROOMS[roomId];
+        if(room && room.isRealRoom) loadRoomMessagesFromServer(roomId, room);
+      });
     return;
   }
 
@@ -31041,6 +31051,8 @@ function renderChatMessages(){
       const postShare = parsePostShare(m.text);
       const textEl = row.querySelector('.msg-bubble-text');
       if(m.dateAsk && m.dateAsk.date){
+        // 주황/회색 말풍선으로 덮지 않고 약속 요청 카드처럼 카드만 보이게
+        textEl.parentNode.classList.add('msg-bubble-post');
         textEl.parentNode.insertBefore(buildDateAskCardEl(m, room), textEl);
         textEl.remove();
       } else if(postShare){
