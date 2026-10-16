@@ -3541,6 +3541,7 @@
   }
   .chat-pinned-schedule .pin-list.collapsed{ display:none; }
   .chat-pinned-schedule .pin-card{
+    -webkit-touch-callout:none; -webkit-user-drag:none; /* 아이폰 꾹 누르기 때 카드가 흰 판에 얹혀 뜨지 않게 */
     display:flex;
     flex-direction:column;
     gap:8px;
@@ -29812,7 +29813,10 @@ function renderPinnedSchedule(){
       handle.addEventListener('pointerup', finish);
       handle.addEventListener('pointercancel', reset);
       handle.addEventListener('contextmenu', (e) => e.preventDefault());
+      // 아이폰은 꾹 누르면 카드 전체를 흰 판에 얹어 띄우는 기본 끌기 효과가 있어서 막음 (손가락 끌기는 위 pointer로 직접 처리)
+      handle.addEventListener('touchstart', (e) => e.preventDefault(), { passive:false });
     });
+    card.addEventListener('dragstart', (e) => e.preventDefault());
 
     card.querySelectorAll('.pin-remove-loc').forEach(btn => {
       btn.addEventListener('click', async () => {
