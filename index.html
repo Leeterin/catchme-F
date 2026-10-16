@@ -33462,6 +33462,11 @@ document.getElementById('schedFriendStrip').addEventListener('click', (e) => {
   const btn = e.target.closest('.sched-friend[data-friend-id]');
   if(!btn || schedFriendEditing) return;
   openFriendCalendar(btn.dataset.friendId, 'calendar');
+  // 내 캘린더에서 보던 화면(주/달) 그대로 친구 캘린더도 열어줌 - 일은 원래대로 오늘 화면
+  const myView = document.querySelector('#scheduleSegment .segment-btn.active')?.dataset.view;
+  if(myView === 'week' || myView === 'month'){
+    document.querySelector(`#friendCalendarSegment .segment-btn[data-view="${myView}"]`)?.click();
+  }
 });
 // "순서"를 누른 동안은 바로, 평소엔 꾹 눌러서(0.35초) 집어 들고 좌우로 끌기
 function attachSchedFriendDrag(item){
