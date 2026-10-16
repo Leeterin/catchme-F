@@ -5,7 +5,7 @@ import SwiftUI
 // 소: 바로 다음 약속 1개 / 중: 3개 / 대: 다음 약속 크게 + 5개 더
 // 데이터는 앱(웹 화면)이 CatchmeWidgetPlugin으로 App Group에 넣어둔 JSON을 읽음
 
-let appGroup = "group.com.catchme.app"
+let appGroup = "group.com.meetzip.app"
 let accent = Color(red: 0x38 / 255, green: 0xBD / 255, blue: 0xF8 / 255)
 
 struct WidgetItem: Codable, Hashable {

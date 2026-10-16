@@ -12,7 +12,7 @@ public class CatchmeWidgetPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "update", returnType: CAPPluginReturnPromise)
     ]
 
-    static let appGroup = "group.com.catchme.app"
+    static let appGroup = "group.com.meetzip.app"
     static let dataKey = "widgetData"
 
     @objc func update(_ call: CAPPluginCall) {

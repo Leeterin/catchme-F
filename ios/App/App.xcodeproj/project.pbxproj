@@ -10,6 +10,7 @@
 		0F4D97FD691EC8FE19E2450B /* CatchmeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C73465B7556222333837E8E6 /* CatchmeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2597CACF145DCF7DF01DE7F4 /* CatchmeWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34776CB287D7251773A20DB7 /* CatchmeWidget.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		B2F0CA012F00000100C0FFEE /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = B2F0CA022F00000100C0FFEE /* GoogleService-Info.plist */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -53,6 +54,7 @@
 /* Begin PBXFileReference section */
 		086042874BEAA35B2EB31854 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		B2F0CA022F00000100C0FFEE /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		34776CB287D7251773A20DB7 /* CatchmeWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CatchmeWidget.swift; sourceTree = "<group>"; };
 		44DF3936C4C27C627F7630C7 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS14.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
@@ -128,6 +130,7 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				A1F0CA042F00000100C0FFEE /* App.entitlements */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
+				B2F0CA022F00000100C0FFEE /* GoogleService-Info.plist */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				A62D11E829D6D23C4805AF39 /* CatchmeWidgetPlugin.swift */,
 				9DE20C55AA53EC5DF26C134C /* MainViewController.swift */,
@@ -256,6 +259,7 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				B2F0CA012F00000100C0FFEE /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -456,6 +460,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Z86JLY6SML;
@@ -478,6 +483,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = CatchmeWidget/CatchmeWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = Z86JLY6SML;

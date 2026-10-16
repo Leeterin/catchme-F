@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>API_KEY</key>
+	<string>AIzaSyAnby5F_AE5k5SHHqIhO2vVyIRwsGzH_q8</string>
+	<key>GCM_SENDER_ID</key>
+	<string>778614421540</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.meetzip.app</string>
+	<key>PROJECT_ID</key>
+	<string>catchme-54727</string>
+	<key>STORAGE_BUCKET</key>
+	<string>catchme-54727.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:778614421540:ios:89acdf1f98c06c8c2bc0b1</string>
+</dict>
+</plist>
