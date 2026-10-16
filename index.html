@@ -7987,6 +7987,8 @@
     box-shadow:inset 4px 4px 10px var(--neu-lo), inset -4px -4px 10px var(--neu-hi);
   }
   #myProfileView .mp-card .mp-input-group:last-child{ margin-bottom:0; }
+  .mp-birthday-row{ display:flex; gap:8px; }
+  .mp-birthday-row select{ flex:1; min-width:0; }
   #myProfileView .mp-visibility-row{ border-bottom:none; padding:0 4px 14px; color:var(--neu-dim); font-size:12.5px; }
   #myProfileView .mp-card .mp-visibility-row:last-child{ padding-bottom:0; }
   #myProfileView #mpSaveBtn{
@@ -9078,6 +9080,7 @@
     <button type="button" class="home-card home-mini" id="homeTodayCard" data-home-key="today"></button>
     <button type="button" class="home-card home-mini" id="homeFriendsCard" data-home-key="friends"></button>
     <button type="button" class="home-card home-mini" id="homeUnreadCard" data-home-key="unread"></button>
+    <button type="button" class="home-card home-mini" id="homeBirthdayCard" data-home-key="birthday"></button>
     <!-- 맨 아래 [홈 편집] - 카드를 꾹 눌러도 편집이 시작됨 (applyHomeOrder가 항상 맨 뒤로 옮김) -->
     <button type="button" class="home-edit-entry" id="homeEditEntryBtn">홈 편집</button>
   </div>
@@ -11477,6 +11480,8 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   myProfileData.phone = user.phone || '';
   myProfileData.phonePublic = !!user.phonePublic;
   myProfileData.emailPublic = !!user.emailPublic;
+  myProfileData.birthday = user.birthday || '';
+  myProfileData.birthdayPublic = !!user.birthdayPublic;
   myProfileData.profileImageUrl = user.profileImageUrl || null;
   myProfileData.reviewNickname = user.reviewNickname || '';
   myProfileData.reviewAvatarUrl = user.reviewAvatarUrl || null;
@@ -13111,6 +13116,7 @@ const HOME_SECTIONS = [
   { key: 'today', label: '오늘', size: 'small', desc: '오늘 날짜와 오늘 일정 전체', defaultOff: true },
   { key: 'friends', label: '친구', size: 'small', desc: '친구 수와 얼굴', defaultOff: true },
   { key: 'unread', label: '안 읽은 메시지', size: 'small', desc: '안 읽은 채팅 수', defaultOff: true },
+  { key: 'birthday', label: '친구 생일', size: 'small', desc: '곧 생일인 친구와 D-day', defaultOff: true },
 ];
 // 저장된 순서 + (나중에 새로 생긴 카드는 기본 자리 순서대로 뒤에)
 function currentHomeOrder(){
@@ -13231,7 +13237,7 @@ function attachHomeOrderDrag(row){
 // 집어 든 동안은 설정 화면이 스크롤되지 않게 (iOS는 touchmove를 막아야 함)
 document.addEventListener('touchmove', (e) => { if(homeOrderDrag) e.preventDefault(); }, { passive: false });
 
-// ---------- 작은 위젯 (오늘 / 친구 / 안 읽은 메시지) ----------
+// ---------- 작은 위젯 (오늘 / 친구 / 안 읽은 메시지 / 친구 생일) ----------
 // '오늘' 위젯에 보일 오늘 일정 전체 - 메모, 약속, 내 일정, 보낸 약속 요청(요청중), 받은 약속 요청(요청받음)
 // 예약 가능 시간은 '내 예약 가능 시간' 위젯이 따로 있어서 뺌. 메모(시간 없음)가 맨 위, 나머지는 시작 시각 순
 const HOME_TODAY_MAX = 3;
@@ -13263,6 +13269,22 @@ function homeTodayItems(){
       text: `요청받음 · ${who}`, color: 'var(--hm-accent)' });
   });
   return items.sort((a, b) => (a.startMin == null ? -1 : a.startMin) - (b.startMin == null ? -1 : b.startMin));
+}
+// "MM-DD" → "3월 5일"
+function birthdayLabel(birthday){
+  const [m, d] = String(birthday).split('-').map(Number);
+  return `${m}월 ${d}일`;
+}
+// '친구 생일' 위젯 - 생일을 공개한 친구를 다음 생일이 가까운 순으로 (오늘이 생일이면 0일)
+function homeFriendBirthdays(){
+  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+  const nextDate = (m, d, y) => (m === 2 && d === 29 && new Date(y, 1, 29).getMonth() !== 1) ? new Date(y, 1, 28) : new Date(y, m - 1, d); // 윤년이 아니면 2/29 생일은 2/28에
+  return groupableFriends().filter(f => /^\d{2}-\d{2}$/.test(f.birthday || '')).map(f => {
+    const [m, d] = f.birthday.split('-').map(Number);
+    let date = nextDate(m, d, todayStart.getFullYear());
+    if(date < todayStart) date = nextDate(m, d, todayStart.getFullYear() + 1);
+    return { friend: f, days: Math.round((date - todayStart) / 86400000) };
+  }).sort((a, b) => a.days - b.days);
 }
 function renderHomeMiniWidgets(){
   const todayCard = document.getElementById('homeTodayCard');
@@ -13303,11 +13325,30 @@ function renderHomeMiniWidgets(){
     <span class="hm-mini-foot">${rooms.length
       ? escapeHtml(rooms.slice(0, 2).map(r => r.name || '채팅').join(', ') + (rooms.length > 2 ? ` 외 ${rooms.length - 2}곳` : ''))
       : '모두 읽었어요'}</span>`;
+
+  const birthdays = homeFriendBirthdays();
+  const next = birthdays[0];
+  const dLabel = x => x.days === 0 ? '오늘' : `D-${x.days}`;
+  document.getElementById('homeBirthdayCard').innerHTML = next ? `
+    <span class="hm-mini-label">친구 생일</span>
+    <b class="hm-mini-big${next.days === 0 ? ' accent' : ''}">${dLabel(next)}</b>
+    <span class="hm-mini-sub">${escapeHtml(next.friend.name)} · ${birthdayLabel(next.friend.birthday)}</span>
+    ${birthdays.length > 1 ? `<span class="hm-today-list">${birthdays.slice(1, 3).map(x => `
+      <span class="hm-today-row"><i style="background:${x.friend.color}"></i><em>${dLabel(x)}</em><span>${escapeHtml(x.friend.name)}</span></span>`).join('')}</span>` : ''}`
+    : `
+    <span class="hm-mini-label">친구 생일</span>
+    <span class="hm-mini-foot">생일을 공개한 친구가 아직 없어요</span>`;
   ensureHomeEditBadges(); // innerHTML로 다시 그리면 편집용 [−]도 지워져서 다시 붙임
 }
 document.getElementById('homeTodayCard').addEventListener('click', () => switchTopTab('schedule'));
 document.getElementById('homeFriendsCard').addEventListener('click', () => switchTopTab('friends'));
 document.getElementById('homeUnreadCard').addEventListener('click', () => switchTopTab('chat'));
+// 가장 가까운 생일인 친구 프로필로, 아무도 없으면 친구 탭
+document.getElementById('homeBirthdayCard').addEventListener('click', () => {
+  const next = homeFriendBirthdays()[0];
+  if(next) openFriendProfile(next.friend.id);
+  else switchTopTab('friends');
+});
 
 // ---------- 홈 위젯 편집 (아이폰 홈 화면처럼) ----------
 // 카드를 꾹 누르거나 맨 아래 [홈 편집] → 카드가 흔들리고, 끌어서 옮기고, [−]로 빼고, 위쪽 [+]로 추가.
@@ -17858,6 +17899,8 @@ const myProfileData = {
   email: 'me@catchme.com',
   phonePublic: false,
   emailPublic: false,
+  birthday: '', // 월-일만 ("MM-DD") - 나이가 드러나지 않게
+  birthdayPublic: false, // 전화번호처럼 기본 비공개, 켜야 친구 홈의 '친구 생일' 위젯에 뜸
   profileImageUrl: null,
   reviewNickname: '', // 리뷰용(커뮤니티) 프로필 닉네임 - 실명으로 리뷰 달기 창피할 때 대신 쓰는 이름. 비어있으면 실명을 씀
   reviewAvatarUrl: null, // 리뷰용 프로필 사진 - 비어있으면 실명 프로필 사진을 그대로 씀
@@ -17931,6 +17974,10 @@ function renderMyProfile(){
           <div class="mp-info-text"><span class="mp-field-label">이메일</span><span class="mp-field-value">${myProfileData.email ? escapeHtml(myProfileData.email) : '<span class="mp-empty">아직 없어요 · 편집에서 추가</span>'}</span></div>
           <button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtn">${myProfileData.emailPublic ? '공개' : '비공개'}</button>
         </div>
+        <div class="mp-info-row">
+          <div class="mp-info-text"><span class="mp-field-label">생일</span><span class="mp-field-value">${myProfileData.birthday ? birthdayLabel(myProfileData.birthday) : '<span class="mp-empty">아직 없어요 · 편집에서 추가</span>'}</span></div>
+          <button class="visibility-toggle${myProfileData.birthdayPublic ? ' on' : ''}" id="birthdayVisBtn">${myProfileData.birthdayPublic ? '공개' : '비공개'}</button>
+        </div>
       </div>
     `;
     document.getElementById('phoneVisBtn').addEventListener('click', () => {
@@ -17943,7 +17990,13 @@ function renderMyProfile(){
       saveProfileVisibility();
       renderMyProfile();
     });
+    document.getElementById('birthdayVisBtn').addEventListener('click', () => {
+      myProfileData.birthdayPublic = !myProfileData.birthdayPublic;
+      saveProfileVisibility();
+      renderMyProfile();
+    });
   } else {
+    const [bMonth, bDay] = myProfileData.birthday ? myProfileData.birthday.split('-').map(Number) : [0, 0];
     body.innerHTML = `
       <div class="mp-photo-btns">
         <button type="button" class="mp-pill-btn" id="mpPhotoChangeBtn">사진 변경</button>
@@ -17960,6 +18013,11 @@ function renderMyProfile(){
         <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.phonePublic ? ' on' : ''}" id="phoneVisBtnEdit">${myProfileData.phonePublic ? '공개' : '비공개'}</button></div>
         <div class="mp-input-group"><label>이메일</label><input class="search-input" id="mpEmailInput" value="${escapeHtml(myProfileData.email)}" maxlength="40" inputmode="email" /></div>
         <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.emailPublic ? ' on' : ''}" id="emailVisBtnEdit">${myProfileData.emailPublic ? '공개' : '비공개'}</button></div>
+        <div class="mp-input-group"><label>생일</label><div class="mp-birthday-row">
+          <select class="search-input" id="mpBirthMonth"><option value="">월</option>${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}"${bMonth === i + 1 ? ' selected' : ''}>${i + 1}월</option>`).join('')}</select>
+          <select class="search-input" id="mpBirthDay"><option value="">일</option>${Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}"${bDay === i + 1 ? ' selected' : ''}>${i + 1}일</option>`).join('')}</select>
+        </div></div>
+        <div class="mp-visibility-row"><span>친구에게 공개</span><button class="visibility-toggle${myProfileData.birthdayPublic ? ' on' : ''}" id="birthdayVisBtnEdit">${myProfileData.birthdayPublic ? '공개' : '비공개'}</button></div>
       </div>
 
       <button class="profile-chat-btn" id="mpSaveBtn">저장하기</button>
@@ -17983,11 +18041,22 @@ function renderMyProfile(){
       myProfileData.emailPublic = !myProfileData.emailPublic;
       renderMyProfile();
     });
+    // 다시 그리면 고르던 월·일이 저장 전 값으로 돌아가서, 생일 스위치는 버튼만 바꿈
+    document.getElementById('birthdayVisBtnEdit').addEventListener('click', (e) => {
+      myProfileData.birthdayPublic = !myProfileData.birthdayPublic;
+      e.currentTarget.classList.toggle('on', myProfileData.birthdayPublic);
+      e.currentTarget.textContent = myProfileData.birthdayPublic ? '공개' : '비공개';
+    });
     document.getElementById('mpSaveBtn').addEventListener('click', () => {
       myProfileData.name = document.getElementById('mpNameInput').value.trim() || myProfileData.name;
       myProfileData.id = document.getElementById('mpIdInput').value.trim() || myProfileData.id;
       myProfileData.phone = document.getElementById('mpPhoneInput').value.trim();
       myProfileData.email = document.getElementById('mpEmailInput').value.trim();
+      const bm = Number(document.getElementById('mpBirthMonth').value);
+      const bd = Number(document.getElementById('mpBirthDay').value);
+      if(!!bm !== !!bd){ showToast('생일은 월과 일을 둘 다 골라 주세요.'); return; }
+      if(bm && bd > new Date(2000, bm, 0).getDate()){ showToast(`${bm}월에는 ${bd}일이 없어요.`); return; }
+      myProfileData.birthday = bm ? `${String(bm).padStart(2, '0')}-${String(bd).padStart(2, '0')}` : '';
       saveProfileToServer();
       goBackOrClose(exitMyProfileEdit);
     });
@@ -18160,6 +18229,8 @@ function saveProfileToServer(){
       phone: myProfileData.phone,
       phonePublic: myProfileData.phonePublic,
       emailPublic: myProfileData.emailPublic,
+      birthday: myProfileData.birthday || '',
+      birthdayPublic: myProfileData.birthdayPublic,
       profileImageUrl: myProfileData.profileImageUrl,
       reviewNickname: myProfileData.reviewNickname || '',
       reviewAvatarUrl: myProfileData.reviewAvatarUrl,
@@ -18173,6 +18244,8 @@ function saveProfileToServer(){
       currentUser.profileImageUrl = myProfileData.profileImageUrl;
       currentUser.name = myProfileData.name;
       currentUser.username = data.user.username;
+      currentUser.birthday = data.user.birthday || null;
+      currentUser.birthdayPublic = !!data.user.birthdayPublic;
       persistSession();
     }
     myProfileData.id = data.user.username; // 서버가 실제로 저장한 값으로 맞춤 (혹시 소문자 변환 등이 있었을 수 있음)
@@ -18441,7 +18514,7 @@ function saveProfileVisibility(){
   if(!authToken) return;
   apiRequest('/profile', {
     method: 'PATCH',
-    body: JSON.stringify({ phonePublic: myProfileData.phonePublic, emailPublic: myProfileData.emailPublic }),
+    body: JSON.stringify({ phonePublic: myProfileData.phonePublic, emailPublic: myProfileData.emailPublic, birthdayPublic: myProfileData.birthdayPublic }),
   }).catch(() => {});
 }
 
@@ -23148,6 +23221,7 @@ async function loadFriendsFromServer(){
       email: f.email,
       phonePublic: !!f.phone,
       emailPublic: !!f.email,
+      birthday: f.birthday || null, // 친구가 공개로 켠 경우에만 서버가 내려줌 ("MM-DD")
       avatar: f.hasAvatar ? cachedAvatarUrl(f.id) : null,
       groupIds: Array.isArray(f.groupIds) ? f.groupIds : [],
       privateAccess: !!f.privateAccess,
@@ -23520,6 +23594,9 @@ function openFriendProfile(friendId){
   }
   if(friend.emailPublic && friend.email){
     contactRows.push(`<div class="mp-field-row"><span class="mp-field-label">이메일</span><span class="mp-field-value">${escapeHtml(friend.email)}</span></div>`);
+  }
+  if(friend.birthday){
+    contactRows.push(`<div class="mp-field-row"><span class="mp-field-label">생일</span><span class="mp-field-value">${birthdayLabel(friend.birthday)}</span></div>`);
   }
   document.getElementById('profileContactInfo').innerHTML = contactRows.join('');
 
