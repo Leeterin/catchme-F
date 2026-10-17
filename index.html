@@ -11908,6 +11908,14 @@ function connectRealtimeSocket(){
     }
   });
 
+  // 화면을 켜 둔 채 연결이 잠깐 끊겼다 다시 붙으면, 그새 놓친 메시지와 "읽음"을 다시 받아옴
+  realtimeSocket.io.on('reconnect', () => {
+    loadChatRoomsFromServer();
+    if(activeChatRoomId && CHAT_ROOMS[activeChatRoomId] && CHAT_ROOMS[activeChatRoomId].isRealRoom){
+      loadRoomMessagesFromServer(activeChatRoomId, CHAT_ROOMS[activeChatRoomId], false);
+    }
+  });
+
   // 상대가 약속 장소 순서(1차, 2차...)를 바꿨으면 그 방 핀을 다시 불러옴
   realtimeSocket.on('pinsChanged', ({ roomId }) => {
     const room = roomId && CHAT_ROOMS[roomId];
@@ -26333,6 +26341,13 @@ async function loadChatRoomsFromServer(){
       if(existing) Object.assign(existing, room);
       else CHAT_ROOMS[r.id] = room;
     });
+    // 앱을 내려뒀거나 연결이 끊긴 사이 상대가 읽었으면 그 알림(소켓)을 놓쳤을 수 있으니, 지금 보고 있는 방의 "읽음"을 다시 맞춤
+    const activeRoom = activeChatRoomId && CHAT_ROOMS[activeChatRoomId];
+    if(activeRoom && activeRoom.messages){
+      let readChanged = false;
+      activeRoom.messages.forEach(m => { if(applyOtherReadAt(activeRoom, m)) readChanged = true; });
+      if(readChanged) renderChatMessages();
+    }
     renderChatList();
     updateChatNavBadge();
   } catch(err){
@@ -30760,6 +30775,8 @@ function loadRoomMessagesFromServer(id, room, isFirstLoad){
     const changed = chatMessagesSignature(room.messages) !== before;
     if(activeChatRoomId === id){
       if(changed) renderChatMessages();
+      // 앱을 내려뒀다 오거나 연결이 끊긴 사이 온 메시지는 소켓으로 못 받아서 "읽음"을 안 보냈음 - 이 방을 보고 있으면 지금 읽음 처리
+      if(changed && document.visibilityState === 'visible') markRoomRead(id);
       checkPendingRestoreAvailPrompts(id); // 서버에서 새로 받아온 메시지 기준으로 다시 한 번 확인 (새로고침 느낌으로 들어온 경우 대비)
     }
   }).catch(err => { if(isFirstLoad) showToast(err.message); else console.error('[messages resync]', err); });
