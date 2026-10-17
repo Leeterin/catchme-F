@@ -24580,6 +24580,7 @@ document.getElementById('friendCalDateTodayBtn').addEventListener('click', () =>
 });
 let calendarOpenedFromChat = null; // 채팅에서 진입한 경우 그 방 id를 기억 (닫을 때 특별한 처리는 이제 필요 없지만, 상태 표시용으로 남겨둠)
 let reserveOpenedFromMatching = null; // 캘린더 매칭에서 바로 예약 화면으로 들어온 경우 그 방 id를 기억
+let reserveOpenedFromDateAsk = false; // 날짜 물어보기의 "시간 정하기"로 바로 예약 화면을 연 경우 - 닫으면 친구 캘린더 말고 채팅방으로
 
 function closeFriendCalendar(){
   document.getElementById('friendCalendarView').classList.remove('active');
@@ -25269,42 +25270,60 @@ document.getElementById('locationClearBtn').addEventListener('click', () => {
   resetLocationPicker();
 });
 
-function openFriendReserve(dateObj, hour){
+// opts.wholeDay: 날짜 물어보기로 둘이 정한 날 - 열어둔 시간과 상관없이 그날 아무 시간이나 고름 (서버도 확정된 날짜면 받아줌)
+function openFriendReserve(dateObj, hour, opts = {}){
   closeAllCustomPopups();
   const friend = FRIENDS.find(f => f.id === activeFriendCalendarId);
   if(!friend) return;
   document.getElementById('friendReserveSubmitBtn').disabled = false;
 
   reserveOpenedFromMatching = null; // 일반 경로로 열 때는 매칭 복귀 상태를 초기화 (매칭 경로는 이 함수 호출 뒤에 별도로 설정함)
+  reserveOpenedFromDateAsk = !!opts.wholeDay;
 
-  // 클릭한 시간을 포함해서, 그 앞뒤로 연속으로 비어있는(예약 가능한) 전체 구간을 찾음 - 이 구간 안에서만 시작/종료를 자유롭게 고를 수 있음
-  const sched = friend
-    ? getFriendScheduleForRender(friend, dateObj)
-    : getFriendSchedule(activeFriendCalendarId, dateKeyOf(dateObj));
-  let startIdx = HOURS.indexOf(hour);
-  let endIdx = startIdx;
-  while(startIdx > 0 && sched[startIdx - 1]) startIdx--;
-  while(endIdx + 1 < HOURS.length && sched[endIdx + 1]) endIdx++;
-  const windowStartHour = HOURS[startIdx];
-  const windowEndHour = HOURS[endIdx] + 1; // 이 구간에서 예약 가능한 마지막 순간(종료시간으로 고를 수 있는 최대값)
+  let windowStartHour, windowEndHour;
+  if(opts.wholeDay){
+    windowStartHour = 0;
+    windowEndHour = 24;
+  } else {
+    // 클릭한 시간을 포함해서, 그 앞뒤로 연속으로 비어있는(예약 가능한) 전체 구간을 찾음 - 이 구간 안에서만 시작/종료를 자유롭게 고를 수 있음
+    const sched = friend
+      ? getFriendScheduleForRender(friend, dateObj)
+      : getFriendSchedule(activeFriendCalendarId, dateKeyOf(dateObj));
+    let startIdx = HOURS.indexOf(hour);
+    let endIdx = startIdx;
+    while(startIdx > 0 && sched[startIdx - 1]) startIdx--;
+    while(endIdx + 1 < HOURS.length && sched[endIdx + 1]) endIdx++;
+    windowStartHour = HOURS[startIdx];
+    windowEndHour = HOURS[endIdx] + 1; // 이 구간에서 예약 가능한 마지막 순간(종료시간으로 고를 수 있는 최대값)
+  }
 
   // 예약 요청 시간은 분 단위까지 고를 수 있어야 해서, 창(window) 경계도 분 단위로 들고 있음(시간 경계를 *60한 것 뿐)
   friendReserveContext = { date: dateObj, friendId: friend.id, windowStartMin: windowStartHour * 60, windowEndMin: windowEndHour * 60 };
+  // 정한 날이 오늘이면 이미 지난 시각은 빼고 지금 이후(5분 단위)부터 고르게 함 - 지난 시간은 서버가 안 받음
+  if(opts.wholeDay && toDateInputValue(dateObj) === toDateInputValue(new Date())){
+    const now = new Date();
+    friendReserveContext.windowStartMin = Math.ceil((now.getHours() * 60 + now.getMinutes() + 1) / 5) * 5;
+    if(friendReserveContext.windowStartMin >= friendReserveContext.windowEndMin){
+      showToast('오늘은 더 고를 수 있는 시간이 없어요.');
+      return false;
+    }
+  }
 
   document.getElementById('friendReserveTitle').textContent = `${friend.name}님에게 약속 요청`;
   document.getElementById('friendReserveDateLabel').textContent =
     `${dateObj.getMonth()+1}월 ${dateObj.getDate()}일 ${WEEKDAY_KO[dateObj.getDay()]}요일`;
   // "연속으로 비어있는 만큼만 선택 가능" 대신 실제로 고를 수 있는 범위를 시간으로 보여줌
   const hm = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-  document.getElementById('friendReserveWindowHint').textContent =
-    `${friend.name}님이 열어둔 ${hm(windowStartHour * 60)}–${hm(windowEndHour * 60)} 안에서 시간을 골라요`;
+  document.getElementById('friendReserveWindowHint').textContent = opts.wholeDay
+    ? `${friend.name}님과 정한 날이라 원하는 시간을 바로 골라요`
+    : `${friend.name}님이 열어둔 ${hm(windowStartHour * 60)}–${hm(windowEndHour * 60)} 안에서 시간을 골라요`;
   // 이 구간에 걸치는 내 일정도 같이 알려줌 - 시간 고를 때 내 일정을 따로 확인하러 나가지 않아도 되게
-  const myIn = myBusyRangesForDate(dateObj).filter(r => r.s < windowEndHour * 60 && r.e > windowStartHour * 60);
+  const myIn = myBusyRangesForDate(dateObj).filter(r => r.s < friendReserveContext.windowEndMin && r.e > friendReserveContext.windowStartMin);
   const myEl = document.getElementById('friendReserveMyEvents');
-  myEl.textContent = myIn.length ? `이 시간대 내 일정: ${myIn.map(myRangeLabel).join(', ')}` : '이 시간대에 내 일정은 없어요';
+  myEl.textContent = myIn.length ? `${opts.wholeDay ? '이 날' : '이 시간대'} 내 일정: ${myIn.map(myRangeLabel).join(', ')}` : `${opts.wholeDay ? '이 날' : '이 시간대에'} 내 일정은 없어요`;
   myEl.style.display = '';
 
-  updateFriendReserveStartOptions(hour * 60);
+  updateFriendReserveStartOptions(opts.wholeDay ? Math.max(hour * 60, friendReserveContext.windowStartMin) : hour * 60);
   document.getElementById('friendReserveNoteInput').value = '';
   resetLocationPicker();
 
@@ -25312,7 +25331,8 @@ function openFriendReserve(dateObj, hour){
   document.getElementById('friendReserveView').classList.add('active');
   document.getElementById('friendCalendarBackBtn').style.display = 'none';
   document.getElementById('friendCalendarTitle').style.display = 'none';
-  pushViewState(closeFriendReserveView);
+  // 날짜 물어보기에서 바로 열었으면 친구 캘린더는 거치지 않으니, 뒤로가기 한 번에 채팅방으로 돌아가게 기록을 더 쌓지 않음
+  if(!opts.wholeDay) pushViewState(closeFriendReserveView);
 }
 
 // 예약 가능한 구간(windowStartMin~windowEndMin, 분 단위) 안에서 5분 단위로 시작 시간 선택지를 채움
@@ -25534,6 +25554,11 @@ document.addEventListener('mousedown', (e) => {
 }, true);
 
 function closeFriendReserveView(){
+  if(reserveOpenedFromDateAsk){
+    reserveOpenedFromDateAsk = false;
+    closeFriendCalendar();
+    return;
+  }
   document.getElementById('friendReserveView').classList.remove('active');
   if(reserveOpenedFromMatching){
     reserveOpenedFromMatching = null;
@@ -33524,7 +33549,7 @@ function startPlaceFromChat(){
 
 // ---------- 날짜 먼저 물어보기 ("20일 어때요?") ----------
 // 시간까지 한 번에 고르기 전에 날짜만 먼저 물어봄. 상대가 "좋아요" 하면 같은 카드에 시간 정하기·장소 정하기가 생김.
-// 시간 정하기는 기존 흐름 그대로(1:1은 친구가 열어둔 그날 시간에 요청, 모임은 그날 모두 되는 시간 찾기) - 열어둔 시간 안에서만 잡힘
+// 시간 정하기 - 1:1은 둘이 정한 날이라 그날 아무 시간이나 바로 골라 요청(서버도 확정된 날짜면 열어둔 시간 밖이어도 받음), 모임은 기존대로 그날 모두 되는 시간 찾기
 let dateAskState = null; // { roomId, year, month(1-12), selected: 'YYYY-MM-DD' | null }
 const DATE_ASK_MAX_MONTHS = 12;
 function dateAskLabel(dateKey){
@@ -33663,8 +33688,10 @@ function setTimeForDateAsk(roomId, dateKey){
     showToast('친구로 추가된 사람만 약속을 잡을 수 있어요.');
     return;
   }
+  // 이미 둘이 정한 날이라 친구 캘린더(열어둔 시간)를 거치지 않고, 그날 시간 고르기 화면을 바로 띄움
   calendarOpenedFromChat = roomId;
-  openHomeMatchSlot(friendId, dateKey);
+  openFriendCalendar(friendId, 'reserve');
+  if(openFriendReserve(parseDateInputValue(dateKey), 18, { wholeDay: true }) === false) closeViewThen(closeFriendCalendar, () => {});
 }
 
 function buildDateAskCardEl(m, room){
