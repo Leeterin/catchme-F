@@ -33580,6 +33580,11 @@ function startPlaceFromChat(){
   const roomId = activeChatRoomId;
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
+  const meet = dateAskMeetPin(room);
+  if(meet){
+    changePinLocation(room, roomId, meet, null, { roomId, pinned: meet });
+    return;
+  }
   addMeetPlace(room, roomId, null, true);
 }
 
@@ -33748,12 +33753,15 @@ function setTimeForDateAsk(roomId, dateKey, meetPin){
 // 좋다고 한 날의 장소 정하기 - 이 날을 위해 이미 장소를 정해둔 약속(이 카드 뒤에 생긴 날짜 미정 약속)이 있으면
 // 새 약속 카드를 또 만들지 않고 그 약속의 장소만 바꿈. 없으면 지금처럼 새로 정함
 function placeForDateAsk(room, roomId, m){
-  const askedAt = m.time ? new Date(m.time).getTime() : 0;
-  const meet = pendingDateAskKey(room) === m.dateAsk.date
-    ? undatedMeetPins(room).filter(p => placePinTime(p) >= askedAt).sort((a, b) => placePinTime(b) - placePinTime(a))[0]
-    : null;
+  const meet = pendingDateAskKey(room) === m.dateAsk.date ? dateAskMeetPin(room) : null;
   if(meet) changePinLocation(room, roomId, meet, null, { roomId, pinned: meet });
   else startPlaceFromChat();
+}
+// 날짜 물어보기로 정한 날이 있으면 날짜 미정 약속 카드는 전부 "그날 만나요"로 보여서, 장소를 새로 정할 때마다
+// 새 약속을 만들면 같은 날 약속 카드가 계속 늘어남 - 그때는 가장 최근 날짜 미정 약속의 장소를 바꾸게 이 약속을 돌려줌
+function dateAskMeetPin(room){
+  if(!pendingDateAskKey(room)) return null;
+  return undatedMeetPins(room).sort((a, b) => placePinTime(b) - placePinTime(a))[0] || null;
 }
 
 function buildDateAskCardEl(m, room){
