@@ -7746,51 +7746,37 @@
   .auth-agree input{ width:18px; height:18px; margin:1px 0 0; flex-shrink:0; accent-color:var(--accent); }
   .auth-agree-link, .auth-form .auth-agree-link{ width:auto; height:auto; margin:0; background:none; border:none; border-radius:0; padding:0; font:inherit; font-weight:600; color:var(--text); text-decoration:underline; cursor:pointer; box-shadow:none; display:inline; }
   .auth-social-note{ font-size:11px; color:var(--text-dim); text-align:center; margin-top:10px; line-height:1.5; }
-  /* ---------------- 앱 처음 열었을 때 소개 (옆으로 넘겨보는 4장) ---------------- */
-  .intro-tour{
-    position:fixed; inset:0; z-index:3500; background:var(--mz-bg);
-    display:flex; flex-direction:column;
-    padding-top:env(safe-area-inset-top); padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  /* ---------------- 처음 쓰는 사람 튜토리얼 - 안내 카드 + 눌러볼 버튼 깜빡임 ---------------- */
+  .tut-card{
+    position:fixed; left:12px; right:12px; z-index:3100; box-sizing:border-box;
+    bottom:calc(max(10px, env(safe-area-inset-bottom) - 12px) + 78px);
+    padding:14px 16px 14px; border-radius:18px; background:var(--mz-ink); color:#FFFFFF;
+    box-shadow:0 12px 32px rgba(0,0,0,0.22);
   }
-  .intro-tour[hidden]{ display:none; }
-  .intro-skip{ align-self:flex-end; margin:8px 14px 0; padding:8px 6px; background:none; border:none; color:var(--mz-gray); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; }
-  .intro-skip.gone{ visibility:hidden; }
-  .intro-track{ flex:1; min-height:0; display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
-  .intro-track::-webkit-scrollbar{ display:none; }
-  .intro-slide{ flex:0 0 100%; box-sizing:border-box; scroll-snap-align:center; scroll-snap-stop:always; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 30px; text-align:center; }
-  .intro-art{ width:100%; max-width:290px; height:230px; display:flex; align-items:center; justify-content:center; margin-bottom:34px; }
-  .intro-slide h2{ margin:0 0 12px; font-size:24px; font-weight:800; letter-spacing:-0.03em; line-height:1.3; color:var(--mz-ink); }
-  .intro-slide p{ margin:0; font-size:15px; line-height:1.65; color:var(--mz-gray-dark); word-break:keep-all; }
-  .intro-dots{ display:flex; justify-content:center; gap:6px; margin:18px 0 20px; }
-  .intro-dots span{ width:6px; height:6px; border-radius:3px; background:var(--mz-line); transition:width .2s ease, background .2s ease; }
-  .intro-dots span.on{ width:18px; background:var(--mz-tomato); }
-  .intro-next{ margin:0 20px; height:52px; border:none; border-radius:14px; background:var(--mz-tomato); color:#FFFFFF; font-family:inherit; font-size:16px; font-weight:700; cursor:pointer; }
-  .intro-next:active{ background:var(--mz-tomato-deep); }
-  /* 그림 - 실제 화면을 단순하게 줄인 카드 */
-  .intro-logo{ width:120px; height:120px; border-radius:32px; background:var(--mz-tomato); display:flex; align-items:center; justify-content:center; box-shadow:0 14px 30px rgba(216,90,48,0.28); }
-  .intro-logo svg{ width:74px; height:74px; }
-  .intro-card{ width:100%; box-sizing:border-box; background:var(--mz-card); border-radius:20px; padding:18px; box-shadow:0 10px 28px rgba(44,44,42,0.08); text-align:left; }
-  .intro-card-label{ font-size:12px; font-weight:700; color:var(--mz-gray); margin-bottom:12px; }
-  .intro-week{ display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; margin-bottom:14px; }
-  .intro-week span{ height:34px; border-radius:9px; background:var(--mz-segment); color:var(--mz-gray); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
-  .intro-week span.on{ background:var(--mz-tomato-light); color:var(--mz-tomato); box-shadow:inset 0 0 0 1.5px var(--mz-tomato); }
-  .intro-slot{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:12px; background:var(--mz-tomato-light); font-size:14px; font-weight:700; color:var(--mz-ink); }
-  .intro-slot b{ font-size:12px; color:var(--mz-tomato); }
-  .intro-req{ display:flex; align-items:center; gap:12px; }
-  .intro-req b{ display:block; font-size:15px; color:var(--mz-ink); }
-  .intro-req small{ display:block; margin-top:2px; font-size:13px; color:var(--mz-gray); }
-  .intro-avatar{ width:42px; height:42px; flex-shrink:0; border-radius:50%; background:#7C6CFF; color:#FFFFFF; font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; }
-  .intro-down{ display:flex; justify-content:center; padding:10px 0; color:var(--mz-line); }
-  .intro-confirm{ display:flex; align-items:center; justify-content:center; gap:6px; height:44px; border-radius:12px; background:var(--mz-tomato); color:#FFFFFF; font-size:15px; font-weight:700; }
-  .intro-place{ padding:0; overflow:hidden; }
-  .intro-place-photo{ height:110px; background:var(--mz-tomato-light); color:var(--mz-tomato); display:flex; align-items:center; justify-content:center; }
-  .intro-place-row{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px 8px; }
-  .intro-place-row b{ font-size:15px; color:var(--mz-ink); }
-  .intro-place-row span{ font-size:14px; font-weight:800; color:var(--mz-tomato); }
-  .intro-place-tags{ display:flex; gap:6px; padding:0 16px 16px; }
-  .intro-place-tags span{ padding:4px 9px; border-radius:8px; background:var(--mz-segment); font-size:12px; color:var(--mz-gray-dark); }
+  .tut-card[hidden]{ display:none; }
+  .tut-card.at-top{ bottom:auto; top:calc(env(safe-area-inset-top) + 10px); }
+  /* 빠르게 열기 창 위에서는 맨 아래에 붙이고(위엔 창 닫기 버튼이 있음), 창 안쪽 아래에 여백을 둬서 '열어두기'를 카드 위로 올려 볼 수 있게 */
+  .tut-card.in-sheet{ bottom:calc(env(safe-area-inset-bottom) + 10px); }
+  body:has(.tut-card.in-sheet:not([hidden])) #quickAvailOverlay .quick-avail-card{ padding-bottom:170px; }
+  /* 카드가 아래에 떠 있는 동안 알림(토스트)은 위에 띄움 - 카드와 겹쳐 글자가 섞여 보였음 (채팅방 안에서와 같은 방식) */
+  body:has(.tut-card:not([hidden]):not(.at-top)) .global-toast{ bottom:auto; top:calc(env(safe-area-inset-top, 0px) + 16px); transform:translateX(-50%) translateY(-16px); }
+  body:has(.tut-card:not([hidden]):not(.at-top)) .global-toast.show{ transform:translateX(-50%) translateY(0); }
+  body.dark-mode .tut-card{ background:#3A3734; }
+  /* 가입 화면이 뜨면 그 위에 겹치지 않게 잠깐 숨김 */
+  body:has(#authGateView[style*="flex"]) .tut-card{ display:none; }
+  .tut-card-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+  .tut-step{ font-size:12px; font-weight:700; color:var(--mz-golden); }
+  .tut-skip{ background:none; border:none; padding:2px 0 2px 10px; color:rgba(255,255,255,0.6); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .tut-title{ font-size:16px; font-weight:800; letter-spacing:-0.02em; margin-bottom:4px; }
+  .tut-text{ font-size:13.5px; line-height:1.55; color:rgba(255,255,255,0.85); word-break:keep-all; }
+  .tut-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
+  .tut-actions:empty{ display:none; }
+  .tut-actions button{ height:36px; padding:0 16px; border:none; border-radius:10px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; background:rgba(255,255,255,0.14); color:#FFFFFF; }
+  .tut-actions button.primary{ background:var(--mz-tomato); }
+  .tut-target{ outline:3px solid var(--mz-tomato) !important; outline-offset:3px; animation:tutPulse 1.3s ease-in-out infinite; }
+  @keyframes tutPulse{ 0%,100%{ outline-color:var(--mz-tomato); outline-offset:3px; } 50%{ outline-color:rgba(216,90,48,0.25); outline-offset:6px; } }
   @media (prefers-reduced-motion: no-preference){
-    .intro-tour:not([hidden]){ animation:mzFadeIn .3s ease; }
+    .tut-card:not([hidden]){ animation:mzRiseIn .25s ease; }
   }
   .auth-skip-btn{ display:block; width:100%; background:none; border:none; color:var(--text-dim); font-size:13px; font-weight:600; padding:16px 0 4px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   .auth-hint{
@@ -9195,51 +9181,12 @@
 
 
 
-  <!-- 앱을 처음 열었을 때 한 번만 보여주는 소개 - 옆으로 넘겨보는 4장 (maybeShowIntroTour) -->
-  <div class="intro-tour" id="introTour" hidden>
-    <button type="button" class="intro-skip" id="introSkipBtn">건너뛰기</button>
-    <div class="intro-track" id="introTrack">
-      <section class="intro-slide">
-        <div class="intro-art"><div class="intro-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 10 82 31H18Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round"/><g fill="#FFFFFF"><rect x="23" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="23" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="57.1" width="15.8" height="15.8" rx="3.6" fill="#E9A23B"/><rect x="23" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="76.2" width="15.8" height="15.8" rx="3.6"/></g></svg></div></div>
-        <h2>MEETZIP에 오신 걸 환영해요</h2>
-        <p>친구가 열어둔 시간에,<br>거절 걱정 없이 약속을 잡는 앱이에요.</p>
-      </section>
-      <section class="intro-slide">
-        <div class="intro-art">
-          <div class="intro-card">
-            <div class="intro-card-label">내 예약 가능 시간</div>
-            <div class="intro-week"><span>월</span><span>화</span><span>수</span><span class="on">목</span><span>금</span><span class="on">토</span><span class="on">일</span></div>
-            <div class="intro-slot"><span>토 14:00 – 18:00</span><b>열림</b></div>
-          </div>
-        </div>
-        <h2>되는 시간을 열어두세요</h2>
-        <p>캘린더에서 예약 가능 시간을 열면,<br>친구들이 그 시간 안에서 약속을 신청해요.</p>
-      </section>
-      <section class="intro-slide">
-        <div class="intro-art">
-          <div class="intro-card">
-            <div class="intro-req"><span class="intro-avatar">지</span><div><b>지우</b><small>토 15:00 약속 신청</small></div></div>
-            <div class="intro-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
-            <div class="intro-confirm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>약속이 잡혔어요</div>
-          </div>
-        </div>
-        <h2>친구 시간에 바로 신청</h2>
-        <p>친구가 열어둔 시간 중에 골라 신청하고,<br>친구가 수락하면 약속이 잡혀요.<br>장소는 채팅에서 같이 정해요.</p>
-      </section>
-      <section class="intro-slide">
-        <div class="intro-art">
-          <div class="intro-card intro-place">
-            <div class="intro-place-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="34" height="34" aria-hidden="true"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-1.7 1.2-3 3.4-3 6v4h3v8"/></svg></div>
-            <div class="intro-place-row"><b>성수 브런치 카페</b><span>&#9733; 4.8</span></div>
-            <div class="intro-place-tags"><span>#분위기좋은</span><span>#대화하기좋은</span></div>
-          </div>
-        </div>
-        <h2>어디 갈지도 여기서</h2>
-        <p>다른 사람들이 추천한 맛집·카페를 둘러보세요.<br>둘러보기는 가입 없이 되고,<br>친구와 약속을 잡을 때 가입하면 돼요.</p>
-      </section>
-    </div>
-    <div class="intro-dots" id="introDots"><span class="on"></span><span></span><span></span><span></span></div>
-    <button type="button" class="intro-next" id="introNextBtn">다음</button>
+  <!-- 처음 쓰는 사람 튜토리얼 안내 카드 - 실제 버튼에 테두리를 깜빡이게 하고, 직접 눌러보면 다음 단계로 (startTutorial) -->
+  <div class="tut-card" id="tutCard" hidden>
+    <div class="tut-card-top"><span class="tut-step" id="tutStep"></span><button type="button" class="tut-skip" id="tutSkipBtn">건너뛰기</button></div>
+    <div class="tut-title" id="tutTitle"></div>
+    <div class="tut-text" id="tutText"></div>
+    <div class="tut-actions" id="tutActions"></div>
   </div>
 
   <!-- Top bar -->
@@ -12850,6 +12797,7 @@ function showTab(tabKey){
     }
   }
   slideInTopTab(prevTopTab, tabKey);
+  if(typeof tutorialEvent === 'function') tutorialEvent('tab:' + (tabKey || 'home'));
 }
 
 // 아래 탭을 바꿀 때 탭 순서대로 옆에서 밀려 들어옴 - 오른쪽 탭으로 가면 오른쪽에서, 왼쪽 탭으로 가면 왼쪽에서.
@@ -14739,12 +14687,15 @@ function renderSettingsDetailBody(id){
         <div><div class="stt-label">흔들어서 오류 신고하기</div><div class="stt-sub">폰을 5번 흔들면 오류 신고 창이 열려요</div></div>
         <div class="toggle${isShakeReportEnabled() ? ' on' : ''}" id="shakeReportToggle"><div class="knob"></div></div>
       </div>
+      <div class="settings-simple-row"><span>튜토리얼 다시 보기</span><button class="settings-action-btn" id="replayTutorialBtn">시작 &#8250;</button></div>
       <div class="settings-simple-row"><span>캐시 삭제</span><button class="settings-action-btn" id="clearCacheBtn">삭제</button></div>
       <div class="settings-simple-row"><span>이용약관</span><button class="settings-action-btn" id="termsPageBtn">보기 &#8250;</button></div>
       <div class="settings-simple-row"><span>개인정보 처리방침</span><button class="settings-action-btn" id="privacyPageBtn">보기 &#8250;</button></div>
       <div class="settings-simple-row"><span>현재 버전</span><span class="value">1.0.0</span></div>
     `;
     document.getElementById('clearCacheBtn').addEventListener('click', clearLocalCaches);
+    // 설정 화면을 닫고 홈에서 처음 단계부터
+    document.getElementById('replayTutorialBtn').addEventListener('click', () => { switchTopTab(null); startTutorial(); });
     document.getElementById('shakeReportToggle').addEventListener('click', (e) => {
       const next = !isShakeReportEnabled();
       setShakeReportEnabled(next);
@@ -34724,6 +34675,7 @@ function openQuickAvail(){
   if(ov.classList.contains('show')) return;
   ov.classList.add('show');
   pushViewState(closeQuickAvail);
+  tutorialEvent('quick:open');
 }
 // 캘린더 탭 맨 위 - 처음 쓰는 사람에겐 "첫 일정 추가", 그리고 친구 프사 한 줄
 function renderQuickAvailEntry(){
@@ -35360,6 +35312,7 @@ function syncAvailFirstTip(){
 }
 function closeQuickAvail(){
   document.getElementById('quickAvailOverlay').classList.remove('show');
+  tutorialEvent('quick:close');
 }
 function quickPct(min){ return (min - quickAvailAxis.s) / (quickAvailAxis.e - quickAvailAxis.s) * 100; }
 // 보이는 범위 밖으로 나간 부분은 잘라서 그림 (전부 밖이면 숨김 - 시간 글자를 눌러 고칠 수 있음)
@@ -36017,6 +35970,7 @@ document.getElementById('quickAvailSubmitBtn').addEventListener('click', async (
     return;
   }
   resyncAllScheduleEvents();
+  if(opened) tutorialEvent('avail:opened'); // 튜토리얼 중이면 다음 단계로 (닫기보다 먼저 - 닫기는 "안 열고 닫음"으로 처리됨)
   dismissView(closeQuickAvail);
   refreshActiveScheduleView();
   refreshHomeDashIfVisible();
@@ -39165,50 +39119,159 @@ function openInviteFromUrl(){
   openInviteByToken(token);
 }
 
-// ---------- 앱을 처음 열었을 때 소개 (옆으로 넘겨보는 4장, 한 번 보면 다시 안 뜸) ----------
-const INTRO_SEEN_KEY = 'catchme_intro_seen';
-async function maybeShowIntroTour(){
-  let seen = null;
-  try { seen = localStorage.getItem(INTRO_SEEN_KEY); } catch(e) {}
+
+// ---------- 처음 쓰는 사람 튜토리얼 - 예약 가능 시간을 직접 열어보고, 캘린더·친구·장소 탭을 차례로 눌러봄 ----------
+// 단계마다 눌러볼 실제 버튼에 테두리가 깜빡이고, 그 동작을 하면(until) 다음 단계로. until이 없는 단계는 카드의 버튼으로 넘어감
+const TUTORIAL_DONE_KEY = 'catchme_tutorial_done';
+const navItemOf = (tab) => document.querySelector(`.bottom-nav .nav-item[data-tab="${tab}"]`);
+const TUTORIAL_STEPS = [
+  {
+    title: '내 예약 가능 시간 열기',
+    text: "친구들이 약속을 신청할 수 있는, 내가 되는 시간이에요. 홈의 '빠르게 열기'를 눌러 열어볼까요?",
+    targets: () => [currentTopTab === null ? document.getElementById('homeAvailQuickBtn') : navItemOf('home')],
+    until: 'quick:open',
+  },
+  {
+    // 이번 주에 남은 날이 없으면(주말 저녁 등) 다음 주로 넘기라고 안내
+    title: '시간 정하기',
+    text: () => quickTutorialTrack()
+      ? "날짜 아래 빈 막대를 누르면 시간이 생겨요. 양 끝을 끌어 시간을 맞춘 뒤, 맨 아래 '열어두기'를 눌러요."
+      : '이번 주는 남은 날이 없어요. 오른쪽 화살표로 다음 주로 넘겨 주세요.',
+    targets: () => quickTutorialTrack() ? [quickTutorialTrack(), document.getElementById('quickAvailSubmitBtn')] : [document.getElementById('quickAvailWeekNext')],
+    inSheet: true,
+    until: 'avail:opened',
+    backOn: { 'quick:close': 0 }, // 안 열고 닫으면 처음 단계로
+  },
+  {
+    title: '캘린더에서 확인',
+    text: '열어둔 시간은 캘린더에 표시돼요. 아래 캘린더 탭을 눌러보세요.',
+    targets: () => [navItemOf('schedule')],
+    until: 'tab:schedule',
+  },
+  {
+    title: '열어둔 시간 보기',
+    text: '점이 찍힌 날에 일정이나 열어둔 시간이 있어요. 날짜를 누르면 그날 시간이 보이고, 여기서 일정도 넣을 수 있어요.',
+    targets: () => [],
+    next: '다음',
+  },
+  {
+    title: '친구와 약속 잡기',
+    text: '친구를 추가하면 서로 열어둔 시간이 겹치는 때를 보고 바로 약속을 신청할 수 있어요. 친구 탭을 눌러보세요.',
+    targets: () => [navItemOf('friends')],
+    until: 'tab:friends',
+  },
+  {
+    title: '친구 추가',
+    text: "'+'로 아이디를 찾아 친구를 추가해요. 가입 안 한 친구에게는 약속 링크를 보내서 되는 시간을 물어볼 수 있어요.",
+    targets: () => [document.getElementById('addFriendBtn')],
+    next: '다음',
+  },
+  {
+    title: '어디서 만날지',
+    text: '만날 장소는 장소 탭에서 골라요. 다른 사람들이 추천한 맛집·카페를 볼 수 있어요.',
+    targets: () => [navItemOf('community')],
+    until: 'tab:community',
+  },
+  {
+    title: '다 됐어요!',
+    text: () => authToken ? '이제 친구를 추가하고 약속을 잡아보세요.' : '둘러보다가 친구와 약속을 잡고 싶을 때 가입하면 돼요.',
+    targets: () => [],
+    next: '시작하기',
+    signup: true,
+  },
+];
+let tutorialStep = -1; // -1 = 튜토리얼 안 하는 중
+let tutorialTargets = [];
+
+// 빠르게 열기 화면에서 시간을 넣을 수 있는 첫 날의 막대 (오늘처럼 일부가 지난 날은 빼고, 아예 지난 날은 막대가 없음)
+function quickTutorialTrack(){
+  return [...document.querySelectorAll('#quickAvailRows [data-qa-track]')].find(t => !t.querySelector('.qa-past')) || null;
+}
+
+async function maybeStartTutorial(){
+  let done = null;
+  try { done = localStorage.getItem(TUTORIAL_DONE_KEY); } catch(e) {}
   // iOS가 웹 저장공간을 비워도 다시 안 뜨게 앱 자체 저장소에도 같이 봄 (로그인 세션과 같은 방식)
-  if(!seen && nativePrefs()){
-    try { seen = (await nativePrefs().get({ key: INTRO_SEEN_KEY })).value; } catch(e) {}
+  if(!done && nativePrefs()){
+    try { done = (await nativePrefs().get({ key: TUTORIAL_DONE_KEY })).value; } catch(e) {}
   }
-  if(!seen) openIntroTour();
+  if(!done) startTutorial();
 }
-function openIntroTour(){
-  const el = document.getElementById('introTour');
-  el.hidden = false;
-  document.getElementById('introTrack').scrollLeft = 0;
-  updateIntroTourStep();
-  pushViewState(closeIntroTour); // 안드로이드 뒤로가기로도 닫힘
+function startTutorial(){
+  goTutorialStep(0);
 }
-function closeIntroTour(){
-  document.getElementById('introTour').hidden = true;
-  try { localStorage.setItem(INTRO_SEEN_KEY, '1'); } catch(e) {}
-  if(nativePrefs()) nativePrefs().set({ key: INTRO_SEEN_KEY, value: '1' }).catch(() => {});
+function endTutorial(){
+  tutorialStep = -1;
+  setTutorialTargets([]);
+  document.getElementById('tutCard').hidden = true;
+  try { localStorage.setItem(TUTORIAL_DONE_KEY, '1'); } catch(e) {}
+  if(nativePrefs()) nativePrefs().set({ key: TUTORIAL_DONE_KEY, value: '1' }).catch(() => {});
 }
-function introTourStep(){
-  const track = document.getElementById('introTrack');
-  return Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+function goTutorialStep(i){
+  if(i >= TUTORIAL_STEPS.length){ endTutorial(); return; }
+  tutorialStep = i;
+  renderTutorialStep();
 }
-// 지금 보는 장에 맞춰 점, 버튼 글자(마지막 장은 "시작하기"), 건너뛰기(마지막 장엔 숨김)를 바꿈
-function updateIntroTourStep(){
-  const step = introTourStep();
-  const dots = document.querySelectorAll('#introDots span');
-  dots.forEach((d, i) => d.classList.toggle('on', i === step));
-  const last = step >= dots.length - 1;
-  document.getElementById('introNextBtn').textContent = last ? '시작하기' : '다음';
-  document.getElementById('introSkipBtn').classList.toggle('gone', last);
+// 앱 곳곳에서 "이런 일이 있었다"고 알려줌 - 지금 단계가 기다리던 거면 다음 단계로
+function tutorialEvent(name){
+  if(tutorialStep < 0) return;
+  const step = TUTORIAL_STEPS[tutorialStep];
+  if(step.until === name){ goTutorialStep(tutorialStep + 1); return; }
+  if(step.backOn && name in step.backOn){ goTutorialStep(step.backOn[name]); return; }
+  setTimeout(refreshTutorialTargets, 60); // 화면이 바뀌었으면 깜빡일 버튼도 다시 찾음
 }
-document.getElementById('introTrack').addEventListener('scroll', updateIntroTourStep, { passive: true });
-document.getElementById('introSkipBtn').addEventListener('click', () => dismissView(closeIntroTour));
-document.getElementById('introNextBtn').addEventListener('click', () => {
-  const track = document.getElementById('introTrack');
-  const step = introTourStep();
-  if(step >= track.children.length - 1){ dismissView(closeIntroTour); return; }
-  track.scrollTo({ left: (step + 1) * track.clientWidth, behavior: 'smooth' });
-});
+function setTutorialTargets(list){
+  tutorialTargets.forEach(el => el.classList.remove('tut-target'));
+  tutorialTargets = list.filter(Boolean);
+  tutorialTargets.forEach(el => el.classList.add('tut-target'));
+}
+function refreshTutorialTargets(){
+  if(tutorialStep < 0) return;
+  const step = TUTORIAL_STEPS[tutorialStep];
+  setTutorialTargets(step.targets());
+  document.getElementById('tutText').textContent = typeof step.text === 'function' ? step.text() : step.text;
+  // 눌러볼 버튼이 화면 아래쪽에 있으면 카드가 가리지 않게 위로 올림
+  const first = tutorialTargets[0];
+  const r = first && first.getBoundingClientRect();
+  const low = r && r.height && r.top > window.innerHeight * 0.5 && !first.closest('.bottom-nav');
+  const card = document.getElementById('tutCard');
+  card.classList.toggle('in-sheet', !!step.inSheet);
+  card.classList.toggle('at-top', !step.inSheet && !!low);
+}
+function renderTutorialStep(){
+  const step = TUTORIAL_STEPS[tutorialStep];
+  document.getElementById('tutCard').hidden = false;
+  document.getElementById('tutStep').textContent = `${tutorialStep + 1} / ${TUTORIAL_STEPS.length}`;
+  document.getElementById('tutTitle').textContent = step.title;
+  document.getElementById('tutSkipBtn').style.display = step.signup ? 'none' : '';
+  const actions = document.getElementById('tutActions');
+  actions.innerHTML = '';
+  if(step.signup && !authToken){
+    const signup = document.createElement('button');
+    signup.type = 'button';
+    signup.textContent = '가입하기';
+    signup.addEventListener('click', () => { endTutorial(); openAuthGate(); });
+    actions.appendChild(signup);
+  }
+  if(step.next){
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'primary';
+    next.textContent = step.next;
+    next.addEventListener('click', () => goTutorialStep(tutorialStep + 1));
+    actions.appendChild(next);
+  }
+  // 첫 단계는 홈에서 시작
+  if(tutorialStep === 0 && currentTopTab !== null) switchTopTab(null);
+  refreshTutorialTargets();
+  // 눌러볼 버튼이 화면 밖이면 보이게 스크롤 (아래 탭 버튼은 늘 보임)
+  const first = tutorialTargets[0];
+  if(first && !first.closest('.bottom-nav') && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+document.getElementById('tutSkipBtn').addEventListener('click', endTutorial);
+// 화면을 누르거나 스크롤하면 깜빡일 버튼과 카드 위치를 다시 맞춤 (주를 넘기거나 목록이 다시 그려진 경우)
+document.addEventListener('click', () => { if(tutorialStep >= 0) setTimeout(refreshTutorialTargets, 80); }, true);
+window.addEventListener('scroll', () => { if(tutorialStep >= 0) requestAnimationFrame(refreshTutorialTargets); }, { passive: true, capture: true });
 
 // ---------- 카카오/네이버 소셜 로그인 ----------
 document.getElementById('kakaoLoginBtn').addEventListener('click', () => {
@@ -39261,8 +39324,8 @@ handleSocialLoginRedirect().catch(() => false).then(async handled => {
   if(!authToken){
     showTab(null); // 로그인 안 했어도 가입 화면 없이 홈부터 - 계정이 필요한 걸 누를 때 가입 화면이 뜸
     loadFeedPostsFromServer(); // 장소 리뷰는 가입 없이도 볼 수 있음
-    // 처음 연 사람에게 앱 소개 - 약속 링크·비밀번호 재설정 링크로 들어온 거면 그 화면이 먼저라 건너뜀
-    if(!STARTUP_INVITE_TOKEN && !pendingResetPasswordToken) maybeShowIntroTour();
+    // 처음 연 사람에게 직접 해보는 튜토리얼 - 약속 링크·비밀번호 재설정 링크로 들어온 거면 그 화면이 먼저라 건너뜀
+    if(!STARTUP_INVITE_TOKEN && !pendingResetPasswordToken) maybeStartTutorial();
   }
   // 로그인 상태면 일정/친구/채팅/설정을 다 받아서 그린 다음에 로고를 닫음 (너무 오래 걸리면 12초에서 끊음)
   if(startupDataPromise) return Promise.race([startupDataPromise, new Promise(r => setTimeout(r, 12000))]);
