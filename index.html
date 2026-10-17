@@ -8995,6 +8995,7 @@
 
   /* 닫히는 중인 화면·창 - 실제로는 이미 닫혔지만 잠깐 그대로 보여주면서 사라지는 모션만 (누르기는 통과) - setupExitMotion */
   .mz-leaving{ display:block !important; pointer-events:none !important; }
+  body.mz-tab-sliding, body.mz-tab-sliding .app{ overflow-x:clip; }
   .mz-leaving.mz-leave-flex{ display:flex !important; }
   .mz-leaving.mz-leave-view{ position:fixed !important; z-index:30; margin:0 !important; overflow:hidden; box-shadow:-6px 0 20px rgba(0,0,0,0.08); }
 
@@ -12693,6 +12694,7 @@ const panels = {
 
 let currentTopTab = null; // 지금 보고 있는 아래 탭 (null = 메인 캘린더)
 function showTab(tabKey){
+  const prevTopTab = currentTopTab;
   exitHomeEdit(); // 홈 편집 중에 다른 화면으로 가면 편집은 끝냄
   // 내 캘린더 자리에 친구 일정을 띄워둔 채로 탭을 옮기면, 돌아왔을 때는 내 캘린더부터
   if(isFriendCalInline()){
@@ -12751,6 +12753,36 @@ function showTab(tabKey){
       renderFeedReviewProfileCard();
     }
   }
+  slideInTopTab(prevTopTab, tabKey);
+}
+
+// 아래 탭을 바꿀 때 탭 순서대로 옆에서 밀려 들어옴 - 오른쪽 탭으로 가면 오른쪽에서, 왼쪽 탭으로 가면 왼쪽에서.
+// transform/translate로 움직이면 탭 안의 position:fixed 버튼(리뷰 쓰기 등)이 잠깐 엉뚱한 데로 튀어서, 좌우 여백을 움직임
+const TOP_TAB_ORDER = [null, 'schedule', 'friends', 'chat', 'community'];
+function slideInTopTab(fromTab, toTab){
+  if(fromTab === toTab || fromTab === undefined) return;
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const fromIdx = TOP_TAB_ORDER.indexOf(fromTab), toIdx = TOP_TAB_ORDER.indexOf(toTab);
+  if(fromIdx < 0 || toIdx < 0) return;
+  const el = toTab === null ? homeDash : panels[toTab];
+  if(!el || !el.animate) return;
+  if(el._mzTabAnim) el._mzTabAnim.cancel();
+  const cs = getComputedStyle(el);
+  const ml = parseFloat(cs.marginLeft) || 0, mr = parseFloat(cs.marginRight) || 0;
+  const dx = toIdx > fromIdx ? 28 : -28;
+  document.body.classList.add('mz-tab-sliding'); // 밀려 들어오는 동안 화면 옆으로 삐져나간 부분 때문에 가로 스크롤이 생기지 않게
+  const anim = el.animate([
+    { opacity: 0, marginLeft: (ml + dx) + 'px', marginRight: (mr - dx) + 'px' },
+    { opacity: 1, marginLeft: ml + 'px', marginRight: mr + 'px' },
+  ], { duration: 280, easing: 'cubic-bezier(.2,.8,.3,1)' });
+  el._mzTabAnim = anim;
+  const done = () => {
+    if(el._mzTabAnim !== anim) return;
+    el._mzTabAnim = null;
+    document.body.classList.remove('mz-tab-sliding');
+  };
+  anim.onfinish = done;
+  anim.oncancel = done;
 }
 
 // 아래 탭/홈 로고로 화면을 옮길 때도 뒤로가기 한 번이면 직전에 보던 탭으로 돌아가게 함.
