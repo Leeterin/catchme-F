@@ -18995,6 +18995,7 @@ function mapServerReservationMessage(m){
     location: r.location,
     locationLat: r.locationLat,
     locationLon: r.locationLon,
+    meetPinId: r.pinId || null, // 장소부터 정한 약속의 시간을 정하려고 보낸 요청이면 그 약속 핀
     status: RESERVATION_STATUS_MAP[r.status] || 'pending',
     startMs: startD.getTime(), // 답 없이 시간이 지난 요청인지 확인용
     time: m.createdAt,
@@ -27162,6 +27163,15 @@ function roomMeetPlaces(room, pin){
   if(pin.serverId) (room.pinnedSchedules || []).filter(p => p !== pin && !p.dateLabel && p.forPinId === pin.serverId).forEach(add);
   return out;
 }
+// 장소부터 정해둔 약속의 시간을 정하려고 보낸 약속 요청이면 그 약속의 장소들 ("강남역 → 홍대입구", 없으면 '')
+// 확정되면 장소들이 새 일정 카드로 옮겨가니 그 카드 기준으로, 확정 전이면 날짜 미정 약속 카드 기준으로 찾음
+function reservationMeetPlacesLabel(room, m){
+  if(!room || !m.meetPinId) return '';
+  const pins = room.pinnedSchedules || [];
+  const target = pins.find(p => p.dateObj && m._serverId && p.reservationMsgId === m._serverId)
+    || pins.find(p => p.serverId === m.meetPinId && isUndatedMeetPin(p));
+  return target ? roomMeetPlaces(room, target).map(p => escapeHtml(p.location)).join(' → ') : '';
+}
 function placePinTime(p){
   return typeof p.createdAt === 'number' ? p.createdAt : Date.now();
 }
@@ -31120,7 +31130,7 @@ function renderChatMessages(){
           <div class="reservation-card-header">${ICO.calendar} 약속 요청</div>
           <div class="reservation-card-time chat-date-link">${m.dateLabel} ${m.timeLabel}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
-          <div class="reservation-card-note">${ICO.pin} ${m.location ? escapeHtml(m.location) : '장소 미정 (만나서 정해요)'}</div>
+          <div class="reservation-card-note">${ICO.pin} ${m.location ? escapeHtml(m.location) : reservationMeetPlacesLabel(room, m) || '장소 미정 (만나서 정해요)'}</div>
           <div class="reservation-card-status ${expired ? 'expired' : m.status}">${statusLabel}</div>
           ${showActions ? `
             <div class="reservation-card-actions">
