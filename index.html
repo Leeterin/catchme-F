@@ -11880,6 +11880,7 @@ document.addEventListener('visibilitychange', () => {
   });
   loadChatRoomsFromServer();
   if(activeChatRoomId && CHAT_ROOMS[activeChatRoomId] && CHAT_ROOMS[activeChatRoomId].isRealRoom){
+    markRoomRead(activeChatRoomId); // 내려둔 사이 와 있던 메시지를 이제 화면에서 봤으니 읽음 처리
     loadRoomMessagesFromServer(activeChatRoomId, CHAT_ROOMS[activeChatRoomId], false);
   }
   loadScheduleFromServer();
@@ -26369,6 +26370,8 @@ function updateChatNavBadge(){
 }
 function markRoomRead(roomId){
   const room = CHAT_ROOMS[roomId];
+  // 앱을 내려둔(화면이 안 보이는) 동안 온 메시지는 안 본 거라 읽음 처리하지 않음 - 다시 화면이 보일 때 처리됨
+  if(document.visibilityState !== 'visible') return;
   if(room){
     room.unreadCount = 0;
     updateChatNavBadge();
