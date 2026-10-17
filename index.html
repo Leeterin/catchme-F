@@ -30888,12 +30888,12 @@ function getGroupSenderName(room, m){
   return '멤버';
 }
 
-function buildMsgMetaHtml(m){
+function buildMsgMetaHtml(m, isLastMine){
   const timeText = formatMessageTime(m.time || Date.now());
   if(m.who === 'me'){
     if(m._failed) return `<div class="msg-meta"><button type="button" class="msg-retry-btn">다시 보내기</button><span class="msg-failed-label">전송 실패</span></div>`;
     if(m._pending) return `<div class="msg-meta"><span class="msg-sending-dot"></span></div>`;
-    const showRead = m.read && settingsState.chat_read_receipt;
+    const showRead = isLastMine && m.read && settingsState.chat_read_receipt;
     return `<div class="msg-meta">${showRead ? '<span>읽음</span>' : ''}<span>${timeText}</span></div>`;
   }
   return `<div class="msg-meta"><span>${timeText}</span></div>`;
@@ -30991,6 +30991,12 @@ function renderChatMessages(){
   for(let i = room.messages.length - 1; i >= 0; i--){
     if(room.messages[i].type === 'hotplace'){ latestHotplaceMsg = room.messages[i]; break; }
   }
+  // "읽음"은 내가 맨 밑에 보낸 메시지에만 (그 전 메시지들엔 안 띄움)
+  let lastMyMsg = null;
+  for(let i = room.messages.length - 1; i >= 0; i--){
+    const mm = room.messages[i];
+    if(mm.who === 'me' && !parseSysNotice(mm.text)){ lastMyMsg = mm; break; }
+  }
   let lastOtherRunKey = null; // 바로 앞 "상대 메시지"의 보낸 사람+분 - 같으면 프로필 아이콘을 또 그리지 않음
 
   visibleMessages.forEach(m => {
@@ -31034,7 +31040,7 @@ function renderChatMessages(){
     row.className = 'msg-row ' + m.who + (m._animate ? ' msg-pop' : '') + (m._pending ? ' msg-sending' : '') + (m._failed ? ' msg-failed' : '');
     m._animate = false; // 처음 보낼 때 한 번만 튀어오르게 (다시 그릴 때는 모션 없이)
     if(m.id) row.dataset.msgId = m.id; // 핀 카드를 눌렀을 때 이 메시지로 바로 이동하기 위한 참조
-    const metaHtml = buildMsgMetaHtml(m);
+    const metaHtml = buildMsgMetaHtml(m, m === lastMyMsg);
 
     if(m.type === 'reservation'){
       // 답을 못 받은 채 약속 시간이 지난 요청은 수락/거절 버튼 대신 "시간이 지났어요"로 (서버도 지난 요청은 수락을 막음)
