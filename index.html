@@ -29870,6 +29870,7 @@ function renderPinnedSchedule(){
   // 새 일정 카드에 이 장소들이 그대로 붙음 (서버가 옮김)
   pins = pins.concat(undatedMeetPins(room));
   const onlyUndated = pins.length > 0 && pins.every(p => !p.dateObj);
+  const askedDateKey = pendingDateAskKey(room); // 날짜 물어보기로 이미 정한 날 - 날짜 미정 약속은 그날 시간만 정하면 됨
   if(pins.length === 0){
     el.style.display = 'none';
     el.innerHTML = '';
@@ -29884,7 +29885,7 @@ function renderPinnedSchedule(){
   const headerTitle = document.createElement('span');
   headerTitle.className = 'pin-header-title';
   headerTitle.innerHTML = onlyUndated
-    ? `${ICO.pushpin} 날짜 미정 약속${pins.length > 1 ? ` (${pins.length})` : ''}`
+    ? `${ICO.pushpin} ${askedDateKey ? '시간 미정 약속' : '날짜 미정 약속'}${pins.length > 1 ? ` (${pins.length})` : ''}`
     : `${ICO.pushpin} ${pins.some(p => !p.dateObj) ? '약속' : '확정된 약속'} (${pins.length})`;
   const collapseBtn = document.createElement('button');
   collapseBtn.type = 'button';
@@ -29912,7 +29913,7 @@ function renderPinnedSchedule(){
     const pinPast = isPinPast(pinned); // 지난 약속은 장소 변경/삭제/추가 없이 보기만 가능
     const undated = !dateObj;
     // 날짜 미정 약속이 2주 넘게 시간을 못 정했으면 아직 할 건지 물어보고 한 번에 정리할 수 있게 함
-    const undatedStale = undated && places.every(p => Date.now() - placePinTime(p) > UNDATED_PLAN_STALE_DAYS * 86400e3);
+    const undatedStale = undated && !askedDateKey && places.every(p => Date.now() - placePinTime(p) > UNDATED_PLAN_STALE_DAYS * 86400e3);
 
     const card = document.createElement('div');
     card.className = 'pin-card' + (undatedStale ? ' pin-card-stale' : '');
@@ -29921,7 +29922,7 @@ function renderPinnedSchedule(){
         <span class="pin-icon">${ICO.pushpin}</span>
         <div class="pin-info">
           ${dateLabel ? `<div class="pin-time">${dateLabel} ${timeLabel}</div>` : ''}
-          ${undated ? `<div class="pin-time">${undatedStale ? '2주 넘게 날짜를 못 정했어요. 이 약속 아직 할까요?' : '장소는 정했어요. 날짜만 정하면 돼요'}</div>` : ''}
+          ${undated ? `<div class="pin-time">${undatedStale ? '2주 넘게 날짜를 못 정했어요. 이 약속 아직 할까요?' : askedDateKey ? `${dateAskLabel(askedDateKey)}에 만나요. 시간만 정하면 돼요` : '장소는 정했어요. 날짜만 정하면 돼요'}</div>` : ''}
           ${note ? `<div class="pin-note">${escapeHtml(note)}</div>` : ''}
           ${places.length ? `<div class="pin-note">${ICO.pin} ${places.map(p => escapeHtml(p.location)).join(' → ')}</div>` : ''}
         </div>
@@ -29940,7 +29941,7 @@ function renderPinnedSchedule(){
           </div>`;
         }).join('')}</div>` : ''}
         ${dateObj ? `<button type="button" class="pin-action-btn pin-goday">${ICO.calendar} 이 날 내 캘린더</button>` : ''}
-        ${undated ? `<button type="button" class="pin-action-btn pin-plan-time">${ICO.calendar} 날짜 정하기</button>` : ''}
+        ${undated ? `<button type="button" class="pin-action-btn pin-plan-time">${ICO.calendar} ${askedDateKey ? '시간 정하기' : '날짜 정하기'}</button>` : ''}
         ${pinPast ? '' : `<button type="button" class="pin-action-btn pin-add-loc">${places.length ? '+ 장소 추가' : '장소 정하기'}</button>`}
         ${undatedStale ? `<button type="button" class="pin-action-btn danger pin-clear-undated">약속 정리</button>` : ''}
       </div>
@@ -30044,7 +30045,7 @@ function renderPinnedSchedule(){
 
     const planTimeBtn = card.querySelector('.pin-plan-time');
     if(planTimeBtn){
-      planTimeBtn.addEventListener('click', () => startPlanFromChat(pinned));
+      planTimeBtn.addEventListener('click', () => askedDateKey ? setTimeForDateAsk(activeChatRoomId, askedDateKey, pinned) : startPlanFromChat(pinned));
     }
 
     const clearUndatedBtn = card.querySelector('.pin-clear-undated');
@@ -30094,6 +30095,7 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
   const pin = (room.pinnedSchedules || []).find(p => p.id === pinId);
   if(!pin) return;
   apptDetailReturnViewId = returnViewId || 'chatRoomView';
+  const askedDateKey = pin.dateObj ? null : pendingDateAskKey(room); // 날짜 물어보기로 정한 날이 있으면 시간만 정하면 됨
 
   document.getElementById('appointmentDetailTitle').textContent = pin.dateLabel ? `${pin.dateLabel} 약속` : '약속 상세';
 
@@ -30119,7 +30121,11 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       <div class="appt-detail-label">${ICO.calendar} 날짜 · 시간</div>
       ${pin.dateLabel
         ? `<div class="appt-detail-datetime">${escapeHtml(pin.dateLabel)} ${escapeHtml(pin.timeLabel || '')}</div>`
-        : `<div class="appt-detail-empty">아직 날짜가 정해지지 않았어요.</div>
+        : askedDateKey
+          ? `<div class="appt-detail-datetime">${escapeHtml(dateAskLabel(askedDateKey))}</div>
+           <div class="appt-detail-empty">시간은 아직 안 정했어요.</div>
+           <button type="button" class="hotplace-notice-btn" id="apptDetailPlanTimeBtn" style="margin-top:8px;">시간 정하기</button>`
+          : `<div class="appt-detail-empty">아직 날짜가 정해지지 않았어요.</div>
            <button type="button" class="hotplace-notice-btn" id="apptDetailPlanTimeBtn" style="margin-top:8px;">날짜 정하기</button>`}
     </div>
     <div class="appt-detail-section">
@@ -30177,7 +30183,8 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
     planTimeBtn.addEventListener('click', () => {
       apptDetailFromHome = false; // 약속 잡기는 채팅방에서 이어지므로 채팅방으로 돌아감
       goBackOrClose(closeAppointmentDetailView);
-      startPlanFromChat(pin);
+      if(askedDateKey) setTimeForDateAsk(roomId, askedDateKey, pin);
+      else startPlanFromChat(pin);
     });
   }
   const addPlaceBtn = document.getElementById('apptDetailAddPlaceBtn');
@@ -31190,7 +31197,7 @@ function renderChatMessages(){
       const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
       const cardHtml = `
         <div class="reservation-card ls-card">
-          <div class="reservation-card-header">${ICO.pin} 장소 제안 - 여기 어때요?</div>
+          <div class="reservation-card-header">${m.status === 'confirmed' ? `${ICO.check} 장소 확정` : `${ICO.pin} 장소 제안 - 여기 어때요?`}</div>
           <div class="reservation-card-time">${escapeHtml(locationSuggestTitle(activeChatRoomId, m))}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           ${m.location ? `<div class="reservation-card-note">${escapeHtml(m.location)}</div>` : ''}
@@ -33670,11 +33677,26 @@ async function respondDateAsk(roomId, msg, action){
   else if(action === 'decline') openDateAsk(roomId); // 다른 날 - 바로 내가 되는 날을 골라 다시 물어봄
 }
 
+// 날짜 물어보기로 둘이 정했는데 아직 시간은 안 정한 날 (가장 최근 것, 없으면 null)
+// - 장소부터 정해둔 "날짜 미정 약속" 카드에서 날짜를 또 정하라고 하지 않고 그날 시간만 정하게 하려고 씀
+function pendingDateAskKey(room){
+  if(!room || !room.messages) return null;
+  const todayKey = toDateInputValue(TODAY);
+  for(let i = room.messages.length - 1; i >= 0; i--){
+    const da = room.messages[i].dateAsk;
+    if(!da || da.status !== 'CONFIRMED' || da.date < todayKey) continue;
+    const booked = (room.pinnedSchedules || []).some(p => p.dateObj && toDateInputValue(new Date(p.dateObj)) === da.date);
+    if(!booked) return da.date;
+  }
+  return null;
+}
+
 // 좋다고 한 날의 시간 정하기 - 장소부터 정해둔 날짜 미정 약속이 있으면, 시간이 정해질 때 그 장소들이 같이 붙게 함
-function setTimeForDateAsk(roomId, dateKey){
+// meetPin: 그 약속 카드에서 눌렀으면 그 약속 (없으면 가장 최근 날짜 미정 약속)
+function setTimeForDateAsk(roomId, dateKey, meetPin){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
-  const meet = undatedMeetPins(room).filter(p => p.serverId).sort((a, b) => placePinTime(b) - placePinTime(a))[0];
+  const meet = (meetPin && meetPin.serverId) ? meetPin : undatedMeetPins(room).filter(p => p.serverId).sort((a, b) => placePinTime(b) - placePinTime(a))[0];
   planMeetTarget = meet ? { roomId, pinId: meet.serverId, at: Date.now() } : null;
   if(room.isGroup){
     if(!room.members || room.members.length <= 1){
