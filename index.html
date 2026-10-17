@@ -11804,11 +11804,16 @@ async function initPushNotifications(){
     console.warn('[push] 초기화 실패', err);
   }
 }
+let pushTapOpeningRoomId = null; // 같은 알림 탭이 두 번 들어와도(앱이 꺼져 있다 켜질 때) 방을 한 번만 열게
 async function handlePushTap(data){
   if(!authToken) return;
   trackEvent('push_open', { type: data.type || '' });
   if(data.type === 'chat' && data.roomId){
-    if(!CHAT_ROOMS[data.roomId]) await loadChatRoomsFromServer();
+    if(pushTapOpeningRoomId === data.roomId) return;
+    pushTapOpeningRoomId = data.roomId;
+    try {
+      if(!CHAT_ROOMS[data.roomId]) await loadChatRoomsFromServer();
+    } finally { pushTapOpeningRoomId = null; }
     if(!CHAT_ROOMS[data.roomId]) return;
     if(activeChatRoomId === data.roomId) return;
     jumpToView(() => { showTab('chat'); openChatRoom(data.roomId); });
