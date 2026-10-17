@@ -4123,6 +4123,7 @@
     display:block;
     width:100%;
     max-width:220px;
+    height:auto; /* width/height 속성으로 넣어둔 비율대로 로드 전에도 높이를 잡게 */
     max-height:280px;
     object-fit:cover;
     border-radius:12px;
@@ -30942,6 +30943,24 @@ function applyReservationUpdate(m, serverMsg){
   const cur = room && (room.messages || []).find(x => x !== m && x._serverId && x._serverId === m._serverId);
   if(cur) Object.assign(cur, fresh);
 }
+// 채팅 사진 크기(가로, 세로)를 주소별로 기억 - 앱을 다시 켜도(알림 눌러 들어온 경우 등) 사진 자리가 처음부터 잡혀 있게 폰에 저장
+var CHAT_IMAGE_SIZE_KEY = 'catchme_chat_image_sizes';
+var CHAT_IMAGE_SIZE_LIMIT = 300;
+var chatImageSizeCache = (() => { // var: 시작할 때 링크로 바로 방이 열려도 선언 전 접근 에러가 안 나게
+  try { return JSON.parse(localStorage.getItem(CHAT_IMAGE_SIZE_KEY)) || {}; } catch(e) { return {}; }
+})();
+var chatImageSizeSaveTimer = null;
+function rememberChatImageSize(url, img){
+  if(!chatImageSizeCache || !url || url.startsWith('data:') || !img.naturalWidth || !img.naturalHeight) return; // 보내는 중인 사진(data:)은 주소가 너무 길어서 저장 안 함
+  delete chatImageSizeCache[url]; // 최근 본 사진이 뒤로 가게 해서 넘치면 오래된 것부터 지움
+  chatImageSizeCache[url] = [img.naturalWidth, img.naturalHeight];
+  const keys = Object.keys(chatImageSizeCache);
+  for(let i = 0; i < keys.length - CHAT_IMAGE_SIZE_LIMIT; i++) delete chatImageSizeCache[keys[i]];
+  clearTimeout(chatImageSizeSaveTimer);
+  chatImageSizeSaveTimer = setTimeout(() => {
+    try { localStorage.setItem(CHAT_IMAGE_SIZE_KEY, JSON.stringify(chatImageSizeCache)); } catch(e) {}
+  }, 500);
+}
 function renderChatMessages(){
   const room = CHAT_ROOMS[activeChatRoomId];
   const box = document.getElementById('chatMessages');
@@ -31348,8 +31367,14 @@ function renderChatMessages(){
       row.className = 'msg-row system-notice-row';
       row.innerHTML = `<div class="system-notice-card">${systemNoticeHTML(m)}</div>`;
     } else if(m.type === 'image'){
-      const imgHtml = `<div class="msg-bubble msg-bubble-image"><img src="${m.imageUrl}" alt="사진" loading="lazy" /></div>`;
+      // 전에 본 사진이면 크기를 미리 넣어둠 - 다시 그릴 때 사진이 0 크기로 떴다가 커지면서 스크롤이 튀던 것 방지
+      const imgSize = chatImageSizeCache && chatImageSizeCache[m.imageUrl];
+      // (사진은 로드돼야 원래 크기를 알아서, 말풍선 폭을 로드된 뒤와 같은 값으로 미리 정하고 사진 비율로 높이를 잡음)
+      const bubbleStyle = imgSize ? ` style="width:min(60%, 220px, ${imgSize[0]}px)"` : '';
+      const sizeAttr = imgSize ? ` width="${imgSize[0]}" height="${imgSize[1]}"` : '';
+      const imgHtml = `<div class="msg-bubble msg-bubble-image"${bubbleStyle}><img src="${m.imageUrl}" alt="사진" loading="lazy"${sizeAttr} /></div>`;
       row.innerHTML = m.who === 'me' ? (metaHtml + imgHtml) : (imgHtml + metaHtml);
+      if(!imgSize) row.querySelector('img').addEventListener('load', (e) => rememberChatImageSize(m.imageUrl, e.target), { once: true });
       // 사진을 누르면 크게 보기만 열림 - 답장은 메시지를 왼쪽으로 밀어서
       row.querySelector('img').addEventListener('click', () => {
         if(Date.now() - chatSwipeReplyAt < 400) return;
