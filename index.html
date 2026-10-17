@@ -519,6 +519,8 @@
   }
   /* 사진 없는 프로필 - 밋집 마스코트(집 캐릭터). 동그라미 배경색은 각 사람 색 그대로 */
   .mascot-avatar{ width:100%; height:100%; display:block; border-radius:50%; }
+  /* 기본 아바타(회색 실루엣)를 담은 칸은 사람별 색 대신 회색으로 - 테두리에 색이 비치지 않게 */
+  :has(> .mascot-avatar){ background:#E3E5E9 !important; }
   .placeholder-avatar img,
   .profile-avatar-lg img{
     width:100%;
@@ -12349,7 +12351,8 @@ const WEEKDAY_KO = ["일","월","화","수","목","금","토"];
 
 // ---------- 채팅(예약/제안/장소/핫플 등)에서 쓰는 라인 아이콘 (이모지 대체용) ----------
 // 사진 없는 프로필에 그리는 밋집 마스코트 - 흰 집 캐릭터, 배경은 그 사람 색
-const MASCOT_AVATAR_SVG = '<svg class="mascot-avatar" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 21 L85 50 Q88 54 83 55 H17 Q12 54 15 50 Z" fill="#fff" fill-opacity=".55"/><rect x="65" y="25" width="9" height="15" rx="2.5" fill="#fff" fill-opacity=".55"/><rect x="23" y="47" width="54" height="64" rx="13" fill="#fff"/><circle cx="40" cy="67" r="4.6" fill="#33364A"/><circle cx="60" cy="67" r="4.6" fill="#33364A"/><circle cx="41.6" cy="65.3" r="1.5" fill="#fff"/><circle cx="61.6" cy="65.3" r="1.5" fill="#fff"/><ellipse cx="32" cy="76" rx="5" ry="3.2" fill="#FF8FA3" fill-opacity=".55"/><ellipse cx="68" cy="76" rx="5" ry="3.2" fill="#FF8FA3" fill-opacity=".55"/><path d="M45 75 Q50 80 55 75" fill="none" stroke="#33364A" stroke-width="3" stroke-linecap="round"/></svg>';
+// 프로필 사진이 없을 때 보여주는 기본 아바타 - 회색 원에 사람 실루엣 (배경까지 그려서 바깥 배경색과 상관없이 늘 회색)
+const MASCOT_AVATAR_SVG = '<svg class="mascot-avatar" viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" fill="#E3E5E9"/><circle cx="50" cy="40" r="17" fill="#AEB3BC"/><path d="M15 100 Q15 64 50 64 Q85 64 85 100 Z" fill="#AEB3BC"/></svg>';
 const ICO = {
   // 이모티콘 대신 쓰는 라인 아이콘 (글자 크기를 따라감)
   carLi: '<svg class="li" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="1em" height="1em" style="vertical-align:-0.15em;"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><path d="M3 12h18"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>',
