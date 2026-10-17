@@ -7746,6 +7746,52 @@
   .auth-agree input{ width:18px; height:18px; margin:1px 0 0; flex-shrink:0; accent-color:var(--accent); }
   .auth-agree-link, .auth-form .auth-agree-link{ width:auto; height:auto; margin:0; background:none; border:none; border-radius:0; padding:0; font:inherit; font-weight:600; color:var(--text); text-decoration:underline; cursor:pointer; box-shadow:none; display:inline; }
   .auth-social-note{ font-size:11px; color:var(--text-dim); text-align:center; margin-top:10px; line-height:1.5; }
+  /* ---------------- 앱 처음 열었을 때 소개 (옆으로 넘겨보는 4장) ---------------- */
+  .intro-tour{
+    position:fixed; inset:0; z-index:3500; background:var(--mz-bg);
+    display:flex; flex-direction:column;
+    padding-top:env(safe-area-inset-top); padding-bottom:calc(20px + env(safe-area-inset-bottom));
+  }
+  .intro-tour[hidden]{ display:none; }
+  .intro-skip{ align-self:flex-end; margin:8px 14px 0; padding:8px 6px; background:none; border:none; color:var(--mz-gray); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+  .intro-skip.gone{ visibility:hidden; }
+  .intro-track{ flex:1; min-height:0; display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; -webkit-overflow-scrolling:touch; }
+  .intro-track::-webkit-scrollbar{ display:none; }
+  .intro-slide{ flex:0 0 100%; box-sizing:border-box; scroll-snap-align:center; scroll-snap-stop:always; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 30px; text-align:center; }
+  .intro-art{ width:100%; max-width:290px; height:230px; display:flex; align-items:center; justify-content:center; margin-bottom:34px; }
+  .intro-slide h2{ margin:0 0 12px; font-size:24px; font-weight:800; letter-spacing:-0.03em; line-height:1.3; color:var(--mz-ink); }
+  .intro-slide p{ margin:0; font-size:15px; line-height:1.65; color:var(--mz-gray-dark); word-break:keep-all; }
+  .intro-dots{ display:flex; justify-content:center; gap:6px; margin:18px 0 20px; }
+  .intro-dots span{ width:6px; height:6px; border-radius:3px; background:var(--mz-line); transition:width .2s ease, background .2s ease; }
+  .intro-dots span.on{ width:18px; background:var(--mz-tomato); }
+  .intro-next{ margin:0 20px; height:52px; border:none; border-radius:14px; background:var(--mz-tomato); color:#FFFFFF; font-family:inherit; font-size:16px; font-weight:700; cursor:pointer; }
+  .intro-next:active{ background:var(--mz-tomato-deep); }
+  /* 그림 - 실제 화면을 단순하게 줄인 카드 */
+  .intro-logo{ width:120px; height:120px; border-radius:32px; background:var(--mz-tomato); display:flex; align-items:center; justify-content:center; box-shadow:0 14px 30px rgba(216,90,48,0.28); }
+  .intro-logo svg{ width:74px; height:74px; }
+  .intro-card{ width:100%; box-sizing:border-box; background:var(--mz-card); border-radius:20px; padding:18px; box-shadow:0 10px 28px rgba(44,44,42,0.08); text-align:left; }
+  .intro-card-label{ font-size:12px; font-weight:700; color:var(--mz-gray); margin-bottom:12px; }
+  .intro-week{ display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; margin-bottom:14px; }
+  .intro-week span{ height:34px; border-radius:9px; background:var(--mz-segment); color:var(--mz-gray); font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .intro-week span.on{ background:var(--mz-tomato-light); color:var(--mz-tomato); box-shadow:inset 0 0 0 1.5px var(--mz-tomato); }
+  .intro-slot{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:12px; background:var(--mz-tomato-light); font-size:14px; font-weight:700; color:var(--mz-ink); }
+  .intro-slot b{ font-size:12px; color:var(--mz-tomato); }
+  .intro-req{ display:flex; align-items:center; gap:12px; }
+  .intro-req b{ display:block; font-size:15px; color:var(--mz-ink); }
+  .intro-req small{ display:block; margin-top:2px; font-size:13px; color:var(--mz-gray); }
+  .intro-avatar{ width:42px; height:42px; flex-shrink:0; border-radius:50%; background:#7C6CFF; color:#FFFFFF; font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+  .intro-down{ display:flex; justify-content:center; padding:10px 0; color:var(--mz-line); }
+  .intro-confirm{ display:flex; align-items:center; justify-content:center; gap:6px; height:44px; border-radius:12px; background:var(--mz-tomato); color:#FFFFFF; font-size:15px; font-weight:700; }
+  .intro-place{ padding:0; overflow:hidden; }
+  .intro-place-photo{ height:110px; background:var(--mz-tomato-light); color:var(--mz-tomato); display:flex; align-items:center; justify-content:center; }
+  .intro-place-row{ display:flex; align-items:center; justify-content:space-between; padding:14px 16px 8px; }
+  .intro-place-row b{ font-size:15px; color:var(--mz-ink); }
+  .intro-place-row span{ font-size:14px; font-weight:800; color:var(--mz-tomato); }
+  .intro-place-tags{ display:flex; gap:6px; padding:0 16px 16px; }
+  .intro-place-tags span{ padding:4px 9px; border-radius:8px; background:var(--mz-segment); font-size:12px; color:var(--mz-gray-dark); }
+  @media (prefers-reduced-motion: no-preference){
+    .intro-tour:not([hidden]){ animation:mzFadeIn .3s ease; }
+  }
   .auth-skip-btn{ display:block; width:100%; background:none; border:none; color:var(--text-dim); font-size:13px; font-weight:600; padding:16px 0 4px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   .auth-hint{
     margin-top:16px;
@@ -9147,6 +9193,54 @@
     </div>
   </div>
 
+
+
+  <!-- 앱을 처음 열었을 때 한 번만 보여주는 소개 - 옆으로 넘겨보는 4장 (maybeShowIntroTour) -->
+  <div class="intro-tour" id="introTour" hidden>
+    <button type="button" class="intro-skip" id="introSkipBtn">건너뛰기</button>
+    <div class="intro-track" id="introTrack">
+      <section class="intro-slide">
+        <div class="intro-art"><div class="intro-logo"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 10 82 31H18Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round"/><g fill="#FFFFFF"><rect x="23" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="23" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="57.1" width="15.8" height="15.8" rx="3.6" fill="#E9A23B"/><rect x="23" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="76.2" width="15.8" height="15.8" rx="3.6"/></g></svg></div></div>
+        <h2>MEETZIP에 오신 걸 환영해요</h2>
+        <p>친구가 열어둔 시간에,<br>거절 걱정 없이 약속을 잡는 앱이에요.</p>
+      </section>
+      <section class="intro-slide">
+        <div class="intro-art">
+          <div class="intro-card">
+            <div class="intro-card-label">내 예약 가능 시간</div>
+            <div class="intro-week"><span>월</span><span>화</span><span>수</span><span class="on">목</span><span>금</span><span class="on">토</span><span class="on">일</span></div>
+            <div class="intro-slot"><span>토 14:00 – 18:00</span><b>열림</b></div>
+          </div>
+        </div>
+        <h2>되는 시간을 열어두세요</h2>
+        <p>캘린더에서 예약 가능 시간을 열면,<br>친구들이 그 시간 안에서 약속을 신청해요.</p>
+      </section>
+      <section class="intro-slide">
+        <div class="intro-art">
+          <div class="intro-card">
+            <div class="intro-req"><span class="intro-avatar">지</span><div><b>지우</b><small>토 15:00 약속 신청</small></div></div>
+            <div class="intro-down"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></div>
+            <div class="intro-confirm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>약속이 잡혔어요</div>
+          </div>
+        </div>
+        <h2>친구 시간에 바로 신청</h2>
+        <p>친구가 열어둔 시간 중에 골라 신청하고,<br>친구가 수락하면 약속이 잡혀요.<br>장소는 채팅에서 같이 정해요.</p>
+      </section>
+      <section class="intro-slide">
+        <div class="intro-art">
+          <div class="intro-card intro-place">
+            <div class="intro-place-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="34" height="34" aria-hidden="true"><path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 3c-1.7 1.2-3 3.4-3 6v4h3v8"/></svg></div>
+            <div class="intro-place-row"><b>성수 브런치 카페</b><span>&#9733; 4.8</span></div>
+            <div class="intro-place-tags"><span>#분위기좋은</span><span>#대화하기좋은</span></div>
+          </div>
+        </div>
+        <h2>어디 갈지도 여기서</h2>
+        <p>다른 사람들이 추천한 맛집·카페를 둘러보세요.<br>둘러보기는 가입 없이 되고,<br>친구와 약속을 잡을 때 가입하면 돼요.</p>
+      </section>
+    </div>
+    <div class="intro-dots" id="introDots"><span class="on"></span><span></span><span></span><span></span></div>
+    <button type="button" class="intro-next" id="introNextBtn">다음</button>
+  </div>
 
   <!-- Top bar -->
   <div class="topbar">
@@ -39071,6 +39165,51 @@ function openInviteFromUrl(){
   openInviteByToken(token);
 }
 
+// ---------- 앱을 처음 열었을 때 소개 (옆으로 넘겨보는 4장, 한 번 보면 다시 안 뜸) ----------
+const INTRO_SEEN_KEY = 'catchme_intro_seen';
+async function maybeShowIntroTour(){
+  let seen = null;
+  try { seen = localStorage.getItem(INTRO_SEEN_KEY); } catch(e) {}
+  // iOS가 웹 저장공간을 비워도 다시 안 뜨게 앱 자체 저장소에도 같이 봄 (로그인 세션과 같은 방식)
+  if(!seen && nativePrefs()){
+    try { seen = (await nativePrefs().get({ key: INTRO_SEEN_KEY })).value; } catch(e) {}
+  }
+  if(!seen) openIntroTour();
+}
+function openIntroTour(){
+  const el = document.getElementById('introTour');
+  el.hidden = false;
+  document.getElementById('introTrack').scrollLeft = 0;
+  updateIntroTourStep();
+  pushViewState(closeIntroTour); // 안드로이드 뒤로가기로도 닫힘
+}
+function closeIntroTour(){
+  document.getElementById('introTour').hidden = true;
+  try { localStorage.setItem(INTRO_SEEN_KEY, '1'); } catch(e) {}
+  if(nativePrefs()) nativePrefs().set({ key: INTRO_SEEN_KEY, value: '1' }).catch(() => {});
+}
+function introTourStep(){
+  const track = document.getElementById('introTrack');
+  return Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+}
+// 지금 보는 장에 맞춰 점, 버튼 글자(마지막 장은 "시작하기"), 건너뛰기(마지막 장엔 숨김)를 바꿈
+function updateIntroTourStep(){
+  const step = introTourStep();
+  const dots = document.querySelectorAll('#introDots span');
+  dots.forEach((d, i) => d.classList.toggle('on', i === step));
+  const last = step >= dots.length - 1;
+  document.getElementById('introNextBtn').textContent = last ? '시작하기' : '다음';
+  document.getElementById('introSkipBtn').classList.toggle('gone', last);
+}
+document.getElementById('introTrack').addEventListener('scroll', updateIntroTourStep, { passive: true });
+document.getElementById('introSkipBtn').addEventListener('click', () => dismissView(closeIntroTour));
+document.getElementById('introNextBtn').addEventListener('click', () => {
+  const track = document.getElementById('introTrack');
+  const step = introTourStep();
+  if(step >= track.children.length - 1){ dismissView(closeIntroTour); return; }
+  track.scrollTo({ left: (step + 1) * track.clientWidth, behavior: 'smooth' });
+});
+
 // ---------- 카카오/네이버 소셜 로그인 ----------
 document.getElementById('kakaoLoginBtn').addEventListener('click', () => {
   window.location.href = API_BASE_URL + '/auth/kakao/login';
@@ -39122,6 +39261,8 @@ handleSocialLoginRedirect().catch(() => false).then(async handled => {
   if(!authToken){
     showTab(null); // 로그인 안 했어도 가입 화면 없이 홈부터 - 계정이 필요한 걸 누를 때 가입 화면이 뜸
     loadFeedPostsFromServer(); // 장소 리뷰는 가입 없이도 볼 수 있음
+    // 처음 연 사람에게 앱 소개 - 약속 링크·비밀번호 재설정 링크로 들어온 거면 그 화면이 먼저라 건너뜀
+    if(!STARTUP_INVITE_TOKEN && !pendingResetPasswordToken) maybeShowIntroTour();
   }
   // 로그인 상태면 일정/친구/채팅/설정을 다 받아서 그린 다음에 로고를 닫음 (너무 오래 걸리면 12초에서 끊음)
   if(startupDataPromise) return Promise.race([startupDataPromise, new Promise(r => setTimeout(r, 12000))]);
