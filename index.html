@@ -26254,7 +26254,10 @@ async function loadChatRoomsFromServer(){
       if(!hasLoadedMessages && r.lastMessage){
         room.messages = [mapServerMessageToLocal(r.lastMessage, room)];
       }
-      CHAT_ROOMS[r.id] = room;
+      // 이미 있는 방은 객체를 새로 바꿔치지 않고 값만 갱신 - 알림 눌러 앱이 열릴 때처럼 방 목록과 방 메시지를
+      // 동시에 받으면, 메시지는 옛 객체에 채워지고 화면은 새 객체(대화 비어있음)를 그려서 대화가 사라져 보였음
+      if(existing) Object.assign(existing, room);
+      else CHAT_ROOMS[r.id] = room;
     });
     renderChatList();
     updateChatNavBadge();
