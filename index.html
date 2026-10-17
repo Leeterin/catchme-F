@@ -7746,6 +7746,7 @@
   .auth-agree input{ width:18px; height:18px; margin:1px 0 0; flex-shrink:0; accent-color:var(--accent); }
   .auth-agree-link, .auth-form .auth-agree-link{ width:auto; height:auto; margin:0; background:none; border:none; border-radius:0; padding:0; font:inherit; font-weight:600; color:var(--text); text-decoration:underline; cursor:pointer; box-shadow:none; display:inline; }
   .auth-social-note{ font-size:11px; color:var(--text-dim); text-align:center; margin-top:10px; line-height:1.5; }
+  .auth-skip-btn{ display:block; width:100%; background:none; border:none; color:var(--text-dim); font-size:13px; font-weight:600; padding:16px 0 4px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   .auth-hint{
     margin-top:16px;
     font-size:11px;
@@ -9076,7 +9077,7 @@
 <div class="app">
 
   <!-- 회원가입 / 로그인 게이트 -->
-  <div class="auth-gate" id="authGateView">
+  <div class="auth-gate" id="authGateView" style="display:none;">
     <div class="auth-card">
       <div class="auth-logo">
         <div class="mark"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 10 82 31H18Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round"/><g fill="#FFFFFF"><rect x="23" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="23" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="57.1" width="15.8" height="15.8" rx="3.6" fill="#E9A23B"/><rect x="23" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="76.2" width="15.8" height="15.8" rx="3.6"/></g></svg></div>
@@ -9139,6 +9140,8 @@
         네이버로 로그인
       </button>
       <div class="auth-social-note" id="authSocialNote">카카오·네이버로 처음 시작하면 <button type="button" class="auth-agree-link" data-legal="terms">이용약관</button>과 <button type="button" class="auth-agree-link" data-legal="privacy">개인정보 처리방침</button>에 동의하는 것으로 봐요.</div>
+      <!-- 가입 없이 먼저 써보기 - 친구 추가·약속 신청처럼 계정이 필요한 걸 누를 때 다시 이 화면이 뜸 -->
+      <button type="button" class="auth-skip-btn" id="authSkipBtn">나중에 할게요</button>
 
     </div>
   </div>
@@ -11315,6 +11318,16 @@ async function apiRequest(path, options = {}, _isRetry) {
   const { slowMessage, ...fetchOptions } = options; // slowMessage: 오래 걸릴 때 띄울 문구 (fetch엔 안 넘김)
   const headers = { 'Content-Type': 'application/json', ...(fetchOptions.headers || {}) };
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  // 로그인 없이 둘러보는 중이면 계정이 필요한 요청은 서버에 보내지 않음.
+  // 직접 뭔가를 하려던 거면(조회가 아니라 저장/전송) 가입 화면을 띄우고, 화면을 그리려고 불러오는 조회는 조용히 실패시킴
+  if (!authToken && !isGuestAllowedPath(path)) {
+    const method = (fetchOptions.method || 'GET').toUpperCase();
+    if (method !== 'GET' && !path.startsWith('/engagement/')) openAuthGate('가입하면 친구와 약속을 잡고 채팅할 수 있어요.');
+    const err = new Error('로그인하면 쓸 수 있어요.');
+    err.needsLogin = true;
+    err.status = 401;
+    throw err;
+  }
 
   let res;
   let isSlow = false;
@@ -11346,6 +11359,34 @@ async function apiRequest(path, options = {}, _isRetry) {
     throw err;
   }
   return data;
+}
+
+// 로그인 안 해도 부를 수 있는 서버 주소 - 로그인/가입, 친구가 보낸 약속 링크 보기·응답
+function isGuestAllowedPath(path){
+  return path.startsWith('/auth/') || /^\/invites\/(?!availability)[A-Za-z0-9_-]+(\/respond)?(\?|$)/.test(path);
+}
+
+// 로그인/가입 화면 띄우기 - reason이 있으면(계정이 필요한 걸 눌렀을 때) 왜 가입하는지 한 줄 보여주고 회원가입 탭부터
+function openAuthGate(reason){
+  const gate = document.getElementById('authGateView');
+  if(gate.style.display === 'flex') return;
+  const notice = document.getElementById('authInviteNotice');
+  if(reason){
+    notice.textContent = reason;
+    notice.style.display = 'block';
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'signup'));
+    showAuthForm('authFormSignup');
+  }
+  document.getElementById('authSkipBtn').style.display = '';
+  gate.style.display = 'flex';
+  pushViewState(closeAuthGate); // 폰 뒤로가기로도 닫혀서 하던 화면으로 돌아감
+}
+// 로그아웃 직후엔 화면에 이전 계정의 친구·일정·채팅이 그대로 남아 있어서, 가입 없이 둘러보기로 못 넘어가게 숨김
+function hideAuthSkipBtn(){
+  document.getElementById('authSkipBtn').style.display = 'none';
+}
+function closeAuthGate(){
+  document.getElementById('authGateView').style.display = 'none';
 }
 
 // 액세스 토큰을 리프레시 토큰으로 새로 발급받음
@@ -11411,6 +11452,7 @@ function handleSessionExpired(){
   clearSavedSession();
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
   showToast('로그인이 만료됐어요. 다시 로그인해주세요.');
+  hideAuthSkipBtn();
   document.getElementById('authGateView').style.display = 'flex';
 }
 
@@ -11435,6 +11477,7 @@ async function performLogout(){
     }).catch(() => {}); // 실패해도 어차피 로컬 세션은 이미 지웠으니 무시
   }
 
+  hideAuthSkipBtn();
   document.getElementById('authGateView').style.display = 'flex';
   showTab(null);
 }
@@ -11478,6 +11521,7 @@ document.getElementById('deleteAccountConfirmBtn').addEventListener('click', asy
     refreshTokenValue = null;
     currentUser = null;
     clearSavedSession();
+    hideAuthSkipBtn();
     document.getElementById('authGateView').style.display = 'flex';
     showTab(null);
     showToast('계정이 삭제됐어요. 그동안 이용해주셔서 감사해요.');
@@ -11489,6 +11533,27 @@ document.getElementById('deleteAccountConfirmBtn').addEventListener('click', asy
     btn.textContent = '삭제하기';
   }
 });
+
+document.getElementById('authSkipBtn').addEventListener('click', () => dismissView(closeAuthGate));
+
+// 로그인 없이 둘러보는 중에 계정이 있어야 하는 버튼을 누르면, 그 화면을 열기 전에 가입 화면부터 띄움
+// (다 채우고 저장할 때 막히지 않게 누르는 순간 막음)
+const GUEST_LOCKED_ACTIONS = [
+  ['#homePlanCta, .fl-plan-btn', '가입하면 친구가 열어둔 시간에 바로 약속을 신청할 수 있어요.'],
+  ['#addFriendBtn, [data-friend-invite]', '가입하면 친구를 추가하고 약속 링크를 보낼 수 있어요.'],
+  ['#openGroupsBtn, #homeGroupManageBtn, #homeGroupAddBtn, [data-home-group], [data-home-group-new]', '가입하면 친구 그룹을 만들어 그룹마다 다르게 시간을 열 수 있어요.'],
+  ['#createFeedPostBtn, .feed-empty-cta', '가입하면 가본 곳을 리뷰로 추천할 수 있어요.'],
+  ['#newGroupBtn', '가입하면 친구들과 채팅할 수 있어요.'],
+  ['#myProfileBtn', '가입하면 내 프로필을 만들어 친구에게 보여줄 수 있어요.'],
+];
+document.addEventListener('click', (e) => {
+  if(authToken || !e.target.closest) return;
+  const hit = GUEST_LOCKED_ACTIONS.find(([sel]) => e.target.closest(sel));
+  if(!hit) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  openAuthGate(hit[1]);
+}, true);
 
 document.querySelectorAll('.auth-tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -11547,6 +11612,7 @@ function checkForPasswordResetLink(){
   pendingResetPasswordToken = match[1];
   history.replaceState(null, '', location.pathname + location.search); // 주소창에 토큰이 남지 않게 정리
   showAuthForm('authFormResetPassword');
+  openAuthGate(); // 로그인 화면이 처음부터 떠 있지 않으니 직접 띄움
 }
 checkForPasswordResetLink();
 
@@ -11661,7 +11727,7 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   myProfileData.reviewNickname = user.reviewNickname || '';
   myProfileData.reviewAvatarUrl = user.reviewAvatarUrl || null;
 
-  document.getElementById('authGateView').style.display = 'none';
+  dismissView(closeAuthGate); // 둘러보다가 띄운 가입 화면이면 뒤로가기 기록도 같이 지움
   // 로그인/앱 시작 직후 첫 화면은 홈(약속 중심) - 이게 없으면 예전 달력 화면이 먼저 보이고 아래 탭도 아무것도 선택 안 돼 있었음.
   // 앱 시작 때는 이 함수가 showTab 정의보다 먼저 불려서, 스크립트가 다 읽힌 뒤에 실행되게 미룸
   // 단, 막 가입했거나 아직 내 일정이 하나도 없는 사람은 캘린더부터 - 친구/예약 가능 시간 설명 없이 바로 첫 일정을 넣게 함
@@ -14374,7 +14440,14 @@ function renderSettingsDetailBody(id){
 
   const body = document.getElementById('settingsDetailBody');
 
-  if(id === 'account'){
+  if(id === 'account' && !authToken){
+    // 로그인 없이 둘러보는 중 - 로그아웃/삭제 대신 가입·로그인 버튼
+    body.innerHTML = `
+      <div class="settings-detail-desc">아직 로그인하지 않았어요. 가입하면 친구와 약속을 잡고 채팅할 수 있어요.</div>
+      <div class="settings-simple-row"><span>로그인 / 회원가입</span><button class="settings-action-btn" id="guestLoginBtn">시작하기 &#8250;</button></div>
+    `;
+    document.getElementById('guestLoginBtn').addEventListener('click', () => openAuthGate());
+  } else if(id === 'account'){
     body.innerHTML = `
       <div class="settings-detail-desc">계정 정보와 로그인 관련 설정이에요.</div>
       <div class="settings-simple-row"><span>아이디</span><span class="value">@${myProfileData.id}</span></div>
@@ -25924,7 +25997,7 @@ function closeFriendSearchView(){
 // 주변에 캐치미를 쓰는 사람이 없으면 아이디 검색만으로는 친구를 못 만듦 - 내 아이디를 보내거나, 가입 안 한 사람도
 // 받을 수 있는 약속 링크를 보내는 길을 친구 추가 화면/빈 친구 목록에 같이 둠
 function friendInviteBoxHtml(){
-  const myId = myProfileData && myProfileData.id ? `@${escapeHtml(myProfileData.id)}` : '';
+  const myId = authToken && myProfileData && myProfileData.id ? `@${escapeHtml(myProfileData.id)}` : ''; // 로그인 전엔 아직 내 아이디가 없음
   return `
     <div class="friend-invite-box">
       <div class="friend-invite-title">주변에 MEETZIP을 쓰는 친구가 없나요?</div>
@@ -38921,6 +38994,7 @@ function goSignupFromInvite(){
   closeInviteOverlay();
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === 'signup'));
   showAuthForm('authFormSignup');
+  openAuthGate(); // 로그인 화면이 처음부터 떠 있지 않으니 직접 띄움
   const nameInput = document.getElementById('signupName');
   if(nameInput && !nameInput.value && inviteState.guestName) nameInput.value = inviteState.guestName.trim();
 }
@@ -39010,6 +39084,7 @@ handleSocialLoginRedirect().catch(() => false).then(async handled => {
   widgetSessionRestored = true;
   try { syncWidgetData(); } catch(e) {} // 로그인 안 된 상태로 끝났으면 위젯도 로그아웃으로
   openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
+  if(!authToken) showTab(null); // 로그인 안 했어도 가입 화면 없이 홈부터 - 계정이 필요한 걸 누를 때 가입 화면이 뜸
   // 로그인 상태면 일정/친구/채팅/설정을 다 받아서 그린 다음에 로고를 닫음 (너무 오래 걸리면 12초에서 끊음)
   if(startupDataPromise) return Promise.race([startupDataPromise, new Promise(r => setTimeout(r, 12000))]);
 }).finally(() => requestAnimationFrame(hideAppSplash));
