@@ -11859,16 +11859,20 @@ let realtimeSocket = null;
 // 아이폰 사파리 등은 앱이 백그라운드로 가면 웹소켓 연결이 끊기고, 그동안 온 실시간 이벤트도 놓치게 됨.
 // 화면이 다시 보일 때(포그라운드 복귀) 소켓이 끊겨있으면 재연결하고, 그새 놓쳤을 수 있는 핵심 데이터를 새로 불러와서
 // "강제종료 후 재실행해야만 최신 상태로 보인다"는 문제를 없앰.
-// 입력창에 포커스가 있는 채로 다른 앱으로 갔다 오면, 아이폰이 복귀하면서 키보드를 내렸다가 다시 올리며 화면이 출렁임.
-// 백그라운드로 갈 때 포커스를 미리 풀어둬서, 돌아왔을 때 키보드가 내려간 상태로 차분하게 시작하게 함
-function blurActiveInputOnHide(){
+// 키보드를 켜 둔 채 다른 앱으로 갔다 와도 키보드가 그대로 떠 있게 함.
+// 나갈 때 쓰던 입력칸을 기억해 두고, 돌아왔을 때 아이폰이 포커스를 풀어버렸으면 그 칸에 다시 포커스를 줌
+let inputFocusedBeforeHide = null;
+function rememberActiveInputOnHide(){
   const el = document.activeElement;
-  if(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) el.blur();
+  inputFocusedBeforeHide = (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) ? el : null;
 }
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'hidden') blurActiveInputOnHide();
+  if(document.visibilityState === 'hidden'){ rememberActiveInputOnHide(); return; }
+  const el = inputFocusedBeforeHide;
+  inputFocusedBeforeHide = null;
+  if(!el || !el.isConnected || el.offsetParent === null || document.activeElement === el) return;
+  setTimeout(() => { if(document.visibilityState === 'visible' && el.isConnected) el.focus({ preventScroll: true }); }, 50);
 });
-window.addEventListener('pagehide', blurActiveInputOnHide);
 
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState !== 'visible' || !authToken) return;
@@ -32690,6 +32694,8 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
     if(e.target.closest('input, textarea, .location-picker-full, .invite-overlay')) return;
     if(isInsideHorizontalScroll(e.target)) return; // 가로로 넘기는 줄(버튼 목록 등)은 그쪽 스크롤 우선
     const t = e.touches[0];
+    // 화면 맨 아래(아이폰 하단 바 자리)에서 시작한 옆 밀기는 앱 전환 제스처라 채팅방 나가기로 보지 않음
+    if(t.clientY > window.innerHeight - 40) return;
     startX = t.clientX; startY = t.clientY; startT = Date.now(); dx = 0;
     tracking = true; dragging = false;
   }, { passive: true });
@@ -32724,14 +32730,15 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
     setOffset(dx);
   }, { passive: false });
 
-  function onEnd(){
+  // cancelled: 아이폰 하단 바를 옆으로 밀어 다른 앱으로 넘길 때처럼 시스템이 터치를 가져간 경우 - 나가지 않고 제자리로 되돌림
+  function onEnd(cancelled){
     if(!tracking) return;
     tracking = false;
     if(!dragging) return;
     dragging = false;
     const width = view.offsetWidth || window.innerWidth;
     const speed = dx / Math.max(1, Date.now() - startT); // px/ms
-    const shouldClose = dx > width * 0.33 || (dx > 40 && speed > 0.5);
+    const shouldClose = cancelled !== true && !document.hidden && (dx > width * 0.33 || (dx > 40 && speed > 0.5));
     view.style.transition = 'transform .24s cubic-bezier(.2,.8,.3,1)';
     if(shouldClose){
       setOffset(width + 20);
@@ -32759,8 +32766,9 @@ document.getElementById('chatBackBtn').addEventListener('click', () => goBackOrC
       });
     }
   }
-  view.addEventListener('touchend', onEnd);
-  view.addEventListener('touchcancel', onEnd);
+  view.addEventListener('touchend', () => onEnd(false));
+  view.addEventListener('touchcancel', () => onEnd(true));
+  document.addEventListener('visibilitychange', () => { if(document.hidden) onEnd(true); });
 })();
 
 // ---------- 채팅방: 대화 내용 검색 ----------
