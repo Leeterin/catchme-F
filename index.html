@@ -6911,7 +6911,7 @@
   }
   .week-cal-block.pending.has-chat{ cursor:pointer; }
   .week-cal-block.linked{
-    background:#F43F5E !important; /* 확정된 약속 - 눈에 잘 띄게 빨강 */
+    background:#A8473A !important; /* 확정된 약속 - 토마토(예약 가능)와 구분되는 차분한 벽돌색 */
     color:#FFFFFF;
     cursor:pointer;
   }
@@ -8552,7 +8552,7 @@
   #dayEventList .day-event-card, #friendTodayList .day-event-card{ padding:16px 74px 14px 16px; border:none; border-radius:22px; background:var(--hm-card); }
   #dayEventList .day-event-card.available, #friendTodayList .day-event-card.available{ box-shadow:inset 3px 0 0 var(--hm-accent); }
   #dayEventList .day-event-card.pending-hold, #friendTodayList .day-event-card.pending-hold{ border:1px dashed #EAB308; background:#FEF9C3; }
-  #dayEventList .day-event-card.reservation-linked, #friendTodayList .day-event-card.reservation-linked{ background:var(--hm-card); box-shadow:inset 3px 0 0 #F43F5E; }
+  #dayEventList .day-event-card.reservation-linked, #friendTodayList .day-event-card.reservation-linked{ background:var(--hm-card); box-shadow:inset 3px 0 0 #A8473A; }
   body.dark-mode #dayEventList .day-event-card.pending-hold, body.dark-mode #friendTodayList .day-event-card.pending-hold{ background:rgba(234,179,8,0.14); }
   #dayEventList .day-event-time, #friendTodayList .day-event-time{
     display:inline-block; margin-bottom:8px; padding:5px 10px; border-radius:11px;
@@ -8586,7 +8586,7 @@
   /* 확정 약속/예약 가능 카드의 왼쪽 색 줄 - 둥근 모서리를 따라 휘어 보여서, 카드 안쪽에 짧은 막대로 */
   #dayEventList .day-event-card.available, #dayEventList .day-event-card.reservation-linked{ box-shadow:none; }
   #dayEventList .day-event-card.available::before, #dayEventList .day-event-card.reservation-linked::before{ content:''; position:absolute; left:0; top:18px; bottom:18px; width:4px; border-radius:0 4px 4px 0; background:var(--hm-accent); }
-  #dayEventList .day-event-card.reservation-linked::before{ background:#F43F5E; }
+  #dayEventList .day-event-card.reservation-linked::before{ background:#A8473A; }
   #dayEventList .day-event-empty, #friendTodayList .day-event-empty{ padding:34px 0; border-radius:22px; background:var(--hm-card); color:var(--hm-dim); font-size:13.5px; }
   /* 친구 캘린더 - 내 캘린더와 같은 베이지 바탕 + 큰 제목 (위 규칙들에 친구 캘린더 id도 같이 걸어둠) */
   .friend-calendar-view{ background:var(--hm-bg); color:var(--hm-ink); }
@@ -8637,17 +8637,17 @@
 
   /* 누구랑 잡힌 약속 칸 - 메모처럼 오른쪽 위 모서리를 접어서 다른 일정보다 눈에 띄게 (진한 빨강 칸 + 접힌 귀퉁이).
      모서리는 잘라내고(clip-path) 그 자리에 접힌 면을 그려서, 칸 뒤 바탕색이 뭐든 자연스럽게 보임 */
-  .appt-fold{ --fold:8px; --fold-c:#BE123C; clip-path:polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%); }
+  .appt-fold{ --fold:8px; --fold-c:#7A2F24; clip-path:polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%); }
   .appt-fold::after{
     content:''; position:absolute; top:0; right:0; width:var(--fold); height:var(--fold); pointer-events:none;
     background:linear-gradient(45deg, var(--fold-c) 50%, transparent 50%); border-bottom-left-radius:2px;
   }
   #monthSchedGrid .month-event-label.appt-fold, #friendMonthGrid .month-event-label.appt-fold{
-    --fold:6px; position:relative; background:#F43F5E !important; color:#FFFFFF !important; font-weight:700;
+    --fold:6px; position:relative; background:#A8473A !important; color:#FFFFFF !important; font-weight:700;
   }
   #weekGrid .week-cal-block.appt-fold, #friendWeekGrid .week-cal-block.appt-fold{ font-weight:700; }
-  #dayEventList .day-event-card.appt-fold, #friendTodayList .day-event-card.appt-fold{ --fold:18px; --fold-c:#FB7185; background:#FFE4E8; }
-  body.dark-mode #dayEventList .day-event-card.appt-fold, body.dark-mode #friendTodayList .day-event-card.appt-fold{ --fold-c:#9F1239; background:rgba(244,63,94,0.18); }
+  #dayEventList .day-event-card.appt-fold, #friendTodayList .day-event-card.appt-fold{ --fold:18px; --fold-c:#D9A091; background:#F6E4DF; }
+  body.dark-mode #dayEventList .day-event-card.appt-fold, body.dark-mode #friendTodayList .day-event-card.appt-fold{ --fold-c:#6E2B21; background:rgba(168,71,58,0.22); }
   #dayEventList .day-event-card.appt-fold .day-event-title, #friendTodayList .day-event-card.appt-fold .day-event-title{ color:#BE123C; }
   body.dark-mode #dayEventList .day-event-card.appt-fold .day-event-title, body.dark-mode #friendTodayList .day-event-card.appt-fold .day-event-title{ color:#FDA4AF; }
 
@@ -22369,7 +22369,7 @@ const WEEK_ROW_H = 32; // 일주일 블록 캘린더 한 시간당 높이(px), C
 
 // ---------- 일주일 캘린더 색상: 테마 + 직접 지정 ----------
 const COLOR_THEMES = [
-  { name: '기본', baseColor: '#8B5CF6' }, // 일반 일정 기본색 - 예약 가능(하늘색)/약속(빨강)과 겹치지 않는 보라 계열
+  { name: '기본', baseColor: '#8B5CF6' }, // 일반 일정 기본색 - 예약 가능(하늘색)/약속(벽돌색)과 겹치지 않는 보라 계열
   { name: '파스텔', baseColor: '#FFB4A2' },
   { name: '모노 블루', baseColor: '#2563EB' },
   { name: '비비드', baseColor: '#EF4444' },
@@ -22411,11 +22411,11 @@ function colorForScheduleText(text){
   return shadeHexColor(COLOR_THEMES[activeThemeIndex].baseColor, percent);
 }
 
-// 종류별 기본색 - 예약 가능은 하늘색 그대로, 채팅으로 확정된 약속은 눈에 띄게 빨강, 일반 일정은 테마(기본 보라) 색
+// 종류별 기본색 - 예약 가능은 하늘색 그대로, 채팅으로 확정된 약속은 차분한 벽돌색, 일반 일정은 테마(기본 보라) 색
 const AVAILABLE_EVENT_COLOR = 'var(--accent)'; // 다크 모드에선 밝은 회색으로 바뀌게 색 변수로
 // 강조색(예약 가능) 바탕 위 글씨색 - 다크 모드는 바탕이 밝은 회색이라 흰 글씨 대신 어두운 글씨 (그 외 색은 원래대로 흰 글씨)
 function textColorOnEventBg(bg){ return bg === AVAILABLE_EVENT_COLOR ? 'color:var(--on-accent);' : ''; }
-const APPOINTMENT_EVENT_COLOR = '#F43F5E';
+const APPOINTMENT_EVENT_COLOR = '#A8473A';
 
 // 예약 가능 시간을 누구에게 열지 - "모든 친구 / 내 그룹들 / 업무용 링크" 칩을 여러 개 고름
 // 서버 저장값은 그대로: availableFor(all = 친구 + 업무용 링크 / friends = 친구만 / work = 업무용 링크만) + visibility.groupIds(친구 중 어느 그룹)
@@ -24636,7 +24636,7 @@ function getFriendSlotExtrasForRender(friend, dateObj){
   const real = friendRealScheduleCache[friend.username + '::' + dateKeyOf(dateObj)];
   return { colors: (real && real.colors) || null, withMe: (real && real.withMe) || null };
 }
-// 친구 일정 블록 색 - 친구가 정한 색이 있으면 그 색, 나랑 잡은 약속이면 내 캘린더 약속처럼 빨강, 아니면 예전처럼 테마 색
+// 친구 일정 블록 색 - 친구가 정한 색이 있으면 그 색, 나랑 잡은 약속이면 내 캘린더 약속과 같은 색, 아니면 예전처럼 테마 색
 function friendBlockColor(b){
   if(b.color) return b.color;
   if(b.withMe) return APPOINTMENT_EVENT_COLOR;
