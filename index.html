@@ -12176,14 +12176,8 @@ function connectRealtimeSocket(){
     const room = CHAT_ROOMS[roomId];
     if(!room || !room.messages) return;
     room.otherLastReadAt = lastReadAt; // 1:1 방 기준 - 다음에 목록 새로고침할 때도 유지되게 저장
-    const readAtTime = new Date(lastReadAt).getTime();
     let changed = false;
-    room.messages.forEach(m => {
-      if(m.who === 'me' && !m.read && m.time && new Date(m.time).getTime() <= readAtTime){
-        m.read = true;
-        changed = true;
-      }
-    });
+    room.messages.forEach(m => { if(applyOtherReadAt(room, m)) changed = true; });
     if(changed && activeChatRoomId === roomId){
       renderChatMessages();
     }
@@ -26362,6 +26356,14 @@ function markRoomRead(roomId){
     }
   }
 }
+// 내 메시지가 상대가 읽은 시각 이전 것이면 "읽음"으로 바꿈 (바뀌었으면 true)
+// 전송 중 메시지는 아직 서버 시각이 없어서 건너뜀 - 서버 시각을 받은 뒤 다시 그릴 때 확인됨
+function applyOtherReadAt(room, m){
+  if(!room.otherLastReadAt || m.who !== 'me' || m.read || m._pending || !m.time) return false;
+  if(new Date(m.time).getTime() > new Date(room.otherLastReadAt).getTime()) return false;
+  m.read = true;
+  return true;
+}
 function addIncomingMessageUnread(roomId){
   if(activeChatRoomId !== roomId && CHAT_ROOMS[roomId]){
     CHAT_ROOMS[roomId].unreadCount = (CHAT_ROOMS[roomId].unreadCount || 0) + 1;
@@ -31025,6 +31027,7 @@ function renderChatMessages(){
     const mm = room.messages[i];
     if(mm.who === 'me' && !parseSysNotice(mm.text)){ lastMyMsg = mm; break; }
   }
+  if(lastMyMsg) applyOtherReadAt(room, lastMyMsg); // 읽었다는 알림이 내 메시지 전송 확인보다 먼저 왔어도 놓치지 않게
   let lastOtherRunKey = null; // 바로 앞 "상대 메시지"의 보낸 사람+분 - 같으면 프로필 아이콘을 또 그리지 않음
 
   visibleMessages.forEach(m => {
