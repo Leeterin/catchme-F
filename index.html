@@ -33719,6 +33719,17 @@ function setTimeForDateAsk(roomId, dateKey, meetPin){
   if(openFriendReserve(parseDateInputValue(dateKey), 18, { wholeDay: true }) === false) closeViewThen(closeFriendCalendar, () => {});
 }
 
+// 좋다고 한 날의 장소 정하기 - 이 날을 위해 이미 장소를 정해둔 약속(이 카드 뒤에 생긴 날짜 미정 약속)이 있으면
+// 새 약속 카드를 또 만들지 않고 그 약속의 장소만 바꿈. 없으면 지금처럼 새로 정함
+function placeForDateAsk(room, roomId, m){
+  const askedAt = m.time ? new Date(m.time).getTime() : 0;
+  const meet = pendingDateAskKey(room) === m.dateAsk.date
+    ? undatedMeetPins(room).filter(p => placePinTime(p) >= askedAt).sort((a, b) => placePinTime(b) - placePinTime(a))[0]
+    : null;
+  if(meet) changePinLocation(room, roomId, meet, null, { roomId, pinned: meet });
+  else startPlaceFromChat();
+}
+
 function buildDateAskCardEl(m, room){
   const da = m.dateAsk;
   const label = dateAskLabel(da.date);
@@ -33773,7 +33784,7 @@ function buildDateAskCardEl(m, room){
     const roomId = activeChatRoomId;
     const act = btn.dataset.act;
     if(act === 'time') setTimeForDateAsk(roomId, da.date);
-    else if(act === 'place') startPlaceFromChat();
+    else if(act === 'place') placeForDateAsk(room, roomId, m);
     else if(act === 'again') openDateAsk(roomId);
     else respondDateAsk(roomId, m, act);
   }));
