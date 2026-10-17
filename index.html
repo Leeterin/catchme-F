@@ -3585,6 +3585,19 @@
     -webkit-overflow-scrolling:touch;
   }
   .chat-pinned-schedule .pin-list > *{ flex-shrink:0; }
+  /* 카드가 넘쳐서 더 볼 게 남은 쪽(아래/위) 끝을 흐리게 사라지게 해서 밀어볼 수 있다는 걸 알려줌 */
+  .chat-pinned-schedule .pin-list.fade-bottom{
+    -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+    mask-image:linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  }
+  .chat-pinned-schedule .pin-list.fade-top{
+    -webkit-mask-image:linear-gradient(to top, #000 calc(100% - 36px), transparent);
+    mask-image:linear-gradient(to top, #000 calc(100% - 36px), transparent);
+  }
+  .chat-pinned-schedule .pin-list.fade-top.fade-bottom{
+    -webkit-mask-image:linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+    mask-image:linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  }
   .chat-pinned-schedule .pin-list.collapsed{ display:none; }
   .chat-pinned-schedule .pin-card{
     -webkit-touch-callout:none; -webkit-user-drag:none; /* 아이폰 꾹 누르기 때 카드가 흰 판에 얹혀 뜨지 않게 */
@@ -29940,6 +29953,7 @@ function renderPinnedSchedule(){
 
   const listEl = document.createElement('div');
   listEl.className = 'pin-list' + (room.pinnedCollapsed ? ' collapsed' : '');
+  listEl.addEventListener('scroll', updatePinListFade, { passive: true });
   el.appendChild(listEl);
 
   // 확정된 예약/장소가 여러 개면 전부 카드로 보여줌
@@ -30104,6 +30118,16 @@ function fitPinListHeight(){
   const bottom = msgs.getBoundingClientRect().bottom;
   const top = listEl.getBoundingClientRect().top;
   if(bottom - top > 80) listEl.style.maxHeight = Math.floor(bottom - top - 8) + 'px';
+  updatePinListFade();
+}
+
+// 약속 카드 목록이 넘칠 때, 아래에 더 있으면 아래 끝을, 위로 밀려 올라간 게 있으면 위 끝을 흐리게 함
+function updatePinListFade(){
+  const listEl = document.querySelector('#chatPinnedSchedule .pin-list');
+  if(!listEl) return;
+  const more = listEl.scrollHeight - listEl.clientHeight;
+  listEl.classList.toggle('fade-top', more > 2 && listEl.scrollTop > 2);
+  listEl.classList.toggle('fade-bottom', more > 2 && listEl.scrollTop < more - 2);
 }
 window.addEventListener('resize', fitPinListHeight);
 if(window.visualViewport) window.visualViewport.addEventListener('resize', fitPinListHeight);
