@@ -11357,6 +11357,7 @@ function handleSessionExpired(){
   refreshTokenValue = null;
   currentUser = null;
   homeScheduleLoaded = false; // 다시 로그인하면 그 계정 일정을 받은 뒤에 위젯을 채움
+  homeChatsLoaded = false;
   try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
   clearSavedSession();
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
@@ -11372,6 +11373,7 @@ async function performLogout(){
   refreshTokenValue = null;
   currentUser = null;
   homeScheduleLoaded = false; // 다시 로그인하면 그 계정 일정을 받은 뒤에 위젯을 채움
+  homeChatsLoaded = false;
   try { syncWidgetData(); } catch(e) {} // 로그아웃하면 위젯에 남은 약속도 지움
   clearSavedSession();
   if(typeof realtimeSocket !== 'undefined' && realtimeSocket){ realtimeSocket.disconnect(); realtimeSocket = null; }
@@ -13773,13 +13775,22 @@ function buildWidgetCalendarDays(){
   }
   return days;
 }
+// 위젯에 넘겨도 되는 상태인지 - 저장된 로그인 복원이 끝났고, 로그인 상태면 일정과 채팅방(약속 목록)을 한 번씩 받은 뒤
+function widgetDataReady(){
+  if(!widgetSessionRestored) return false;
+  return !authToken || (homeScheduleLoaded && homeChatsLoaded);
+}
 function syncWidgetData(){
   if(!widgetPlugin()) return;
   // 로그인 상태인데 서버 일정을 아직 못 받았으면(앱 켠 직후 등) 빈 일정으로 위젯을 덮어쓰지 않음
   // (예전엔 받아오기 전에 홈이 그려지면서 빈 달력이 넘어가, 위젯 일정이 통째로 사라졌음)
-  if(authToken && !homeScheduleLoaded) return;
+  // 오래 내려뒀다 켜면 iOS가 웹 저장공간을 비워서 로그인을 앱 저장소에서 복원하는데, 그 사이엔 로그아웃 상태로 보여서
+  // 위젯이 '로그인하면 일정이 보여요'/빈 일정으로 덮였음 - 복원이 끝나기 전엔 건드리지 않음
+  if(!widgetDataReady()) return;
   clearTimeout(widgetSyncTimer);
   widgetSyncTimer = setTimeout(() => {
+    // 기다리는 0.8초 사이에 로그인 복원 등으로 상태가 바뀌었을 수 있어서 한 번 더 확인
+    if(!widgetDataReady()) return;
     try {
       const json = JSON.stringify(buildWidgetPayload());
       if(json === lastWidgetPayload) return;
@@ -13804,6 +13815,8 @@ function refreshHomeDashIfVisible(){
 // 친구/일정을 서버에서 받아오기 전에는 잘못 바뀌어 보이지 않게 기본 '약속 잡기'를 그대로 둠
 let homeFriendsLoaded = false;
 let homeScheduleLoaded = false;
+let homeChatsLoaded = false; // 채팅방(다가오는 약속)을 서버에서 한 번 받았는지 - 위젯용
+let widgetSessionRestored = false; // 앱 시작 때 저장된 로그인 복원이 끝났는지 - 위젯용
 let homeAvailOpenDays = 0; // renderHomeAvailCard가 셈 - 앞으로 2주 중 예약 가능 시간이 있는 날 수
 const HOME_PLAN_CTA = {
   friends: { title: '친구 추가하기', sub: '아이디로 찾거나, 링크로 가입 안 한 친구에게도 시간을 물어볼 수 있어요', go: '친구 추가' },
@@ -26193,6 +26206,7 @@ async function loadChatRoomsFromServer(){
   if(!authToken) return;
   try {
     const data = await apiRequest('/chats');
+    homeChatsLoaded = true;
     data.rooms.forEach(r => {
       const existing = CHAT_ROOMS[r.id];
       // 이 방을 이번 세션에서 이미 열어봐서 전체 메시지가 로컬에 쌓여있으면 그걸 그대로 씀.
@@ -38724,6 +38738,8 @@ async function handleSocialLoginRedirect(){
 if(STARTUP_INVITE_TOKEN) openInviteFromUrl();
 handleSocialLoginRedirect().catch(() => false).then(async handled => {
   try { if(!handled) await tryRestoreSession(); } catch(e) { console.error('[session restore]', e); }
+  widgetSessionRestored = true;
+  try { syncWidgetData(); } catch(e) {} // 로그인 안 된 상태로 끝났으면 위젯도 로그아웃으로
   openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
   // 로그인 상태면 일정/친구/채팅/설정을 다 받아서 그린 다음에 로고를 닫음 (너무 오래 걸리면 12초에서 끊음)
   if(startupDataPromise) return Promise.race([startupDataPromise, new Promise(r => setTimeout(r, 12000))]);
