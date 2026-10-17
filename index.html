@@ -3038,18 +3038,18 @@
     position:relative;
     z-index:6;
   }
-  /* 블러 판은 헤더보다 아래로 조금 더 내려서, 아래쪽으로 갈수록 서서히 옅어지게 (메시지와 경계선 없이 이어짐) */
+  /* 블러 판은 헤더 안에서 끝나고, 헤더 아래쪽으로 갈수록 서서히 옅어지게 (메시지와 경계선 없이 이어짐) */
   .chat-room-header::before{
     content:'';
     position:absolute;
-    left:0; right:0; top:0; bottom:-22px;
+    left:0; right:0; top:0; bottom:0;
     z-index:-1;
     pointer-events:none;
     background:color-mix(in srgb, var(--bg) 18%, transparent);
     backdrop-filter:blur(4px);
     -webkit-backdrop-filter:blur(4px);
-    -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 40px), transparent 100%);
-    mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 40px), transparent 100%);
+    -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+    mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
   }
   /* 다른 화면들도 맨 위(상태표시줄 자리)를 채팅방 헤더처럼 반투명 + 블러로 - 내용이 밑으로 지나가며 흐리게 비침.
      헤더 버튼을 흐리게 하지 않도록 상태표시줄 높이 + 조금만 덮고 아래로 서서히 옅어지게. 채팅방은 자기 헤더 블러가 있어서 뺌 */
