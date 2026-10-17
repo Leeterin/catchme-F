@@ -32174,10 +32174,14 @@ let chatSwipeReplyAt = 0;
 function sendChatMessage(){
   const input = document.getElementById('chatInput');
   // 한글을 조합하던 중에 전송하면 마지막 글자가 키보드에 남아 있다가 비운 입력칸에 다시 들어가서
-  // 다음 메시지 앞에 붙었음("미나" 보내면 다음이 "나아"). 포커스를 잠깐 뺐다 돌려서 조합을 먼저 끝냄
-  if(document.activeElement === input){ input.blur(); input.focus({ preventScroll: true }); }
+  // 다음 메시지 앞에 붙었음("미나" 보내면 다음이 "나아"). 포커스를 잠깐 빼서 조합을 먼저 끝냄
+  // 포커스는 입력칸을 비운 "뒤에" 돌려줌 - 비우기 전에 돌려주면 아이폰 키보드가 보낸 글자가 아직 칸에 있는 줄 알고
+  // 다음에 치는 글자 조합이 깨졌음("린스"가 "리ㄴㅅ"로)
+  const refocus = document.activeElement === input;
+  if(refocus) input.blur();
+  const restoreFocus = () => { if(refocus) input.focus({ preventScroll: true }); };
   const typed = input.value.trim();
-  if((!typed && !pendingCalShare) || !activeChatRoomId) return;
+  if((!typed && !pendingCalShare) || !activeChatRoomId){ restoreFocus(); return; }
   // 친구 캘린더에서 붙여온 일정이 있으면 카드로 같이 보냄
   const text = pendingCalShare ? buildCalShareText(pendingCalShare, typed) : typed;
   cancelCalShare();
@@ -32190,6 +32194,7 @@ function sendChatMessage(){
 
   if(room.isRealRoom){
     input.value = '';
+    restoreFocus();
     cancelReply();
     // 서버 응답을 기다리지 않고 내 화면에 바로 띄움 (카톡처럼) - 서버가 저장해주면 그때 서버 id만 붙여줌
     const pendingMsg = { who: 'me', text, time: new Date(), read: false, id: 'msg' + (locationMsgIdCounter++), _animate: true };
@@ -32208,6 +32213,7 @@ function sendChatMessage(){
   touchRoom(roomId);
   renderChatList();
   input.value = '';
+  restoreFocus();
   cancelReply();
   renderChatMessages();
 
