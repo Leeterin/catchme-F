@@ -17092,17 +17092,12 @@ async function deleteFeedPostItem(post){
 // 게시물 카드의 동작(수정·삭제·신고) 연결
 function wireFeedPostCard(card, post){
   const isMine = currentUser && post.author && post.author.id === currentUser.id;
-  // 장소 태그(#상호명)를 누르면 해시태그처럼 같은 장소로 올라온 다른 글들을 모아서 보여줌
-  const tagBtn = card.querySelector('.feed-ig-place-tag');
-  if(tagBtn) tagBtn.addEventListener('click', () => openFeedPlaceTagView(post.title));
-  // 작성자 이름/등급뱃지를 누르면 그 사람이 쓴 리뷰 모아보기로 이동 (카드 전체를 누르면 상세보기로 가는 것과 안 겹치게 전파를 막음)
-  const authorNameEl = card.querySelector('.feed-ig-author-name');
-  if(authorNameEl) authorNameEl.addEventListener('click', (e) => { e.stopPropagation(); openFeedAuthorView(post.author); });
-  const authorBadgeEl = card.querySelector('.reviewer-level-badge');
-  if(authorBadgeEl) authorBadgeEl.addEventListener('click', (e) => { e.stopPropagation(); openFeedAuthorView(post.author); });
-  // 실주소/전화/길찾기/공유 - 카드를 눌러 상세보기로 들어가는 것과 겹치지 않게 클릭을 여기서 막음
-  const addrEl = card.querySelector('.feed-place-info-addr');
-  if(addrEl) addrEl.addEventListener('click', (e) => { e.stopPropagation(); openPlaceDetailMap(post); });
+  // 장소 첫 화면 목록에서는 장소 이름(태그)·작성자 이름/등급뱃지·주소를 눌러도 다른 화면으로 새지 않고
+  // 카드를 누른 것처럼 리뷰 상세로 들어감 (장소 모아보기·작성자 리뷰·지도는 상세 화면에서 열 수 있음)
+  card.querySelectorAll('.feed-ig-place-tag, .feed-ig-author-name, .reviewer-level-badge, .feed-place-info-addr').forEach(el => {
+    el.addEventListener('click', (e) => { e.stopPropagation(); openFeedPostDetail(post); });
+  });
+  // 전화/길찾기/공유 - 카드를 눌러 상세보기로 들어가는 것과 겹치지 않게 클릭을 여기서 막음
   wirePlaceInfoRow(card, post);
   // 상세로 안 들어가고 목록에서 바로 채팅방에 보냄
   const cardShareBtn = card.querySelector('.feed-card-share-btn');
