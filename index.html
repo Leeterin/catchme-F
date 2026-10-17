@@ -30089,7 +30089,20 @@ function renderPinnedSchedule(){
 
     listEl.appendChild(card);
   });
+  fitPinListHeight();
 }
+
+// 약속 카드 목록을 중간(화면 40%)에서 자르지 않고 대화창 끝(입력창 바로 위)까지 늘리고, 그 안에서 위아래로 밀어보게 함
+function fitPinListHeight(){
+  const listEl = document.querySelector('#chatPinnedSchedule .pin-list');
+  const msgs = document.getElementById('chatMessages');
+  if(!listEl || !msgs || listEl.classList.contains('collapsed')) return;
+  const bottom = msgs.getBoundingClientRect().bottom;
+  const top = listEl.getBoundingClientRect().top;
+  if(bottom - top > 80) listEl.style.maxHeight = Math.floor(bottom - top - 8) + 'px';
+}
+window.addEventListener('resize', fitPinListHeight);
+if(window.visualViewport) window.visualViewport.addEventListener('resize', fitPinListHeight);
 
 // 약속 장소를 카카오맵(앱이 있으면 앱, 없으면 웹)으로 엶 - 좌표가 있으면 그 위치, 없으면 주소/이름으로 검색
 function openPlaceInKakaoMap(name, address, lat, lon){
@@ -30461,6 +30474,7 @@ function onAppKeyboardChange(height){
   } else {
     releaseKeyboardPadding();
   }
+  setTimeout(fitPinListHeight, 350); // 키보드가 올라오거나 내려간 만큼 약속 카드 목록 높이도 다시 맞춤
 }
 (function installAppKeyboardHandling(){
   // 1) 짧게 탭할 때 iOS의 페이지 밀어올림을 막고 포커스만 줌 (꾹 누르기는 그대로 - 글자 선택·붙여넣기)
@@ -30713,6 +30727,7 @@ function revealChatMessagesWhenReady(token){
   box.scrollTop = box.scrollHeight;
   requestAnimationFrame(() => {
     if(token === chatEnterToken) box.scrollTop = box.scrollHeight;
+    fitPinListHeight(); // 방이 막 보인 뒤에 재야 대화창 끝 위치가 맞음
   });
 }
 
