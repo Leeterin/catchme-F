@@ -4144,6 +4144,19 @@
     max-height:100%;
     border-radius:8px;
   }
+  /* 채팅 사진 보내기 전 미리보기 - 사진 아래에 취소/전송 버튼 */
+  .chat-image-send-overlay{
+    flex-direction:column;
+    padding:calc(20px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));
+  }
+  .chat-image-send-overlay img{ flex:1 1 auto; min-height:0; object-fit:contain; }
+  .chat-image-send-actions{ display:flex; gap:10px; width:100%; max-width:420px; margin-top:16px; flex-shrink:0; }
+  .chat-image-send-actions button{
+    flex:1; height:46px; border:none; border-radius:12px;
+    font-size:15px; font-weight:600; cursor:pointer;
+  }
+  .chat-image-send-actions .cancel{ background:rgba(255,255,255,0.18); color:#fff; }
+  .chat-image-send-actions .send{ background:var(--accent); color:var(--on-accent); }
   /* 밀어서 답장 - 왼쪽으로 미는 동안 오른쪽 끝에서 답장 아이콘이 나타남 */
   .msg-row{ position:relative; }
   .msg-swipe-reply-icon{
@@ -18264,7 +18277,7 @@ function handleChatImageSelected(e){
         showToast('사진 용량이 너무 커요. 더 작은 사진을 선택해주세요.');
         return;
       }
-      sendChatImageMessage(dataUrl);
+      openChatImageSendPreview(dataUrl);
     };
     img.src = ev.target.result;
   };
@@ -18343,6 +18356,35 @@ async function sendChatImageMessage(dataUrl){
   touchRoom(roomId);
   renderChatMessages();
   renderChatList();
+}
+
+// 찍거나 고른 사진을 바로 보내지 않고 미리보기로 보여준 뒤 전송 버튼을 눌러야 보냄
+function openChatImageSendPreview(dataUrl){
+  let overlay = document.getElementById('chatImageSendOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'chatImageSendOverlay';
+    overlay.className = 'image-preview-overlay chat-image-send-overlay';
+    overlay.innerHTML = '<img id="chatImageSendImg" src="" alt="보낼 사진 미리보기" />'
+      + '<div class="chat-image-send-actions">'
+      + '<button type="button" class="cancel" id="chatImageSendCancel">취소</button>'
+      + '<button type="button" class="send" id="chatImageSendConfirm">전송</button>'
+      + '</div>';
+    document.body.appendChild(overlay);
+    document.getElementById('chatImageSendCancel').addEventListener('click', () => {
+      overlay.classList.remove('show');
+      overlay._dataUrl = null;
+    });
+    document.getElementById('chatImageSendConfirm').addEventListener('click', () => {
+      const url = overlay._dataUrl;
+      overlay.classList.remove('show');
+      overlay._dataUrl = null;
+      if(url) sendChatImageMessage(url);
+    });
+  }
+  overlay._dataUrl = dataUrl;
+  document.getElementById('chatImageSendImg').src = dataUrl;
+  overlay.classList.add('show');
 }
 
 // 이미지 크게 보기 (탭하면 화면 전체로)
