@@ -11321,8 +11321,8 @@ async function apiRequest(path, options = {}, _isRetry) {
   if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
   // 로그인 없이 둘러보는 중이면 계정이 필요한 요청은 서버에 보내지 않음.
   // 직접 뭔가를 하려던 거면(조회가 아니라 저장/전송) 가입 화면을 띄우고, 화면을 그리려고 불러오는 조회는 조용히 실패시킴
-  if (!authToken && !isGuestAllowedPath(path)) {
-    const method = (fetchOptions.method || 'GET').toUpperCase();
+  const method = (fetchOptions.method || 'GET').toUpperCase();
+  if (!authToken && !isGuestAllowedPath(path, method)) {
     if (method !== 'GET' && !path.startsWith('/engagement/')) openAuthGate('가입하면 친구와 약속을 잡고 채팅할 수 있어요.');
     const err = new Error('로그인하면 쓸 수 있어요.');
     err.needsLogin = true;
@@ -11362,9 +11362,10 @@ async function apiRequest(path, options = {}, _isRetry) {
   return data;
 }
 
-// 로그인 안 해도 부를 수 있는 서버 주소 - 로그인/가입, 친구가 보낸 약속 링크 보기·응답
-function isGuestAllowedPath(path){
-  return path.startsWith('/auth/') || /^\/invites\/(?!availability)[A-Za-z0-9_-]+(\/respond)?(\?|$)/.test(path);
+// 로그인 안 해도 부를 수 있는 서버 주소 - 로그인/가입, 친구가 보낸 약속 링크 보기·응답, 장소 리뷰 목록·별점 보기
+function isGuestAllowedPath(path, method){
+  if(path.startsWith('/auth/') || /^\/invites\/(?!availability)[A-Za-z0-9_-]+(\/respond)?(\?|$)/.test(path)) return true;
+  return method === 'GET' && /^\/(feed|feed\/[A-Za-z0-9_-]+\/comments|places\/stats)(\?|$)/.test(path);
 }
 
 // 로그인/가입 화면 띄우기 - reason이 있으면(계정이 필요한 걸 눌렀을 때) 왜 가입하는지 한 줄 보여주고 회원가입 탭부터
@@ -11545,6 +11546,7 @@ const GUEST_LOCKED_ACTIONS = [
   ['#openGroupsBtn, #homeGroupManageBtn, #homeGroupAddBtn, [data-home-group], [data-home-group-new]', '가입하면 친구 그룹을 만들어 그룹마다 다르게 시간을 열 수 있어요.'],
   ['#createFeedPostBtn, .feed-empty-cta', '가입하면 가본 곳을 리뷰로 추천할 수 있어요.'],
   ['#newGroupBtn', '가입하면 친구들과 채팅할 수 있어요.'],
+  ['.feed-card-share-btn, .feed-share-btn', '가입하면 마음에 드는 장소를 친구 채팅방에 보낼 수 있어요.'],
   ['#myProfileBtn', '가입하면 내 프로필을 만들어 친구에게 보여줄 수 있어요.'],
 ];
 document.addEventListener('click', (e) => {
@@ -17285,7 +17287,6 @@ function wireFeedPostCard(card, post){
 
 // 서버에 저장된 게시물 목록을 불러와서 로컬 목록에 합침
 async function loadFeedPostsFromServer(){
-  if(!authToken) return;
   try {
     const data = await apiRequest('/feed');
     Object.keys(FEED_POSTS).forEach(cat => { FEED_POSTS[cat] = []; });
@@ -17622,6 +17623,8 @@ function ensureReviewProfileThenRun(callback){
 }
 
 function openFeedCreate(){
+  // 리뷰 보기는 가입 없이 되지만 쓰기는 계정이 있어야 함
+  if(!authToken){ openAuthGate('가입하면 가본 곳을 리뷰로 추천할 수 있어요.'); return; }
   ensureReviewProfileThenRun(doOpenFeedCreate);
 }
 
@@ -26575,6 +26578,7 @@ function setPostSavedEverywhere(placeKey, saved, extra){
 }
 function toggleSavedPlace(category, post){
   if(!post || !post.id) return;
+  if(!authToken){ openAuthGate('가입하면 마음에 드는 장소를 저장해 둘 수 있어요.'); return; }
   const next = !post.savedByMe;
   const placeKey = feedPlaceKey(post);
   setPostSavedEverywhere(placeKey, next, post); // 화면은 바로 바뀌게 먼저 반영하고, 서버 저장이 실패하면 되돌림
@@ -29196,7 +29200,6 @@ let hotplaceKakaoToken = 0;
 let hotplaceCatchmeStats = {}; // 카카오 장소 id -> 캐치미 집계 { avgRating, reviewCount, confirmCount }
 // 카카오 목록에 뜬 가게들 중 캐치미에 리뷰/약속 기록이 있는 곳의 집계를 받아와서 카드에 붙임
 async function loadHotplaceCatchmeStats(category, results){
-  if(!authToken) return;
   const ids = results.map(r => String(r.id)).filter(id => !(id in hotplaceCatchmeStats));
   if(!ids.length) return;
   ids.forEach(id => { hotplaceCatchmeStats[id] = null; }); // 같은 걸 또 묻지 않게
@@ -39116,7 +39119,10 @@ handleSocialLoginRedirect().catch(() => false).then(async handled => {
   widgetSessionRestored = true;
   try { syncWidgetData(); } catch(e) {} // 로그인 안 된 상태로 끝났으면 위젯도 로그아웃으로
   openInviteFromUrl(); // 친구가 보낸 약속 링크로 들어왔으면 로그인 없이도 바로 응답 화면
-  if(!authToken) showTab(null); // 로그인 안 했어도 가입 화면 없이 홈부터 - 계정이 필요한 걸 누를 때 가입 화면이 뜸
+  if(!authToken){
+    showTab(null); // 로그인 안 했어도 가입 화면 없이 홈부터 - 계정이 필요한 걸 누를 때 가입 화면이 뜸
+    loadFeedPostsFromServer(); // 장소 리뷰는 가입 없이도 볼 수 있음
+  }
   // 로그인 상태면 일정/친구/채팅/설정을 다 받아서 그린 다음에 로고를 닫음 (너무 오래 걸리면 12초에서 끊음)
   if(startupDataPromise) return Promise.race([startupDataPromise, new Promise(r => setTimeout(r, 12000))]);
 }).finally(() => requestAnimationFrame(hideAppSplash));
