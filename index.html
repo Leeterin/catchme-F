@@ -26286,7 +26286,7 @@ async function loadChatRoomsFromServer(){
         // 이미 불러와둔 상단 고정 일정이 통째로 사라져 보이거나("상단바가 갑자기 사라짐" 버그), 상단 고정한
         // 채팅방 표시나 "숨기기" 상태가 원래대로 리셋되는 문제가 있었음
         pinnedSchedules: existing ? existing.pinnedSchedules : undefined,
-        pinnedCollapsed: existing ? existing.pinnedCollapsed : false,
+        pinnedCollapsed: existing ? existing.pinnedCollapsed : loadPinCollapsed(r.id),
         pinned: existing ? existing.pinned : false,
         _pinsLoaded: existing ? existing._pinsLoaded : false,
       };
@@ -26950,6 +26950,19 @@ function syncPinDeleteToServer(room, pin){
 // 상단 고정 카드(핀)도 폰에 저장해둠 - 앱을 새로 켜고 방에 들어가도 서버 응답을 기다리지 않고 처음부터 보이게
 function pinsCacheKey(roomId){
   return 'catchme_pins_cache_' + (currentUser && currentUser.id ? currentUser.id : 'anon') + '_' + roomId;
+}
+// 상단 약속 카드 '숨기기' 상태를 방별로 기억 - 메모리에만 두면 앱을 다시 열거나 화면이 새로 뜰 때마다 다시 펼쳐졌음
+function pinCollapsedKey(roomId){
+  return 'catchme_pin_collapsed_' + (currentUser && currentUser.id ? currentUser.id : 'anon') + '_' + roomId;
+}
+function loadPinCollapsed(roomId){
+  try { return localStorage.getItem(pinCollapsedKey(roomId)) === '1'; } catch(e){ return false; }
+}
+function savePinCollapsed(roomId, collapsed){
+  try {
+    if(collapsed) localStorage.setItem(pinCollapsedKey(roomId), '1');
+    else localStorage.removeItem(pinCollapsedKey(roomId));
+  } catch(e){}
 }
 function mapServerPinToLocal(p){
   return {
@@ -29849,6 +29862,7 @@ function renderPinnedSchedule(){
   collapseBtn.textContent = room.pinnedCollapsed ? `펼치기 (${pins.length})` : '숨기기';
   collapseBtn.addEventListener('click', () => {
     room.pinnedCollapsed = !room.pinnedCollapsed;
+    savePinCollapsed(activeChatRoomId, room.pinnedCollapsed);
     renderPinnedSchedule();
   });
   headerRow.appendChild(headerTitle);
