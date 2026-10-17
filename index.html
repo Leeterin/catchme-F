@@ -6911,8 +6911,8 @@
   }
   .week-cal-block.pending.has-chat{ cursor:pointer; }
   .week-cal-block.linked{
-    background:#A8473A !important; /* 확정된 약속 - 토마토(예약 가능)와 구분되는 차분한 벽돌색 */
-    color:#FFFFFF;
+    background:var(--appt-paper) !important; /* 확정된 약속 - 메모(노란 포스트잇)와 같은 톤의 분홍 포스트잇 */
+    color:var(--appt-ink);
     cursor:pointer;
   }
   /* 아이콘은 블록 안쪽 우상단에 딱 붙여서, 절대 블록 밖으로 삐져나가지 않게 함 */
@@ -8552,7 +8552,7 @@
   #dayEventList .day-event-card, #friendTodayList .day-event-card{ padding:16px 74px 14px 16px; border:none; border-radius:22px; background:var(--hm-card); }
   #dayEventList .day-event-card.available, #friendTodayList .day-event-card.available{ box-shadow:inset 3px 0 0 var(--hm-accent); }
   #dayEventList .day-event-card.pending-hold, #friendTodayList .day-event-card.pending-hold{ border:1px dashed #EAB308; background:#FEF9C3; }
-  #dayEventList .day-event-card.reservation-linked, #friendTodayList .day-event-card.reservation-linked{ background:var(--hm-card); box-shadow:inset 3px 0 0 #A8473A; }
+  #dayEventList .day-event-card.reservation-linked, #friendTodayList .day-event-card.reservation-linked{ background:var(--hm-card); box-shadow:inset 3px 0 0 var(--appt-fold); }
   body.dark-mode #dayEventList .day-event-card.pending-hold, body.dark-mode #friendTodayList .day-event-card.pending-hold{ background:rgba(234,179,8,0.14); }
   #dayEventList .day-event-time, #friendTodayList .day-event-time{
     display:inline-block; margin-bottom:8px; padding:5px 10px; border-radius:11px;
@@ -8586,7 +8586,7 @@
   /* 확정 약속/예약 가능 카드의 왼쪽 색 줄 - 둥근 모서리를 따라 휘어 보여서, 카드 안쪽에 짧은 막대로 */
   #dayEventList .day-event-card.available, #dayEventList .day-event-card.reservation-linked{ box-shadow:none; }
   #dayEventList .day-event-card.available::before, #dayEventList .day-event-card.reservation-linked::before{ content:''; position:absolute; left:0; top:18px; bottom:18px; width:4px; border-radius:0 4px 4px 0; background:var(--hm-accent); }
-  #dayEventList .day-event-card.reservation-linked::before{ background:#A8473A; }
+  #dayEventList .day-event-card.reservation-linked::before{ background:var(--appt-fold); }
   #dayEventList .day-event-empty, #friendTodayList .day-event-empty{ padding:34px 0; border-radius:22px; background:var(--hm-card); color:var(--hm-dim); font-size:13.5px; }
   /* 친구 캘린더 - 내 캘린더와 같은 베이지 바탕 + 큰 제목 (위 규칙들에 친구 캘린더 id도 같이 걸어둠) */
   .friend-calendar-view{ background:var(--hm-bg); color:var(--hm-ink); }
@@ -8607,6 +8607,9 @@
   /* 메모 - 노란 포스트잇처럼 (모서리 접힘 + 하루 보기는 테이프·그림자·살짝 기울임). 확정 대기 노란 카드와 헷갈리지 않게 */
   body{ --memo-paper:#FFE89A; --memo-fold:#E8BE3C; --memo-ink:#6B4A0A; }
   body.dark-mode{ --memo-paper:#4A3F1E; --memo-fold:#8A7430; --memo-ink:#FDE68A; }
+  /* 확정 약속 - 메모와 같은 포스트잇 톤의 분홍 (토마토·골든타임·메모 노랑과 안 겹치게) */
+  body{ --appt-paper:#FFC4D3; --appt-fold:#E8799A; --appt-ink:#7A1F3D; }
+  body.dark-mode{ --appt-paper:#4D2A35; --appt-fold:#8E4A5E; --appt-ink:#FFC9D6; }
   #dayEventList .day-memo-card{
     position:relative; border:none; border-radius:4px 4px 4px 4px; padding:16px 16px 14px; margin:6px 4px 14px;
     background:linear-gradient(45deg, var(--memo-fold) 50%, transparent 50%) top right / 18px 18px no-repeat,
@@ -8635,21 +8638,21 @@
   }
   #panel-schedule .month-memo-row .month-selected-text, #panel-schedule .month-memo-row .memo-check{ color:var(--memo-ink); }
 
-  /* 누구랑 잡힌 약속 칸 - 메모처럼 오른쪽 위 모서리를 접어서 다른 일정보다 눈에 띄게 (진한 빨강 칸 + 접힌 귀퉁이).
+  /* 누구랑 잡힌 약속 칸 - 메모처럼 오른쪽 위 모서리를 접어서 다른 일정보다 눈에 띄게 (분홍 포스트잇 칸 + 접힌 귀퉁이).
      모서리는 잘라내고(clip-path) 그 자리에 접힌 면을 그려서, 칸 뒤 바탕색이 뭐든 자연스럽게 보임 */
-  .appt-fold{ --fold:8px; --fold-c:#7A2F24; clip-path:polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%); }
+  .appt-fold{ --fold:8px; --fold-c:var(--appt-fold); clip-path:polygon(0 0, calc(100% - var(--fold)) 0, 100% var(--fold), 100% 100%, 0 100%); }
   .appt-fold::after{
     content:''; position:absolute; top:0; right:0; width:var(--fold); height:var(--fold); pointer-events:none;
     background:linear-gradient(45deg, var(--fold-c) 50%, transparent 50%); border-bottom-left-radius:2px;
   }
   #monthSchedGrid .month-event-label.appt-fold, #friendMonthGrid .month-event-label.appt-fold{
-    --fold:6px; position:relative; background:#A8473A !important; color:#FFFFFF !important; font-weight:700;
+    --fold:6px; position:relative; background:var(--appt-paper) !important; color:var(--appt-ink) !important; font-weight:700;
   }
   #weekGrid .week-cal-block.appt-fold, #friendWeekGrid .week-cal-block.appt-fold{ font-weight:700; }
-  #dayEventList .day-event-card.appt-fold, #friendTodayList .day-event-card.appt-fold{ --fold:18px; --fold-c:#D9A091; background:#F6E4DF; }
-  body.dark-mode #dayEventList .day-event-card.appt-fold, body.dark-mode #friendTodayList .day-event-card.appt-fold{ --fold-c:#6E2B21; background:rgba(168,71,58,0.22); }
-  #dayEventList .day-event-card.appt-fold .day-event-title, #friendTodayList .day-event-card.appt-fold .day-event-title{ color:#BE123C; }
-  body.dark-mode #dayEventList .day-event-card.appt-fold .day-event-title, body.dark-mode #friendTodayList .day-event-card.appt-fold .day-event-title{ color:#FDA4AF; }
+  #dayEventList .day-event-card.appt-fold, #friendTodayList .day-event-card.appt-fold{ --fold:18px; --fold-c:var(--appt-fold); background:var(--appt-paper); }
+  body.dark-mode #dayEventList .day-event-card.appt-fold, body.dark-mode #friendTodayList .day-event-card.appt-fold{ --fold-c:var(--appt-fold); background:var(--appt-paper); }
+  #dayEventList .day-event-card.appt-fold .day-event-title, #friendTodayList .day-event-card.appt-fold .day-event-title{ color:var(--appt-ink); }
+  body.dark-mode #dayEventList .day-event-card.appt-fold .day-event-title, body.dark-mode #friendTodayList .day-event-card.appt-fold .day-event-title{ color:var(--appt-ink); }
 
   /* ===================== 앱 전체 새 디자인 (홈·캘린더와 같은 밋집 무드: 베이지 바탕 + 흰 카드 + 토마토색) =====================
      앱 곳곳이 쓰는 공통 색 변수(--bg, --surface, --accent ...)를 홈 색으로 바꿔서 설정·일정 추가·친구·채팅·커뮤니티까지 한 번에 맞춤.
@@ -22374,7 +22377,7 @@ const WEEK_ROW_H = 32; // 일주일 블록 캘린더 한 시간당 높이(px), C
 
 // ---------- 일주일 캘린더 색상: 테마 + 직접 지정 ----------
 const COLOR_THEMES = [
-  { name: '기본', baseColor: '#8B5CF6' }, // 일반 일정 기본색 - 예약 가능(하늘색)/약속(벽돌색)과 겹치지 않는 보라 계열
+  { name: '기본', baseColor: '#8B5CF6' }, // 일반 일정 기본색 - 예약 가능(하늘색)/약속(분홍)과 겹치지 않는 보라 계열
   { name: '파스텔', baseColor: '#FFB4A2' },
   { name: '모노 블루', baseColor: '#2563EB' },
   { name: '비비드', baseColor: '#EF4444' },
@@ -22416,11 +22419,11 @@ function colorForScheduleText(text){
   return shadeHexColor(COLOR_THEMES[activeThemeIndex].baseColor, percent);
 }
 
-// 종류별 기본색 - 예약 가능은 하늘색 그대로, 채팅으로 확정된 약속은 차분한 벽돌색, 일반 일정은 테마(기본 보라) 색
+// 종류별 기본색 - 예약 가능은 하늘색 그대로, 채팅으로 확정된 약속은 메모 톤의 분홍, 일반 일정은 테마(기본 보라) 색
 const AVAILABLE_EVENT_COLOR = 'var(--accent)'; // 다크 모드에선 밝은 회색으로 바뀌게 색 변수로
 // 강조색(예약 가능) 바탕 위 글씨색 - 다크 모드는 바탕이 밝은 회색이라 흰 글씨 대신 어두운 글씨 (그 외 색은 원래대로 흰 글씨)
 function textColorOnEventBg(bg){ return bg === AVAILABLE_EVENT_COLOR ? 'color:var(--on-accent);' : ''; }
-const APPOINTMENT_EVENT_COLOR = '#A8473A';
+const APPOINTMENT_EVENT_COLOR = '#E8799A'; // 점·친구 블록 등 글자 없는 곳용 (칸 바탕은 CSS --appt-paper)
 
 // 예약 가능 시간을 누구에게 열지 - "모든 친구 / 내 그룹들 / 업무용 링크" 칩을 여러 개 고름
 // 서버 저장값은 그대로: availableFor(all = 친구 + 업무용 링크 / friends = 친구만 / work = 업무용 링크만) + visibility.groupIds(친구 중 어느 그룹)
