@@ -3585,19 +3585,30 @@
     -webkit-overflow-scrolling:touch;
   }
   .chat-pinned-schedule .pin-list > *{ flex-shrink:0; }
-  /* 카드가 넘쳐서 더 볼 게 남은 쪽(아래/위) 끝을 흐리게 사라지게 해서 밀어볼 수 있다는 걸 알려줌 */
-  .chat-pinned-schedule .pin-list.fade-bottom{
-    -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
-    mask-image:linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  /* 카드가 넘쳐서 더 볼 게 남은 쪽(아래/위) 끝의 카드를 흐리게 해서 밀어볼 수 있다는 걸 알려줌.
+     카드를 투명하게 만들면 뒤 채팅이 비쳐 보여서, 카드 위에 블러 띠를 얹어 카드 자체만 흐려 보이게 함 */
+  .chat-pinned-schedule .pin-list .pin-edge-blur{
+    position:sticky;
+    z-index:1;
+    height:36px;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .15s;
+    backdrop-filter:blur(3px);
+    -webkit-backdrop-filter:blur(3px);
   }
-  .chat-pinned-schedule .pin-list.fade-top{
-    -webkit-mask-image:linear-gradient(to top, #000 calc(100% - 36px), transparent);
-    mask-image:linear-gradient(to top, #000 calc(100% - 36px), transparent);
+  .chat-pinned-schedule .pin-list .pin-edge-blur.top{
+    top:0; margin-bottom:-44px; /* 자리는 차지하지 않게 (높이 36 + 카드 사이 간격 8) */
+    -webkit-mask-image:linear-gradient(to top, transparent, #000);
+    mask-image:linear-gradient(to top, transparent, #000);
   }
-  .chat-pinned-schedule .pin-list.fade-top.fade-bottom{
-    -webkit-mask-image:linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
-    mask-image:linear-gradient(to bottom, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  .chat-pinned-schedule .pin-list .pin-edge-blur.bottom{
+    bottom:0; margin-top:-44px;
+    -webkit-mask-image:linear-gradient(to bottom, transparent, #000);
+    mask-image:linear-gradient(to bottom, transparent, #000);
   }
+  .chat-pinned-schedule .pin-list.fade-top .pin-edge-blur.top,
+  .chat-pinned-schedule .pin-list.fade-bottom .pin-edge-blur.bottom{ opacity:1; }
   .chat-pinned-schedule .pin-list.collapsed{ display:none; }
   .chat-pinned-schedule .pin-card{
     -webkit-touch-callout:none; -webkit-user-drag:none; /* 아이폰 꾹 누르기 때 카드가 흰 판에 얹혀 뜨지 않게 */
@@ -29954,6 +29965,7 @@ function renderPinnedSchedule(){
   const listEl = document.createElement('div');
   listEl.className = 'pin-list' + (room.pinnedCollapsed ? ' collapsed' : '');
   listEl.addEventListener('scroll', updatePinListFade, { passive: true });
+  listEl.innerHTML = '<div class="pin-edge-blur top"></div>';
   el.appendChild(listEl);
 
   // 확정된 예약/장소가 여러 개면 전부 카드로 보여줌
@@ -30107,6 +30119,7 @@ function renderPinnedSchedule(){
 
     listEl.appendChild(card);
   });
+  listEl.insertAdjacentHTML('beforeend', '<div class="pin-edge-blur bottom"></div>');
   fitPinListHeight();
 }
 
