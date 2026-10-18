@@ -6631,6 +6631,7 @@
   .allow-booking-card .stt-label{ color:var(--accent); font-weight:800; }
   .travel-from-chip{ padding:5px 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--text-dim); font-size:12px; font-weight:600; font-family:'Inter',sans-serif; cursor:pointer; }
   .travel-from-chip.on{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
+  .travel-add-chip{ border-style:dashed; }
   .travel-remove{ border:none; background:none; color:var(--text-dim); font-size:12px; text-decoration:underline; cursor:pointer; padding:6px 0 0; font-family:'Inter',sans-serif; }
   .travel-foot{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .travel-foot .travel-map-link{ margin:6px 0 0; }
@@ -20564,6 +20565,84 @@ function travelOriginOptions(){
   });
   return opts;
 }
+// 자주 가는 곳(집/회사 등)을 설정에 안 들어가도 일정 이동시간 칸에서 바로 등록할 수 있게
+// - 아직 없는 집/회사는 "+ 집" "+ 회사" 버튼, 검색해서 고른 곳은 "☆ 저장" 버튼 (누르면 집/회사/학교/직접 이름 중 고름)
+async function saveFrequentPlace(body){
+  const data = await apiRequest('/profile/locations', { method: 'POST', body: JSON.stringify(body) });
+  const idx = body.label === 'CUSTOM' ? -1 : mySavedLocations.findIndex(l => l.label === body.label);
+  if(idx >= 0) mySavedLocations[idx] = data.location; else mySavedLocations.push(data.location);
+  renderSavedLocationsList(); // 설정 화면이 열려 있으면 거기도 바로 반영
+  return data.location;
+}
+// which: 'from'(출발) | 'to'(도착), cur: 지금 고른 장소, opts: 그 줄에 이미 보이는 바로가기들
+function addFrequentPlaceChips(row, which, cur, opts){
+  if(!authToken) return;
+  const useSaved = (loc) => {
+    formTravel = { ...(formTravel || {}), [which]: { name: loc.displayName || loc.address, lat: loc.lat, lon: loc.lon } };
+    if(which === 'to' && !formTravel.from) formTravel.from = defaultTravelOrigin();
+    computeFormTravel();
+  };
+  const extra = [];
+  // "+ 집" "+ 회사"는 출발 줄에만 (두 줄에 똑같이 뜨면 복잡해서) - 도착 줄은 고른 곳 "☆ 저장"만
+  if(which === 'from') FIXED_LOCATION_LABELS.filter(f => f.label !== 'SCHOOL' && !mySavedLocations.some(l => l.label === f.label)).forEach(f => {
+    extra.push({ text: `+ ${f.name}`, onTap: () => openDepartureLocationPicker({
+      title: `${f.name} 주소 등록`, showSaved: false, requireCustomName: false,
+      onConfirm: async (picked) => {
+        try {
+          const loc = await saveFrequentPlace({ label: f.label, address: picked.address, lat: picked.lat, lon: picked.lon });
+          showToast(`${f.name}을 저장했어요. 다음부턴 버튼 하나로 골라져요.`);
+          useSaved(loc);
+        } catch(err){ showToast(err.message); }
+      },
+    }) });
+  });
+  // 검색해서 고른 곳인데 아직 저장 안 된 곳이면 "☆ 저장"
+  const isSaved = cur && opts.some(o => o.lat === cur.lat && o.lon === cur.lon);
+  if(cur && !isSaved && typeof cur.lat === 'number'){
+    const address = cur.address || cur.name;
+    const place = { address, lat: cur.lat, lon: cur.lon };
+    const saveAs = async (label, name) => {
+      try {
+        await saveFrequentPlace({ label, ...place });
+        showToast(`'${name}'(으)로 저장했어요.`);
+        renderTravelSection();
+      } catch(err){ showToast(err.message); }
+    };
+    extra.push({ text: '☆ 저장', onTap: () => openWeekBlockSheet('자주 가는 곳으로 저장', cur.name || address, [
+      ...FIXED_LOCATION_LABELS.map(f => {
+        const had = mySavedLocations.some(l => l.label === f.label);
+        return { label: had ? `${f.name} 바꾸기` : f.name, primary: !had, onTap: () => saveAs(f.label, f.name) };
+      }),
+      { label: '직접 이름 붙이기', onTap: () => {
+        openDepartureLocationPicker({
+          title: '이름 붙여서 저장', showSaved: false, requireCustomName: true,
+          onConfirm: async (picked) => {
+            try {
+              await saveFrequentPlace({ label: 'CUSTOM', customLabel: picked.customLabel, address: picked.address, lat: picked.lat, lon: picked.lon });
+              showToast(`'${picked.customLabel}'(으)로 저장했어요.`);
+              renderTravelSection();
+            } catch(err){ showToast(err.message); }
+          },
+        });
+        // 고른 곳은 이미 정해져 있으니 이름만 넣으면 되게
+        depLocPickerState.picked = place;
+        document.getElementById('depLocPickerInput').value = cur.name || address;
+        document.getElementById('depLocPickerPickedInfo').textContent = `선택됨: ${cur.name || address} (${address})`;
+        document.getElementById('depLocPickerCustomNameInput').focus();
+      } },
+    ]) });
+  }
+  if(!extra.length) return;
+  if(!row.innerHTML) row.innerHTML = `<span class="travel-chip-label">${which === 'from' ? '출발' : '도착'}</span>`;
+  extra.forEach(x => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'travel-from-chip travel-add-chip';
+    btn.textContent = x.text;
+    btn.addEventListener('click', x.onTap);
+    row.appendChild(btn);
+  });
+}
 function defaultTravelOrigin(){
   const opts = travelOriginOptions();
   const pick = opts.find(o => o.key === 'prev') || opts.find(o => o.label === 'HOME') || opts[0];
@@ -20647,6 +20726,9 @@ function renderTravelSection(){
     if(!formTravel.from) formTravel.from = defaultTravelOrigin();
     computeFormTravel();
   }));
+
+  addFrequentPlaceChips(chips, 'from', t.from, opts);
+  addFrequentPlaceChips(destChips, 'to', t.to, destOpts);
 
   const info = document.getElementById('travelInfo');
   if(!t.from && !t.to){ info.style.display = 'none'; return; }
