@@ -23883,8 +23883,8 @@ function getMeetCountWithFriend(friend){
   const roomId = findFriendRoomId(friend);
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room || !room.pinnedSchedules) return 0;
-  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-  return room.pinnedSchedules.filter(p => p.dateObj && p.dateObj < todayStart).length;
+  // 오늘 약속도 끝나는 시각이 지났으면 만난 걸로 셈
+  return room.pinnedSchedules.filter(p => p.dateObj && isPinPast(p)).length;
 }
 // 3단계 뱃지: 단골(3회+) → 친밀(5회+) → 각별(10회+). 개인 친구/비즈니스 관계 구분 없이 동일한 기준으로 적용됨
 const MEET_BADGE_TIERS = [
