@@ -7799,6 +7799,9 @@
   .tut-actions:empty{ display:none; }
   .tut-actions button{ height:36px; padding:0 16px; border:none; border-radius:10px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; background:rgba(255,255,255,0.14); color:#FFFFFF; }
   .tut-actions button.primary{ background:var(--mz-tomato); }
+  .tut-progress{ flex:1; align-self:center; height:3px; border-radius:2px; background:rgba(255,255,255,0.15); overflow:hidden; }
+  .tut-progress i{ display:block; height:100%; background:var(--mz-golden); transform-origin:left; animation:tutProgress linear forwards; }
+  @keyframes tutProgress{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
   /* 눌러볼 버튼 위에 따로 띄우는 노란 테두리 - 버튼 자체에 테두리를 그리면 바깥 카드에 잘려서 네모나게 보였음.
      버튼보다 조금 크게, 깜빡이면서 바깥으로 퍼지는 물결이 계속 나감 (위치는 placeTutorialRings가 매 프레임 맞춤) */
   .tut-rings{ position:fixed; inset:0; z-index:3050; pointer-events:none; }
@@ -24833,6 +24836,7 @@ let reserveOpenedFromDateAsk = false; // 날짜 물어보기의 "시간 정하�
 
 function closeFriendCalendar(){
   document.getElementById('friendCalendarView').classList.remove('active');
+  tutorialEvent('friendcal:close');
   calendarOpenedFromChat = null;
   closeFriendBlockAskPopover();
   syncSchedFriendMode();
@@ -31132,6 +31136,7 @@ let chatReturnToCalendar = null; //캘린더의 "채팅에서 확인"으로 들�
 
 function closeChatRoomView(){
   setChatPlusMenu(false); // + 패널은 방을 옮기거나 닫으면 접음
+  setTimeout(() => tutorialEvent('chat:close'), 0); // 튜토리얼 중이면 다음 단계로 (방이 다 닫힌 뒤)
   closeRestoreAvailPrompt(); // 결정 안 하고 방을 나가도 팝업 상태를 리셋해서, 다음에 들어오면 다시 뜨게 함
   if(placeReviewState) closePlaceReviewSheet('later');
   const view = document.getElementById('chatRoomView');
@@ -39213,34 +39218,20 @@ const TUTORIAL_STEPS = [
     until: 'tab:schedule',
   },
   {
-    title: '열어둔 시간 보기',
-    text: '점이 찍힌 날에 일정이나 열어둔 시간이 있어요. 날짜를 누르면 그날 시간이 보여요.',
-    targets: () => [],
-    next: '다음',
-  },
-  {
     title: '일정 추가하기',
-    text: "이번엔 내 일정을 넣어볼게요. 위쪽 '+'를 눌러보세요.",
+    text: "점이 찍힌 날에 일정이나 열어둔 시간이 있어요. 이번엔 내 일정을 넣어볼게요. 위쪽 '+'를 눌러보세요.",
     targets: () => [document.getElementById('schedHeadAddBtn')],
     until: 'eventform:open',
   },
   {
-    title: '일정 이름과 시간',
-    blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
-    text: '일정 이름을 적고 날짜·시작·끝 시간을 정해요. (예: 친구랑 저녁 7시)',
-    needs: () => document.getElementById('eventFormView').classList.contains('active'),
-    targets: () => [document.getElementById('eventFormTitle')],
-    next: '다음',
-    backOn: { 'eventform:close': '일정 추가하기' }, // 저장 안 하고 닫으면 '+' 누르는 단계로
-  },
-  {
     title: '어디로 가요?',
     blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
-    text: "도착지에 가는 곳을 검색해서 골라요. 일정 시작에 맞춰 도착하려면 언제 나가야 하는지 계산해줘요.",
+    text: "일정 이름과 시간을 정하고, 도착지에 가는 곳을 검색해서 골라요. 일정 시작에 맞춰 도착하려면 언제 나가야 하는지 계산해줘요.",
     needs: () => document.getElementById('eventFormView').classList.contains('active'),
-    targets: () => [document.getElementById('travelDestInput')],
+    // 이름을 아직 안 적었으면 이름 칸도 같이 표시
+    targets: () => [document.getElementById('eventFormTitle').value.trim() ? null : document.getElementById('eventFormTitle'), document.getElementById('travelDestInput')],
     until: 'travel:dest',
-    backOn: { 'eventform:close': '일정 추가하기' },
+    backOn: { 'eventform:close': '일정 추가하기' }, // 저장 안 하고 닫으면 '+' 누르는 단계로
   },
   {
     title: '어디서 출발해요?',
@@ -39269,15 +39260,16 @@ const TUTORIAL_STEPS = [
   {
     when: () => tutorialPractice,
     title: '민지의 캘린더',
-    text: "민지의 일정과, 민지가 약속 받으려고 열어둔 '예약 가능' 시간이 보여요. 날짜를 누르면 그날 시간이 나와요. 맨 앞 '나'를 누르면 내 캘린더로 돌아와요. 약속은 조금 뒤에 같이 잡아볼게요.",
+    text: "민지의 일정과, 민지가 약속 받으려고 열어둔 '예약 가능' 시간이 보여요. 날짜를 누르면 그날 시간이 나와요. 다 봤으면 맨 앞 '나'를 눌러 내 캘린더로 돌아와요.",
     needs: () => isFriendCalInline(),
     // 카드가 아래를 덮으니 오늘이 있는 줄이 화면 위쪽에 오게 내려줌 (민지 일정은 오늘부터 보임)
     enter: () => setTimeout(() => {
       const cell = document.querySelector('#friendCalendarView .day-cell.today, #friendCalendarView .day-cell.selected-day');
       if(cell) window.scrollBy({ top: cell.getBoundingClientRect().top - 110, behavior: 'smooth' });
     }, 300),
-    targets: () => [],
-    next: '다음',
+    noScroll: true, // '나'까지 끌어올리지 않음 - 안 보이면 위로 올리라는 화살표가 뜸
+    targets: () => [document.querySelector('#schedFriendStrip .sched-friend-me')],
+    until: 'friendcal:close',
   },
   {
     title: '친구와 약속 잡기',
@@ -39286,17 +39278,11 @@ const TUTORIAL_STEPS = [
     until: 'tab:friends',
   },
   {
-    title: '친구 추가',
-    text: "'+'로 아이디를 찾아 친구를 추가해요. 가입 안 한 친구에게는 약속 링크를 보내서 되는 시간을 물어볼 수 있어요.",
-    targets: () => [document.getElementById('addFriendBtn')],
-    next: '다음',
-  },
-  {
     // 연습: 가입 안 하고 둘러보는 중이면 연습용 친구(민지)와 실제 화면으로 약속을 잡아봄 (서버엔 아무것도 안 감)
     when: () => tutorialPractice,
     title: '연습용 친구',
-    text: "친구 목록에도 연습용 친구 '민지'가 있어요. 이제 민지와 실제로 약속을 잡아볼게요. 아래 홈 탭을 눌러보세요.",
-    targets: () => [[...document.querySelectorAll('#friendsListContainer .placeholder-row')].find(r => r.textContent.includes(DEMO_FRIEND.name)), navItemOf('home')],
+    text: "'+'로 아이디를 찾아 친구를 추가해요. 목록에 연습용 친구 '민지'도 있어요. 이제 민지와 실제로 약속을 잡아볼게요. 아래 홈 탭을 눌러보세요.",
+    targets: () => [document.getElementById('addFriendBtn'), [...document.querySelectorAll('#friendsListContainer .placeholder-row')].find(r => r.textContent.includes(DEMO_FRIEND.name)), navItemOf('home')],
     until: 'tab:home',
   },
   {
@@ -39349,16 +39335,16 @@ const TUTORIAL_STEPS = [
     when: () => tutorialPractice,
     title: '약속이 잡혔어요!',
     needs: () => activeChatRoomId === TUTORIAL_PRACTICE_ROOM_ID && document.body.classList.contains('chat-open'),
-    text: "잡힌 약속은 채팅방 맨 위에 고정되고 내 캘린더에도 들어가요. '장소 정하기'로 친구와 장소도 정할 수 있어요.",
-    targets: () => [document.querySelector('#chatPinnedSchedule .pin-card') || document.getElementById('chatPinnedSchedule')],
-    next: '다음',
+    text: "잡힌 약속은 채팅방 맨 위에 고정되고 내 캘린더에도 들어가요. '장소 정하기'로 친구와 장소도 정할 수 있어요. 다 봤으면 왼쪽 위 '‹'로 채팅방을 나가요.",
+    targets: () => [document.querySelector('#chatPinnedSchedule .pin-card') || document.getElementById('chatPinnedSchedule'), document.getElementById('chatBackBtn')],
+    until: 'chat:close',
   },
   // 로그인한 사람은 연습 대신 그림으로 설명 (연습 약속이 서버 캘린더에 올라가면 안 돼서)
   {
     when: () => !tutorialPractice,
     title: '약속 잡으러 가기',
-    text: '친구가 생기면 약속은 홈에서 시작해요. 아래 홈 탭을 눌러보세요.',
-    targets: () => [navItemOf('home')],
+    text: "'+'로 아이디를 찾아 친구를 추가해요. 가입 안 한 친구에겐 약속 링크로 되는 시간을 물어볼 수 있어요. 약속은 홈에서 시작해요. 아래 홈 탭을 눌러보세요.",
+    targets: () => [document.getElementById('addFriendBtn'), navItemOf('home')],
     until: 'tab:home',
   },
   {
@@ -39372,7 +39358,7 @@ const TUTORIAL_STEPS = [
       <span><b>링크로 물어보기</b>가입 안 한 친구도 되는 시간을 골라줘요</span>
     </div>`,
     targets: () => [document.getElementById('homePlanCta')],
-    next: '다음',
+    auto: 7000, // 해볼 게 없는 설명이라 읽을 시간만큼 두고 저절로 넘어감
   },
   {
     when: () => !tutorialPractice,
@@ -39384,7 +39370,7 @@ const TUTORIAL_STEPS = [
       <span class="tut-art-ok">&#10003; 약속이 잡혔어요</span>
     </div>`,
     targets: () => [],
-    next: '다음',
+    auto: 7000, // 해볼 게 없는 설명이라 읽을 시간만큼 두고 저절로 넘어감
   },
   {
     when: () => !tutorialPractice,
@@ -39403,7 +39389,7 @@ const TUTORIAL_STEPS = [
       <span class="tut-art-bubble me">좋아! 거기로 하자</span>
     </div>`,
     targets: () => [],
-    next: '다음',
+    auto: 7000, // 해볼 게 없는 설명이라 읽을 시간만큼 두고 저절로 넘어감
   },
   {
     title: '어디서 만날지',
@@ -39417,7 +39403,7 @@ const TUTORIAL_STEPS = [
     title: '장소 고르기',
     text: '마음에 드는 곳은 저장해 두거나 채팅방에 바로 보내서 친구와 정해요. 다녀온 곳은 리뷰로 추천할 수 있어요.',
     targets: () => [],
-    next: '다음',
+    auto: 5000, // 해볼 게 없는 설명이라 읽을 시간만큼 두고 저절로 넘어감
   },
   {
     title: '다 됐어요!',
@@ -39430,6 +39416,7 @@ const TUTORIAL_STEPS = [
 var tutorialStep = -1; // -1 = 튜토리얼 안 하는 중 (var: 이 줄보다 먼저 화면 전환이 일어나도 안 터지게)
 var tutorialTargets = [];
 var tutorialPractice = false; // 연습용 친구와 약속 잡아보기 중인지 (로그인 안 한 사람만 - 서버엔 아무것도 안 감)
+var tutorialAutoTimer = 0; // 설명만 있는 단계를 저절로 넘기는 타이머
 const TUTORIAL_PRACTICE_ROOM_ID = 'dm-' + DEMO_FRIEND.id;
 
 // 연습용 친구(민지)를 친구 목록에 넣고, 앞으로 2주 동안 예약 가능 시간을 열어둔 것처럼 채움 (평일 저녁, 주말 오후, 오늘은 지금 이후)
@@ -39524,6 +39511,7 @@ function startTutorial(){
 }
 function endTutorial(){
   tutorialStep = -1;
+  clearTimeout(tutorialAutoTimer);
   document.getElementById('tutScrollHint').hidden = true;
   cleanupTutorialPractice();
   setTutorialTargets([]);
@@ -39637,7 +39625,8 @@ function placeTutorialScrollHint(off, cardRect, cardAtTop){
     hint.style.bottom = (cardRect && !cardAtTop ? window.innerHeight - cardRect.top + 10 : 24) + 'px';
   } else {
     hint.style.bottom = 'auto';
-    hint.style.top = (cardRect && cardAtTop ? cardRect.bottom + 10 : 16) + 'px';
+    // 위쪽엔 알림(토스트)이 뜨는 자리라 그 아래로
+    hint.style.top = cardRect && cardAtTop ? (cardRect.bottom + 10) + 'px' : 'calc(env(safe-area-inset-top, 0px) + 68px)';
   }
 }
 document.getElementById('tutScrollHint').addEventListener('click', () => {
@@ -39690,13 +39679,20 @@ function renderTutorialStep(){
     next.addEventListener('click', () => goTutorialStep(tutorialStep + 1));
     actions.appendChild(next);
   }
+  // 해볼 게 없는 설명 단계는 '다음' 버튼 없이 읽을 시간만큼 지나면 저절로 넘어감 (아래 막대가 차오름)
+  clearTimeout(tutorialAutoTimer);
+  if(step.auto){
+    actions.insertAdjacentHTML('beforeend', `<div class="tut-progress"><i style="animation-duration:${step.auto}ms"></i></div>`);
+    const at = tutorialStep;
+    tutorialAutoTimer = setTimeout(() => { if(tutorialStep === at) goTutorialStep(at + 1); }, step.auto);
+  }
   // 첫 단계는 홈에서 시작 - 이전으로 돌아왔는데 빠르게 열기 창이 열려 있으면 닫아서 버튼이 보이게
   if(tutorialStep === 0 && document.getElementById('quickAvailOverlay').classList.contains('show')) dismissView(closeQuickAvail);
   if(tutorialStep === 0 && currentTopTab !== null) switchTopTab(null);
   refreshTutorialTargets();
   // 눌러볼 버튼이 화면 밖이면 보이게 스크롤 (아래 탭 버튼은 늘 보임)
   const first = tutorialTargets[0];
-  if(first && !first.closest('.bottom-nav') && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  if(first && !step.noScroll && !first.closest('.bottom-nav') && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
   // 막 열린 화면은 조금 뒤에 다 그려지니 깜빡일 버튼을 한 번 더 찾음
   setTimeout(refreshTutorialTargets, 250);
 }
@@ -39707,9 +39703,7 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   e.stopImmediatePropagation();
   showToast('잠깐! 도착지와 출발지를 넣고 출발 시간을 먼저 계산해봐요.');
-  // 이름 단계였으면 도착지 단계로 넘겨줌 (이름은 이미 적었을 테니)
-  if(TUTORIAL_STEPS[tutorialStep].title === '일정 이름과 시간') goTutorialStep(tutorialStep + 1);
-  else renderTutorialStep();
+  renderTutorialStep(); // 지금 단계의 칸으로 스크롤
 }, true);
 // 안내가 화면을 많이 가려서 내려둘 수 있게 - '내리기'나 아래로 밀면 한 줄로 작아지고, 누르거나 위로 밀면 다시 펼쳐짐
 function setTutorialFolded(folded){
