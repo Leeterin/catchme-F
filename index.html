@@ -7757,13 +7757,13 @@
   .tut-card.at-top{ bottom:auto; top:calc(env(safe-area-inset-top) + 10px); }
   /* 빠르게 열기 창 위에서는 맨 아래에 붙이고(위엔 창 닫기 버튼이 있음), 창 안쪽 아래에 여백을 둬서 '열어두기'를 카드 위로 올려 볼 수 있게 */
   .tut-card.in-sheet{ bottom:calc(env(safe-area-inset-bottom) + 10px); }
-  body:has(.tut-card.in-sheet:not([hidden])) #quickAvailOverlay .quick-avail-card{ padding-bottom:170px; }
+  body.tut-in-sheet #quickAvailOverlay .quick-avail-card{ padding-bottom:170px; }
   /* 카드가 아래에 떠 있는 동안 알림(토스트)은 위에 띄움 - 카드와 겹쳐 글자가 섞여 보였음 (채팅방 안에서와 같은 방식) */
-  body:has(.tut-card:not([hidden]):not(.at-top)) .global-toast{ bottom:auto; top:calc(env(safe-area-inset-top, 0px) + 16px); transform:translateX(-50%) translateY(-16px); }
-  body:has(.tut-card:not([hidden]):not(.at-top)) .global-toast.show{ transform:translateX(-50%) translateY(0); }
+  body.tut-card-bottom .global-toast{ bottom:auto; top:calc(env(safe-area-inset-top, 0px) + 16px); transform:translateX(-50%) translateY(-16px); }
+  body.tut-card-bottom .global-toast.show{ transform:translateX(-50%) translateY(0); }
   body.dark-mode .tut-card{ background:#3A3734; }
   /* 가입 화면이 뜨면 그 위에 겹치지 않게 잠깐 숨김 */
-  body:has(#authGateView[style*="flex"]) .tut-card{ display:none; }
+  body.auth-gate-open .tut-card{ display:none; }
   .tut-card-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
   .tut-step{ font-size:12px; font-weight:700; color:var(--mz-golden); }
   .tut-top-btns{ display:flex; align-items:center; gap:4px; }
@@ -7805,7 +7805,7 @@
   /* 눌러볼 버튼 위에 따로 띄우는 노란 테두리 - 버튼 자체에 테두리를 그리면 바깥 카드에 잘려서 네모나게 보였음.
      버튼보다 조금 크게, 깜빡이면서 바깥으로 퍼지는 물결이 계속 나감 (위치는 placeTutorialRings가 매 프레임 맞춤) */
   .tut-rings{ position:fixed; inset:0; z-index:3050; pointer-events:none; }
-  body:has(#authGateView[style*="flex"]) .tut-rings{ display:none; }
+  body.auth-gate-open .tut-rings{ display:none; }
   .tut-ring{ position:fixed; box-sizing:border-box; border:3px solid #FFD43B; animation:tutGlow 1.8s ease-out infinite; }
   /* 깜빡임(켜졌다 꺼짐)과 퍼지는 물결을 같이 돌리니 번쩍거리고 물결이 커지며 네모나 보였음 -
      테두리는 그대로 두고, 같은 둥근 모양의 빛만 한 번씩 부드럽게 퍼졌다 사라짐 */
@@ -7822,7 +7822,7 @@
   @keyframes tutHintBob{ 0%,100%{ translate:0 0; } 50%{ translate:0 5px; } }
   .tut-scroll-hint.up{ animation-name:tutHintBobUp; }
   @keyframes tutHintBobUp{ 0%,100%{ translate:0 0; } 50%{ translate:0 -5px; } }
-  body:has(#authGateView[style*="flex"]) .tut-scroll-hint{ display:none; }
+  body.auth-gate-open .tut-scroll-hint{ display:none; }
   @media (prefers-reduced-motion: reduce){ .tut-scroll-hint{ animation:none; } }
   @media (prefers-reduced-motion: no-preference){
     .tut-card:not([hidden]){ animation:mzRiseIn .25s ease; }
@@ -30657,11 +30657,14 @@ document.getElementById('dayViewChatBackBtn').addEventListener('click', () => go
 function focusWithoutScrollJump(input){
   input.__noJumpBound = true; // 아래 앱 공통 처리(installAppKeyboardHandling)가 이 칸은 건너뜀
   // 꾹 누르기(글자 선택/붙여넣기 메뉴)는 기본 동작 그대로 둠 - 막으면 선택이 안 되고 메뉴도 안 떴음
-  let touchStartAt = 0;
-  input.addEventListener('touchstart', () => { touchStartAt = Date.now(); }, { passive: true });
+  let touchStartAt = 0, touchStartX = 0, touchStartY = 0;
+  input.addEventListener('touchstart', (e) => { touchStartAt = Date.now(); touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }, { passive: true });
   input.addEventListener('touchend', (e) => {
     if(document.activeElement === input) return; // 이미 포커스돼있으면(예: 커서 위치만 바꾸는 탭) 손대지 않음
     if(Date.now() - touchStartAt > 350) return;
+    // 칸 위에서 시작해 화면을 쓸어 올리거나 내린 거면(스크롤) 포커스하지 않음 - 안 그러면 스크롤하다 키보드가 튀어나옴
+    const t = e.changedTouches[0];
+    if(Math.abs(t.clientX - touchStartX) > 10 || Math.abs(t.clientY - touchStartY) > 10) return;
     e.preventDefault();
     input.focus({ preventScroll: true });
     showNativeEditMenu(input);
@@ -30741,12 +30744,15 @@ function onAppKeyboardChange(height){
   // 1) 짧게 탭할 때 iOS의 페이지 밀어올림을 막고 포커스만 줌 (꾹 누르기는 그대로 - 글자 선택·붙여넣기)
   document.addEventListener('touchstart', (e) => {
     const f = appTextFieldFrom(e.target);
-    if(f) f.__touchStartAt = Date.now();
+    if(f){ f.__touchStartAt = Date.now(); f.__touchStartX = e.touches[0].clientX; f.__touchStartY = e.touches[0].clientY; }
   }, { passive: true, capture: true });
   document.addEventListener('touchend', (e) => {
     const f = appTextFieldFrom(e.target);
     if(!f || f.__noJumpBound || document.activeElement === f) return;
     if(Date.now() - (f.__touchStartAt || 0) > 350) return;
+    // 칸 위에서 시작해 화면을 쓸어 넘긴 거면(스크롤) 포커스하지 않음 - 스크롤하다 키보드가 튀어나오고 화면이 그 칸으로 튀었음
+    const t = e.changedTouches[0];
+    if(Math.abs(t.clientX - (f.__touchStartX || 0)) > 10 || Math.abs(t.clientY - (f.__touchStartY || 0)) > 10) return;
     e.preventDefault();
     f.focus({ preventScroll: true });
     setTimeout(keepFocusedFieldAboveKeyboard, 60);
@@ -39519,6 +39525,17 @@ function startTutorial(){
   if(!authToken) addTutorialPracticeFriend();
   goTutorialStep(0);
 }
+// 안내 카드 상태를 body 클래스로 - CSS에서 body:has(...)로 찾으면 아이폰에서 화면이 바뀔 때마다 페이지 전체를 다시 살펴서 버벅였음
+function syncTutorialBodyClasses(){
+  const card = document.getElementById('tutCard');
+  const on = tutorialStep >= 0 && !card.hidden;
+  document.body.classList.toggle('tut-in-sheet', on && card.classList.contains('in-sheet'));
+  document.body.classList.toggle('tut-card-bottom', on && !card.classList.contains('at-top'));
+}
+// 로그인 화면이 떠 있는지도 body 클래스로 (튜토리얼 카드·테두리를 그동안 숨김)
+new MutationObserver(() => {
+  document.body.classList.toggle('auth-gate-open', document.getElementById('authGateView').style.display === 'flex');
+}).observe(document.getElementById('authGateView'), { attributes: true, attributeFilter: ['style'] });
 function endTutorial(){
   tutorialStep = -1;
   clearTimeout(tutorialAutoTimer);
@@ -39526,6 +39543,7 @@ function endTutorial(){
   cleanupTutorialPractice();
   setTutorialTargets([]);
   document.getElementById('tutCard').hidden = true;
+  syncTutorialBodyClasses();
   try { localStorage.setItem(TUTORIAL_DONE_KEY, '1'); } catch(e) {}
   if(nativePrefs()) nativePrefs().set({ key: TUTORIAL_DONE_KEY, value: '1' }).catch(() => {});
 }
@@ -39555,11 +39573,13 @@ function tutorialEvent(name){
     goTutorialStep(typeof back === 'string' ? TUTORIAL_STEPS.findIndex(st => st.title === back) : back);
     return;
   }
-  setTimeout(refreshTutorialTargets, 60); // 화면이 바뀌었으면 깜빡일 버튼도 다시 찾음
+  setTimeout(() => refreshTutorialTargets(), 60); // 화면이 바뀌었으면 깜빡일 버튼도 다시 찾음
 }
 function setTutorialTargets(list){
+  list = list.filter(Boolean);
+  if(list.length === tutorialTargets.length && list.every((el, i) => el === tutorialTargets[i])) return; // 그대로면 안 건드림
   tutorialTargets.forEach(el => el.classList.remove('tut-target'));
-  tutorialTargets = list.filter(Boolean);
+  tutorialTargets = list;
   tutorialTargets.forEach(el => el.classList.add('tut-target'));
   const box = document.getElementById('tutRings');
   while(box.children.length < tutorialTargets.length) box.appendChild(Object.assign(document.createElement('div'), { className: 'tut-ring' }));
@@ -39572,14 +39592,20 @@ const TUT_RING_GAP = 6;
 // 버튼이 실제로 보이는 범위 - 화면 안이면서, 안에서 스크롤되는 창(빠르게 열기 등)의 보이는 칸 안
 function tutorialVisibleBox(el){
   const box = { top: 0, bottom: window.innerHeight };
-  for(let p = el.parentElement; p && p !== document.body; p = p.parentElement){
-    if(p.scrollHeight <= p.clientHeight + 1) continue;
-    const oy = getComputedStyle(p).overflowY;
-    if(oy !== 'auto' && oy !== 'scroll' && oy !== 'hidden') continue;
+  // 스크롤되는 감싼 화면은 버튼을 정할 때 한 번만 찾아둠 (매 프레임 스타일을 읽으면 폰에서 버벅임)
+  if(!el._tutScrollers){
+    el._tutScrollers = [];
+    for(let p = el.parentElement; p && p !== document.body; p = p.parentElement){
+      const oy = getComputedStyle(p).overflowY;
+      if(oy === 'auto' || oy === 'scroll' || oy === 'hidden') el._tutScrollers.push(p);
+    }
+  }
+  el._tutScrollers.forEach(p => {
+    if(p.scrollHeight <= p.clientHeight + 1) return;
     const pr = p.getBoundingClientRect();
     box.top = Math.max(box.top, pr.top);
     box.bottom = Math.min(box.bottom, pr.bottom);
-  }
+  });
   return box;
 }
 function placeTutorialRings(){
@@ -39594,7 +39620,7 @@ function placeTutorialRings(){
     const ring = rings[i];
     if(!ring) return;
     const r = el.getBoundingClientRect();
-    if(!r.width || !r.height){ ring.style.display = 'none'; return; } // 숨은 버튼이면 테두리도 숨김
+    if(!r.width || !r.height){ if(ring.style.display !== 'none') ring.style.display = 'none'; return; } // 숨은 버튼이면 테두리도 숨김
     // 스크롤 밖이거나 안내 카드에 가려 보이지 않으면 테두리는 숨기고 화살표로 알려줌 (화면 엉뚱한 곳에 떠 있지 않게)
     const vis = tutorialVisibleBox(el);
     let dir = null;
@@ -39602,23 +39628,27 @@ function placeTutorialRings(){
     else if(r.bottom < vis.top + 16) dir = 'up';
     else if(cardRect && !card.contains(el) && r.top < cardRect.bottom && r.bottom > cardRect.top && r.left < cardRect.right && r.right > cardRect.left) dir = cardAtTop ? 'up' : 'down';
     if(dir){
-      ring.style.display = 'none';
+      if(ring.style.display !== 'none') ring.style.display = 'none';
       if(!offscreen || (offscreen.el.tagName !== 'BUTTON' && el.tagName === 'BUTTON')) offscreen = { el, dir }; // 버튼이면 그 이름으로 알려줌
       return;
     }
+    // 위치가 그대로면 아무것도 안 바꿈 (매 프레임 스타일을 다시 쓰면 폰에서 화면 전체가 버벅임)
+    const key = `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`;
+    if(ring._key === key && ring.style.display === '') return;
+    ring._key = key;
     ring.style.display = '';
     ring.style.left = (r.left - TUT_RING_GAP) + 'px';
     ring.style.top = (r.top - TUT_RING_GAP) + 'px';
     ring.style.width = (r.width + TUT_RING_GAP * 2) + 'px';
     ring.style.height = (r.height + TUT_RING_GAP * 2) + 'px';
-    const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
-    ring.style.borderRadius = Math.min(Math.max(radius + TUT_RING_GAP, 14), (r.height + TUT_RING_GAP * 2) / 2) + 'px'; // 모서리가 각진 칸도 둥글게 감쌈
+    if(el._tutRadius === undefined) el._tutRadius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
+    ring.style.borderRadius = Math.min(Math.max(el._tutRadius + TUT_RING_GAP, 14), (r.height + TUT_RING_GAP * 2) / 2) + 'px'; // 모서리가 각진 칸도 둥글게 감쌈
   });
   placeTutorialScrollHint(offscreen, cardRect, cardAtTop);
 }
 function placeTutorialScrollHint(off, cardRect, cardAtTop){
   const hint = document.getElementById('tutScrollHint');
-  if(!off || tutorialStep < 0){ hint.hidden = true; hint._target = null; return; }
+  if(!off || tutorialStep < 0){ if(!hint.hidden) hint.hidden = true; hint._target = null; return; }
   const label = (off.el.tagName === 'BUTTON' && off.el.textContent.trim().length <= 14) ? off.el.textContent.trim() : '';
   const down = off.dir === 'down';
   const text = `${down ? '아래로 내려서' : '위로 올려서'} ${label ? `'${label}'` : '이어서 하기'}`;
@@ -39626,18 +39656,17 @@ function placeTutorialScrollHint(off, cardRect, cardAtTop){
     hint.innerHTML = `${escapeHtml(text)} <span class="arr">${down ? '&#8964;' : '&#8963;'}</span>`;
     hint._text = text;
   }
-  hint.classList.toggle('up', !down);
   hint._target = off.el;
+  // 안내 카드 바로 위(아래쪽이면)나 바로 아래(위쪽이면)에 붙임 - 위쪽엔 알림(토스트)이 뜨는 자리라 그 아래로
+  const top = down ? 'auto' : (cardRect && cardAtTop ? Math.round(cardRect.bottom + 10) + 'px' : 'calc(env(safe-area-inset-top, 0px) + 68px)');
+  const bottom = down ? Math.round(cardRect && !cardAtTop ? window.innerHeight - cardRect.top + 10 : 24) + 'px' : 'auto';
+  const pos = `${down}|${top}|${bottom}`;
+  if(hint._pos === pos && !hint.hidden) return; // 그대로면 안 건드림
+  hint._pos = pos;
+  hint.classList.toggle('up', !down);
   hint.hidden = false;
-  // 안내 카드 바로 위(아래쪽이면)나 바로 아래(위쪽이면)에 붙임
-  if(down){
-    hint.style.top = 'auto';
-    hint.style.bottom = (cardRect && !cardAtTop ? window.innerHeight - cardRect.top + 10 : 24) + 'px';
-  } else {
-    hint.style.bottom = 'auto';
-    // 위쪽엔 알림(토스트)이 뜨는 자리라 그 아래로
-    hint.style.top = cardRect && cardAtTop ? (cardRect.bottom + 10) + 'px' : 'calc(env(safe-area-inset-top, 0px) + 68px)';
-  }
+  hint.style.top = top;
+  hint.style.bottom = bottom;
 }
 document.getElementById('tutScrollHint').addEventListener('click', () => {
   const el = document.getElementById('tutScrollHint')._target;
@@ -39649,11 +39678,15 @@ function followTutorialRings(){
   placeTutorialRings();
   requestAnimationFrame(followTutorialRings);
 }
-function refreshTutorialTargets(){
+// placeCard: 단계를 시작할 때만 카드 위치(위/아래)를 정함 - 스크롤할 때마다 다시 정하면 카드가 위아래로 튀었음
+function refreshTutorialTargets(placeCard){
   if(tutorialStep < 0) return;
   const step = TUTORIAL_STEPS[tutorialStep];
   setTutorialTargets(step.targets());
-  document.getElementById('tutText').textContent = typeof step.text === 'function' ? step.text() : step.text;
+  const text = typeof step.text === 'function' ? step.text() : step.text;
+  const textEl = document.getElementById('tutText');
+  if(textEl.textContent !== text) textEl.textContent = text;
+  if(placeCard !== true) return;
   // 눌러볼 버튼이 화면 아래쪽에 있으면 카드가 가리지 않게 위로 올림
   const first = tutorialTargets[0];
   const r = first && first.getBoundingClientRect();
@@ -39661,6 +39694,7 @@ function refreshTutorialTargets(){
   const card = document.getElementById('tutCard');
   card.classList.toggle('in-sheet', !!step.inSheet);
   card.classList.toggle('at-top', !step.inSheet && !!low);
+  syncTutorialBodyClasses();
 }
 function renderTutorialStep(){
   const step = TUTORIAL_STEPS[tutorialStep];
@@ -39699,12 +39733,12 @@ function renderTutorialStep(){
   // 첫 단계는 홈에서 시작 - 이전으로 돌아왔는데 빠르게 열기 창이 열려 있으면 닫아서 버튼이 보이게
   if(tutorialStep === 0 && document.getElementById('quickAvailOverlay').classList.contains('show')) dismissView(closeQuickAvail);
   if(tutorialStep === 0 && currentTopTab !== null) switchTopTab(null);
-  refreshTutorialTargets();
+  refreshTutorialTargets(true);
   // 눌러볼 버튼이 화면 밖이면 보이게 스크롤 (아래 탭 버튼은 늘 보임)
   const first = tutorialTargets[0];
   if(first && !step.noScroll && !first.closest('.bottom-nav') && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
   // 막 열린 화면은 조금 뒤에 다 그려지니 깜빡일 버튼을 한 번 더 찾음
-  setTimeout(refreshTutorialTargets, 250);
+  setTimeout(() => refreshTutorialTargets(), 250);
 }
 document.getElementById('tutPrevBtn').addEventListener('click', goTutorialPrev);
 // 튜토리얼에서 출발 시간 계산을 해보기 전에 '추가하기'를 누르면 저장하지 않고, 아직 안 한 칸으로 데려감
@@ -39740,8 +39774,8 @@ document.getElementById('tutCard').addEventListener('click', (e) => {
   }, { passive: true });
 })();
 // 화면을 누르거나 스크롤하면 깜빡일 버튼과 카드 위치를 다시 맞춤 (주를 넘기거나 목록이 다시 그려진 경우)
-document.addEventListener('click', () => { if(tutorialStep >= 0) setTimeout(refreshTutorialTargets, 80); }, true);
-window.addEventListener('scroll', () => { if(tutorialStep >= 0) requestAnimationFrame(refreshTutorialTargets); }, { passive: true, capture: true });
+// 화면을 누르면 깜빡일 버튼을 다시 찾음 (주를 넘기거나 목록이 다시 그려진 경우) - 스크롤 따라가기는 테두리가 매 프레임 알아서 함
+document.addEventListener('click', () => { if(tutorialStep >= 0) setTimeout(() => refreshTutorialTargets(), 80); }, true);
 
 // ---------- 카카오/네이버 소셜 로그인 ----------
 // 서버가 잠들어 있으면 넘어가기까지 몇 초 걸려서, 누른 버튼에 "이동 중"을 보여주고 두 번 눌리지 않게 막음
