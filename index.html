@@ -8618,7 +8618,7 @@
   #monthSchedGrid .day-cell:nth-child(7n) .month-date-num, #friendMonthGrid .day-cell:nth-child(7n) .month-date-num{ color:#3D7BD9; }
   #monthSchedGrid .day-cell.today .month-date-num, #friendMonthGrid .day-cell.today .month-date-num{
     display:inline-flex; align-items:center; justify-content:center; line-height:1; border-radius:50%;
-    background:var(--hm-accent); color:#FFFFFF; font-weight:800; box-shadow:none; /* 연한 분홍이면 오늘이 잘 안 보여서 진한 토마토 + 흰 글씨 */
+    background:var(--hm-ink); color:var(--hm-card); font-weight:800; box-shadow:none; /* 연한 분홍이면 오늘이 잘 안 보여서 진한 먹색 + 흰 글씨 (다크 모드는 반대로) */
   }
   #monthSchedGrid .day-cell.selected-day, #friendMonthGrid .day-cell.selected-day{ outline:none; background:var(--hm-well); border-radius:12px; border-top-color:transparent; }
   #monthSchedGrid .month-avail-dot, #friendMonthGrid .month-avail-dot{ background:var(--hm-accent); }
@@ -8667,7 +8667,7 @@
   #weekGrid .week-cal-day-head, #friendWeekGrid .week-cal-day-head{ font-family:inherit; font-size:10px; font-weight:600; color:var(--hm-dim); border-radius:10px; }
   #weekGrid .week-cal-day:nth-child(6) .week-cal-day-head, #friendWeekGrid .week-cal-day:nth-child(6) .week-cal-day-head{ color:#3D7BD9; }
   #weekGrid .week-cal-day:nth-child(7) .week-cal-day-head, #friendWeekGrid .week-cal-day:nth-child(7) .week-cal-day-head{ color:#D9533F; }
-  #weekGrid .week-cal-day .week-cal-day-head.today, #friendWeekGrid .week-cal-day .week-cal-day-head.today{ background:var(--hm-accent); color:#FFFFFF; font-weight:800; } /* 토/일 글자색보다 우선 (흰 글씨) */
+  #weekGrid .week-cal-day .week-cal-day-head.today, #friendWeekGrid .week-cal-day .week-cal-day-head.today{ background:var(--hm-ink); color:var(--hm-card); font-weight:800; } /* 토/일 글자색보다 우선 (흰 글씨) */
   #weekGrid .week-cal-day-body, #friendWeekGrid .week-cal-day-body{
     border-left:1px solid var(--hm-line);
     background-image:repeating-linear-gradient(to bottom, var(--hm-line) 0, var(--hm-line) 1px, transparent 1px, transparent 32px);
@@ -8691,7 +8691,7 @@
   #scheduleView-day .day-header-sub #dayViewLabel, #friendCalendarMain .day-header-sub #friendCalDateNavLabel{ font-family:inherit; font-size:19px; font-weight:800; letter-spacing:-0.02em; color:var(--hm-ink); }
   #scheduleView-day .day-header-sub.is-today #dayViewLabel, #friendCalendarMain .day-header-sub.is-today #friendCalDateNavLabel{ color:var(--hm-ink); }
   #scheduleView-day .day-today-chip, #friendCalendarMain .day-today-chip{ padding:3px 9px; font-size:11.5px; background:var(--hm-card); color:var(--hm-dim); }
-  #scheduleView-day .day-today-chip.today, #friendCalendarMain .day-today-chip.today{ background:var(--hm-accent); color:#FFFFFF; }
+  #scheduleView-day .day-today-chip.today, #friendCalendarMain .day-today-chip.today{ background:var(--hm-ink); color:var(--hm-card); }
   #scheduleView-day .day-goto-today-btn, #friendCalendarMain .day-goto-today-btn{ padding:3px 10px; font-size:11.5px; border:none; background:var(--hm-accent); color:#fff; }
   #scheduleView-day .day-header-actions, #friendCalendarMain .day-header-actions{ gap:8px; }
   #scheduleView-day .day-header-actions button, #friendCalendarMain .day-header-actions button{ width:36px; height:36px; border:none; border-radius:50%; background:var(--hm-card); color:var(--hm-ink); font-size:20px; }
