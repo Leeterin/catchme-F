@@ -30297,7 +30297,6 @@ function renderPinnedSchedule(){
               ${multi ? `<span class="pin-place-order">${meetPlaceOrderLabel(idx)}</span>` : ''}
               <span class="pin-loc-name">${ICO.pin} ${escapeHtml(p.location)}</span>${addr ? `<span class="pin-loc-addr">${escapeHtml(addr)}</span>` : ''}
             </button>
-            ${pinPast ? '' : `<button type="button" class="pin-action-btn danger pin-remove-loc" data-place-idx="${idx}">삭제</button>`}
             ${multi && !pinPast ? `<button type="button" class="pin-drag-handle" data-place-idx="${idx}" aria-label="꾹 눌러서 순서 바꾸기">${ICO.gripLi}</button>` : ''}
           </div>`;
         }).join('')}</div>` : ''}
@@ -30319,11 +30318,23 @@ function renderPinnedSchedule(){
       goDayBtn.addEventListener('click', () => viewDayFromChat(new Date(dateObj)));
     }
 
-    // 장소를 누르면 카카오맵에서 그 장소를 엶 (바꾸고 싶으면 삭제 후 "+ 장소 추가")
+    // 장소를 누르면 아래에서 메뉴가 올라옴 - 주변 핫플 보기 / 카카오맵에서 보기 / 삭제
+    // (한 줄에 버튼을 더 넣기엔 1차, 2차... 장소 이름이 너무 잘려서, 삭제도 이 메뉴 안으로 옮김.
+    //  바꾸고 싶으면 삭제 후 "+ 장소 추가")
     card.querySelectorAll('.pin-set-loc').forEach(btn => {
       btn.addEventListener('click', () => {
-        const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
-        if(placePin) openPlaceInKakaoMap(placePin.location, placePin.locationAddress, placePin.locationLat, placePin.locationLon);
+        const idx = parseInt(btn.dataset.placeIdx, 10);
+        const placePin = places[idx];
+        if(!placePin) return;
+        const buttons = [
+          { label: '주변 핫플', primary: true, onTap: () => openHotplaceView(placePin.location, placePin.locationLat, placePin.locationLon) },
+          { label: '카카오맵', onTap: () => openPlaceInKakaoMap(placePin.location, placePin.locationAddress, placePin.locationLat, placePin.locationLon) },
+        ];
+        if(!pinPast) buttons.push({ label: '삭제', danger: true, onTap: async () => {
+          if(!(await confirmRemovePlace(placePin))) return;
+          removePinnedLocation(pinned.id, placePin.id);
+        } });
+        openWeekBlockSheet(`${multi ? `${meetPlaceOrderLabel(idx)} · ` : ''}${placePin.location}`, pinnedLocationAddress(placePin) || '', buttons, null, null);
       });
     });
 
@@ -30390,14 +30401,6 @@ function renderPinnedSchedule(){
       handle.addEventListener('touchstart', (e) => e.preventDefault(), { passive:false });
     });
     card.addEventListener('dragstart', (e) => e.preventDefault());
-
-    card.querySelectorAll('.pin-remove-loc').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const placePin = places[parseInt(btn.dataset.placeIdx, 10)];
-        if(!placePin || !(await confirmRemovePlace(placePin))) return;
-        removePinnedLocation(pinned.id, placePin.id);
-      });
-    });
 
     const addLocBtn = card.querySelector('.pin-add-loc');
     if(addLocBtn){
