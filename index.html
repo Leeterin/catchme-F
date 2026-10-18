@@ -3978,6 +3978,14 @@
        홈바에 안 겹칠 만큼만 띄움 (홈바 영역이 없는 폰은 8px) */
     padding:8px 12px max(16px, calc(env(safe-area-inset-bottom) - 4px));
   }
+  .chat-scroll-bottom-btn{
+    position:absolute; right:16px; bottom:calc(100% + 10px); z-index:5;
+    width:40px; height:40px; border-radius:50%; border:1px solid var(--line);
+    background:var(--surface); color:var(--text-dim);
+    display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer;
+    box-shadow:0 2px 10px rgba(0,0,0,.12);
+  }
+  .chat-scroll-bottom-btn[hidden]{ display:none; }
   /* 앱에서 키보드가 올라와 있을 때: 키보드 높이에 홈바 영역이 이미 포함돼 있어서 하단 여백을 카카오톡처럼 최소로 */
   .chat-room-view.keyboard-open .chat-bottom-fixed{ padding-bottom:6px; }
   /* 앱에서는 입력창이 키보드 애니메이션(약 0.25초)과 같이 부드럽게 올라오도록 */
@@ -10558,6 +10566,8 @@
       <button type="button" class="chat-active-recommend-bar" id="chatActiveRecommendBar" hidden></button>
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-bottom-fixed">
+        <!-- 위로 올려서 최신 메시지가 안 보일 때 뜨는 "맨 아래로" 버튼 (카톡처럼) -->
+        <button type="button" class="chat-scroll-bottom-btn" id="chatScrollBottomBtn" aria-label="맨 아래로" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M6 9l6 6 6-6"/></svg></button>
         <!-- 대화 검색 중엔 메시지 입력칸 대신 이 줄이 뜸 (카톡처럼): 보낸 사람 / 날짜 + 위·아래 이동 -->
         <div class="chat-search-toolbar" id="chatSearchNav" hidden>
           <div class="chat-search-popup" id="chatSearchSenderList" hidden></div>
@@ -32295,7 +32305,7 @@ function scrollChatToBottom(){
   const box = document.getElementById('chatMessages');
   if(!box) return;
   const token = ++chatAutoScrollToken;
-  const toBottom = () => { if(token === chatAutoScrollToken) box.scrollTop = box.scrollHeight; };
+  const toBottom = () => { if(token === chatAutoScrollToken){ box.scrollTop = box.scrollHeight; updateChatScrollBottomBtn(); } };
   toBottom();
   requestAnimationFrame(toBottom);
   setTimeout(toBottom, 300);
@@ -32361,6 +32371,19 @@ function loadOlderChatWithSpinner(revealPx){
     if(atBottom && !isChatSearchActive()) box.scrollTop = box.scrollHeight;
   }).observe(box);
 })();
+// 맨 아래에서 한 화면쯤 위로 올라가 있으면 "맨 아래로" 버튼을 띄움 (검색 중엔 아래 검색 줄이 있어서 안 띄움)
+function updateChatScrollBottomBtn(){
+  const box = document.getElementById('chatMessages');
+  const btn = document.getElementById('chatScrollBottomBtn');
+  const away = box.scrollHeight - box.scrollTop - box.clientHeight;
+  btn.hidden = isChatSearchActive() || away < Math.max(200, box.clientHeight * 0.6);
+}
+document.getElementById('chatMessages').addEventListener('scroll', updateChatScrollBottomBtn, { passive: true });
+document.getElementById('chatScrollBottomBtn').addEventListener('click', () => {
+  const box = document.getElementById('chatMessages');
+  chatAutoScrollToken++;
+  box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+});
 document.getElementById('chatMessages').addEventListener('scroll', () => {
   const box = document.getElementById('chatMessages');
   if(chatStatusTapScrolling) return;
