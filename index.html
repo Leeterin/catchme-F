@@ -729,6 +729,11 @@
     font-family:'Space Grotesk',sans-serif;
     font-weight:700;
     font-size:15px;
+    min-width:0;
+    margin:0 8px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
   .location-picker-topbar-spacer{ width:34px; }
   .location-picker-searchbar{
@@ -27543,6 +27548,16 @@ function activeMeetPlacePins(room){
 function meetPlaceOrderLabel(idx){
   return `${idx + 1}차`;
 }
+// 장소를 고르는 화면/장소 제안 카드에 보여줄 "어느 약속의 몇 차 장소인지" (target 없으면 새 약속)
+// 2차 장소를 정하는 중인지, 새 약속이 생기는지 헷갈리지 않게 함
+function meetPlaceTargetText(room, target, replace){
+  if(!target) return '새 약속 장소';
+  const askKey = !target.dateLabel ? pendingDateAskKey(room) : null;
+  const who = target.dateLabel ? `${target.dateLabel} 약속` : askKey ? `${dateAskLabel(askKey)} 약속` : '날짜 미정 약속';
+  if(replace) return `${who} 장소 바꾸기`;
+  const n = roomMeetPlaces(room, target).length;
+  return n ? `${who} · ${meetPlaceOrderLabel(n)} 장소` : `${who} 장소`;
+}
 
 // 장소 하나를 toIdx 차로 옮김 - 핀 자리는 그대로 두고 장소 내용만 새 순서대로 옮겨 담음 (서버도 똑같이)
 async function moveMeetPlace(roomId, places, fromIdx, toIdx){
@@ -28781,6 +28796,11 @@ function openLocationPicker(initialQuery, initialLat, initialLon, callback, opts
   locationPickerCallback = callback;
   locationPickerOpts = opts && opts.roomId ? opts : null;
   locationPickerCandidates = [];
+  // 채팅방 약속 장소를 정할 때는 제목에 어느 약속의 몇 차 장소인지 보여줌
+  const pickerRoom = locationPickerOpts && CHAT_ROOMS[locationPickerOpts.roomId];
+  document.querySelector('#locationPickerOverlay .location-picker-title').textContent = pickerRoom
+    ? meetPlaceTargetText(pickerRoom, suggestTargetPin(pickerRoom, locationPickerOpts.pinned, locationPickerOpts.newMeet), locationPickerOpts.replace)
+    : '지도';
   renderLocationPickerCandidates();
   document.getElementById('locationPickerMeetRecommendBtn').hidden = !locationPickerOpts;
   document.getElementById('locationPickerAddCandidateBtn').hidden = !locationPickerOpts;
@@ -30188,6 +30208,7 @@ let activeChatRoomId = null;
 // 상단 고정 카드의 "장소 정하기" 버튼과, 약속 상세보기 화면의 "변경" 버튼이 같이 씀.
 // afterPicked(label, lat, lon)로 화면마다 다른 마무리 동작(핫플 열기, 상세보기 다시 그리기 등)을 넘김
 function changePinLocation(room, roomId, pin, afterPicked, pickerOpts){
+  if(pickerOpts && pin.location) pickerOpts = { ...pickerOpts, replace: true };
   openLocationPicker(pin.location || '', pin.locationLat, pin.locationLon, async (label, lat, lon, addr) => {
     const oldName = pin.location;
     pin.location = label;
@@ -31656,9 +31677,14 @@ function renderChatMessages(){
       const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
       // 약속이 바뀌어서(장소 변경/삭제, 약속 취소, 지난 약속) 이제 예전 것이 된 "장소 확정" 카드는 회색으로
       const isOutdatedConfirm = m.status === 'confirmed' && isOutdatedLocationConfirm(room, m);
+      // 투표 중인 제안은 어느 약속의 몇 차 장소 후보인지 머리에 보여줌 (약속 카드를 아직 못 불러왔으면 예전 문구)
+      const suggestTarget = m.pinId ? (room.pinnedSchedules || []).find(p => p.serverId === m.pinId) : null;
+      const suggestHeader = isPending && (suggestTarget || !m.pinId)
+        ? `${ICO.pin} ${escapeHtml(meetPlaceTargetText(room, suggestTarget))} 제안`
+        : `${ICO.pin} 장소 제안 - 여기 어때요?`;
       const cardHtml = `
         <div class="reservation-card ls-card${m.status === 'confirmed' && !isOutdatedConfirm ? ' is-confirmed' : !isPending ? ' is-done' : ''}">
-          <div class="reservation-card-header">${isOutdatedConfirm ? `${ICO.pin} 장소 변경` : m.status === 'confirmed' ? `${ICO.check} 장소 확정` : `${ICO.pin} 장소 제안 - 여기 어때요?`}</div>
+          <div class="reservation-card-header">${isOutdatedConfirm ? `${ICO.pin} 장소 변경` : m.status === 'confirmed' ? `${ICO.check} 장소 확정` : suggestHeader}</div>
           <div class="reservation-card-time">${escapeHtml(locationSuggestTitle(activeChatRoomId, m))}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           ${m.location ? `<div class="reservation-card-note">${escapeHtml(m.location)}</div>` : ''}
@@ -34036,9 +34062,10 @@ function closeRecommendMode(){
   document.getElementById('recommendModeOverlay').classList.remove('show');
 }
 // 채팅 + 패널의 "장소" - 상단 약속 카드의 "+ 장소 추가"와 같은 화면(지도 검색/핀 + 모임 장소 추천받기 + 후보 제안).
-// 여기서는 항상 새 약속의 장소를 정함(후보 번호 1번부터, 정해지면 날짜 미정 약속 카드가 새로 생김).
-// 이미 있는 약속에 장소를 더하려면 그 약속 카드의 "+ 장소 추가"나 "장소 정하기" 화면의 "+ 장소 제안"으로
-function startPlaceFromChat(){
+// 안 끝난 약속이 있으면 그 약속의 다음 차수 장소로 정할지, 새 약속의 장소를 정할지(후보 번호 1번부터,
+// 정해지면 날짜 미정 약속 카드가 새로 생김) 먼저 고름. 약속이 없으면 바로 새 약속의 장소를 정함
+// askNew: 날짜 물어보기 카드의 "장소 정하기"처럼 새 약속인 게 분명하면 묻지 않음
+function startPlaceFromChat(askNew){
   const roomId = activeChatRoomId;
   const room = roomId ? CHAT_ROOMS[roomId] : null;
   if(!room) return;
@@ -34047,7 +34074,23 @@ function startPlaceFromChat(){
     changePinLocation(room, roomId, meet, null, { roomId, pinned: meet });
     return;
   }
-  addMeetPlace(room, roomId, null, true);
+  // 아직 안 끝난 약속이 있으면 그 약속에 다음 차수 장소로 붙일지, 새 약속 장소를 정할지 먼저 물어봄
+  // (예전엔 항상 새 약속이 돼서, 2차 장소를 정하려다 날짜 미정 약속이 하나 더 생기곤 했음)
+  const meets = [
+    ...(room.pinnedSchedules || []).filter(p => p.dateObj && !isPinPast(p)).sort((a, b) => pinEndDate(a) - pinEndDate(b)),
+    ...undatedMeetPins(room),
+  ].slice(0, 3);
+  if(!meets.length || askNew === false){
+    addMeetPlace(room, roomId, null, true);
+    return;
+  }
+  const buttons = meets.map((p, i) => ({
+    label: `${meetPlaceTargetText(room, p)} 정하기`,
+    primary: i === 0,
+    onTap: () => addMeetPlace(room, roomId, p, false),
+  }));
+  buttons.push({ label: '새 약속 장소 정하기', onTap: () => addMeetPlace(room, roomId, null, true) });
+  openWeekBlockSheet('어느 약속의 장소인가요?', '', buttons, null, null);
 }
 
 // ---------- 날짜 먼저 물어보기 ("20일 어때요?") ----------
@@ -34217,7 +34260,7 @@ function setTimeForDateAsk(roomId, dateKey, meetPin){
 function placeForDateAsk(room, roomId, m){
   const meet = pendingDateAskKey(room) === m.dateAsk.date ? dateAskMeetPin(room) : null;
   if(meet) changePinLocation(room, roomId, meet, null, { roomId, pinned: meet });
-  else startPlaceFromChat();
+  else startPlaceFromChat(false);
 }
 // 날짜 물어보기로 정한 날이 있으면 날짜 미정 약속 카드는 전부 "그날 만나요"로 보여서, 장소를 새로 정할 때마다
 // 새 약속을 만들면 같은 날 약속 카드가 계속 늘어남 - 그때는 가장 최근 날짜 미정 약속의 장소를 바꾸게 이 약속을 돌려줌
