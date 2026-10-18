@@ -31811,6 +31811,8 @@ function renderChatMessages(){
       // 말풍선을 왼쪽으로 밀면 그 메시지에 답장 (setupChatSwipeReply)
       if(m.id) row._replyMsg = m;
     }
+    // 약속 요청·장소 제안·시간 제안 같은 카드도 왼쪽으로 밀어서 답장 (단순 알림 카드는 빼둠)
+    if(!row._replyMsg && m.id && m.type !== 'system-notice' && !row.classList.contains('system-notice-row')) row._replyMsg = m;
 
     // 상대가 보낸 메시지엔 왼쪽에 프로필 아이콘 (카톡처럼 같은 사람이 같은 분에 이어 보낸 건 첫 메시지에만, 나머지는 자리만 비워 줄 맞춤)
     const isOtherRow = row.classList.contains('other');
@@ -32005,11 +32007,13 @@ let replyingToMsg = null; // { msgId, preview }
 
 function getMsgPreviewText(m){
   if(!m) return '';
-  if(m.type === 'reservation') return '약속 요청';
-  if(m.type === 'location-suggest') return '장소 제안';
-  if(m.type === 'location-fixed') return '장소 확정';
+  // 카드에 답장할 땐 어떤 카드인지 알 수 있게 날짜·시간이나 장소 이름을 같이 보여줌
+  const placeName = typeof m.place === 'string' ? m.place : (m.place && m.place.name) || '';
+  if(m.type === 'reservation') return ['약속 요청', [m.dateLabel, m.timeLabel].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+  if(m.type === 'location-suggest') return placeName ? `장소 제안 · ${placeName}` : '장소 제안';
+  if(m.type === 'location-fixed') return placeName ? `장소 확정 · ${placeName}` : '장소 확정';
   if(m.type === 'location-recommend') return m.status === 'COMPLETED' ? '모임 장소 추천 결과' : (m.status === 'CANCELLED' ? '모임 장소 추천이 취소됐어요' : '모임 장소 추천 - 출발지를 입력해주세요');
-  if(m.type === 'time-options-suggest') return '시간 제안';
+  if(m.type === 'time-options-suggest' || m.type === 'time-suggest') return '시간 제안';
   if(m.type === 'hotplace') return m.superseded ? '약속 장소가 변경됐어요' : '핫플 알림';
   if(m.type === 'system-notice') return String(m.text || '').replace(/<svg[\s\S]*?<\/svg>\s*/g, '') || '알림';
   if(m.type === 'image') return '사진';
@@ -32476,7 +32480,13 @@ let chatSwipeReplyAt = 0;
   box.addEventListener('touchstart', (e) => {
     if(e.touches.length !== 1) return;
     const r = e.target.closest('.msg-row');
-    if(!r || !r._replyMsg || e.target.closest('button, a, input, textarea')) return;
+    if(!r || !r._replyMsg || e.target.closest('input, textarea, select')) return;
+    // 글 말풍선은 링크·버튼 위에선 밀지 않음. 카드는 거의 버튼이라 버튼 위에서 시작해도 밀 수 있게 (밀면 버튼은 안 눌림)
+    if(r.querySelector('.msg-bubble-text') && e.target.closest('button, a')) return;
+    // 카드 안의 옆으로 넘기는 목록(핫플 등) 위에서는 그 목록을 넘기게 둠
+    for(let el = e.target; el && el !== r; el = el.parentElement){
+      if(el.scrollWidth > el.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(el).overflowX)) return;
+    }
     row = r; startX = e.touches[0].clientX; startY = e.touches[0].clientY; dx = 0; dragging = false; ready = false;
   }, { passive: true });
   box.addEventListener('touchmove', (e) => {
@@ -32514,6 +32524,10 @@ let chatSwipeReplyAt = 0;
   };
   box.addEventListener('touchend', end);
   box.addEventListener('touchcancel', end);
+  // 카드 버튼 위에서 밀어 답장했을 때 그 버튼(수락·거절 등)까지 눌리지 않게
+  box.addEventListener('click', (e) => {
+    if(Date.now() - chatSwipeReplyAt < 400){ e.stopPropagation(); e.preventDefault(); }
+  }, true);
 
   // 컴퓨터(마우스)에서는 밀 수가 없으니, 메시지에 마우스를 올리면 말풍선 옆에 답장 버튼을 띄움
   if(!window.matchMedia || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
