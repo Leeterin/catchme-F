@@ -39468,11 +39468,25 @@ document.addEventListener('click', () => { if(tutorialStep >= 0) setTimeout(refr
 window.addEventListener('scroll', () => { if(tutorialStep >= 0) requestAnimationFrame(refreshTutorialTargets); }, { passive: true, capture: true });
 
 // ---------- 카카오/네이버 소셜 로그인 ----------
-document.getElementById('kakaoLoginBtn').addEventListener('click', () => {
-  window.location.href = API_BASE_URL + '/auth/kakao/login';
-});
-document.getElementById('naverLoginBtn').addEventListener('click', () => {
-  window.location.href = API_BASE_URL + '/auth/naver/login';
+// 서버가 잠들어 있으면 넘어가기까지 몇 초 걸려서, 누른 버튼에 "이동 중"을 보여주고 두 번 눌리지 않게 막음
+function startSocialLogin(btnId, provider, label){
+  const btn = document.getElementById(btnId);
+  if(btn.disabled) return;
+  btn.disabled = true;
+  btn.dataset.label = btn.lastChild.textContent;
+  btn.lastChild.textContent = ` ${label}로 이동 중...`;
+  window.location.href = API_BASE_URL + `/auth/${provider}/login`;
+}
+document.getElementById('kakaoLoginBtn').addEventListener('click', () => startSocialLogin('kakaoLoginBtn', 'kakao', '카카오'));
+document.getElementById('naverLoginBtn').addEventListener('click', () => startSocialLogin('naverLoginBtn', 'naver', '네이버'));
+// 카카오/네이버 화면에서 뒤로 돌아오면(페이지가 그대로 복원됨) 버튼을 원래대로
+window.addEventListener('pageshow', () => {
+  ['kakaoLoginBtn', 'naverLoginBtn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(!btn.disabled) return;
+    btn.disabled = false;
+    if(btn.dataset.label) btn.lastChild.textContent = btn.dataset.label;
+  });
 });
 
 // 카카오/네이버 로그인을 마치고 백엔드가 돌려보낸 뒤 처리 (토큰은 주소 뒷부분 #에 담겨 옴)
@@ -39498,11 +39512,16 @@ async function handleSocialLoginRedirect(){
     }
   }
   const search = new URLSearchParams(location.search);
-  if(search.get('authError')){
-    showToast(search.get('authError') === 'suspended'
-      ? '이용이 제한된 계정이라 로그인할 수 없어요.'
-      : '소셜 로그인에 실패했어요. 다시 시도해주세요.');
+  const authError = search.get('authError');
+  if(authError){
     history.replaceState(null, '', location.pathname);
+    // 카카오/네이버 화면에서 직접 취소한 건 오류가 아니라 그냥 둠
+    if(authError !== 'cancelled'){
+      showToast(authError === 'suspended' ? '이용이 제한된 계정이라 로그인할 수 없어요.'
+        : authError === 'state_mismatch' ? '로그인 확인 시간이 지났어요. 한 번 더 눌러주세요.'
+        : '소셜 로그인에 실패했어요. 다시 시도해주세요.', 3200);
+      setTimeout(() => openAuthGate(), 0); // 바로 다시 해볼 수 있게 로그인 화면을 띄워 둠
+    }
   }
   return false;
 }
