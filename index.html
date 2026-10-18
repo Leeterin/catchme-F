@@ -7927,6 +7927,15 @@
   body{ letter-spacing:-0.01em; }
   .day-event-time, .week-cal-hour, .home-match-slot, .ecs-hex, .travel-min, .time-picker-btn, .date-picker-btn,
   .reservation-card-time, .month-date-num, .home-avail-day{ font-variant-numeric:tabular-nums; }
+  /* 채팅 카드(약속 요청·장소 제안 등) - 흰 말풍선과 똑같아 보여서 묻혔음. 토마토 테두리 + 위쪽 연한 토마토 띠로 눈에 띄게.
+     확정된 약속은 띠를 진한 토마토로, 끝난(거절·취소·지난) 요청은 회색으로 차분하게 */
+  .msg-row .reservation-card{ border:1.5px solid var(--mz-tomato); box-shadow:0 4px 14px rgba(216,90,48,0.12); overflow:hidden; }
+  .msg-row .reservation-card-header{ margin:-12px -13px 9px; padding:8px 13px; background:var(--mz-tomato-light); color:var(--mz-tomato-deep); font-size:13px; }
+  .msg-row .reservation-card.is-confirmed .reservation-card-header{ background:var(--mz-tomato); color:#FFFFFF; }
+  .msg-row .reservation-card.is-done{ border-color:var(--mz-line); box-shadow:none; }
+  .msg-row .reservation-card.is-done .reservation-card-header{ background:var(--mz-divider); color:var(--mz-gray); }
+  body.dark-mode .msg-row .reservation-card-header{ color:var(--mz-tomato); }
+  body.dark-mode .msg-row .reservation-card.is-confirmed .reservation-card-header{ color:#FFFFFF; }
 
   .tab-panel{
     margin:6px 0 0;
@@ -31451,7 +31460,7 @@ function renderChatMessages(){
       const showWithdraw = m.who === 'me' && m.status === 'pending' && !expired;
       const showConfirmedExtras = m.status === 'confirmed';
       const cardHtml = `
-        <div class="reservation-card">
+        <div class="reservation-card${m.status === 'confirmed' ? ' is-confirmed' : (m.status !== 'pending' || expired) ? ' is-done' : ''}">
           <div class="reservation-card-header">${ICO.calendar} ${m.status === 'confirmed' ? '약속이 확정됐어요' : '약속 요청'}</div>
           <div class="reservation-card-time chat-date-link">${m.dateLabel} ${m.timeLabel}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
@@ -31560,7 +31569,7 @@ function renderChatMessages(){
       const showCancel = m.who === 'me' && isPending;
       const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
       const cardHtml = `
-        <div class="reservation-card ls-card">
+        <div class="reservation-card ls-card${m.status === 'confirmed' ? ' is-confirmed' : !isPending ? ' is-done' : ''}">
           <div class="reservation-card-header">${m.status === 'confirmed' ? `${ICO.check} 장소 확정` : `${ICO.pin} 장소 제안 - 여기 어때요?`}</div>
           <div class="reservation-card-time">${escapeHtml(locationSuggestTitle(activeChatRoomId, m))}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
@@ -31622,7 +31631,7 @@ function renderChatMessages(){
         actionsHtml = `<div class="reservation-card-actions">${mainBtn}</div>${requesterBtns}`;
       }
       row.innerHTML = `
-        <div class="reservation-card lr-collect-card">
+        <div class="reservation-card lr-collect-card${isCollecting ? '' : ' is-done'}">
           <div class="reservation-card-header">${ICO.pin} 모임 장소 추천 (${escapeHtml(m.modeLabel)})</div>
           <div class="reservation-card-time">${isCollecting ? '각자 출발지를 입력해주세요' : '추천이 취소됐어요'}</div>
           ${isCollecting ? `
