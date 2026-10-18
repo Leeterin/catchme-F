@@ -11355,12 +11355,14 @@ function mzFinishAppearAnims(){
   });
 }
 
-function showToast(message, duration = 2400){
+// onTap: 토스트를 누르면 할 일 (예: 새 메시지 알림을 누르면 그 채팅방으로)
+function showToast(message, duration = 2400, onTap){
   const el = document.getElementById('globalToast');
   el.style.transition = '';
   el.style.transform = '';
   el.style.opacity = '';
   el.textContent = message;
+  el._onTap = onTap || null;
   el.classList.add('show');
   clearTimeout(el._hideTimer);
   el._hideTimer = setTimeout(() => el.classList.remove('show'), duration);
@@ -11402,6 +11404,14 @@ function showToast(message, duration = 2400){
   };
   el.addEventListener('touchend', end);
   el.addEventListener('touchcancel', end);
+  el.addEventListener('click', () => {
+    const fn = el._onTap;
+    if(!fn || !el.classList.contains('show')) return;
+    el._onTap = null;
+    clearTimeout(el._hideTimer);
+    el.classList.remove('show');
+    fn();
+  });
 })();
 
 // ============================================================
@@ -12054,9 +12064,10 @@ async function handlePushTap(data){
     try {
       if(!CHAT_ROOMS[data.roomId]) await loadChatRoomsFromServer();
     } finally { pushTapOpeningRoomId = null; }
-    if(!CHAT_ROOMS[data.roomId]) return;
-    if(activeChatRoomId === data.roomId) return;
-    jumpToView(() => { showTab('chat'); openChatRoom(data.roomId); });
+    // 앱이 꺼져 있다 알림으로 켜졌으면, 시작할 때 화면을 정하는 처리(첫 화면/캘린더 전환 등)가 끝난 뒤에 열어야
+    // 그 처리에 덮여서 채팅 목록에 머무는 일이 없음
+    if(startupDataPromise) await startupDataPromise.catch(() => {});
+    openChatRoomFromNotif(data.roomId);
   } else if(data.type === 'friend'){
     switchTopTab('friends');
   } else if(data.type === 'invite'){
@@ -12070,6 +12081,13 @@ async function handlePushTap(data){
     // 일요일 저녁 "다음 주 시간 열어둘까요?" 알림 - 바로 빠르게 열기 화면
     jumpToView(() => { showTab('schedule'); openQuickAvail(); });
   }
+}
+// 알림(휴대폰 푸시, 앱 안 새 메시지 알림)을 눌렀을 때 그 채팅방 안으로 바로 들어감
+function openChatRoomFromNotif(roomId){
+  if(!CHAT_ROOMS[roomId]) return;
+  const roomView = document.getElementById('chatRoomView');
+  if(activeChatRoomId === roomId && currentTopTab === 'chat' && roomView.classList.contains('active')) return;
+  jumpToView(() => { showTab('chat'); openChatRoom(roomId); });
 }
 // 로그아웃하면 이 기기로 더 이상 내 알림이 안 오게 서버에서 토큰을 지움
 function unregisterPushToken(accessToken){
@@ -12387,7 +12405,8 @@ function connectRealtimeSocket(){
       // "새 메시지 알림"이 켜져있을 때만 인앱 토스트를 띄움 (미리보기 설정에 따라 내용 표시 여부도 결정)
       if(settingsState.notif_message && !room.muted){
         const preview = settingsState.chat_preview ? stripCalShare(message.text) : '메시지가 도착했어요';
-        showToast(`${room.name}: ${preview}`);
+        // 누르면 그 사람과의 채팅방으로 바로 들어감
+        showToast(`${room.name}: ${preview}`, 3000, () => openChatRoomFromNotif(roomId));
       }
     }
     renderChatList();
