@@ -4308,6 +4308,12 @@
     cursor:pointer;
     font:inherit;
   }
+  /* 일정 카드 + 그 아래 말풍선을 한 메시지로 세로로 쌓음 (카드는 말풍선 밖에 따로) */
+  .msg-stack{ display:flex; flex-direction:column; align-items:flex-start; gap:4px; max-width:75%; min-width:0; }
+  .msg-row.me .msg-stack{ align-items:flex-end; }
+  .msg-stack .msg-bubble{ max-width:100%; }
+  .msg-stack .msg-bubble.msg-bubble-post{ background:transparent !important; padding:0 !important; border:none !important; border-radius:0 !important; box-shadow:none !important; }
+  .msg-bubble-post .cal-share-card{ margin-bottom:0; border-radius:14px; padding:10px 12px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
   .cal-share-card .csc-head{ font-size:11px; font-weight:700; color:var(--accent); margin-bottom:3px; }
   .cal-share-card .csc-when{ font-size:13px; font-weight:700; }
   .cal-share-card .csc-title{ font-size:13px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -31835,9 +31841,18 @@ function renderChatMessages(){
         if(postShare.rest.trim()) fillChatTextWithSearchHits(textEl, postShare.rest, q);
         else textEl.remove();
       } else if(calShare){
-        textEl.parentNode.insertBefore(buildCalShareCardEl(calShare.share, room), textEl);
+        // 일정 카드는 말풍선 밖에 따로(주황 바탕에 묻혀 보였음), 같이 보낸 말("'팬싸' 일정이 뭐야?")은 그 아래 보통 말풍선으로
+        const bubble = textEl.parentNode;
+        const stack = document.createElement('div');
+        stack.className = 'msg-stack';
+        bubble.replaceWith(stack);
+        const cardWrap = document.createElement('div');
+        cardWrap.className = 'msg-bubble msg-bubble-post';
+        cardWrap.appendChild(buildCalShareCardEl(calShare.share, room));
+        stack.appendChild(cardWrap);
         if(calShare.rest.trim()) fillChatTextWithSearchHits(textEl, calShare.rest, q);
         else textEl.remove();
+        if(calShare.rest.trim() || m.replyTo) stack.appendChild(bubble);
       } else {
         fillChatTextWithSearchHits(textEl, m.text, q);
       }
