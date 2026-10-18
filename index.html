@@ -39216,6 +39216,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '일정 이름과 시간',
+    blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
     text: '일정 이름을 적고 날짜·시작·끝 시간을 정해요. (예: 친구랑 저녁 7시)',
     needs: () => document.getElementById('eventFormView').classList.contains('active'),
     targets: () => [document.getElementById('eventFormTitle')],
@@ -39224,6 +39225,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '어디로 가요?',
+    blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
     text: "도착지에 가는 곳을 검색해서 골라요. 일정 시작에 맞춰 도착하려면 언제 나가야 하는지 계산해줘요.",
     needs: () => document.getElementById('eventFormView').classList.contains('active'),
     targets: () => [document.getElementById('travelDestInput')],
@@ -39232,6 +39234,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '어디서 출발해요?',
+    blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
     text: '출발지도 골라요. 집·회사를 자주 쓰는 출발지로 저장해 두면 다음부턴 버튼 하나로 골라져요.',
     needs: () => document.getElementById('eventFormView').classList.contains('active'),
     targets: () => [document.getElementById('travelFromInput')],
@@ -39630,6 +39633,16 @@ function renderTutorialStep(){
   setTimeout(refreshTutorialTargets, 250);
 }
 document.getElementById('tutPrevBtn').addEventListener('click', goTutorialPrev);
+// 튜토리얼에서 출발 시간 계산을 해보기 전에 '추가하기'를 누르면 저장하지 않고, 아직 안 한 칸으로 데려감
+document.addEventListener('click', (e) => {
+  if(tutorialStep < 0 || !TUTORIAL_STEPS[tutorialStep].blockSave || !e.target.closest || !e.target.closest('#eventFormSubmitBtn')) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  showToast('잠깐! 도착지와 출발지를 넣고 출발 시간을 먼저 계산해봐요.');
+  // 이름 단계였으면 도착지 단계로 넘겨줌 (이름은 이미 적었을 테니)
+  if(TUTORIAL_STEPS[tutorialStep].title === '일정 이름과 시간') goTutorialStep(tutorialStep + 1);
+  else renderTutorialStep();
+}, true);
 // 안내가 화면을 많이 가려서 내려둘 수 있게 - '내리기'나 아래로 밀면 한 줄로 작아지고, 누르거나 위로 밀면 다시 펼쳐짐
 function setTutorialFolded(folded){
   const card = document.getElementById('tutCard');
