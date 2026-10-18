@@ -22288,11 +22288,15 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     }
   }
 
+  const editingEv = editingEventId ? SCHEDULE_EVENTS.find(e => e.id === editingEventId) : null;
+  const editingServerId = editingEv && editingEv.serverId;
   let overlapFound = null;
   for(const { date, winStart, winEnd } of dailyWindows){
     const dayEvents = getEventsForDate(date);
     const found = dayEvents.find(ev => {
       if(ev.id === editingEventId || editingLinkedPieceIds.includes(ev.id)) return false;
+      // 고치는 일정 자신이 (서버에서 다시 받아오면서) 다른 id로 한 번 더 들어 있어도 자기와 겹친다고 하지 않음
+      if(editingServerId && ev.serverId === editingServerId) return false;
       // "이 시간에도 예약 받기"를 켠 일정과 예약 가능 시간은 겹쳐도 서로 막지 않으니 물어보지 않음
       // (켠 일정을 열어둔 시간 위에 넣을 때 / 열어둔 시간을 켠 일정 위에 열 때 둘 다)
       // 안 켠 일정은 겹친 예약 가능 시간을 그 시간만 닫으니(cutAvailableByBusyEvent) 역시 물어보지 않음 (잘라낼 수 없는 반복/기간 시간만 물어봄)
@@ -22307,7 +22311,7 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
     const d = overlapFound.date;
     const label = `${d.getMonth()+1}/${d.getDate()}(${WEEKDAY_KO[d.getDay()]})`;
     openScheduleOverlapConfirm(
-      `${label}에 이미 "${overlapFound.event.title}" (${minutesToLabel(overlapFound.disp.startMin)}-${minutesToLabel(overlapFound.disp.endMin)}) 일정이 있어요. 그래도 추가할까요?`,
+      `${label}에 이미 "${overlapFound.event.title}" (${minutesToLabel(overlapFound.disp.startMin)}-${minutesToLabel(overlapFound.disp.endMin)}) 일정이 있어요. 그래도 ${editingEventId ? '수정할까요' : '추가할까요'}?`,
       proceedEventFormSubmit
     );
     return;
