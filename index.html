@@ -12968,18 +12968,42 @@ function restoreScreen(snap){
   if(snap.tab === null) renderHomeDash();
   window.scrollTo(0, snap.scrollY);
 }
-function jumpToView(openFn){
+// 마지막으로 점프한 화면의 { 닫기 함수, 돌아갈 화면, onBack } - 밀어서 뒤로가기 때 밑에 진짜 돌아갈 화면을 미리 깔려고 씀
+let lastJumpBack = null;
+// onBack: 돌아갈 때 화면 복원 뒤에 같이 할 일 (예: 내려뒀던 팝업 다시 띄우기)
+function jumpToView(openFn, onBack){
   const snap = snapshotScreen();
   const opened = [];
   const prevCollector = viewPushCollector;
   viewPushCollector = opened;
   try { openFn(); } finally { viewPushCollector = prevCollector; }
-  pushViewState(() => {
+  const back = () => {
     for(let i = opened.length - 1; i >= 0; i--){
       try { opened[i](); } catch(err){ console.error('[뒤로가기] 화면 닫기 실패:', err); }
     }
     restoreScreen(snap);
-  });
+    if(onBack) onBack();
+  };
+  lastJumpBack = { closeFn: back, snap, onBack };
+  pushViewState(back);
+}
+// 지금 맨 위 화면이 점프로 연 화면이면, 닫지는 않고 돌아갈 화면만 미리 보여줌 - 되돌리는 함수를 돌려줌 (아니면 null).
+// 밀어서 뒤로가기 중에 밑에 '장소' 탭 목록 대신 진짜 돌아갈 화면(채팅방 등)이 보이게 하려고 씀
+function isJumpBackOnTop(){
+  return !!lastJumpBack && viewCloseStack[viewCloseStack.length - 1] === lastJumpBack.closeFn;
+}
+function previewJumpBack(){
+  if(!isJumpBackOnTop()) return null;
+  const cur = snapshotScreen();
+  const shownBefore = new Set(document.querySelectorAll('.show'));
+  const { snap, onBack } = lastJumpBack;
+  restoreScreen(snap);
+  if(onBack) onBack();
+  const shownNow = [...document.querySelectorAll('.show')].filter(el => !shownBefore.has(el));
+  return () => {
+    shownNow.forEach(el => el.classList.remove('show'));
+    restoreScreen(cur);
+  };
 }
 
 navItems.forEach(item => {
@@ -15923,6 +15947,8 @@ function renderFeedAuthorViewContent(author){
   });
 }
 let feedAuthorViewCurrent = null; // 지금 작성자 리뷰 화면에 떠 있는 사람 (보기 방식 전환 시 다시 그리려고)
+// 작성자 화면을 닫았을 때 돌아갈 화면 - 리뷰 상세에서 닉네임을 눌러 왔으면 그 상세로 (예전엔 항상 목록으로 가버렸음)
+let feedAuthorReturnViewId = 'feedListView';
 function openFeedAuthorView(author){
   if(!author || !author.id) return;
   feedAuthorViewCurrent = author;
@@ -15933,6 +15959,8 @@ function openFeedAuthorView(author){
   const reviewProfileCard = document.getElementById('feedReviewProfileCard');
   rememberActiveFeedViewScroll();
   if(reviewProfileCard) reviewProfileCard.style.display = 'none';
+  const fromView = [...document.querySelectorAll('#communityView-feed > .feed-list-view')].find(v => v.classList.contains('active'));
+  feedAuthorReturnViewId = fromView && fromView.id !== 'feedAuthorView' ? fromView.id : 'feedListView';
 
   document.getElementById('feedListView').classList.remove('active');
   document.getElementById('feedPlaceDetailView').classList.remove('active');
@@ -15945,10 +15973,13 @@ function openFeedAuthorView(author){
 }
 function closeFeedAuthorView(){
   document.getElementById('feedAuthorView').classList.remove('active');
-  document.getElementById('feedListView').classList.add('active');
+  const back = document.getElementById(feedAuthorReturnViewId) || document.getElementById('feedListView');
+  back.classList.add('active');
+  if(back.id === 'feedPlaceDetailView') document.getElementById('panel-community').classList.add('feed-detail-open');
+  // 목록으로 돌아갈 때만 "내 리뷰 프로필" 카드를 다시 보여줌
   const reviewProfileCard = document.getElementById('feedReviewProfileCard');
-  if(reviewProfileCard) reviewProfileCard.style.display = '';
-  restoreFeedViewScroll('feedListView');
+  if(reviewProfileCard && back.id === 'feedListView') reviewProfileCard.style.display = '';
+  restoreFeedViewScroll(back.id);
 }
 document.getElementById('feedAuthorBackBtn').addEventListener('click', () => goBackOrClose(closeFeedAuthorView));
 // 리뷰용 프로필 수정 팝업 - 작성자 화면의 수정 버튼과 추천 탭 맨 위 "내 리뷰 프로필" 카드가 같이 씀
@@ -17122,6 +17153,8 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       return false;
     }
     let colWidth = 0, dim = null, sheet = null, rafId = 0, pendingX = 0;
+    // 점프로 연 화면(채팅방 핫플에서 연 리뷰 등)이면 밑에 '장소' 탭 대신 진짜 돌아갈 화면을 깔고, 취소하면 되돌림
+    let jumpMode = false, jumpUndo = null;
     // 지금 보이는 화면만 그대로 복사 (숨겨진 다른 화면까지 복사하면 무거우니 보이는 것만, 하단 탭바는 그대로 두고 제외)
     function cloneVisible(node, scrolled){
       if(node.nodeType !== 1) return node.cloneNode(true);
@@ -17199,10 +17232,12 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       const rect = app.getBoundingClientRect();
       colWidth = rect.width;
       const bodyBg = getComputedStyle(document.body).backgroundColor;
+      jumpMode = isJumpBackOnTop();
       sheet = document.createElement('div');
       Object.assign(sheet.style, {
         position: 'fixed', top: '0', bottom: '0', left: rect.left + 'px', width: rect.width + 'px',
-        overflow: 'hidden', background: bodyBg, zIndex: '5', pointerEvents: 'none',
+        // 점프 모드면 밑에 다시 뜨는 팝업(핫플 화면 등)보다 위에 있어야 함
+        overflow: 'hidden', background: bodyBg, zIndex: jumpMode ? '9000' : '5', pointerEvents: 'none',
         willChange: 'transform', transform: 'translate3d(0,0,0)',
       });
       sheet.className = 'mz-swipe-sheet';
@@ -17228,16 +17263,21 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       dim = document.createElement('div');
       Object.assign(dim.style, {
         position: 'fixed', top: '0', bottom: '0', left: sheet.style.left, width: rect.width + 'px',
-        background: '#000', opacity: '0', zIndex: '4', pointerEvents: 'none', transition: 'opacity 120ms linear',
+        background: '#000', opacity: '0', zIndex: jumpMode ? '8999' : '4', pointerEvents: 'none', transition: 'opacity 120ms linear',
       });
       document.body.insertBefore(dim, sheet);
       setOffset(pendingX);
       view.style.display = 'none';
-      const underId = id === 'feedPlaceDetailView' ? feedDetailReturnViewId : 'feedListView';
+      if(jumpMode){
+        jumpUndo = previewJumpBack();
+        if(jumpUndo){ underView = null; return; }
+      }
+      const underId = id === 'feedPlaceDetailView' ? feedDetailReturnViewId : id === 'feedAuthorView' ? feedAuthorReturnViewId : 'feedListView';
       underView = document.getElementById(underId) || document.getElementById('feedListView');
       underWasActive = underView.classList.contains('active');
       underView.classList.add('active');
       if(id === 'feedPlaceDetailView') document.getElementById('panel-community').classList.remove('feed-detail-open');
+      if(underView.id === 'feedPlaceDetailView') document.getElementById('panel-community').classList.add('feed-detail-open');
       if(underView.id === 'feedListView'){
         const card = document.getElementById('feedReviewProfileCard');
         if(card) card.style.display = '';
@@ -17320,6 +17360,7 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
       if(shouldClose){
         setOffset(width);
         afterTransition(ms, () => {
+          jumpUndo = null; // 진짜로 닫힘 - 미리 깔아둔 돌아갈 화면이 그대로 최종 화면
           goBackOrClose(closeFn);
           // history.back()으로 닫히는 건 한 박자 늦게 일어나서, 실제로 닫힌 뒤에 고정을 풀어야 제자리로 번쩍 안 돌아옴
           const until = Date.now() + 600;
@@ -17334,7 +17375,9 @@ document.getElementById('feedTagBackBtn').addEventListener('click', () => goBack
           // 취소: 밑에 깔았던 화면을 다시 숨기고, 원래 보던 위치로 (복사본을 걷기 전에 실제 화면을 먼저 되돌려 놓음)
           view.style.display = '';
           if(!didSwap){ dropView(); return; }
+          if(jumpUndo){ jumpUndo(); jumpUndo = null; }
           if(!underWasActive && underView) underView.classList.remove('active');
+          if(id === 'feedAuthorView' && underView && underView.id === 'feedPlaceDetailView') document.getElementById('panel-community').classList.remove('feed-detail-open');
           if(id === 'feedPlaceDetailView') document.getElementById('panel-community').classList.add('feed-detail-open');
           if(id === 'feedAuthorView' || id === 'feedPlaceDetailView'){
             const card = document.getElementById('feedReviewProfileCard');
@@ -27153,10 +27196,9 @@ function openHotplaceReviewDetail(post){
     .map(id => document.getElementById(id))
     .filter(el => el.classList.contains('show'));
   jumpToView(() => {
-    pushViewState(() => shown.forEach(el => el.classList.add('show')));
     shown.forEach(el => el.classList.remove('show'));
     showTab('community'); switchCommunityView('feed'); openFeedPostDetail(post);
-  });
+  }, () => shown.forEach(el => el.classList.add('show')));
 }
 
 function openHotplacePlaceReviews(group, category, distKm){
