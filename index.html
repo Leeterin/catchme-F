@@ -7803,11 +7803,15 @@
      버튼보다 조금 크게, 깜빡이면서 바깥으로 퍼지는 물결이 계속 나감 (위치는 placeTutorialRings가 매 프레임 맞춤) */
   .tut-rings{ position:fixed; inset:0; z-index:3050; pointer-events:none; }
   body:has(#authGateView[style*="flex"]) .tut-rings{ display:none; }
-  .tut-ring{ position:fixed; box-sizing:border-box; border:3px solid #FFE14D; box-shadow:0 0 0 2px rgba(255,255,255,0.9), 0 0 18px 4px rgba(255,214,0,0.8); animation:tutBlink 1s ease-in-out infinite; }
-  .tut-ring::after{ content:''; position:absolute; inset:-3px; border-radius:inherit; border:3px solid #FFE14D; animation:tutRipple 1.3s ease-out infinite; }
-  @keyframes tutBlink{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
-  @keyframes tutRipple{ from{ inset:-3px; opacity:0.9; } to{ inset:-16px; opacity:0; } }
-  @media (prefers-reduced-motion: reduce){ .tut-ring, .tut-ring::after{ animation:none; } }
+  .tut-ring{ position:fixed; box-sizing:border-box; border:3px solid #FFD43B; animation:tutGlow 1.8s ease-out infinite; }
+  /* 깜빡임(켜졌다 꺼짐)과 퍼지는 물결을 같이 돌리니 번쩍거리고 물결이 커지며 네모나 보였음 -
+     테두리는 그대로 두고, 같은 둥근 모양의 빛만 한 번씩 부드럽게 퍼졌다 사라짐 */
+  @keyframes tutGlow{
+    0%{ box-shadow:0 0 0 0 rgba(255,212,59,0.75), 0 0 10px 1px rgba(255,212,59,0.6); }
+    70%{ box-shadow:0 0 0 12px rgba(255,212,59,0), 0 0 10px 1px rgba(255,212,59,0.6); }
+    100%{ box-shadow:0 0 0 0 rgba(255,212,59,0), 0 0 10px 1px rgba(255,212,59,0.6); }
+  }
+  @media (prefers-reduced-motion: reduce){ .tut-ring{ animation:none; box-shadow:0 0 10px 1px rgba(255,212,59,0.6); } }
   @media (prefers-reduced-motion: no-preference){
     .tut-card:not([hidden]){ animation:mzRiseIn .25s ease; }
   }
