@@ -28304,6 +28304,8 @@ function cancelReservation(m, restoreAvailability){
     apiRequest(`/chats/messages/${m._serverId}/cancel`, { method: 'POST', body: JSON.stringify({ restoreAvailability }) })
       .then(async (data) => {
         Object.assign(m, mapServerReservationMessage(data.message));
+        // 취소하면서 이미 "예약 가능으로 남길지"를 골랐으니, 방에 다시 들어와도 또 묻지 않게
+        if(typeof restoreAvailability === 'boolean') markRestorePromptResolved(m._serverId);
         await loadPinsFromServer(roomId, room);
         loadScheduleFromServer(); // 취소되면서 서버에서 지워진 "약속" 일정을 내 캘린더에도 바로 반영
         renderChatMessages();
@@ -28763,10 +28765,21 @@ function runRestoreAvailChoice(restore){
   const roomId = pendingRestoreAvailRoomId;
   closeRestoreAvailPrompt();
   if(!m) return;
+  // 같은 시간 약속이 여러 번 취소돼서 카드가 여러 장이면, 한 번 고른 걸로 다 같이 정리 (같은 질문이 연달아 뜨지 않게)
+  const room = CHAT_ROOMS[roomId];
+  const sameTime = (room && room.messages || []).filter(x => x !== m && x.type === 'reservation' && x.status === 'cancelled' && x._serverId
+    && x.dateLabel === m.dateLabel && x.timeLabel === m.timeLabel);
+  const resolveAll = () => [m, ...sameTime].forEach(x => { x._restoreAvailHandled = true; markRestorePromptResolved(x._serverId); });
+  if(!restore){
+    // "괜찮아요"는 서버에서 바꿀 게 없어서 바로 기억해둠 - 네트워크가 안 좋아도 다음에 또 뜨지 않게
+    resolveAll();
+    showToast('예약 가능 시간으로 남기지 않았어요.');
+    checkPendingRestoreAvailPrompts(roomId);
+    return;
+  }
   apiRequest(`/chats/messages/${m._serverId}/restore-availability-choice`, { method: 'POST', body: JSON.stringify({ restore }) })
     .then(() => {
-      m._restoreAvailHandled = true;
-      markRestorePromptResolved(m._serverId); // 다음에 방을 다시 들어와서 메시지가 새로 로드돼도 또 안 물어보게
+      resolveAll(); // 다음에 방을 다시 들어와서 메시지가 새로 로드돼도 또 안 물어보게
       if(restore) loadScheduleFromServer(); // 복원된 "예약 가능"이 내 캘린더에도 바로 반영되게
       showToast(restore ? '이 시간을 예약 가능으로 남겨뒀어요.' : '예약 가능 시간으로 남기지 않았어요.');
       checkPendingRestoreAvailPrompts(roomId); // 같은 방에 또 결정 안 한 취소 건이 남아있으면 바로 이어서 물어봄
