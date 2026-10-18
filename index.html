@@ -7790,8 +7790,15 @@
   .tut-actions:empty{ display:none; }
   .tut-actions button{ height:36px; padding:0 16px; border:none; border-radius:10px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; background:rgba(255,255,255,0.14); color:#FFFFFF; }
   .tut-actions button.primary{ background:var(--mz-tomato); }
-  .tut-target{ outline:3px solid var(--mz-tomato) !important; outline-offset:3px; animation:tutPulse 1.3s ease-in-out infinite; }
-  @keyframes tutPulse{ 0%,100%{ outline-color:var(--mz-tomato); outline-offset:3px; } 50%{ outline-color:rgba(216,90,48,0.25); outline-offset:6px; } }
+  /* 눌러볼 버튼 위에 따로 띄우는 노란 테두리 - 버튼 자체에 테두리를 그리면 바깥 카드에 잘려서 네모나게 보였음.
+     버튼보다 조금 크게, 깜빡이면서 바깥으로 퍼지는 물결이 계속 나감 (위치는 placeTutorialRings가 매 프레임 맞춤) */
+  .tut-rings{ position:fixed; inset:0; z-index:3050; pointer-events:none; }
+  body:has(#authGateView[style*="flex"]) .tut-rings{ display:none; }
+  .tut-ring{ position:fixed; box-sizing:border-box; border:3px solid #FFC53D; box-shadow:0 0 0 3px rgba(255,197,61,0.35), 0 0 16px 2px rgba(255,197,61,0.75); animation:tutBlink 1s ease-in-out infinite; }
+  .tut-ring::after{ content:''; position:absolute; inset:-3px; border-radius:inherit; border:3px solid #FFC53D; animation:tutRipple 1.3s ease-out infinite; }
+  @keyframes tutBlink{ 0%,100%{ opacity:1; } 50%{ opacity:0.35; } }
+  @keyframes tutRipple{ from{ inset:-3px; opacity:0.9; } to{ inset:-16px; opacity:0; } }
+  @media (prefers-reduced-motion: reduce){ .tut-ring, .tut-ring::after{ animation:none; } }
   @media (prefers-reduced-motion: no-preference){
     .tut-card:not([hidden]){ animation:mzRiseIn .25s ease; }
   }
@@ -9199,6 +9206,7 @@
 
 
   <!-- 처음 쓰는 사람 튜토리얼 안내 카드 - 실제 버튼에 테두리를 깜빡이게 하고, 직접 눌러보면 다음 단계로 (startTutorial) -->
+  <div class="tut-rings" id="tutRings"></div>
   <div class="tut-card" id="tutCard" hidden>
     <div class="tut-card-top"><span class="tut-step" id="tutStep"></span><button type="button" class="tut-skip" id="tutSkipBtn">건너뛰기</button></div>
     <div class="tut-title" id="tutTitle"></div>
@@ -39413,6 +39421,35 @@ function setTutorialTargets(list){
   tutorialTargets.forEach(el => el.classList.remove('tut-target'));
   tutorialTargets = list.filter(Boolean);
   tutorialTargets.forEach(el => el.classList.add('tut-target'));
+  const box = document.getElementById('tutRings');
+  while(box.children.length < tutorialTargets.length) box.appendChild(Object.assign(document.createElement('div'), { className: 'tut-ring' }));
+  while(box.children.length > tutorialTargets.length) box.lastChild.remove();
+  placeTutorialRings();
+  if(tutorialTargets.length && !tutorialRingsFollowing){ tutorialRingsFollowing = true; requestAnimationFrame(followTutorialRings); }
+}
+// 테두리를 버튼 자리에 맞춤 - 화면이 스크롤되거나 움직여도 따라가게 튜토리얼 중엔 매 프레임 다시 맞춤
+const TUT_RING_GAP = 6;
+function placeTutorialRings(){
+  const rings = document.getElementById('tutRings').children;
+  tutorialTargets.forEach((el, i) => {
+    const ring = rings[i];
+    if(!ring) return;
+    const r = el.getBoundingClientRect();
+    if(!r.width || !r.height){ ring.style.display = 'none'; return; } // 숨은 버튼이면 테두리도 숨김
+    ring.style.display = '';
+    ring.style.left = (r.left - TUT_RING_GAP) + 'px';
+    ring.style.top = (r.top - TUT_RING_GAP) + 'px';
+    ring.style.width = (r.width + TUT_RING_GAP * 2) + 'px';
+    ring.style.height = (r.height + TUT_RING_GAP * 2) + 'px';
+    const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
+    ring.style.borderRadius = Math.min(radius + TUT_RING_GAP, (r.height + TUT_RING_GAP * 2) / 2) + 'px';
+  });
+}
+let tutorialRingsFollowing = false;
+function followTutorialRings(){
+  if(tutorialStep < 0 || !tutorialTargets.length){ tutorialRingsFollowing = false; return; } // 튜토리얼이 끝나면 멈춤
+  placeTutorialRings();
+  requestAnimationFrame(followTutorialRings);
 }
 function refreshTutorialTargets(){
   if(tutorialStep < 0) return;
