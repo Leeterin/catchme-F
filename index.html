@@ -31634,7 +31634,24 @@ function renderChatMessages(){
     if(!openSuggestGroups.has(key)) openSuggestGroups.set(key, []);
     openSuggestGroups.get(key).push(x);
   });
+  // 같이 취소된 투표(같은 약속에서 연달아 취소된 후보들)도 카드 한 장 그대로 '투표 취소됨'으로 남김
+  const withdrawnSuggestGroups = new Map();
+  const suggestRuns = new Map(); // key -> 지금 이어지는 취소된 후보들
+  const closeSuggestRun = (key) => {
+    const run = suggestRuns.get(key);
+    if(run && run.length > 1) run.forEach(x => withdrawnSuggestGroups.set(x, run));
+    suggestRuns.delete(key);
+  };
+  (room.messages || []).forEach(x => {
+    if(x.type !== 'location-suggest') return;
+    const key = locationSuggestGroup(room, x).key;
+    if(!isWithdrawnLocationSuggest(x)){ closeSuggestRun(key); return; }
+    if(!suggestRuns.has(key)) suggestRuns.set(key, []);
+    suggestRuns.get(key).push(x);
+  });
+  [...suggestRuns.keys()].forEach(closeSuggestRun);
   const openSuggestGroupOf = (x) => {
+    if(withdrawnSuggestGroups.has(x)) return withdrawnSuggestGroups.get(x);
     if(!isOpenLocationSuggest(room, x)) return null;
     const list = openSuggestGroups.get(locationSuggestGroup(room, x).key);
     return list && list.length > 1 ? list : null;
@@ -31799,9 +31816,10 @@ function renderChatMessages(){
       const voters = new Set();
       voteGroup.forEach(x => (x.voterIds || []).forEach(id => voters.add(id)));
       const maxVotes = Math.max(1, ...voteGroup.map(x => (x.voterIds || []).length));
-      const hasMine = voteGroup.some(x => x.who === 'me');
+      const voteDone = isWithdrawnLocationSuggest(m); // 취소된 투표 - 같은 모양 그대로, 버튼만 빼고 회색으로
+      const hasMine = !voteDone && voteGroup.some(x => x.who === 'me');
       row.innerHTML = (m.who === 'me' ? metaHtml : '') + `
-        <div class="reservation-card ls-card ls-vote-card">
+        <div class="reservation-card ls-card ls-vote-card${voteDone ? ' is-done' : ''}">
           <div class="reservation-card-header">${ICO.pin} ${headText}</div>
           <div class="reservation-card-note">후보 ${voteGroup.length}곳 · ${getTotalParticipants(room)}명 중 ${voters.size}명 투표</div>
           <div class="place-vote-list" style="margin-top:8px;">
@@ -31811,35 +31829,39 @@ function renderChatMessages(){
               return `
               <div class="place-vote-row" data-idx="${i}">
                 <div class="place-vote-info">
-                  <div class="place-vote-name">${escapeHtml(locationSuggestTitle(activeChatRoomId, x))}</div>
+                  <div class="place-vote-name">${escapeHtml(voteDone ? `${i + 1}. ${x.place}` : locationSuggestTitle(activeChatRoomId, x))}</div>
                   <div class="place-vote-sub">${x.who === 'me' ? '내 제안' : '친구 제안'}</div>
                   <div class="place-vote-bar"><span style="width:${Math.round(votes / maxVotes * 100)}%"></span></div>
                 </div>
-                <button type="button" class="place-vote-btn${mine ? ' voted' : ''}" data-idx="${i}">${mine ? '✓ ' : ''}${votes}표</button>
+                <button type="button" class="place-vote-btn${mine ? ' voted' : ''}" data-idx="${i}"${voteDone ? ' disabled' : ''}>${mine ? '✓ ' : ''}${votes}표</button>
               </div>`;
             }).join('')}
           </div>
+          ${voteDone ? `
+          <div class="reservation-card-status withdrawn">투표 취소됨</div>` : `
           <div class="reservation-card-actions">
             <button class="reservation-btn decline ls-map-btn">${ICO.pin} 지도에서 후보 보기</button>
-          </div>
+          </div>`}
           ${hasMine ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn decline ls-cancel-btn">제안 취소</button>
             </div>` : ''}
         </div>
       ` + (m.who === 'me' ? '' : metaHtml);
-      row.querySelectorAll('.place-vote-btn').forEach(btn => btn.addEventListener('click', () => {
-        btn.disabled = true;
-        voteLocationSuggestMsg(activeChatRoomId, voteGroup[parseInt(btn.dataset.idx, 10)]);
-      }));
-      // 제안 취소 버튼은 카드에 하나만 - 누르면 친구가 올린 후보까지 이번 투표 전체를 취소
-      const cancelBtn = row.querySelector('.ls-cancel-btn');
-      if(cancelBtn) cancelBtn.addEventListener('click', () => { cancelBtn.disabled = true; cancelLocationSuggestVote(voteGroup); });
-      row.querySelectorAll('.place-vote-row').forEach(r => r.addEventListener('click', (e) => {
-        if(e.target.closest('button')) return;
-        openPlaceSuggestionMap(activeChatRoomId, voteGroup[parseInt(r.dataset.idx, 10)].id);
-      }));
-      row.querySelector('.ls-map-btn').addEventListener('click', () => openPlaceSuggestionMap(activeChatRoomId, voteGroup[0].id));
+      if(!voteDone){
+        row.querySelectorAll('.place-vote-btn').forEach(btn => btn.addEventListener('click', () => {
+          btn.disabled = true;
+          voteLocationSuggestMsg(activeChatRoomId, voteGroup[parseInt(btn.dataset.idx, 10)]);
+        }));
+        // 제안 취소 버튼은 카드에 하나만 - 누르면 친구가 올린 후보까지 이번 투표 전체를 취소
+        const cancelBtn = row.querySelector('.ls-cancel-btn');
+        if(cancelBtn) cancelBtn.addEventListener('click', () => { cancelBtn.disabled = true; cancelLocationSuggestVote(voteGroup); });
+        row.querySelectorAll('.place-vote-row').forEach(r => r.addEventListener('click', (e) => {
+          if(e.target.closest('button')) return;
+          openPlaceSuggestionMap(activeChatRoomId, voteGroup[parseInt(r.dataset.idx, 10)].id);
+        }));
+        row.querySelector('.ls-map-btn').addEventListener('click', () => openPlaceSuggestionMap(activeChatRoomId, voteGroup[0].id));
+      }
     } else if(m.type === 'location-suggest'){
       const voteCount = (m.voterIds || []).length;
       const votedByMe = (m.voterIds || []).includes(myLocationVoterId());
