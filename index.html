@@ -3907,6 +3907,7 @@
     cursor:pointer;
   }
   .appt-detail-place-row:last-child{ margin-bottom:0; }
+  .appt-detail-place-row.appt-detail-vote{ cursor:default; }
   .appt-detail-place-name{
     font-weight:700;
     font-size:13.5px;
@@ -30560,6 +30561,9 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
   }));
   const multiPlaces = meetPlaces.length > 1;
   const pinPast = isPinPast(pin); // 지난 약속이면 보기만 - 장소 정하기/추가(2차...)/삭제 버튼을 안 띄움
+  // 이 약속에 투표 중인 다음 장소 후보들 - 약속 하나의 장소 일은 이 화면에서 다 보이게 같이 보여줌
+  const voteKey = meetGroupKey(room, pin);
+  const voteItems = pinPast ? [] : (room.messages || []).filter(m => isOpenLocationSuggest(room, m) && locationSuggestGroup(room, m).key === voteKey);
 
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
@@ -30584,6 +30588,7 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       ${meetPlaces.length === 0
         ? (pinPast
           ? `<div class="appt-detail-empty">장소 없이 지나간 약속이에요.</div>`
+          : voteItems.length ? ''
           : `<div class="appt-detail-empty">아직 장소가 정해지지 않았어요.</div>
            <button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">장소 정하기</button>`)
         : meetPlaces.map(({ pin: p, srcMsg }, idx) => {
@@ -30604,7 +30609,13 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
               </div>
             `;
           }).join('')}
-      ${meetPlaces.length && !pinPast ? `<button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">+ 장소 추가 (${meetPlaceOrderLabel(meetPlaces.length)})</button>` : ''}
+      ${voteItems.length ? `
+        <div class="appt-detail-place-row appt-detail-vote">
+          <div class="appt-detail-place-name">${meetPlaces.length ? `${meetPlaceOrderLabel(meetPlaces.length)} · ` : ''}투표 중 (후보 ${voteItems.length}곳)</div>
+          ${voteItems.map(m => `<div class="appt-detail-place-sub">${escapeHtml(locationSuggestTitle(roomId, m))}${(m.voterIds || []).length ? ` · ${(m.voterIds || []).length}표` : ''}</div>`).join('')}
+          <button type="button" class="hotplace-notice-btn" id="apptDetailVoteBtn" style="margin-top:8px;">투표하러 가기</button>
+        </div>`
+      : meetPlaces.length && !pinPast ? `<button type="button" class="hotplace-notice-btn" id="apptDetailAddPlaceBtn" style="margin-top:8px;">+ ${meetPlaceOrderLabel(meetPlaces.length)} 장소 정하기</button>` : ''}
     </div>
     ${apptDetailFromHome ? `
     <div class="appt-detail-actions">
@@ -30646,7 +30657,14 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       addMeetPlace(room, roomId, pin);
     });
   }
-  body.querySelectorAll('.appt-detail-place-row').forEach(row => {
+  const voteBtn = document.getElementById('apptDetailVoteBtn');
+  if(voteBtn){
+    voteBtn.addEventListener('click', () => {
+      apptDetailFromHome = false; // 투표/픽스는 채팅방에서 이어지므로 채팅방으로 돌아감
+      closeViewThen(closeAppointmentDetailView, () => openPlaceSuggestionMap(roomId, null, voteKey));
+    });
+  }
+  body.querySelectorAll('.appt-detail-place-row[data-idx]').forEach(row => {
     const idx = parseInt(row.dataset.idx, 10);
     const entry = meetPlaces[idx];
     if(!entry) return;
@@ -34074,7 +34092,7 @@ function startPlaceFromChat(askNew){
     changePinLocation(room, roomId, meet, null, { roomId, pinned: meet });
     return;
   }
-  // 아직 안 끝난 약속이 있으면 그 약속에 다음 차수 장소로 붙일지, 새 약속 장소를 정할지 먼저 물어봄
+  // 아직 안 끝난 약속이 있으면 어느 약속인지 먼저 물어봄 - 고르면 그 약속 화면(장소 1차, 2차, 투표 중 후보가 다 보임)이 열림
   // (예전엔 항상 새 약속이 돼서, 2차 장소를 정하려다 날짜 미정 약속이 하나 더 생기곤 했음)
   const meets = [
     ...(room.pinnedSchedules || []).filter(p => p.dateObj && !isPinPast(p)).sort((a, b) => pinEndDate(a) - pinEndDate(b)),
@@ -34085,12 +34103,12 @@ function startPlaceFromChat(askNew){
     return;
   }
   const buttons = meets.map((p, i) => ({
-    label: `${meetPlaceTargetText(room, p)} 정하기`,
+    label: p.dateLabel ? `${p.dateLabel} 약속` : '날짜 미정 약속',
     primary: i === 0,
-    onTap: () => addMeetPlace(room, roomId, p, false),
+    onTap: () => openAppointmentDetailView(roomId, p.id),
   }));
-  buttons.push({ label: '새 약속 장소 정하기', onTap: () => addMeetPlace(room, roomId, null, true) });
-  openWeekBlockSheet('어느 약속의 장소인가요?', '', buttons, null, null);
+  buttons.push({ label: '새 약속 만들기', onTap: () => addMeetPlace(room, roomId, null, true) });
+  openWeekBlockSheet('어느 약속의 장소를 정할까요?', '', buttons, null, null);
 }
 
 // ---------- 날짜 먼저 물어보기 ("20일 어때요?") ----------
