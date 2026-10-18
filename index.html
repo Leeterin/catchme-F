@@ -12144,8 +12144,10 @@ function connectRealtimeSocket(){
       const mapped = mapServerReservationMessage(message);
       const existing = room.messages.find(m => m._serverId === message.id);
       if(existing){
-        // 기존 예약 메시지의 상태(수락/거절/취소 등)만 갱신
+        // 기존 예약 메시지의 상태(수락/거절/취소 등)만 갱신 - 막 확정됐으면 카드를 맨 아래로 옮김
+        const wasConfirmed = existing.status === 'confirmed';
         Object.assign(existing, mapped);
+        if(!wasConfirmed) moveConfirmedReservationToEnd(room, existing);
       } else {
         room.messages.push(mapped);
       }
@@ -12166,7 +12168,9 @@ function connectRealtimeSocket(){
         if(settingsState.notif_message && !room.muted){
           showToast(mapped.status === 'cancelled'
             ? `${room.name}: ${mapped.dateLabel} ${mapped.timeLabel} 약속이 취소됐어요`
-            : `${room.name}: 약속 관련 알림이 있어요`);
+            : mapped.status === 'confirmed'
+              ? `${room.name}: ${mapped.dateLabel} ${mapped.timeLabel} 약속이 확정됐어요!`
+              : `${room.name}: 약속 관련 알림이 있어요`);
         }
       }
       renderChatList();
@@ -25953,6 +25957,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   reservationMsg._timeoutId = setTimeout(() => {
     if(reservationMsg.status !== 'pending') return; // 그 사이에 철회됐으면 무시
     reservationMsg.status = 'confirmed';
+    moveConfirmedReservationToEnd(CHAT_ROOMS[roomId], reservationMsg);
     clearPendingHoldLocal(reservationMsg.id);
     applyReservationToMyCalendar(date, startMin, endMin, `${withWaGwa(friend.name)} 약속${note ? ' - ' + note : ''}`, roomId, reservationMsg.id);
     addReservationPin(roomId, CHAT_ROOMS[roomId], {
@@ -29840,8 +29845,8 @@ function renderChatList(){
         // 답을 못 받은 채 시간이 지나 (자동으로) 취소된 요청은 "요청 취소됨"으로
         const lastPast = (last.status === 'pending' || last.status === 'withdrawn') && last.startMs && last.startMs < Date.now();
         const statusLabel = lastPast ? '요청 취소됨' : last.status === 'confirmed' ? '약속 확정됨' : (last.status === 'declined' ? '거절됨' : (last.status === 'cancelled' ? '취소됨' : (last.status === 'withdrawn' ? '요청 취소함' : '요청됨')));
-        previewTag = '약속 요청';
-        previewText = statusLabel;
+        previewTag = last.status === 'confirmed' ? '약속 확정' : '약속 요청';
+        previewText = last.status === 'confirmed' ? `${last.dateLabel} ${last.timeLabel}` : statusLabel;
       } else if(last.type === 'location-suggest'){
         const statusLabel = last.status === 'confirmed' ? '장소로 확정됨' : (last.status === 'cancelled' ? '제안 취소됨' : '제안됨');
         previewTag = '장소 제안';
@@ -31313,11 +31318,26 @@ const CHAT_RENDER_STEP = 60;
 // 수락/거절 응답을 화면의 메시지에 반영. 버튼을 그린 뒤 채팅방 메시지를 서버에서 새로 받아오면(예: 홈 "답하기"로 들어온 직후)
 // 클릭한 m은 옛 객체라 그것만 바꾸면 카드가 계속 "요청됨"+수락/거절로 남았음 - 지금 목록에 있는 같은 메시지도 같이 바꿈
 function applyReservationUpdate(m, serverMsg){
+  const wasConfirmed = m.status === 'confirmed';
   const fresh = mapServerReservationMessage(serverMsg);
   Object.assign(m, fresh);
   const room = CHAT_ROOMS[activeChatRoomId];
   const cur = room && (room.messages || []).find(x => x !== m && x._serverId && x._serverId === m._serverId);
   if(cur) Object.assign(cur, fresh);
+  if(!wasConfirmed) moveConfirmedReservationToEnd(room, m);
+}
+// 약속이 확정되면 그 카드를 원래 요청 자리에서 빼서 채팅방 맨 아래(새 소식)로 옮김 - 위에 묻힌 카드가 '확정됨'으로만 바뀌어서
+// 확정된 걸 알아보기 어려웠음. 서버도 카드 시각을 확정한 때로 옮겨 둬서, 방을 다시 열어도 아래에 있음
+function moveConfirmedReservationToEnd(room, m){
+  if(!room || !m || m.status !== 'confirmed') return;
+  // 예전 서버라 시각이 안 바뀌어 왔으면 지금으로 (날짜 구분선이 옛날 날짜로 붙지 않게)
+  if(!m.time || new Date(m.time).getTime() < Date.now() - 60000) m.time = new Date();
+  const i = room.messages.indexOf(m);
+  if(i >= 0 && i !== room.messages.length - 1){
+    room.messages.splice(i, 1);
+    room.messages.push(m);
+  }
+  m._animate = true; // 아래로 내려온 확정 카드가 살짝 튀어오르며 나타나게
 }
 // 채팅 사진 크기(가로, 세로)를 주소별로 기억 - 앱을 다시 켜도(알림 눌러 들어온 경우 등) 사진 자리가 처음부터 잡혀 있게 폰에 저장
 var CHAT_IMAGE_SIZE_KEY = 'catchme_chat_image_sizes';
@@ -31416,7 +31436,7 @@ function renderChatMessages(){
       const showConfirmedExtras = m.status === 'confirmed';
       const cardHtml = `
         <div class="reservation-card">
-          <div class="reservation-card-header">${ICO.calendar} 약속 요청</div>
+          <div class="reservation-card-header">${ICO.calendar} ${m.status === 'confirmed' ? '약속이 확정됐어요' : '약속 요청'}</div>
           <div class="reservation-card-time chat-date-link">${m.dateLabel} ${m.timeLabel}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           <div class="reservation-card-note">${ICO.pin} ${m.location ? escapeHtml(m.location) : reservationMeetPlacesLabel(room, m) || '장소 미정 (만나서 정해요)'}</div>
@@ -31446,6 +31466,7 @@ function renderChatMessages(){
             try {
               const data = await apiRequest(`/chats/messages/${m._serverId}/accept`, { method: 'POST' });
               applyReservationUpdate(m, data.message);
+              markRoomRead(activeChatRoomId); // 확정 카드가 지금 시각으로 옮겨져서, 수락한 내 쪽엔 안 읽은 표시가 안 남게
               await loadPinsFromServer(activeChatRoomId, room);
               loadScheduleFromServer(); // 확정되면서 서버에서 정리된 "예약 가능" 등이 내 캘린더에도 바로 반영되게
               // 장소가 있으면 서버가 "근처에서 만나요" 알림을 만들어 줌(상대방에게도 감) - 그걸 그대로 씀.
@@ -31460,6 +31481,7 @@ function renderChatMessages(){
             return;
           }
 
+          const roomId = activeChatRoomId; // 로컬(데모) 방 - 아래에서 쓰는 roomId가 정의돼 있지 않아 수락하면 오류가 났음
           m.status = 'confirmed';
 
           const parsedDate = parseDateLabelToDate(m.dateLabel);
@@ -31477,6 +31499,7 @@ function renderChatMessages(){
             location: m.location, locationLat: m.locationLat, locationLon: m.locationLon,
             dateObj: parsedDate ? new Date(parsedDate) : null, reservationMsgId: m.id,
           });
+          moveConfirmedReservationToEnd(room, m);
           if(m.location) addHotplaceNoticeMessage(activeChatRoomId, m.location, m.locationLat, m.locationLon);
 
           touchRoom(activeChatRoomId);
@@ -32009,7 +32032,7 @@ function getMsgPreviewText(m){
   if(!m) return '';
   // 카드에 답장할 땐 어떤 카드인지 알 수 있게 날짜·시간이나 장소 이름을 같이 보여줌
   const placeName = typeof m.place === 'string' ? m.place : (m.place && m.place.name) || '';
-  if(m.type === 'reservation') return ['약속 요청', [m.dateLabel, m.timeLabel].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+  if(m.type === 'reservation') return [m.status === 'confirmed' ? '약속 확정' : '약속 요청', [m.dateLabel, m.timeLabel].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
   if(m.type === 'location-suggest') return placeName ? `장소 제안 · ${placeName}` : '장소 제안';
   if(m.type === 'location-fixed') return placeName ? `장소 확정 · ${placeName}` : '장소 확정';
   if(m.type === 'location-recommend') return m.status === 'COMPLETED' ? '모임 장소 추천 결과' : (m.status === 'CANCELLED' ? '모임 장소 추천이 취소됐어요' : '모임 장소 추천 - 출발지를 입력해주세요');
