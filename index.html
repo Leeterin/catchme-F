@@ -4243,35 +4243,34 @@
     padding:0;
   }
   .msg-hover-reply-btn:hover{ color:var(--accent); }
+  /* 답장 인용 - 카톡처럼 위에 "○○에게 답장" + 원문 흐리게(두 줄까지), 가는 선 아래에 답장 내용 */
   .msg-quote-block{
     display:block;
-    border-radius:8px;
-    padding:5px 9px;
-    margin-bottom:5px;
+    padding:1px 0 7px;
+    margin-bottom:7px;
+    border-bottom:1px solid var(--line);
     cursor:pointer;
   }
   .msg-quote-who{
-    font-size:11.5px;
-    font-weight:700;
+    font-size:11px;
+    font-weight:600;
     margin-bottom:2px;
-    opacity:0.85;
+    opacity:0.7;
   }
   .msg-quote-text{
-    font-size:12px;
-    opacity:0.85;
-    max-width:200px;
+    font-size:12.5px;
+    line-height:1.4;
+    opacity:0.6;
+    max-width:240px;
     overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    word-break:keep-all;
+    overflow-wrap:anywhere;
   }
-  .msg-row.other .msg-quote-block{
-    background:rgba(0,0,0,0.05);
-    border-left:3px solid var(--accent);
-  }
-  .msg-row.me .msg-quote-block{
-    background:rgba(255,255,255,0.2);
-    border-left:3px solid rgba(255,255,255,0.75);
-  }
+  .msg-row.me .msg-quote-block{ border-bottom-color:rgba(255,255,255,0.35); }
+  .msg-row.me .msg-quote-who, .msg-row.me .msg-quote-text{ opacity:0.8; }
   .chat-reply-preview-bar{
     display:flex;
     align-items:center;
@@ -7936,7 +7935,7 @@
   /* 앱 시작 로고 화면도 어두운 배경 */
   body.dark-mode .app-splash{ background:#18181A; }
   /* 상대 말풍선 속 인용(답장) 칸: 반투명 검정은 다크에선 안 보여서 흰 반투명으로 */
-  body.dark-mode .msg-row.other .msg-quote-block{ background:rgba(255,255,255,0.07); }
+  body.dark-mode .msg-row.other .msg-quote-block{ border-bottom-color:rgba(255,255,255,0.12); }
   body.dark-mode .chat-search-arrow{ background:#3A3A3C; }
   body.dark-mode .chat-search-popup{ background:#2C2C2E; border-color:#3A3A3C; box-shadow:0 8px 28px rgba(0,0,0,0.55); }
   body.dark-mode input::placeholder,
@@ -32191,7 +32190,7 @@ function renderChatMessages(){
       // 안 그러면 상대방이 보낸 답장은 내 화면에서 원문을 못 찾아 항상 "삭제된 메시지"로만 보임)
       if(m.replyTo){
         const originalMsg = room.messages.find(x => x.id === m.replyTo.msgId || (x._serverId && x._serverId === m.replyTo.msgId));
-        const whoLabel = originalMsg ? (originalMsg.who === 'me' ? '나' : room.name) : '메시지';
+        const whoLabel = originalMsg ? `${originalMsg.who === 'me' ? '나' : (getGroupSenderName(room, originalMsg) || room.name)}에게 답장` : '답장';
         const previewText = originalMsg ? getMsgPreviewText(originalMsg) : (m.replyTo.preview || '삭제된 메시지');
         row.querySelector('.msg-quote-who').textContent = whoLabel;
         row.querySelector('.msg-quote-text').textContent = previewText;
