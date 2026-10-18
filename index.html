@@ -12660,6 +12660,27 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(refreshTodayIfDateChanged, 60 * 1000); // 앱을 켜 둔 채 자정을 넘기는 경우
 
+// 앱을 켜 둔 채 약속이 끝나는 시각을 넘기면 (다가오는 약속, 채팅방 상단 약속, 지난 약속, 친구 만남 횟수) 바로 다시 그림
+let endedPinCountSeen = null;
+function refreshIfAppointmentEnded(){
+  let n = 0;
+  Object.values(CHAT_ROOMS).forEach(room => (room.pinnedSchedules || []).forEach(p => { if(p.dateObj && isPinPast(p)) n++; }));
+  const changed = endedPinCountSeen !== null && n > endedPinCountSeen;
+  endedPinCountSeen = n;
+  if(!changed) return;
+  refreshHomeDashIfVisible();
+  renderChatList();
+  if(activeChatRoomId) renderPinnedSchedule();
+  if(document.getElementById('pastAppointmentsView').classList.contains('active')) renderPastAppointmentsList();
+  renderFriendsList();
+  if(document.getElementById('friendProfileView').classList.contains('active')){
+    const friend = FRIENDS.find(f => f.id === document.getElementById('profilePlanBtn').dataset.friendId);
+    if(friend) renderProfileMeetBadge(friend);
+  }
+}
+setInterval(refreshIfAppointmentEnded, 30 * 1000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') refreshIfAppointmentEnded(); });
+
 // ============================================================
 // 캘린더 렌더링 (월 이동 가능한 실제 달력 로직)
 // ============================================================
@@ -13136,14 +13157,16 @@ navItems.forEach(item => {
 document.getElementById('homeBtn').addEventListener('click', () => switchTopTab(null));
 
 // ---------- 홈 상단: 약속 잡기 버튼 + 다가오는 약속 ----------
-// 모든 채팅방의 상단 고정 카드(확정된 일정) 중 오늘 이후 것을 날짜/시간 순으로 모아서 보여줌
-function homeUpcomingAppointments(){
+// 모든 채팅방의 상단 고정 카드(확정된 일정) 중 아직 안 끝난 것을 날짜/시간 순으로 모아서 보여줌
+// (keepEndedToday: '오늘' 위젯은 오늘 이미 끝난 약속도 오늘 일정으로 보여줌)
+function homeUpcomingAppointments(keepEndedToday){
   const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
   const list = [];
   Object.keys(CHAT_ROOMS).forEach(roomId => {
     const room = CHAT_ROOMS[roomId];
     (room.pinnedSchedules || []).forEach(pin => {
       if(!pin.dateObj || pin.dateObj < todayStart) return;
+      if(!keepEndedToday && isPinPast(pin)) return;
       const mins = pin.timeLabel ? parseTimeLabelMinutes(pin.timeLabel) : null;
       list.push({ roomId, room, pin, sortKey: pin.dateObj.getTime() + (mins ? mins.startMin : 0) * 60000 });
     });
@@ -13694,7 +13717,7 @@ function homeTodayItems(){
   const todayKey = toDateInputValue(TODAY);
   const items = getMemosForDate(TODAY).map(m => ({ startMin: null, endMin: null, text: m.text, color: 'var(--hm-dim)' }));
   const pinRooms = new Set();
-  homeUpcomingAppointments().filter(x => toDateInputValue(x.pin.dateObj) === todayKey).forEach(x => {
+  homeUpcomingAppointments(true).filter(x => toDateInputValue(x.pin.dateObj) === todayKey).forEach(x => {
     pinRooms.add(x.roomId);
     const mins = x.pin.timeLabel ? parseTimeLabelMinutes(x.pin.timeLabel) : null;
     items.push({ startMin: mins ? mins.startMin : 0, endMin: mins ? mins.endMin : null, text: x.room.name || '약속', color: APPOINTMENT_EVENT_COLOR });
@@ -30785,13 +30808,12 @@ function closePastAppointmentsView(){
 }
 function renderPastAppointmentsList(){
   const body = document.getElementById('pastAppointmentsBody');
-  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
   const roomIds = pastAppointmentsAllRooms ? Object.keys(CHAT_ROOMS) : [pastAppointmentsRoomId];
   const pastPins = [];
   roomIds.forEach(roomId => {
     const room = CHAT_ROOMS[roomId];
     (room && room.pinnedSchedules || []).forEach(p => {
-      if(p.dateObj && p.dateObj < todayStart) pastPins.push({ roomId, room, pinned: p });
+      if(p.dateObj && isPinPast(p)) pastPins.push({ roomId, room, pinned: p }); // 오늘 약속도 끝났으면 지난 약속
     });
   });
   pastPins.sort((a, b) => b.pinned.dateObj - a.pinned.dateObj);
