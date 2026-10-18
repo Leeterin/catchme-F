@@ -11610,6 +11610,7 @@ const GUEST_LOCKED_ACTIONS = [
 ];
 document.addEventListener('click', (e) => {
   if(authToken || !e.target.closest) return;
+  if(tutorialPractice && e.target.closest('#homePlanCta, .fl-plan-btn')) return; // 튜토리얼에서 연습용 친구와 약속 잡아보는 중엔 열어줌
   const hit = GUEST_LOCKED_ACTIONS.find(([sel]) => e.target.closest(sel));
   if(!hit) return;
   e.preventDefault();
@@ -11790,6 +11791,7 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   myProfileData.reviewAvatarUrl = user.reviewAvatarUrl || null;
 
   dismissView(closeAuthGate); // 둘러보다가 띄운 가입 화면이면 뒤로가기 기록도 같이 지움
+  if(tutorialPractice) endTutorial(); // 연습용 친구·약속이 실제 계정 화면에 섞이지 않게
   // 로그인/앱 시작 직후 첫 화면은 홈(약속 중심) - 이게 없으면 예전 달력 화면이 먼저 보이고 아래 탭도 아무것도 선택 안 돼 있었음.
   // 앱 시작 때는 이 함수가 showTab 정의보다 먼저 불려서, 스크립트가 다 읽힌 뒤에 실행되게 미룸
   // 단, 막 가입했거나 아직 내 일정이 하나도 없는 사람은 캘린더부터 - 친구/예약 가능 시간 설명 없이 바로 첫 일정을 넣게 함
@@ -14060,7 +14062,7 @@ function renderHomePlanCta(){
   document.getElementById('homePlanCtaFaces').innerHTML = faces + '<span class="hp-face hp-face-add">+</span>';
 }
 document.getElementById('homePlanCta').addEventListener('click', () => {
-  if(!authToken) return;
+  if(!authToken && !tutorialPractice) return; // 튜토리얼 연습 중엔 연습용 친구로 열어줌
   const mode = document.getElementById('homePlanCta').dataset.mode;
   openPlanStart(); // 친구가 없으면 이 화면이 '링크로 물어보기 / 아이디로 친구 추가'를 보여줌
 });
@@ -24570,6 +24572,7 @@ function syncSchedFriendMode(){
 function openFriendCalendar(friendId, mode, opts = {}){
   const friend = FRIENDS.find(f => f.id === friendId);
   if(!friend) return;
+  setTimeout(() => tutorialEvent('friendcal:open'), 0); // 튜토리얼 연습 중이면 다음 단계로 (화면이 다 그려진 뒤)
   const wasInline = isFriendCalInline();
   activeFriendCalendarId = friendId;
   friendCalendarMode = mode === 'reserve' ? 'reserve' : 'calendar';
@@ -25484,6 +25487,7 @@ function openFriendReserve(dateObj, hour, opts = {}){
   closeAllCustomPopups();
   const friend = FRIENDS.find(f => f.id === activeFriendCalendarId);
   if(!friend) return;
+  setTimeout(() => tutorialEvent('reserve:open'), 0);
   document.getElementById('friendReserveSubmitBtn').disabled = false;
 
   reserveOpenedFromMatching = null; // 일반 경로로 열 때는 매칭 복귀 상태를 초기화 (매칭 경로는 이 함수 호출 뒤에 별도로 설정함)
@@ -25914,6 +25918,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
     }
     refreshActiveScheduleView();
     renderChatList();
+    tutorialEvent('reserve:confirmed');
   }, 2200);
 
   document.getElementById('friendReserveView').classList.remove('active');
@@ -25924,6 +25929,7 @@ document.getElementById('friendReserveSubmitBtn').addEventListener('click', asyn
   openChatRoom(roomId);
   showToast('약속 요청을 보냈어요.');
   submitBtn.disabled = false;
+  tutorialEvent('reserve:sent');
   } // proceedReservationSubmit 끝
 });
 
@@ -36869,6 +36875,7 @@ function openPlanStart(friendId, chatRoomId){
   if(ov.classList.contains('show')) return;
   ov.classList.add('show');
   pushViewState(closePlanStart);
+  tutorialEvent('plan:open');
 }
 function closePlanStart(){
   planFriendSeq++; // 친구 시간 불러오는 중에 닫으면 늦게 온 응답은 무시
@@ -39185,12 +39192,73 @@ const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
+    // 연습: 가입 안 하고 둘러보는 중이면 연습용 친구(민지)와 실제 화면으로 약속을 잡아봄 (서버엔 아무것도 안 감)
+    when: () => tutorialPractice,
+    title: '연습용 친구',
+    text: "연습용 친구 '민지'를 넣어뒀어요. 민지와 실제로 약속을 잡아볼게요. 아래 홈 탭을 눌러보세요.",
+    targets: () => [[...document.querySelectorAll('#friendsListContainer .placeholder-row')].find(r => r.textContent.includes(DEMO_FRIEND.name)), navItemOf('home')],
+    until: 'tab:home',
+  },
+  {
+    when: () => tutorialPractice,
+    title: '약속 잡기',
+    text: "'약속 잡기'를 눌러보세요.",
+    targets: () => [document.getElementById('homePlanCta')],
+    until: 'plan:open',
+  },
+  {
+    when: () => tutorialPractice,
+    title: '방법 고르기',
+    text: () => document.querySelector('#planStartOverlay [data-plan="reserve"]')
+      ? "'민지님이 열어둔 시간에 약속 잡기'를 눌러요. 다른 방법은 나중에 써봐요."
+      : "민지를 골라요.",
+    targets: () => document.getElementById('planStartOverlay').classList.contains('show')
+      ? [document.querySelector('#planStartOverlay [data-plan="reserve"]') || document.querySelector(`#planStartOverlay [data-plan-friend="${DEMO_FRIEND.id}"]`)]
+      : [document.getElementById('homePlanCta')],
+    inSheet: true,
+    until: 'friendcal:open',
+  },
+  {
+    when: () => tutorialPractice,
+    title: '시간 고르기',
+    text: () => document.querySelector('#friendCalendarView .day-event-card.available')
+      ? "민지가 열어둔 시간이에요. 눌러서 시간을 골라요."
+      : "이 날은 열린 시간이 없어요. 오른쪽 화살표로 다음 날로 넘겨 주세요.",
+    targets: () => [document.querySelector('#friendCalendarView .day-event-card.available') || document.getElementById('friendCalDateNextBtn')],
+    until: 'reserve:open',
+  },
+  {
+    when: () => tutorialPractice,
+    title: '약속 요청 보내기',
+    text: "시작·끝 시간을 고르고 '약속 요청 보내기'를 눌러요. 메모와 장소는 비워도 돼요.",
+    targets: () => [document.getElementById('friendReserveSubmitBtn')],
+    inSheet: true,
+    until: 'reserve:sent',
+  },
+  {
+    when: () => tutorialPractice,
+    title: '수락 기다리기',
+    text: '요청은 민지와의 채팅방에 올라가요. 민지가 수락하면 약속이 잡혀요. 잠깐만 기다려요…',
+    targets: () => [],
+    until: 'reserve:confirmed',
+  },
+  {
+    when: () => tutorialPractice,
+    title: '약속이 잡혔어요!',
+    text: "잡힌 약속은 채팅방 맨 위에 고정되고 내 캘린더에도 들어가요. '장소 정하기'로 친구와 장소도 정할 수 있어요.",
+    targets: () => [document.querySelector('#chatPinnedSchedule .pin-card') || document.getElementById('chatPinnedSchedule')],
+    next: '다음',
+  },
+  // 로그인한 사람은 연습 대신 그림으로 설명 (연습 약속이 서버 캘린더에 올라가면 안 돼서)
+  {
+    when: () => !tutorialPractice,
     title: '약속 잡으러 가기',
     text: '친구가 생기면 약속은 홈에서 시작해요. 아래 홈 탭을 눌러보세요.',
     targets: () => [navItemOf('home')],
     until: 'tab:home',
   },
   {
+    when: () => !tutorialPractice,
     title: '약속 잡기',
     text: "'약속 잡기'에서 친구를 고르면 잡는 방법이 나와요.",
     art: `<div class="tut-art-list">
@@ -39203,10 +39271,11 @@ const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
+    when: () => !tutorialPractice,
     title: '신청하고 수락받기',
     text: '시간을 골라 신청하면 친구가 수락할 때 약속이 잡혀요. 잡힌 약속은 홈의 다가오는 약속과 캘린더에 들어가요.',
     art: `<div class="tut-art-flow">
-      <span class="tut-art-req"><i>지</i><span><b>지우</b><small>토 15:00 약속 신청</small></span></span>
+      <span class="tut-art-req"><i>민</i><span><b>민지</b><small>토 15:00 약속 신청</small></span></span>
       <span class="tut-art-arrow">&#8595;</span>
       <span class="tut-art-ok">&#10003; 약속이 잡혔어요</span>
     </div>`,
@@ -39214,12 +39283,14 @@ const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
+    when: () => !tutorialPractice,
     title: '채팅에서 마저 정하기',
     text: '약속 신청과 수락은 친구와의 채팅방에서 주고받아요. 아래 채팅 탭을 눌러보세요.',
     targets: () => [navItemOf('chat')],
     until: 'tab:chat',
   },
   {
+    when: () => !tutorialPractice,
     title: '채팅방',
     text: '잡힌 약속은 채팅방 맨 위에 고정돼요. 여기서 시간을 바꾸자고 하거나, 장소 후보를 올려 같이 정해요.',
     art: `<div class="tut-art-chat">
@@ -39233,6 +39304,8 @@ const TUTORIAL_STEPS = [
   {
     title: '어디서 만날지',
     text: '장소 탭에선 다른 사람들이 추천한 맛집·카페를 볼 수 있어요. 눌러보세요.',
+    // 채팅방 안에선 아래 탭이 숨어 있어서 채팅 목록으로 나와서 보여줌
+    enter: () => { if(document.body.classList.contains('chat-open')) switchTopTab('chat'); },
     targets: () => [navItemOf('community')],
     until: 'tab:community',
   },
@@ -39250,8 +39323,51 @@ const TUTORIAL_STEPS = [
     signup: true,
   },
 ];
-let tutorialStep = -1; // -1 = 튜토리얼 안 하는 중
-let tutorialTargets = [];
+var tutorialStep = -1; // -1 = 튜토리얼 안 하는 중 (var: 이 줄보다 먼저 화면 전환이 일어나도 안 터지게)
+var tutorialTargets = [];
+var tutorialPractice = false; // 연습용 친구와 약속 잡아보기 중인지 (로그인 안 한 사람만 - 서버엔 아무것도 안 감)
+const TUTORIAL_PRACTICE_ROOM_ID = 'dm-' + DEMO_FRIEND.id;
+
+// 연습용 친구(민지)를 친구 목록에 넣고, 앞으로 2주 동안 예약 가능 시간을 열어둔 것처럼 채움 (평일 저녁, 주말 오후, 오늘은 지금 이후)
+function addTutorialPracticeFriend(){
+  tutorialPractice = true;
+  if(!FRIENDS.some(f => f.id === DEMO_FRIEND.id)) FRIENDS.unshift({ ...DEMO_FRIEND, status: '튜토리얼 연습용 친구예요' });
+  const nextHour = new Date().getHours() + 1;
+  for(let i = 0; i < 14; i++){
+    const d = new Date(TODAY);
+    d.setDate(d.getDate() + i);
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    const from = i === 0 ? Math.max(nextHour, 10) : (weekend ? 13 : 19);
+    const to = weekend && i > 0 ? 18 : 22;
+    friendRealScheduleCache[DEMO_FRIEND.username + '::' + dateKeyOf(d)] = { hours: HOURS, busy: HOURS.map(() => false), bookable: HOURS.map(h => h >= from && h < to) };
+  }
+  renderFriendsList();
+  renderHomePlanCta();
+}
+// 튜토리얼이 끝나면 연습용 친구·채팅방·연습으로 잡은 약속을 지우고, 그 약속 때문에 잘린 내 예약 가능 시간은 되돌림
+function cleanupTutorialPractice(){
+  if(!tutorialPractice) return;
+  tutorialPractice = false;
+  const room = CHAT_ROOMS[TUTORIAL_PRACTICE_ROOM_ID];
+  if(room){
+    room.messages.forEach(m => {
+      if(m.type !== 'reservation') return;
+      if(m._timeoutId) clearTimeout(m._timeoutId);
+      if(m.status === 'confirmed') cancelReservationLinkedEventLocal(m.id);
+      else clearPendingHoldLocal(m.id, true);
+    });
+    if(activeChatRoomId === TUTORIAL_PRACTICE_ROOM_ID){ switchTopTab(null); activeChatRoomId = null; }
+    delete CHAT_ROOMS[TUTORIAL_PRACTICE_ROOM_ID];
+  }
+  const i = FRIENDS.findIndex(f => f.id === DEMO_FRIEND.id);
+  if(i >= 0) FRIENDS.splice(i, 1);
+  Object.keys(friendRealScheduleCache).forEach(k => { if(k.startsWith(DEMO_FRIEND.username + '::')) delete friendRealScheduleCache[k]; });
+  renderFriendsList();
+  renderHomePlanCta();
+  renderChatList();
+  refreshActiveScheduleView();
+  refreshHomeDashIfVisible();
+}
 
 // 빠르게 열기 화면에서 시간을 넣을 수 있는 첫 날의 막대 (오늘처럼 일부가 지난 날은 빼고, 아예 지난 날은 막대가 없음)
 function quickTutorialTrack(){
@@ -39268,16 +39384,19 @@ async function maybeStartTutorial(){
   if(!done) startTutorial();
 }
 function startTutorial(){
+  if(!authToken) addTutorialPracticeFriend();
   goTutorialStep(0);
 }
 function endTutorial(){
   tutorialStep = -1;
+  cleanupTutorialPractice();
   setTutorialTargets([]);
   document.getElementById('tutCard').hidden = true;
   try { localStorage.setItem(TUTORIAL_DONE_KEY, '1'); } catch(e) {}
   if(nativePrefs()) nativePrefs().set({ key: TUTORIAL_DONE_KEY, value: '1' }).catch(() => {});
 }
 function goTutorialStep(i){
+  while(i < TUTORIAL_STEPS.length && TUTORIAL_STEPS[i].when && !TUTORIAL_STEPS[i].when()) i++; // 지금 상황에 안 맞는 단계는 건너뜀
   if(i >= TUTORIAL_STEPS.length){ endTutorial(); return; }
   tutorialStep = i;
   renderTutorialStep();
@@ -39311,7 +39430,9 @@ function refreshTutorialTargets(){
 function renderTutorialStep(){
   const step = TUTORIAL_STEPS[tutorialStep];
   document.getElementById('tutCard').hidden = false;
-  document.getElementById('tutStep').textContent = `${tutorialStep + 1} / ${TUTORIAL_STEPS.length}`;
+  const shown = TUTORIAL_STEPS.filter(st => !st.when || st.when());
+  document.getElementById('tutStep').textContent = `${shown.indexOf(step) + 1} / ${shown.length}`;
+  if(step.enter) step.enter();
   document.getElementById('tutTitle').textContent = step.title;
   document.getElementById('tutArt').innerHTML = step.art || ''; // 아직 직접 해볼 수 없는 단계(친구가 있어야 하는 것)는 작은 그림으로 보여줌
   document.getElementById('tutSkipBtn').style.display = step.signup ? 'none' : '';
@@ -39338,6 +39459,8 @@ function renderTutorialStep(){
   // 눌러볼 버튼이 화면 밖이면 보이게 스크롤 (아래 탭 버튼은 늘 보임)
   const first = tutorialTargets[0];
   if(first && !first.closest('.bottom-nav') && first.scrollIntoView) first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  // 막 열린 화면은 조금 뒤에 다 그려지니 깜빡일 버튼을 한 번 더 찾음
+  setTimeout(refreshTutorialTargets, 250);
 }
 document.getElementById('tutSkipBtn').addEventListener('click', endTutorial);
 // 화면을 누르거나 스크롤하면 깜빡일 버튼과 카드 위치를 다시 맞춤 (주를 넘기거나 목록이 다시 그려진 경우)
