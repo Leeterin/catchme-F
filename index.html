@@ -7812,6 +7812,15 @@
     100%{ box-shadow:0 0 0 0 rgba(255,212,59,0), 0 0 10px 1px rgba(255,212,59,0.6); }
   }
   @media (prefers-reduced-motion: reduce){ .tut-ring{ animation:none; box-shadow:0 0 10px 1px rgba(255,212,59,0.6); } }
+  /* 눌러볼 버튼이 화면 밖(스크롤 아래·위)이나 안내 카드 뒤에 있으면 "아래로 내려서 'OO' ⌄" - 누르면 그 버튼까지 스크롤 */
+  .tut-scroll-hint{ position:fixed; left:50%; z-index:3090; transform:translateX(-50%); display:flex; align-items:center; gap:6px; padding:9px 16px; border:none; border-radius:999px; background:#FFD43B; color:#2C2C2A; font-family:inherit; font-size:13.5px; font-weight:800; white-space:nowrap; box-shadow:0 6px 18px rgba(0,0,0,0.18); cursor:pointer; animation:tutHintBob 1.2s ease-in-out infinite; }
+  .tut-scroll-hint[hidden]{ display:none; }
+  .tut-scroll-hint .arr{ font-size:16px; line-height:1; }
+  @keyframes tutHintBob{ 0%,100%{ translate:0 0; } 50%{ translate:0 5px; } }
+  .tut-scroll-hint.up{ animation-name:tutHintBobUp; }
+  @keyframes tutHintBobUp{ 0%,100%{ translate:0 0; } 50%{ translate:0 -5px; } }
+  body:has(#authGateView[style*="flex"]) .tut-scroll-hint{ display:none; }
+  @media (prefers-reduced-motion: reduce){ .tut-scroll-hint{ animation:none; } }
   @media (prefers-reduced-motion: no-preference){
     .tut-card:not([hidden]){ animation:mzRiseIn .25s ease; }
   }
@@ -9220,6 +9229,7 @@
 
   <!-- 처음 쓰는 사람 튜토리얼 안내 카드 - 실제 버튼에 테두리를 깜빡이게 하고, 직접 눌러보면 다음 단계로 (startTutorial) -->
   <div class="tut-rings" id="tutRings"></div>
+  <button type="button" class="tut-scroll-hint" id="tutScrollHint" hidden></button>
   <div class="tut-card" id="tutCard" hidden>
     <div class="tut-card-top"><span class="tut-step" id="tutStep"></span><span class="tut-top-btns"><button type="button" class="tut-prev" id="tutPrevBtn">&#8249; 이전</button><button type="button" class="tut-fold" id="tutFoldBtn" aria-label="안내 내리기">내리기 &#8964;</button></span></div>
     <div class="tut-title" id="tutTitle"></div>
@@ -39514,6 +39524,7 @@ function startTutorial(){
 }
 function endTutorial(){
   tutorialStep = -1;
+  document.getElementById('tutScrollHint').hidden = true;
   cleanupTutorialPractice();
   setTutorialTargets([]);
   document.getElementById('tutCard').hidden = true;
@@ -39560,13 +39571,43 @@ function setTutorialTargets(list){
 }
 // 테두리를 버튼 자리에 맞춤 - 화면이 스크롤되거나 움직여도 따라가게 튜토리얼 중엔 매 프레임 다시 맞춤
 const TUT_RING_GAP = 6;
+// 버튼이 실제로 보이는 범위 - 화면 안이면서, 안에서 스크롤되는 창(빠르게 열기 등)의 보이는 칸 안
+function tutorialVisibleBox(el){
+  const box = { top: 0, bottom: window.innerHeight };
+  for(let p = el.parentElement; p && p !== document.body; p = p.parentElement){
+    if(p.scrollHeight <= p.clientHeight + 1) continue;
+    const oy = getComputedStyle(p).overflowY;
+    if(oy !== 'auto' && oy !== 'scroll' && oy !== 'hidden') continue;
+    const pr = p.getBoundingClientRect();
+    box.top = Math.max(box.top, pr.top);
+    box.bottom = Math.min(box.bottom, pr.bottom);
+  }
+  return box;
+}
 function placeTutorialRings(){
+  // 화면이 다시 그려져서 표시하던 버튼이 사라졌으면(막대를 눌러 시간을 넣은 직후 등) 새 버튼을 다시 찾음
+  if(tutorialStep >= 0 && tutorialTargets.some(el => !el.isConnected)){ refreshTutorialTargets(); return; }
   const rings = document.getElementById('tutRings').children;
+  const card = document.getElementById('tutCard');
+  const cardRect = card.hidden ? null : card.getBoundingClientRect();
+  const cardAtTop = !!cardRect && cardRect.top < window.innerHeight / 2;
+  let offscreen = null; // { el, dir: 'down'|'up' } - 처음 찾은 화면 밖 버튼
   tutorialTargets.forEach((el, i) => {
     const ring = rings[i];
     if(!ring) return;
     const r = el.getBoundingClientRect();
     if(!r.width || !r.height){ ring.style.display = 'none'; return; } // 숨은 버튼이면 테두리도 숨김
+    // 스크롤 밖이거나 안내 카드에 가려 보이지 않으면 테두리는 숨기고 화살표로 알려줌 (화면 엉뚱한 곳에 떠 있지 않게)
+    const vis = tutorialVisibleBox(el);
+    let dir = null;
+    if(r.top > vis.bottom - 16) dir = 'down';
+    else if(r.bottom < vis.top + 16) dir = 'up';
+    else if(cardRect && !card.contains(el) && r.top < cardRect.bottom && r.bottom > cardRect.top && r.left < cardRect.right && r.right > cardRect.left) dir = cardAtTop ? 'up' : 'down';
+    if(dir){
+      ring.style.display = 'none';
+      if(!offscreen || (offscreen.el.tagName !== 'BUTTON' && el.tagName === 'BUTTON')) offscreen = { el, dir }; // 버튼이면 그 이름으로 알려줌
+      return;
+    }
     ring.style.display = '';
     ring.style.left = (r.left - TUT_RING_GAP) + 'px';
     ring.style.top = (r.top - TUT_RING_GAP) + 'px';
@@ -39575,7 +39616,34 @@ function placeTutorialRings(){
     const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
     ring.style.borderRadius = Math.min(Math.max(radius + TUT_RING_GAP, 14), (r.height + TUT_RING_GAP * 2) / 2) + 'px'; // 모서리가 각진 칸도 둥글게 감쌈
   });
+  placeTutorialScrollHint(offscreen, cardRect, cardAtTop);
 }
+function placeTutorialScrollHint(off, cardRect, cardAtTop){
+  const hint = document.getElementById('tutScrollHint');
+  if(!off || tutorialStep < 0){ hint.hidden = true; hint._target = null; return; }
+  const label = (off.el.tagName === 'BUTTON' && off.el.textContent.trim().length <= 14) ? off.el.textContent.trim() : '';
+  const down = off.dir === 'down';
+  const text = `${down ? '아래로 내려서' : '위로 올려서'} ${label ? `'${label}'` : '이어서 하기'}`;
+  if(hint._text !== text || hint.hidden){
+    hint.innerHTML = `${escapeHtml(text)} <span class="arr">${down ? '&#8964;' : '&#8963;'}</span>`;
+    hint._text = text;
+  }
+  hint.classList.toggle('up', !down);
+  hint._target = off.el;
+  hint.hidden = false;
+  // 안내 카드 바로 위(아래쪽이면)나 바로 아래(위쪽이면)에 붙임
+  if(down){
+    hint.style.top = 'auto';
+    hint.style.bottom = (cardRect && !cardAtTop ? window.innerHeight - cardRect.top + 10 : 24) + 'px';
+  } else {
+    hint.style.bottom = 'auto';
+    hint.style.top = (cardRect && cardAtTop ? cardRect.bottom + 10 : 16) + 'px';
+  }
+}
+document.getElementById('tutScrollHint').addEventListener('click', () => {
+  const el = document.getElementById('tutScrollHint')._target;
+  if(el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+});
 let tutorialRingsFollowing = false;
 function followTutorialRings(){
   if(tutorialStep < 0 || !tutorialTargets.length){ tutorialRingsFollowing = false; return; } // 튜토리얼이 끝나면 멈춤
