@@ -27281,7 +27281,7 @@ function renderSavedPlacesGroups(){
 
     const groupTitle = document.createElement('div');
     groupTitle.className = 'hotplace-saved-group-title';
-    groupTitle.textContent = `${label} (${list.length})`;
+    groupTitle.innerHTML = `${label} (${list.length})`;
     container.appendChild(groupTitle);
 
     list.forEach(post => {
