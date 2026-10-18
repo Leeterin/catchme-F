@@ -28369,34 +28369,6 @@ function withdrawReservation(m){
   showToast('약속 요청을 취소했어요.');
 }
 
-// 모아 보여준 약속 요청 여러 개를 한 번에 철회 (서버 철회 API를 요청마다 그대로 씀)
-function withdrawReservations(list){
-  const roomId = activeChatRoomId;
-  const local = list.filter(m => !m._serverId);
-  local.forEach(m => {
-    if(m._timeoutId) clearTimeout(m._timeoutId);
-    m.status = 'withdrawn';
-    clearPendingHoldLocal(m.id, true);
-  });
-  const remote = list.filter(m => m._serverId);
-  Promise.all(remote.map(m => apiRequest(`/chats/messages/${m._serverId}/withdraw`, { method: 'POST' })
-    .then(data => { applyReservationUpdate(m, data.message); return null; })
-    .catch(err => err)))
-    .then(errors => {
-      const failed = errors.filter(Boolean);
-      const room = CHAT_ROOMS[roomId];
-      if(room) saveChatCache(roomId, room.messages);
-      if(remote.length) loadScheduleFromServer(); // 서버에서 정리된 "예약중..." 홀드를 내 캘린더에도 바로 반영
-      else { touchRoom(roomId); refreshActiveScheduleView(); }
-      renderChatMessages();
-      renderChatList();
-      if(failed.length){
-        showToast(failed[0].message);
-        if(room && room.isRealRoom) loadRoomMessagesFromServer(roomId, room);
-      } else showToast(`약속 요청 ${list.length}개를 취소했어요.`);
-    });
-}
-
 function cancelReservation(m, restoreAvailability){
   const roomId = activeChatRoomId;
   const room = CHAT_ROOMS[roomId];
@@ -31667,31 +31639,10 @@ function renderChatMessages(){
     const list = openSuggestGroups.get(locationSuggestGroup(room, x).key);
     return list && list.length > 1 ? list : null;
   };
-  // 내가 이어서 보낸 약속 요청 여러 개(답 기다리는 중, 또는 같이 취소한 것)는 카드 한 장으로 모아서 맨 마지막 요청 자리에 보여줌 (취소도 한 번에)
-  const myReservationGroupKey = (x) => {
-    if(x.type !== 'reservation' || x.who !== 'me') return null;
-    const past = x.startMs && x.startMs < Date.now();
-    if(x.status === 'pending' && !past) return 'open';
-    if(x.status === 'withdrawn' && !past) return 'withdrawn';
-    return null;
-  };
-  const reservationGroups = new Map();
-  let resRun = [];
-  const closeResRun = () => { if(resRun.length > 1) resRun.forEach(x => reservationGroups.set(x, resRun)); resRun = []; };
-  (room.messages || []).forEach(x => {
-    const k = myReservationGroupKey(x);
-    if(!k){ closeResRun(); return; }
-    if(resRun.length && myReservationGroupKey(resRun[0]) !== k) closeResRun();
-    resRun.push(x);
-  });
-  closeResRun();
-  const reservationGroupOf = (x) => reservationGroups.get(x) || null;
 
   visibleMessages.forEach(m => {
     const voteGroup = openSuggestGroupOf(m);
     if(voteGroup && m !== voteGroup[voteGroup.length - 1]) return; // 모은 카드는 마지막 후보 자리에 한 번만
-    const resGroup = reservationGroupOf(m);
-    if(resGroup && m !== resGroup[resGroup.length - 1]) return;
     let isSearchHit = searching && (!chatSearchSender || chatSenderKey(m) === chatSearchSender);
     if(q && isSearchHit){
       const haystack = (m.type === 'reservation' || m.type === 'time-suggest'
@@ -31734,39 +31685,7 @@ function renderChatMessages(){
     if(m.id) row.dataset.msgId = m.id; // 핀 카드를 눌렀을 때 이 메시지로 바로 이동하기 위한 참조
     const metaHtml = buildMsgMetaHtml(m, m === lastMyMsg);
 
-    if(m.type === 'reservation' && resGroup){
-      // 메모/장소가 요청마다 다르면 줄마다, 다 같으면 아래에 한 번만
-      const placeOf = (x) => x.location ? escapeHtml(x.location) : reservationMeetPlacesLabel(room, x) || '장소 미정 (만나서 정해요)';
-      const sameNote = resGroup.every(x => (x.note || '') === (m.note || ''));
-      const samePlace = resGroup.every(x => placeOf(x) === placeOf(m));
-      const resOpen = m.status === 'pending';
-      const cardHtml = `
-        <div class="reservation-card${resOpen ? '' : ' is-done'}">
-          <div class="reservation-card-header">${ICO.calendar} 약속 요청 ${resGroup.length}개</div>
-          <div class="time-option-list">
-            ${resGroup.map((x, i) => `
-              <div class="time-option-row">
-                <span class="chat-date-link" data-idx="${i}">${x.dateLabel} ${x.timeLabel}</span>
-                ${!sameNote && x.note ? `<span class="reservation-card-note">${escapeHtml(x.note)}</span>` : ''}
-                ${!samePlace ? `<span class="reservation-card-note">${ICO.pin} ${placeOf(x)}</span>` : ''}
-              </div>`).join('')}
-          </div>
-          ${sameNote && m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
-          ${samePlace ? `<div class="reservation-card-note">${ICO.pin} ${placeOf(m)}</div>` : ''}
-          ${resOpen ? `
-          <div class="reservation-card-status pending">요청됨</div>
-          <div class="reservation-card-actions">
-            <button class="reservation-btn cancel">요청 모두 취소</button>
-          </div>` : `
-          <div class="reservation-card-status withdrawn">요청 취소함</div>`}
-        </div>
-      `;
-      row.innerHTML = metaHtml + cardHtml;
-      row.querySelectorAll('.chat-date-link').forEach(el => el.addEventListener('click', () => {
-        viewDayFromChat(parseDateLabelToDate(resGroup[parseInt(el.dataset.idx, 10)].dateLabel));
-      }));
-      if(resOpen) row.querySelector('.reservation-btn.cancel').addEventListener('click', (e) => { e.currentTarget.disabled = true; withdrawReservations(resGroup); });
-    } else if(m.type === 'reservation'){
+    if(m.type === 'reservation'){
       // 답을 못 받은 채 약속 시간이 지난 요청은 수락/거절 버튼 대신 "시간이 지났어요"로 (서버도 지난 요청은 수락을 막음)
       const expired = m.status === 'pending' && m.startMs && m.startMs < Date.now();
       // 시간이 지나 자동으로 철회된 요청도 "요청 취소함"(내가 취소한 것처럼) 대신 "요청 취소됨"으로
