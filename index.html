@@ -3794,6 +3794,7 @@
     align-items:center;
     gap:4px;
   }
+  .profile-past-appt-btn{ margin-left:auto; border:none; background:none; padding:2px 0; font:inherit; font-size:12px; font-weight:600; color:var(--text-dim); cursor:pointer; }
   .profile-meet-next{
     width:100%;
     font-size:11px;
@@ -23948,11 +23949,20 @@ function renderProfileMeetBadge(friend){
   const nextTier = [...MEET_BADGE_TIERS].sort((a, b) => a.min - b.min).find(b => count < b.min);
   let html = `<span class="profile-meet-count">${ICO.pushpin} 함께한 확정 약속 ${count}회</span>`;
   if(count) html += ' ' + levelChipHtml(count, tier);
+  // 한 번이라도 만났으면 그 친구와의 지난 약속 목록으로 바로 갈 수 있게
+  if(count) html += `<button type="button" class="profile-past-appt-btn" id="profilePastApptBtn">지난 약속 보기 &rsaquo;</button>`;
   html += levelProgressHtml(count, tier && tier.color, n => `약속 ${n}회`);
   if(nextTier){
     html += `<div class="profile-meet-next">'${nextTier.label}' 뱃지까지 ${nextTier.min - count}회 남았어요</div>`;
   }
   el.innerHTML = html;
+  const pastBtn = document.getElementById('profilePastApptBtn');
+  if(pastBtn) pastBtn.addEventListener('click', () => {
+    const roomId = findFriendRoomId(friend);
+    if(!roomId) return;
+    const returnToChat = profileReturnToChat; // 채팅 탭으로 넘어가면 지워지니 돌아올 때 다시 넣음
+    jumpToView(() => { showTab('chat'); openPastAppointmentsView(roomId, true); }, () => { profileReturnToChat = returnToChat; });
+  });
   renderProfileBadgeTiers(count, tier);
   checkMeetLevelUp(friend);
 }
@@ -30786,18 +30796,28 @@ let pastAppointmentsRoomId = null;
 // roomId 없이 열면(홈의 "지난 약속") 모든 채팅방의 지난 약속을 모아서 보여주고, 닫으면 홈으로 돌아감
 let pastAppointmentsAllRooms = false;
 
-function openPastAppointmentsView(roomId){
+// fromProfile: 친구 프로필에서 열었으면 채팅 탭에 있던 화면(목록이든 방이든)을 그대로 뒀다가 닫을 때 되돌림
+let pastAppointmentsHiddenViewId = null;
+function openPastAppointmentsView(roomId, fromProfile){
   pastAppointmentsAllRooms = !roomId;
   if(roomId && !CHAT_ROOMS[roomId]) return;
   pastAppointmentsRoomId = roomId || null;
   renderPastAppointmentsList();
-  document.getElementById(pastAppointmentsAllRooms ? 'chatListView' : 'chatRoomView').classList.remove('active');
+  if(fromProfile){
+    pastAppointmentsHiddenViewId = ['chatRoomView', 'chatListView'].find(id => document.getElementById(id).classList.contains('active')) || '';
+    if(pastAppointmentsHiddenViewId) document.getElementById(pastAppointmentsHiddenViewId).classList.remove('active');
+  } else document.getElementById(pastAppointmentsAllRooms ? 'chatListView' : 'chatRoomView').classList.remove('active');
   document.getElementById('pastAppointmentsView').classList.add('active');
   pushViewState(closePastAppointmentsView);
 }
 function closePastAppointmentsView(){
   document.getElementById('pastAppointmentsView').classList.remove('active');
   pastAppointmentsRoomId = null;
+  if(pastAppointmentsHiddenViewId !== null){
+    if(pastAppointmentsHiddenViewId) document.getElementById(pastAppointmentsHiddenViewId).classList.add('active');
+    pastAppointmentsHiddenViewId = null;
+    return;
+  }
   if(pastAppointmentsAllRooms){
     pastAppointmentsAllRooms = false;
     document.getElementById('chatListView').classList.add('active');
