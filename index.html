@@ -26910,6 +26910,9 @@ function buildFeedPostCard(post, category, distKm){
       ${coverPhoto ? `<div class="feed-post-thumb"><img loading="lazy" src="${coverPhoto}" alt="" /></div>` : ''}
     </div>
   `;
+  // 썸네일을 누르면 그 사진이 있는 리뷰 상세로 (작게만 보여서 크게 보고 싶을 때)
+  const thumbEl = card.querySelector('.feed-post-thumb');
+  if(thumbEl) thumbEl.addEventListener('click', (e) => { e.stopPropagation(); openHotplaceReviewDetail(post); });
   const suggestBtn = card.querySelector('.feed-post-btn.suggest');
   if(suggestBtn) suggestBtn.addEventListener('click', () => suggestHotplaceToChat(compat));
   card.querySelector('.feed-post-btn.fix').addEventListener('click', () => fixHotplaceLocation(compat));
@@ -26949,7 +26952,8 @@ function buildFeedPlaceGroupCard(group, category, distKm){
 
   const card = document.createElement('div');
   card.className = 'feed-post-card feed-place-group-card';
-  const coverPhoto = posts.map(p => (p.photos && p.photos[0])).find(Boolean) || '';
+  const coverPost = posts.find(p => p.photos && p.photos[0]) || null;
+  const coverPhoto = coverPost ? coverPost.photos[0] : '';
   card.innerHTML = `
     <div class="feed-post-card-inner">
       <div class="feed-post-main">
@@ -26972,6 +26976,9 @@ function buildFeedPlaceGroupCard(group, category, distKm){
       ${coverPhoto ? `<div class="feed-post-thumb"><img loading="lazy" src="${coverPhoto}" alt="" /></div>` : ''}
     </div>
   `;
+  // 썸네일을 누르면 그 사진이 있는 리뷰 상세로 (작게만 보여서 크게 보고 싶을 때)
+  const thumbEl = card.querySelector('.feed-post-thumb');
+  if(thumbEl) thumbEl.addEventListener('click', (e) => { e.stopPropagation(); openHotplaceReviewDetail(coverPost); });
   const suggestBtn = card.querySelector('.feed-post-btn.suggest');
   if(suggestBtn) suggestBtn.addEventListener('click', () => suggestHotplaceToChat(compat));
   card.querySelector('.feed-post-btn.fix').addEventListener('click', () => fixHotplaceLocation(compat));
@@ -27102,8 +27109,8 @@ function renderHotplacePlaceReviewsBody(group, category, distKm){
     </div>
     <div class="feed-tag-sub" style="margin:0 0 8px;">리뷰 ${posts.length}개</div>
     <div class="feed-tag-list">
-      ${posts.map(post => `
-        <div class="feed-tag-list-row" style="cursor:default;">
+      ${posts.map((post, i) => `
+        <div class="feed-tag-list-row" data-idx="${i}">
           <div class="feed-tag-list-thumb">${(post.photos && post.photos[0]) ? `<img loading="lazy" src="${post.photos[0]}" alt="" />` : `<div class="feed-tag-list-thumb-noimg">${ICO.pin}</div>`}</div>
           <div class="feed-tag-list-body">
             <div class="feed-tag-list-author">${post.author ? escapeHtml(post.author.name) : ''}</div>
@@ -27118,6 +27125,10 @@ function renderHotplacePlaceReviewsBody(group, category, distKm){
   const addrEl = body.querySelector('.feed-place-info-addr');
   if(addrEl) addrEl.addEventListener('click', () => openPlaceDetailMap(primary));
   wirePlaceInfoRow(body, primary);
+  // 리뷰 한 줄을 누르면 그 리뷰 상세(사진 크게 + 전체 글)로
+  body.querySelectorAll('.feed-tag-list-row[data-idx]').forEach(row => {
+    row.addEventListener('click', () => openHotplaceReviewDetail(posts[Number(row.dataset.idx)]));
+  });
   const suggestBtn = body.querySelector('.feed-post-btn.suggest');
   if(suggestBtn) suggestBtn.addEventListener('click', () => suggestHotplaceToChat(compat));
   const fixBtn = body.querySelector('.feed-post-btn.fix');
@@ -27130,6 +27141,21 @@ function renderHotplacePlaceReviewsBody(group, category, distKm){
     renderHotplaceList('cafe', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
     renderHotplaceList('experience', lastHotplaceLocationHint, lastHotplaceLat, lastHotplaceLon);
     renderSavedPlacesGroups();
+  });
+}
+
+// 핫플 화면에서 리뷰 하나를 누르면 소식 탭의 그 리뷰 상세로 - 뒤로가기하면 핫플 화면(과 모아보기)이 그대로 다시 뜸.
+// (공유 카드 열기와 같은 방식. 핫플 팝업들이 위에 떠 있으면 상세가 그 밑에 가려지니 잠깐 내려둠)
+function openHotplaceReviewDetail(post){
+  if(!post) return;
+  post = Object.values(FEED_POSTS).flat().find(p => p.id === post.id) || post; // 저장 탭 카드는 저장해둔 사본일 수 있어서 최신 글로
+  const shown = ['hotplaceOverlay', 'hotplacePlaceReviewsOverlay']
+    .map(id => document.getElementById(id))
+    .filter(el => el.classList.contains('show'));
+  jumpToView(() => {
+    pushViewState(() => shown.forEach(el => el.classList.add('show')));
+    shown.forEach(el => el.classList.remove('show'));
+    showTab('community'); switchCommunityView('feed'); openFeedPostDetail(post);
   });
 }
 
