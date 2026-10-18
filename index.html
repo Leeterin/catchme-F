@@ -31587,11 +31587,11 @@ function renderChatMessages(){
       const isOutdatedConfirm = m.status === 'confirmed' && isOutdatedLocationConfirm(room, m);
       const cardHtml = `
         <div class="reservation-card ls-card${m.status === 'confirmed' && !isOutdatedConfirm ? ' is-confirmed' : !isPending ? ' is-done' : ''}">
-          <div class="reservation-card-header">${m.status === 'confirmed' ? `${ICO.check} 장소 확정` : `${ICO.pin} 장소 제안 - 여기 어때요?`}</div>
+          <div class="reservation-card-header">${isOutdatedConfirm ? `${ICO.pin} 장소 변경` : m.status === 'confirmed' ? `${ICO.check} 장소 확정` : `${ICO.pin} 장소 제안 - 여기 어때요?`}</div>
           <div class="reservation-card-time">${escapeHtml(locationSuggestTitle(activeChatRoomId, m))}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
           ${m.location ? `<div class="reservation-card-note">${escapeHtml(m.location)}</div>` : ''}
-          <div class="reservation-card-status ${m.status}">${statusLabel}</div>
+          <div class="reservation-card-status ${m.status}">${isOutdatedConfirm ? '장소 변경됨' : statusLabel}</div>
           ${isPending ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn decline ls-map-btn">${ICO.pin} 후보 보기</button>
