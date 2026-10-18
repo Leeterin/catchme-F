@@ -27796,6 +27796,15 @@ function locationSuggestGroup(room, m){
 function isStaleLocationSuggest(room, m){
   return locationSuggestGroup(room, m).stale;
 }
+// 확정된 장소 제안이 지금은 예전 것인지 - 그 약속이 지났거나 취소됐거나, 확정된 장소가 지금 안 끝난 약속들의 장소에 없음(변경/삭제됨)
+// (서버 방은 핀을 불러온 뒤에만 판단 - 불러오기 전에 카드가 잘못 회색이 되지 않게)
+function isOutdatedLocationConfirm(room, m){
+  if(room.isRealRoom && !room._pinsLoaded) return false;
+  if(isStaleLocationSuggest(room, m)) return true;
+  const name = String(m.place || '').trim().toLowerCase();
+  if(!name) return false;
+  return !activeMeetPlacePins(room).some(p => String(p.location || '').trim().toLowerCase() === name);
+}
 // 지금 약속을 위해 투표 중인 제안 (지난 약속 때 올라와서 아직 대기 중인 건 뺌)
 function isOpenLocationSuggest(room, m){
   return m.type === 'location-suggest' && m.status === 'pending' && !isStaleLocationSuggest(room, m);
@@ -31574,8 +31583,10 @@ function renderChatMessages(){
       const isPending = m.status === 'pending' && !isStale;
       const showCancel = m.who === 'me' && isPending;
       const hasCoords = typeof m.locationLat === 'number' && typeof m.locationLon === 'number';
+      // 약속이 바뀌어서(장소 변경/삭제, 약속 취소, 지난 약속) 이제 예전 것이 된 "장소 확정" 카드는 회색으로
+      const isOutdatedConfirm = m.status === 'confirmed' && isOutdatedLocationConfirm(room, m);
       const cardHtml = `
-        <div class="reservation-card ls-card${m.status === 'confirmed' ? ' is-confirmed' : !isPending ? ' is-done' : ''}">
+        <div class="reservation-card ls-card${m.status === 'confirmed' && !isOutdatedConfirm ? ' is-confirmed' : !isPending ? ' is-done' : ''}">
           <div class="reservation-card-header">${m.status === 'confirmed' ? `${ICO.check} 장소 확정` : `${ICO.pin} 장소 제안 - 여기 어때요?`}</div>
           <div class="reservation-card-time">${escapeHtml(locationSuggestTitle(activeChatRoomId, m))}</div>
           ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
