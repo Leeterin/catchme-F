@@ -30337,12 +30337,11 @@ function renderPinnedSchedule(){
     return;
   }
 
-  // 날짜(요일)가 지난 예약은 고정 영역에서 자동으로 안 보이게 함.
+  // 끝난 약속(날짜가 지났거나, 오늘이라도 끝나는 시각이 지난 것)은 고정 영역에서 자동으로 안 보이게 함.
   // 날짜 없이 "장소만" 있는 핀은 이제 메인 채팅화면에 따로 카드로 안 보여주고, 확정된 일정(날짜 있는 핀)을
   // 눌러서 들어가는 "약속 상세보기" 화면 안에서만 보여줌 - 안 그러면 장소 제안이 오갈 때마다 메인 화면
   // 상단이 장소 카드로 계속 지저분하게 쌓임
-  const todayStart = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
-  let pins = room.pinnedSchedules.filter(p => p.dateObj && p.dateObj >= todayStart);
+  let pins = room.pinnedSchedules.filter(p => p.dateObj && !isPinPast(p));
   // 장소부터 정해둔 약속은 "날짜 미정 약속" 카드로 하나씩 보여줌 - 그 카드에서 날짜를 정하면
   // 새 일정 카드에 이 장소들이 그대로 붙음 (서버가 옮김)
   pins = pins.concat(undatedMeetPins(room));
