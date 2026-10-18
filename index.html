@@ -28274,6 +28274,22 @@ function cancelLocationSuggest(msg){
 }
 
 // 투표 중인 후보들을 한꺼번에 취소 (투표 카드의 '제안 취소') - 서버는 같은 약속에 대기 중인 후보를 전부 닫아줌
+// 투표 카드에서 한 번에 같이 취소한 후보들 - 취소된 뒤에도 그 투표 카드 그대로 한 장으로 보여주려고 기억해둠
+// (서버엔 어떤 후보들이 같이 취소됐는지 안 남아서, 예전에 하나씩 취소한 후보까지 묶이지 않게 이걸로만 묶음)
+const CANCELLED_VOTE_BATCHES_KEY = 'catchme_cancelled_vote_batches';
+function loadCancelledVoteBatches(){
+  try { return JSON.parse(localStorage.getItem(CANCELLED_VOTE_BATCHES_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function rememberCancelledVoteBatch(items){
+  const ids = items.map(x => x._serverId || x.id).filter(Boolean);
+  if(ids.length < 2) return;
+  try {
+    const list = loadCancelledVoteBatches();
+    list.push(ids);
+    localStorage.setItem(CANCELLED_VOTE_BATCHES_KEY, JSON.stringify(list.slice(-100)));
+  } catch(e){}
+}
 function cancelLocationSuggestVote(items){
   const roomId = activeChatRoomId;
   const first = items.find(x => x._serverId);
@@ -28287,6 +28303,7 @@ function cancelLocationSuggestVote(items){
           const cur = room && room.messages.find(m => m._serverId === sm.id);
           if(cur) Object.assign(cur, mapped);
         });
+        rememberCancelledVoteBatch(items);
         if(room) saveChatCache(roomId, room.messages);
         renderChatMessages();
         renderChatList();
@@ -28304,6 +28321,7 @@ function cancelLocationSuggestVote(items){
   }
 
   items.forEach(x => { if(x._timeoutId) clearTimeout(x._timeoutId); x.status = 'cancelled'; });
+  rememberCancelledVoteBatch(items);
   touchRoom(roomId);
   renderChatMessages();
   renderChatList();
@@ -31634,22 +31652,16 @@ function renderChatMessages(){
     if(!openSuggestGroups.has(key)) openSuggestGroups.set(key, []);
     openSuggestGroups.get(key).push(x);
   });
-  // 같이 취소된 투표(같은 약속에서 연달아 취소된 후보들)도 카드 한 장 그대로 '투표 취소됨'으로 남김
+  // 투표 카드에서 한 번에 같이 취소한 후보들만 카드 한 장 그대로 '투표 취소됨'으로 남김 (하나씩 취소한 건 예전처럼 따로)
   const withdrawnSuggestGroups = new Map();
-  const suggestRuns = new Map(); // key -> 지금 이어지는 취소된 후보들
-  const closeSuggestRun = (key) => {
-    const run = suggestRuns.get(key);
-    if(run && run.length > 1) run.forEach(x => withdrawnSuggestGroups.set(x, run));
-    suggestRuns.delete(key);
-  };
-  (room.messages || []).forEach(x => {
-    if(x.type !== 'location-suggest') return;
-    const key = locationSuggestGroup(room, x).key;
-    if(!isWithdrawnLocationSuggest(x)){ closeSuggestRun(key); return; }
-    if(!suggestRuns.has(key)) suggestRuns.set(key, []);
-    suggestRuns.get(key).push(x);
+  const withdrawnById = new Map();
+  (room.messages || []).forEach(x => { if(x.type === 'location-suggest' && isWithdrawnLocationSuggest(x)) withdrawnById.set(x._serverId || x.id, x); });
+  if(withdrawnById.size > 1) loadCancelledVoteBatches().forEach(ids => {
+    const batch = ids.map(id => withdrawnById.get(id)).filter(Boolean);
+    if(batch.length < 2) return;
+    batch.sort((a, b) => room.messages.indexOf(a) - room.messages.indexOf(b));
+    batch.forEach(x => withdrawnSuggestGroups.set(x, batch));
   });
-  [...suggestRuns.keys()].forEach(closeSuggestRun);
   const openSuggestGroupOf = (x) => {
     if(withdrawnSuggestGroups.has(x)) return withdrawnSuggestGroups.get(x);
     if(!isOpenLocationSuggest(room, x)) return null;
