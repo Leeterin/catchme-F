@@ -22290,8 +22290,14 @@ document.getElementById('eventFormSubmitBtn').addEventListener('click', () => {
 
   const editingEv = editingEventId ? SCHEDULE_EVENTS.find(e => e.id === editingEventId) : null;
   const editingServerId = editingEv && editingEv.serverId;
+  // 원래 있던 일정을 고치는데 날짜·시간·반복 요일을 그대로 뒀으면(장소·이동시간·메모만 바꿈) 겹침은 묻지 않음 -
+  // 원래 그 시간에 있던 일정이라 다시 물어볼 이유가 없음
+  const sameTiming = !!editingEv && editingEv.startMin === startMin && editingEv.endMin === endMin && (
+    formRepeatMode === 'weekly'
+      ? !!editingEv.recurring && editingEv.recurring.weekdays.length === formSelectedWeekdays.size && editingEv.recurring.weekdays.every(d => formSelectedWeekdays.has(d))
+      : !editingEv.recurring && editingEv.dateKey === baseDateKey);
   let overlapFound = null;
-  for(const { date, winStart, winEnd } of dailyWindows){
+  if(!sameTiming) for(const { date, winStart, winEnd } of dailyWindows){
     const dayEvents = getEventsForDate(date);
     const found = dayEvents.find(ev => {
       if(ev.id === editingEventId || editingLinkedPieceIds.includes(ev.id)) return false;
