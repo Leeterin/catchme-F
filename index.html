@@ -20971,13 +20971,13 @@ bindTravelPlaceSearch('travelFromInput', 'travelFromResults', (place) => {
   formTravel = { ...(formTravel || {}), from: place };
   tutorialEvent('travel:from');
   computeFormTravel();
-}, () => travelOriginOptions().map(o => ({ name: o.short, address: o.key === 'prev' ? '앞 일정 장소' : o.address, lat: o.lat, lon: o.lon })));
+}); // 자주 가는 곳은 아래 버튼 줄에 이미 있어서, 칸을 눌렀을 때 목록을 또 띄우지 않음
 bindTravelPlaceSearch('travelDestInput', 'travelDestResults', (place) => {
   formTravel = { ...(formTravel || {}), to: place };
   if(!formTravel.from) formTravel.from = defaultTravelOrigin(); // 출발지를 안 골랐으면 앞 일정 장소 → 집 순으로 자동
   tutorialEvent('travel:dest');
   computeFormTravel();
-}, () => travelOriginOptions().filter(o => o.key !== 'prev').map(o => ({ name: o.short, address: o.address, lat: o.lat, lon: o.lon })));
+});
 
 document.getElementById('eventAvailForRow').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-aud-chip]');
