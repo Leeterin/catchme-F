@@ -4478,6 +4478,10 @@
   .reservation-card.ls-card{ width:78%; max-width:300px; }
   .ls-card .reservation-card-time{ font-family:inherit; font-size:14px; font-weight:600; line-height:1.4; word-break:keep-all; }
   .ls-card .reservation-card-actions + .reservation-card-actions{ margin-top:8px; }
+  .ls-vote-card .place-vote-row{ cursor:pointer; }
+  .ls-vote-card .place-vote-name{ white-space:normal; word-break:keep-all; }
+  .ls-vote-card .place-vote-list + .reservation-card-actions{ margin-top:10px; }
+  .ls-vote-card .ls-row-cancel{ border:none; background:none; padding:0; font:inherit; color:var(--text-dim); text-decoration:underline; cursor:pointer; }
   .reservation-btn.ls-cancel-btn{ background:var(--surface-2); border:1px solid var(--cta); color:var(--cta); font-weight:700; }
   .reservation-btn.ls-cancel-btn:hover{ background:rgba(255,107,74,0.1); }
   /* 모임 장소 추천 - 카카오톡 투표처럼 채팅방에 남는 "출발지 모으기" 카드의 제출 현황 막대 */
@@ -27908,7 +27912,8 @@ function locationSuggestNumbers(room){
     groups.set(key, g);
     if(x.newRound) g.reset = true; // 새로 시작한 첫 제안을 취소해도 다음 제안부터 1번
     if(isWithdrawnLocationSuggest(x)) return;
-    if((g.last && g.last.status === 'confirmed') || g.reset) g.no = 0;
+    // 이전 투표 판이 끝났으면(확정, 또는 다른 곳으로 정해져 마감) 다시 1번부터
+    if((g.last && (g.last.status === 'confirmed' || g.last.status === 'declined')) || g.reset) g.no = 0;
     g.reset = false;
     nums.set(x, ++g.no);
     g.last = x;
@@ -27923,7 +27928,7 @@ function locationSuggestNo(roomId, m){
 // 이 약속에 새로 제안하면 붙을 번호 바로 앞 번호 (새 약속이면 0이라 1번부터 시작)
 function nextLocationSuggestBaseNo(room, pinned, newMeet){
   const g = locationSuggestNumbers(room).groups.get(meetGroupKey(room, pinned, newMeet));
-  if(!g || !g.last || g.reset || g.last.status === 'confirmed') return 0;
+  if(!g || !g.last || g.reset || g.last.status === 'confirmed' || g.last.status === 'declined') return 0;
   return g.no;
 }
 function locationSuggestTitle(roomId, m){
@@ -31544,8 +31549,23 @@ function renderChatMessages(){
   }
   if(lastMyMsg) applyOtherReadAt(room, lastMyMsg); // 읽었다는 알림이 내 메시지 전송 확인보다 먼저 왔어도 놓치지 않게
   let lastOtherRunKey = null; // 바로 앞 "상대 메시지"의 보낸 사람+분 - 같으면 프로필 아이콘을 또 그리지 않음
+  // 같은 약속에 투표 중인 장소 후보가 여러 곳이면 카드 한 장으로 모아서 맨 마지막 후보 자리에 보여줌
+  const openSuggestGroups = new Map();
+  (room.messages || []).forEach(x => {
+    if(!isOpenLocationSuggest(room, x)) return;
+    const key = locationSuggestGroup(room, x).key;
+    if(!openSuggestGroups.has(key)) openSuggestGroups.set(key, []);
+    openSuggestGroups.get(key).push(x);
+  });
+  const openSuggestGroupOf = (x) => {
+    if(!isOpenLocationSuggest(room, x)) return null;
+    const list = openSuggestGroups.get(locationSuggestGroup(room, x).key);
+    return list && list.length > 1 ? list : null;
+  };
 
   visibleMessages.forEach(m => {
+    const voteGroup = openSuggestGroupOf(m);
+    if(voteGroup && m !== voteGroup[voteGroup.length - 1]) return; // 모은 카드는 마지막 후보 자리에 한 번만
     let isSearchHit = searching && (!chatSearchSender || chatSenderKey(m) === chatSearchSender);
     if(q && isSearchHit){
       const haystack = (m.type === 'reservation' || m.type === 'time-suggest'
@@ -31694,6 +31714,48 @@ function renderChatMessages(){
       if(showConfirmedExtras){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable), '', { keepAvail: !(m.startMs ? m.startMs <= Date.now() : isLabelTimePast(m.dateLabel, m.timeLabel)) }));
       }
+    } else if(m.type === 'location-suggest' && voteGroup){
+      // 투표 중인 후보 여러 곳을 한 카드에 - 줄마다 바로 투표, 내가 올린 후보는 취소도 여기서
+      const me = myLocationVoterId();
+      const suggestTarget = m.pinId ? (room.pinnedSchedules || []).find(p => p.serverId === m.pinId) : null;
+      const headText = suggestTarget || !m.pinId ? `${escapeHtml(meetPlaceTargetText(room, suggestTarget))} 투표` : '장소 투표';
+      const voters = new Set();
+      voteGroup.forEach(x => (x.voterIds || []).forEach(id => voters.add(id)));
+      const maxVotes = Math.max(1, ...voteGroup.map(x => (x.voterIds || []).length));
+      row.innerHTML = (m.who === 'me' ? metaHtml : '') + `
+        <div class="reservation-card ls-card ls-vote-card">
+          <div class="reservation-card-header">${ICO.pin} ${headText}</div>
+          <div class="reservation-card-note">후보 ${voteGroup.length}곳 · ${getTotalParticipants(room)}명 중 ${voters.size}명 투표</div>
+          <div class="place-vote-list" style="margin-top:8px;">
+            ${voteGroup.map((x, i) => {
+              const votes = (x.voterIds || []).length;
+              const mine = (x.voterIds || []).includes(me);
+              return `
+              <div class="place-vote-row" data-idx="${i}">
+                <div class="place-vote-info">
+                  <div class="place-vote-name">${escapeHtml(locationSuggestTitle(activeChatRoomId, x))}</div>
+                  <div class="place-vote-sub">${x.who === 'me' ? '내 제안' : '친구 제안'}${x.who === 'me' ? ` · <button type="button" class="ls-row-cancel" data-idx="${i}">취소</button>` : ''}</div>
+                  <div class="place-vote-bar"><span style="width:${Math.round(votes / maxVotes * 100)}%"></span></div>
+                </div>
+                <button type="button" class="place-vote-btn${mine ? ' voted' : ''}" data-idx="${i}">${mine ? '✓ ' : ''}${votes}표</button>
+              </div>`;
+            }).join('')}
+          </div>
+          <div class="reservation-card-actions">
+            <button class="reservation-btn decline ls-map-btn">${ICO.pin} 지도에서 후보 보기</button>
+          </div>
+        </div>
+      ` + (m.who === 'me' ? '' : metaHtml);
+      row.querySelectorAll('.place-vote-btn').forEach(btn => btn.addEventListener('click', () => {
+        btn.disabled = true;
+        voteLocationSuggestMsg(activeChatRoomId, voteGroup[parseInt(btn.dataset.idx, 10)]);
+      }));
+      row.querySelectorAll('.ls-row-cancel').forEach(btn => btn.addEventListener('click', () => cancelLocationSuggest(voteGroup[parseInt(btn.dataset.idx, 10)])));
+      row.querySelectorAll('.place-vote-row').forEach(r => r.addEventListener('click', (e) => {
+        if(e.target.closest('button')) return;
+        openPlaceSuggestionMap(activeChatRoomId, voteGroup[parseInt(r.dataset.idx, 10)].id);
+      }));
+      row.querySelector('.ls-map-btn').addEventListener('click', () => openPlaceSuggestionMap(activeChatRoomId, voteGroup[0].id));
     } else if(m.type === 'location-suggest'){
       const voteCount = (m.voterIds || []).length;
       const votedByMe = (m.voterIds || []).includes(myLocationVoterId());
