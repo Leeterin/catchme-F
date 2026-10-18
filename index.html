@@ -20503,6 +20503,7 @@ function renderTravelSection(){
     const o = opts.find(x => x.key === b.dataset.from);
     if(!o) return;
     formTravel = { ...(formTravel || {}), from: { name: o.short, lat: o.lat, lon: o.lon } };
+    tutorialEvent('travel:from');
     computeFormTravel();
   }));
   // 도착지 바로가기 - 자주 쓰는 출발지(집·회사 등)
@@ -20746,6 +20747,7 @@ document.getElementById('travelModeRow').addEventListener('click', (e) => {
 });
 bindTravelPlaceSearch('travelFromInput', 'travelFromResults', (place) => {
   formTravel = { ...(formTravel || {}), from: place };
+  tutorialEvent('travel:from');
   computeFormTravel();
 }, () => travelOriginOptions().map(o => ({ name: o.short, address: o.key === 'prev' ? '앞 일정 장소' : o.address, lat: o.lat, lon: o.lon })));
 bindTravelPlaceSearch('travelDestInput', 'travelDestResults', (place) => {
@@ -39227,21 +39229,22 @@ const TUTORIAL_STEPS = [
     until: 'eventform:open',
   },
   {
-    title: '어디로 가요?',
-    blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
-    text: "일정 이름과 시간을 정하고, 도착지에 가는 곳을 검색해서 골라요. 일정 시작에 맞춰 도착하려면 언제 나가야 하는지 계산해줘요.",
-    needs: () => document.getElementById('eventFormView').classList.contains('active'),
-    // 이름을 아직 안 적었으면 이름 칸도 같이 표시
-    targets: () => [document.getElementById('eventFormTitle').value.trim() ? null : document.getElementById('eventFormTitle'), document.getElementById('travelDestInput')],
-    until: 'travel:dest',
-    backOn: { 'eventform:close': '일정 추가하기' }, // 저장 안 하고 닫으면 '+' 누르는 단계로
-  },
-  {
     title: '어디서 출발해요?',
     blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
-    text: '출발지도 골라요. 집·회사를 자주 쓰는 출발지로 저장해 두면 다음부턴 버튼 하나로 골라져요.',
+    text: "일정 이름과 시간을 정하고, 먼저 출발지를 검색해서 골라요. 집·회사를 자주 쓰는 출발지로 저장해 두면 다음부턴 버튼 하나로 골라져요.",
     needs: () => document.getElementById('eventFormView').classList.contains('active'),
-    targets: () => [document.getElementById('travelFromInput')],
+    // 이름을 아직 안 적었으면 이름 칸도 같이 표시
+    targets: () => [document.getElementById('eventFormTitle').value.trim() ? null : document.getElementById('eventFormTitle'), document.getElementById('travelFromInput')],
+    until: 'travel:from',
+    // 저장 안 하고 닫으면 '+' 누르는 단계로, 도착지까지 먼저 골라 계산이 끝났으면 바로 결과 단계로
+    backOn: { 'eventform:close': '일정 추가하기', 'travel:computed': '출발 시간 계산 끝!' },
+  },
+  {
+    title: '어디로 가요?',
+    blockSave: true, // 출발지·도착지를 넣어보기 전에 '추가하기'로 끝내버리지 않게
+    text: '이제 도착지에 가는 곳을 검색해서 골라요. 일정 시작에 맞춰 도착하려면 언제 나가야 하는지 계산해줘요.',
+    needs: () => document.getElementById('eventFormView').classList.contains('active'),
+    targets: () => [document.getElementById('travelDestInput')],
     until: 'travel:computed',
     backOn: { 'eventform:close': '일정 추가하기' },
   },
