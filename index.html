@@ -20583,8 +20583,8 @@ function addFrequentPlaceChips(row, which, cur, opts){
     computeFormTravel();
   };
   const extra = [];
-  // "+ 집" "+ 회사"는 출발 줄에만 (두 줄에 똑같이 뜨면 복잡해서) - 도착 줄은 고른 곳 "☆ 저장"만
-  if(which === 'from') FIXED_LOCATION_LABELS.filter(f => f.label !== 'SCHOOL' && !mySavedLocations.some(l => l.label === f.label)).forEach(f => {
+  // "+ 집" "+ 장소 추가"는 출발 줄에만 (두 줄에 똑같이 뜨면 복잡해서) - 도착 줄은 고른 곳 "☆ 저장"만
+  if(which === 'from') FIXED_LOCATION_LABELS.filter(f => f.label === 'HOME' && !mySavedLocations.some(l => l.label === f.label)).forEach(f => {
     extra.push({ text: `+ ${f.name}`, onTap: () => openDepartureLocationPicker({
       title: `${f.name} 주소 등록`, showSaved: false, requireCustomName: false,
       onConfirm: async (picked) => {
@@ -20596,6 +20596,17 @@ function addFrequentPlaceChips(row, which, cur, opts){
       },
     }) });
   });
+  // 회사/헬스장/본가 등 원하는 이름으로 - 이름 + 주소를 넣어 저장하면 이번 출발지로도 바로 들어감
+  if(which === 'from') extra.push({ text: '+ 장소 추가', onTap: () => openDepartureLocationPicker({
+    title: '자주 가는 곳 추가', showSaved: false, requireCustomName: true,
+    onConfirm: async (picked) => {
+      try {
+        const loc = await saveFrequentPlace({ label: 'CUSTOM', customLabel: picked.customLabel, address: picked.address, lat: picked.lat, lon: picked.lon });
+        showToast(`'${picked.customLabel}'을(를) 저장했어요. 다음부턴 버튼 하나로 골라져요.`);
+        useSaved(loc);
+      } catch(err){ showToast(err.message); }
+    },
+  }) });
   // 검색해서 고른 곳인데 아직 저장 안 된 곳이면 "☆ 저장"
   const isSaved = cur && opts.some(o => o.lat === cur.lat && o.lon === cur.lon);
   if(cur && !isSaved && typeof cur.lat === 'number'){
