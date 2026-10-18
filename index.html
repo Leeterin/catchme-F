@@ -39206,7 +39206,10 @@ const TUTORIAL_STEPS = [
     text: () => quickTutorialTrack()
       ? "날짜 아래 빈 막대를 누르면 시간이 생겨요. 양 끝을 끌어 시간을 맞춘 뒤, 맨 아래 '열어두기'를 눌러요."
       : '이번 주는 남은 날이 없어요. 오른쪽 화살표로 다음 주로 넘겨 주세요.',
-    targets: () => quickTutorialTrack() ? [quickTutorialTrack(), document.getElementById('quickAvailSubmitBtn')] : [document.getElementById('quickAvailWeekNext')],
+    // '열어두기'는 시간을 하나라도 넣은 뒤에만 가리킴 (그 전엔 버튼이 '시간을 골라 주세요'라 아래로 내리라는 표시가 먼저 뜨면 헷갈림)
+    targets: () => quickTutorialTrack()
+      ? [quickTutorialTrack(), quickTutorialPicked() ? document.getElementById('quickAvailSubmitBtn') : null]
+      : [document.getElementById('quickAvailWeekNext')],
     inSheet: true,
     until: 'avail:opened',
     backOn: { 'quick:close': 0 }, // 안 열고 닫으면 처음 단계로
@@ -39492,6 +39495,10 @@ function cleanupTutorialPractice(){
 }
 
 // 빠르게 열기 화면에서 시간을 넣을 수 있는 첫 날의 막대 (오늘처럼 일부가 지난 날은 빼고, 아예 지난 날은 막대가 없음)
+// 빠르게 열기에서 시간을 하나라도 넣었거나 바꿨는지 (보고 있는 주든 넘겨본 다른 주든)
+function quickTutorialPicked(){
+  return quickTabKeys().some(quickTabChanged) || quickOtherChangedWeeks().length > 0;
+}
 function quickTutorialTrack(){
   return [...document.querySelectorAll('#quickAvailRows [data-qa-track]')].find(t => !t.querySelector('.qa-past')) || null;
 }
