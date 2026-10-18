@@ -7766,7 +7766,7 @@
   body:has(#authGateView[style*="flex"]) .tut-card{ display:none; }
   .tut-card-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
   .tut-step{ font-size:12px; font-weight:700; color:var(--mz-golden); }
-  .tut-skip{ background:none; border:none; padding:2px 0 2px 10px; color:rgba(255,255,255,0.6); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+  .tut-prev{ background:none; border:none; padding:2px 0 2px 10px; color:rgba(255,255,255,0.6); font-family:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
   .tut-title{ font-size:16px; font-weight:800; letter-spacing:-0.02em; margin-bottom:4px; }
   .tut-text{ font-size:13.5px; line-height:1.55; color:rgba(255,255,255,0.85); word-break:keep-all; }
   /* 아직 직접 해볼 수 없는 단계의 작은 그림 */
@@ -9208,7 +9208,7 @@
   <!-- 처음 쓰는 사람 튜토리얼 안내 카드 - 실제 버튼에 테두리를 깜빡이게 하고, 직접 눌러보면 다음 단계로 (startTutorial) -->
   <div class="tut-rings" id="tutRings"></div>
   <div class="tut-card" id="tutCard" hidden>
-    <div class="tut-card-top"><span class="tut-step" id="tutStep"></span><button type="button" class="tut-skip" id="tutSkipBtn">건너뛰기</button></div>
+    <div class="tut-card-top"><span class="tut-step" id="tutStep"></span><button type="button" class="tut-prev" id="tutPrevBtn">&#8249; 이전</button></div>
     <div class="tut-title" id="tutTitle"></div>
     <div class="tut-text" id="tutText"></div>
     <div class="tut-art" id="tutArt"></div>
@@ -39167,6 +39167,7 @@ const TUTORIAL_STEPS = [
   {
     // 이번 주에 남은 날이 없으면(주말 저녁 등) 다음 주로 넘기라고 안내
     title: '시간 정하기',
+    needs: () => document.getElementById('quickAvailOverlay').classList.contains('show'), // 이전으로 돌아올 땐 창이 열려 있어야 이어갈 수 있음
     text: () => quickTutorialTrack()
       ? "날짜 아래 빈 막대를 누르면 시간이 생겨요. 양 끝을 끌어 시간을 맞춘 뒤, 맨 아래 '열어두기'를 눌러요."
       : '이번 주는 남은 날이 없어요. 오른쪽 화살표로 다음 주로 넘겨 주세요.',
@@ -39229,6 +39230,7 @@ const TUTORIAL_STEPS = [
   {
     when: () => tutorialPractice,
     title: '시간 고르기',
+    needs: () => document.getElementById('friendCalendarView').classList.contains('active'),
     text: () => document.querySelector('#friendCalendarView .day-event-card.available')
       ? "민지가 열어둔 시간이에요. 눌러서 시간을 골라요."
       : "이 날은 열린 시간이 없어요. 오른쪽 화살표로 다음 날로 넘겨 주세요.",
@@ -39238,6 +39240,7 @@ const TUTORIAL_STEPS = [
   {
     when: () => tutorialPractice,
     title: '약속 요청 보내기',
+    needs: () => document.getElementById('friendReserveView').classList.contains('active'),
     text: "시작·끝 시간을 고르고 '약속 요청 보내기'를 눌러요. 메모와 장소는 비워도 돼요.",
     targets: () => [document.getElementById('friendReserveSubmitBtn')],
     inSheet: true,
@@ -39246,6 +39249,7 @@ const TUTORIAL_STEPS = [
   {
     when: () => tutorialPractice,
     title: '수락 기다리기',
+    needs: () => false, // 기다리기만 하는 단계라 이전으로는 다시 안 감
     text: '요청은 민지와의 채팅방에 올라가요. 민지가 수락하면 약속이 잡혀요. 잠깐만 기다려요…',
     targets: () => [],
     until: 'reserve:confirmed',
@@ -39253,6 +39257,7 @@ const TUTORIAL_STEPS = [
   {
     when: () => tutorialPractice,
     title: '약속이 잡혔어요!',
+    needs: () => activeChatRoomId === TUTORIAL_PRACTICE_ROOM_ID && document.body.classList.contains('chat-open'),
     text: "잡힌 약속은 채팅방 맨 위에 고정되고 내 캘린더에도 들어가요. '장소 정하기'로 친구와 장소도 정할 수 있어요.",
     targets: () => [document.querySelector('#chatPinnedSchedule .pin-card') || document.getElementById('chatPinnedSchedule')],
     next: '다음',
@@ -39409,6 +39414,16 @@ function goTutorialStep(i){
   tutorialStep = i;
   renderTutorialStep();
 }
+// 이전 단계로 - 그 단계 화면(빠르게 열기 창, 약속 요청 화면 등)이 이미 닫혔으면 이어갈 수 있는 단계까지 더 거슬러 감
+function goTutorialPrev(){
+  let i = tutorialStep - 1;
+  while(i > 0){
+    const st = TUTORIAL_STEPS[i];
+    if((!st.when || st.when()) && (!st.needs || st.needs())) break;
+    i--;
+  }
+  goTutorialStep(Math.max(i, 0));
+}
 // 앱 곳곳에서 "이런 일이 있었다"고 알려줌 - 지금 단계가 기다리던 거면 다음 단계로
 function tutorialEvent(name){
   if(tutorialStep < 0) return;
@@ -39472,7 +39487,7 @@ function renderTutorialStep(){
   if(step.enter) step.enter();
   document.getElementById('tutTitle').textContent = step.title;
   document.getElementById('tutArt').innerHTML = step.art || ''; // 아직 직접 해볼 수 없는 단계(친구가 있어야 하는 것)는 작은 그림으로 보여줌
-  document.getElementById('tutSkipBtn').style.display = step.signup ? 'none' : '';
+  document.getElementById('tutPrevBtn').style.visibility = shown.indexOf(step) > 0 ? '' : 'hidden'; // 첫 단계엔 이전이 없음
   const actions = document.getElementById('tutActions');
   actions.innerHTML = '';
   if(step.signup && !authToken){
@@ -39490,7 +39505,8 @@ function renderTutorialStep(){
     next.addEventListener('click', () => goTutorialStep(tutorialStep + 1));
     actions.appendChild(next);
   }
-  // 첫 단계는 홈에서 시작
+  // 첫 단계는 홈에서 시작 - 이전으로 돌아왔는데 빠르게 열기 창이 열려 있으면 닫아서 버튼이 보이게
+  if(tutorialStep === 0 && document.getElementById('quickAvailOverlay').classList.contains('show')) dismissView(closeQuickAvail);
   if(tutorialStep === 0 && currentTopTab !== null) switchTopTab(null);
   refreshTutorialTargets();
   // 눌러볼 버튼이 화면 밖이면 보이게 스크롤 (아래 탭 버튼은 늘 보임)
@@ -39499,7 +39515,7 @@ function renderTutorialStep(){
   // 막 열린 화면은 조금 뒤에 다 그려지니 깜빡일 버튼을 한 번 더 찾음
   setTimeout(refreshTutorialTargets, 250);
 }
-document.getElementById('tutSkipBtn').addEventListener('click', endTutorial);
+document.getElementById('tutPrevBtn').addEventListener('click', goTutorialPrev);
 // 화면을 누르거나 스크롤하면 깜빡일 버튼과 카드 위치를 다시 맞춤 (주를 넘기거나 목록이 다시 그려진 경우)
 document.addEventListener('click', () => { if(tutorialStep >= 0) setTimeout(refreshTutorialTargets, 80); }, true);
 window.addEventListener('scroll', () => { if(tutorialStep >= 0) requestAnimationFrame(refreshTutorialTargets); }, { passive: true, capture: true });
