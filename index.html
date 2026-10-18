@@ -7827,6 +7827,7 @@
   @media (prefers-reduced-motion: no-preference){
     .tut-card:not([hidden]){ animation:mzRiseIn .25s ease; }
   }
+  .auth-later-top{ position:fixed; top:calc(env(safe-area-inset-top) + 12px); right:14px; z-index:1; padding:8px 14px; border:none; border-radius:999px; background:var(--mz-segment, rgba(0,0,0,0.06)); color:var(--text-dim); font-family:inherit; font-size:13.5px; font-weight:700; cursor:pointer; }
   .auth-skip-btn{ display:block; width:100%; background:none; border:none; color:var(--text-dim); font-size:13px; font-weight:600; padding:16px 0 4px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   .auth-hint{
     margin-top:16px;
@@ -9160,6 +9161,8 @@
 
   <!-- 회원가입 / 로그인 게이트 -->
   <div class="auth-gate" id="authGateView" style="display:none;">
+    <!-- 맨 아래 '나중에 할게요'는 스크롤해야 보여서, 오른쪽 위에도 바로 넘길 수 있게 -->
+    <button type="button" class="auth-later-top" id="authLaterTopBtn">나중에</button>
     <div class="auth-card">
       <div class="auth-logo">
         <div class="mark"><svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 10 82 31H18Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="5" stroke-linejoin="round"/><g fill="#FFFFFF"><rect x="23" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="38" width="15.8" height="15.8" rx="3.6"/><rect x="23" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="57.1" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="57.1" width="15.8" height="15.8" rx="3.6" fill="#E9A23B"/><rect x="23" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="42.1" y="76.2" width="15.8" height="15.8" rx="3.6"/><rect x="61.2" y="76.2" width="15.8" height="15.8" rx="3.6"/></g></svg></div>
@@ -11473,12 +11476,14 @@ function openAuthGate(reason){
     showAuthForm('authFormSignup');
   }
   document.getElementById('authSkipBtn').style.display = '';
+  document.getElementById('authLaterTopBtn').style.display = '';
   gate.style.display = 'flex';
   pushViewState(closeAuthGate); // 폰 뒤로가기로도 닫혀서 하던 화면으로 돌아감
 }
 // 로그아웃 직후엔 화면에 이전 계정의 친구·일정·채팅이 그대로 남아 있어서, 가입 없이 둘러보기로 못 넘어가게 숨김
 function hideAuthSkipBtn(){
   document.getElementById('authSkipBtn').style.display = 'none';
+  document.getElementById('authLaterTopBtn').style.display = 'none';
 }
 function closeAuthGate(){
   document.getElementById('authGateView').style.display = 'none';
@@ -11630,6 +11635,7 @@ document.getElementById('deleteAccountConfirmBtn').addEventListener('click', asy
 });
 
 document.getElementById('authSkipBtn').addEventListener('click', () => dismissView(closeAuthGate));
+document.getElementById('authLaterTopBtn').addEventListener('click', () => dismissView(closeAuthGate));
 
 // 로그인 없이 둘러보는 중에 계정이 있어야 하는 버튼을 누르면, 그 화면을 열기 전에 가입 화면부터 띄움
 // (다 채우고 저장할 때 막히지 않게 누르는 순간 막음)
@@ -39419,7 +39425,7 @@ const TUTORIAL_STEPS = [
   },
   {
     title: '다 됐어요!',
-    text: () => authToken ? '이제 친구를 추가하고 약속을 잡아보세요.' : '둘러보다가 친구와 약속을 잡고 싶을 때 가입하면 돼요.',
+    text: () => authToken ? '이제 친구를 추가하고 약속을 잡아보세요.' : "가입하면 방금 연습한 것처럼 진짜 친구와 약속을 잡을 수 있어요. 지금 말고 나중에 가입해도 돼요.",
     targets: () => [],
     next: '시작하기',
     signup: true,
@@ -39708,19 +39714,20 @@ function renderTutorialStep(){
   document.getElementById('tutPrevBtn').style.visibility = shown.indexOf(step) > 0 ? '' : 'hidden'; // 첫 단계엔 이전이 없음
   const actions = document.getElementById('tutActions');
   actions.innerHTML = '';
-  if(step.signup && !authToken){
-    const signup = document.createElement('button');
-    signup.type = 'button';
-    signup.textContent = '가입하기';
-    signup.addEventListener('click', () => { endTutorial(); openAuthGate(); });
-    actions.appendChild(signup);
-  }
   if(step.next){
     const next = document.createElement('button');
     next.type = 'button';
     next.className = 'primary';
     next.textContent = step.next;
-    next.addEventListener('click', () => goTutorialStep(tutorialStep + 1));
+    next.addEventListener('click', () => {
+      // 마지막 '시작하기' - 로그인 안 했으면 바로 가입 화면으로 (아래 '나중에 할게요'로 가입 없이 계속 쓸 수 있음)
+      if(step.signup && !authToken){
+        endTutorial();
+        openAuthGate('가입하면 친구를 추가하고, 열어둔 시간에 진짜 약속을 잡을 수 있어요.');
+        return;
+      }
+      goTutorialStep(tutorialStep + 1);
+    });
     actions.appendChild(next);
   }
   // 해볼 게 없는 설명 단계는 '다음' 버튼 없이 읽을 시간만큼 지나면 저절로 넘어감 (아래 막대가 차오름)
