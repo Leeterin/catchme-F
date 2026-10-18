@@ -25218,7 +25218,7 @@ function renderFriendMonthView(){
 
   const grid = document.getElementById('friendMonthGrid');
   grid.innerHTML = '';
-  if(!friend || !friend.username || friend.id === DEMO_FRIEND.id){
+  if(!friend || !friend.username || (friend.id === DEMO_FRIEND.id && !friendMonthDataCache[`${friend.username}::${friendMonthFocusYear}-${friendMonthFocusMonth}`])){
     grid.innerHTML = `<div class="search-empty">데모 친구는 한달 보기를 지원하지 않아요.</div>`;
     document.getElementById('friendMonthSelectedPanel').innerHTML = '';
     return;
@@ -34726,7 +34726,8 @@ function loadSchedFriendOrder(){
   try { const v = JSON.parse(localStorage.getItem('catchme_sched_friend_order') || 'null'); return Array.isArray(v) ? v : []; } catch(_){ return []; }
 }
 function orderedSchedFriends(){
-  const friends = groupableFriends();
+  // 튜토리얼 연습 중엔 연습용 친구(민지)도 맨 앞에 보여줌
+  const friends = (tutorialPractice ? FRIENDS.filter(f => f.id === DEMO_FRIEND.id) : []).concat(groupableFriends());
   const order = loadSchedFriendOrder();
   const rank = id => { const i = order.indexOf(id); return i < 0 ? order.length + friends.findIndex(f => f.id === id) : i; };
   return friends.slice().sort((a, b) => rank(a.id) - rank(b.id));
@@ -39189,6 +39190,26 @@ const TUTORIAL_STEPS = [
     next: '다음',
   },
   {
+    when: () => tutorialPractice,
+    title: '친구 캘린더 보기',
+    text: "위쪽 얼굴 줄에서 연습용 친구 '민지'를 눌러보세요. 친구 캘린더를 내 캘린더 자리에서 바로 볼 수 있어요.",
+    targets: () => [document.querySelector(`#schedFriendStrip .sched-friend[data-friend-id="${DEMO_FRIEND.id}"]`)],
+    until: 'friendcal:open',
+  },
+  {
+    when: () => tutorialPractice,
+    title: '민지의 캘린더',
+    text: "민지의 일정과, 민지가 약속 받으려고 열어둔 '예약 가능' 시간이 보여요. 날짜를 누르면 그날 시간이 나와요. 맨 앞 '나'를 누르면 내 캘린더로 돌아와요. 약속은 조금 뒤에 같이 잡아볼게요.",
+    needs: () => isFriendCalInline(),
+    // 카드가 아래를 덮으니 오늘이 있는 줄이 화면 위쪽에 오게 내려줌 (민지 일정은 오늘부터 보임)
+    enter: () => setTimeout(() => {
+      const cell = document.querySelector('#friendCalendarView .day-cell.today, #friendCalendarView .day-cell.selected-day');
+      if(cell) window.scrollBy({ top: cell.getBoundingClientRect().top - 110, behavior: 'smooth' });
+    }, 300),
+    targets: () => [],
+    next: '다음',
+  },
+  {
     title: '친구와 약속 잡기',
     text: '친구를 추가하면 서로 열어둔 시간이 겹치는 때를 보고 바로 약속을 신청할 수 있어요. 친구 탭을 눌러보세요.',
     targets: () => [navItemOf('friends')],
@@ -39204,7 +39225,7 @@ const TUTORIAL_STEPS = [
     // 연습: 가입 안 하고 둘러보는 중이면 연습용 친구(민지)와 실제 화면으로 약속을 잡아봄 (서버엔 아무것도 안 감)
     when: () => tutorialPractice,
     title: '연습용 친구',
-    text: "연습용 친구 '민지'를 넣어뒀어요. 민지와 실제로 약속을 잡아볼게요. 아래 홈 탭을 눌러보세요.",
+    text: "친구 목록에도 연습용 친구 '민지'가 있어요. 이제 민지와 실제로 약속을 잡아볼게요. 아래 홈 탭을 눌러보세요.",
     targets: () => [[...document.querySelectorAll('#friendsListContainer .placeholder-row')].find(r => r.textContent.includes(DEMO_FRIEND.name)), navItemOf('home')],
     until: 'tab:home',
   },
@@ -39345,17 +39366,46 @@ const TUTORIAL_PRACTICE_ROOM_ID = 'dm-' + DEMO_FRIEND.id;
 function addTutorialPracticeFriend(){
   tutorialPractice = true;
   if(!FRIENDS.some(f => f.id === DEMO_FRIEND.id)) FRIENDS.unshift({ ...DEMO_FRIEND, status: '튜토리얼 연습용 친구예요' });
-  const nextHour = new Date().getHours() + 1;
+  // 하루·주 보기용(날짜별) - 앞으로 2주
   for(let i = 0; i < 14; i++){
     const d = new Date(TODAY);
     d.setDate(d.getDate() + i);
-    const weekend = d.getDay() === 0 || d.getDay() === 6;
-    const from = i === 0 ? Math.max(nextHour, 10) : (weekend ? 13 : 19);
-    const to = weekend && i > 0 ? 18 : 22;
-    friendRealScheduleCache[DEMO_FRIEND.username + '::' + dateKeyOf(d)] = { hours: HOURS, busy: HOURS.map(() => false), bookable: HOURS.map(h => h >= from && h < to) };
+    friendRealScheduleCache[DEMO_FRIEND.username + '::' + dateKeyOf(d)] = { hours: HOURS, ...tutorialPracticeDay(d) };
+  }
+  // 한달 보기용 - 이번 달과 다음 달
+  for(let k = 0; k < 2; k++){
+    const y = TODAY.getFullYear(), m = TODAY.getMonth() + k; // m은 0부터 (12면 Date가 알아서 다음 해로 넘김)
+    const first = new Date(y, m, 1);
+    const days = [];
+    for(let dd = 1; dd <= new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(); dd++){
+      const d = new Date(first.getFullYear(), first.getMonth(), dd);
+      days.push({ date: toDateInputValue(d), ...tutorialPracticeDay(d) });
+    }
+    friendMonthDataCache[`${DEMO_FRIEND.username}::${first.getFullYear()}-${first.getMonth() + 1}`] = { hours: HOURS, days };
   }
   renderFriendsList();
   renderHomePlanCta();
+  renderSchedFriendStrip();
+}
+// 연습용 친구의 하루 - 평일은 회사(9~18시)·수요일 저녁 필라테스, 토요일 점심 약속, 남는 저녁·주말 오후를 예약 가능으로 열어둠.
+// 지난 날·지난 시간은 비워둠
+function tutorialPracticeDay(d){
+  const day = d.getDay(), weekend = day === 0 || day === 6;
+  const past = dateKeyNum(d) < dateKeyNum(TODAY);
+  const nowHour = dateKeyOf(d) === dateKeyOf(TODAY) ? new Date().getHours() : -1;
+  const busyTitle = h => {
+    if(past) return null;
+    if(!weekend && h >= 9 && h < 18) return '회사';
+    if(day === 3 && h >= 19 && h < 21) return '필라테스';
+    if(day === 6 && h >= 11 && h < 13) return '점심 약속';
+    return null;
+  };
+  const titles = HOURS.map(h => busyTitle(h) || '');
+  return {
+    busy: HOURS.map(h => !!busyTitle(h)),
+    titles,
+    bookable: HOURS.map(h => !past && h > nowHour && !busyTitle(h) && (weekend ? h >= 13 && h < 18 : h >= 19 && h < 23)),
+  };
 }
 // 튜토리얼이 끝나면 연습용 친구·채팅방·연습으로 잡은 약속을 지우고, 그 약속 때문에 잘린 내 예약 가능 시간은 되돌림
 function cleanupTutorialPractice(){
@@ -39375,9 +39425,11 @@ function cleanupTutorialPractice(){
   const i = FRIENDS.findIndex(f => f.id === DEMO_FRIEND.id);
   if(i >= 0) FRIENDS.splice(i, 1);
   Object.keys(friendRealScheduleCache).forEach(k => { if(k.startsWith(DEMO_FRIEND.username + '::')) delete friendRealScheduleCache[k]; });
+  Object.keys(friendMonthDataCache).forEach(k => { if(k.startsWith(DEMO_FRIEND.username + '::')) delete friendMonthDataCache[k]; });
   renderFriendsList();
   renderHomePlanCta();
   renderChatList();
+  renderSchedFriendStrip();
   refreshActiveScheduleView();
   refreshHomeDashIfVisible();
 }
