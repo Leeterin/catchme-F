@@ -28240,6 +28240,43 @@ function cancelLocationSuggest(msg){
   refreshHotplaceListsIfOpen();
 }
 
+// 투표 중인 후보들을 한꺼번에 취소 (투표 카드의 '제안 취소') - 서버는 같은 약속에 대기 중인 후보를 전부 닫아줌
+function cancelLocationSuggestVote(items){
+  const roomId = activeChatRoomId;
+  const first = items.find(x => x._serverId);
+  if(first){
+    apiRequest(`/chats/location-suggestions/${first._serverId}/withdraw-all`, { method: 'POST' })
+      .then(data => {
+        const room = CHAT_ROOMS[roomId];
+        (data.messages || []).forEach(sm => {
+          const mapped = mapServerLocationSuggestMessage(sm);
+          items.filter(x => x._serverId === sm.id).forEach(x => Object.assign(x, mapped));
+          const cur = room && room.messages.find(m => m._serverId === sm.id);
+          if(cur) Object.assign(cur, mapped);
+        });
+        if(room) saveChatCache(roomId, room.messages);
+        renderChatMessages();
+        renderChatList();
+        refreshHotplaceListsIfOpen();
+        refreshPlaceViewer();
+        showToast('장소 투표를 취소했어요.');
+      })
+      .catch(err => {
+        showToast(err.message);
+        const room = CHAT_ROOMS[roomId];
+        if(room && room.isRealRoom) loadRoomMessagesFromServer(roomId, room);
+        else renderChatMessages();
+      });
+    return;
+  }
+
+  items.forEach(x => { if(x._timeoutId) clearTimeout(x._timeoutId); x.status = 'cancelled'; });
+  touchRoom(roomId);
+  renderChatMessages();
+  renderChatList();
+  refreshHotplaceListsIfOpen();
+}
+
 // ---------- 예약 취소 ----------
 
 // 상대가 답하지 않은 채 약속 시간이 지난 "내가 보낸 요청"은 알아서 취소(철회)함 - 철회 API를 그대로 재사용
@@ -31721,7 +31758,7 @@ function renderChatMessages(){
       const voters = new Set();
       voteGroup.forEach(x => (x.voterIds || []).forEach(id => voters.add(id)));
       const maxVotes = Math.max(1, ...voteGroup.map(x => (x.voterIds || []).length));
-      const myItems = voteGroup.filter(x => x.who === 'me');
+      const hasMine = voteGroup.some(x => x.who === 'me');
       row.innerHTML = (m.who === 'me' ? metaHtml : '') + `
         <div class="reservation-card ls-card ls-vote-card">
           <div class="reservation-card-header">${ICO.pin} ${headText}</div>
@@ -31744,7 +31781,7 @@ function renderChatMessages(){
           <div class="reservation-card-actions">
             <button class="reservation-btn decline ls-map-btn">${ICO.pin} 지도에서 후보 보기</button>
           </div>
-          ${myItems.length ? `
+          ${hasMine ? `
             <div class="reservation-card-actions">
               <button class="reservation-btn decline ls-cancel-btn">제안 취소</button>
             </div>` : ''}
@@ -31754,15 +31791,9 @@ function renderChatMessages(){
         btn.disabled = true;
         voteLocationSuggestMsg(activeChatRoomId, voteGroup[parseInt(btn.dataset.idx, 10)]);
       }));
-      // 제안 취소 버튼은 카드에 하나만 - 내 후보가 여러 곳이면 어느 걸 취소할지 고름
+      // 제안 취소 버튼은 카드에 하나만 - 누르면 친구가 올린 후보까지 이번 투표 전체를 취소
       const cancelBtn = row.querySelector('.ls-cancel-btn');
-      if(cancelBtn) cancelBtn.addEventListener('click', () => {
-        if(myItems.length === 1){ cancelLocationSuggest(myItems[0]); return; }
-        openWeekBlockSheet('어느 제안을 취소할까요?', '', [
-          ...myItems.map(x => ({ label: locationSuggestTitle(activeChatRoomId, x), danger: true, onTap: () => cancelLocationSuggest(x) })),
-          { label: '내 제안 모두 취소', danger: true, onTap: () => myItems.forEach(x => cancelLocationSuggest(x)) }
-        ]);
-      });
+      if(cancelBtn) cancelBtn.addEventListener('click', () => { cancelBtn.disabled = true; cancelLocationSuggestVote(voteGroup); });
       row.querySelectorAll('.place-vote-row').forEach(r => r.addEventListener('click', (e) => {
         if(e.target.closest('button')) return;
         openPlaceSuggestionMap(activeChatRoomId, voteGroup[parseInt(r.dataset.idx, 10)].id);
