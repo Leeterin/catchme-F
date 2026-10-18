@@ -25004,6 +25004,22 @@ function attachLongPressPreview(el, dateObj, onClick){
 
 // 이 날짜/블록이 "예약하기"에서 이미 지난 시간대인지 확인 - 날짜 자체가 오늘보다 이전이거나,
 // 오늘이어도 이 블록이 끝나는 시각이 이미 지났으면 지난 걸로 쳐서 예약 목록에서 아예 빼버림
+// 이미 지난 '예약 가능'은 처음부터 안 보이게 - 지난 날짜면 빼고, 오늘이면 지금 이후만 남김
+// (앞부분만 지났으면 지금부터로 잘라서 보여줌, 약속 요청 화면이 고를 수 있게 해주는 첫 시각과 같은 5분 단위 기준). 친구의 다른 일정은 그대로
+function trimPastFriendBookable(dateObj, blocks){
+  const dNum = dateKeyNum(dateObj), todayNum = dateKeyNum(TODAY);
+  if(dNum > todayNum) return blocks;
+  const now = new Date();
+  const fromMin = Math.ceil((now.getHours() * 60 + now.getMinutes() + 1) / 5) * 5;
+  return blocks.flatMap(b => {
+    if(!b.isBookable) return [b];
+    if(dNum < todayNum || b.endHour * 60 <= fromMin) return [];
+    if(b.startHour * 60 >= fromMin) return [b];
+    return [{ ...b, startHour: Math.floor(fromMin / 60), startMin: fromMin }];
+  });
+}
+// 블록 시작 시각(분) - 지난 부분을 잘라낸 블록은 잘린 시각부터
+function friendBlockStartMin(b){ return b.startMin !== undefined ? b.startMin : b.startHour * 60; }
 function isFriendBlockPast(dateObj, block){
   const dNum = dateKeyNum(dateObj);
   const todayNum = dateKeyNum(TODAY);
@@ -25049,7 +25065,7 @@ function renderFriendToday(){
   list.innerHTML = '';
 
   const extras = friend ? getFriendSlotExtrasForRender(friend, friendDayFocusDate) : {};
-  let blocks = groupFriendScheduleBlocks(HOURS, sched, busyArr, titles, extras.colors, extras.withMe);
+  let blocks = trimPastFriendBookable(friendDayFocusDate, groupFriendScheduleBlocks(HOURS, sched, busyArr, titles, extras.colors, extras.withMe));
   // "예약하기" 모드에서는 예약 가능한 블록만 정리해서 보여주고, 나머지는 아예 뺌 - 오늘인데 이미 지난 시간대도 마찬가지로 뺌
   if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(friendDayFocusDate, b));
 
@@ -25065,7 +25081,7 @@ function renderFriendToday(){
     const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
     mine = myBusyRangesForDate(friendDayFocusDate).filter(r => !isToday || r.e > nowMin);
   }
-  const items = blocks.map(b => ({ at: b.startHour * 60, b }))
+  const items = blocks.map(b => ({ at: friendBlockStartMin(b), b }))
     .concat(mine.map(r => ({ at: r.s, mine: r })))
     .sort((x, y) => x.at - y.at || (x.mine ? -1 : 1));
 
@@ -25084,9 +25100,9 @@ function renderFriendToday(){
     card.className = 'day-event-card friend-view' + (b.isBookable ? ' available' : '') + (b.withMe ? ' reservation-linked appt-fold' : '');
     card.style.setProperty('--ev', b.isBookable ? 'var(--accent)' : friendBlockColor(b)); // 시간 알약 색 (내 하루 보기와 같게)
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
-    const overlap = mine.filter(x => x.s < b.endHour * 60 && x.e > b.startHour * 60);
+    const overlap = mine.filter(x => x.s < b.endHour * 60 && x.e > friendBlockStartMin(b));
     card.innerHTML = `
-      <div class="day-event-time">${minutesToLabel(b.startHour * 60)}-${minutesToLabel(b.endHour * 60)}</div>
+      <div class="day-event-time">${minutesToLabel(friendBlockStartMin(b))}-${minutesToLabel(b.endHour * 60)}</div>
       <div class="day-event-title">${label}</div>
       ${overlap.length ? `<div class="day-event-overlap">내 일정과 겹쳐요 · ${overlap.map(x => escapeHtml(myRangeLabel(x))).join(', ')}</div>` : ''}
       ${(!b.isBookable && !b.withMe && friendCalendarMode !== 'reserve') ? `<button type="button" class="day-event-ask-btn">${ICO.chatLi} 친구한테 물어보기</button>` : ''}
@@ -25127,7 +25143,7 @@ function renderFriendWeek(){
     const busyArr = friend ? getFriendBusyForRender(friend, d) : null;
     // 이 날짜 데이터가 아직 서버에서 도착 전이면, 있지도 않은 일정을 잠깐 지어내 보여주지 않고 그냥 빈 칸으로 둠
     const extras = friend ? getFriendSlotExtrasForRender(friend, d) : {};
-    let blocks = dayCached ? groupFriendScheduleBlocks(HOURS, sched, busyArr, titles, extras.colors, extras.withMe) : [];
+    let blocks = dayCached ? trimPastFriendBookable(d, groupFriendScheduleBlocks(HOURS, sched, busyArr, titles, extras.colors, extras.withMe)) : [];
     // 예약하기 모드에서는 이미 지난 날짜/시간대 블록은 아예 목록에서 빼서 그리지도 않음
     if(friendCalendarMode === 'reserve') blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(d, b));
     const isPast = dateKeyNum(d) < dateKeyNum(TODAY); // 이번주 안이라도 이미 지난 날짜는 예약 불가능하게
@@ -25395,7 +25411,7 @@ function renderFriendMonthSelectedPanel(monthData){
 
   if(!dayInfo){ panel.innerHTML = ''; return; }
 
-  let blocks = groupFriendScheduleBlocks(monthData.hours, dayInfo.bookable, dayInfo.busy, dayInfo.titles, dayInfo.colors, dayInfo.withMe);
+  let blocks = trimPastFriendBookable(friendMonthSelectedDate, groupFriendScheduleBlocks(monthData.hours, dayInfo.bookable, dayInfo.busy, dayInfo.titles, dayInfo.colors, dayInfo.withMe));
   if(friendCalendarMode === 'reserve'){
     // 예약하기 모드에서는 날짜 전체가 지났든, 오늘이어도 그 시간이 이미 지났든 아예 목록에서 빼버림
     blocks = blocks.filter(b => b.isBookable && !isFriendBlockPast(friendMonthSelectedDate, b));
@@ -25409,8 +25425,8 @@ function renderFriendMonthSelectedPanel(monthData){
     const label = b.title ? escapeHtml(b.title) : (b.isBookable ? '예약 가능' : '일정');
     const color = b.isBookable ? 'var(--accent)' : friendBlockColor(b);
     return `<div class="month-selected-row${b.isBookable ? ' clickable' : ''}" data-hour="${b.startHour}" style="--ev:${color}">
-      <span class="month-selected-time">${minutesToLabel(b.startHour * 60)}</span>
-      <span class="month-selected-main"><span class="month-selected-text">${label}</span><span class="month-selected-range">${minutesToLabel(b.startHour * 60)} – ${minutesToLabel(b.endHour * 60)}</span>
+      <span class="month-selected-time">${minutesToLabel(friendBlockStartMin(b))}</span>
+      <span class="month-selected-main"><span class="month-selected-text">${label}</span><span class="month-selected-range">${minutesToLabel(friendBlockStartMin(b))} – ${minutesToLabel(b.endHour * 60)}</span>
       ${b.askable ? `<button type="button" class="day-event-ask-btn" data-idx="${i}">${ICO.chatLi} 친구한테 물어보기</button>` : ''}</span>
     </div>`;
   }).join('');
