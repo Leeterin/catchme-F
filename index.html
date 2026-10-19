@@ -11473,7 +11473,8 @@ async function apiRequest(path, options = {}, _isRetry) {
 
   let res;
   let isSlow = false;
-  const slowTimer = setTimeout(() => { isSlow = true; slowRequestCount++; setServerWakingBanner(true, slowMessage); }, 3000);
+  // 오래 걸려도 위에 "불러오고 있어요" 배너는 띄우지 않음 (자꾸 떠서 거슬렸음) - 업로드처럼 문구를 정해 둔 요청만 띄움
+  const slowTimer = slowMessage ? setTimeout(() => { isSlow = true; slowRequestCount++; setServerWakingBanner(true, slowMessage); }, 3000) : null;
   try {
     res = await fetch(API_BASE_URL + path, { ...fetchOptions, headers });
   } catch (networkErr) {
@@ -31794,7 +31795,26 @@ function renderChatMessages(){
     batch.sort((a, b) => room.messages.indexOf(a) - room.messages.indexOf(b));
     batch.forEach(x => withdrawnSuggestGroups.set(x, batch));
   });
+  // 투표로 정해진 판(같은 약속에서 확정된 1곳 + 그때 같이 마감된 후보들)도 투표 카드 그대로 한 장으로 남김
+  const resolvedSuggestGroups = new Map();
+  const suggestRounds = new Map(); // 약속(key) -> 지금 판의 후보들
+  const closeSuggestRound = (key) => {
+    const round = (suggestRounds.get(key) || []).filter(x => x.status === 'confirmed' || x.status === 'declined');
+    if(round.length > 1 && round.filter(x => x.status === 'confirmed').length === 1) round.forEach(x => resolvedSuggestGroups.set(x, round));
+    suggestRounds.delete(key);
+  };
+  (room.messages || []).forEach(x => {
+    if(x.type !== 'location-suggest') return;
+    const key = locationSuggestGroup(room, x).key;
+    const round = suggestRounds.get(key) || [];
+    // 이미 확정된 판에 새 후보(투표 중)나 또 다른 확정이 오면 새 판
+    if(round.some(y => y.status === 'confirmed') && (x.status === 'pending' || x.status === 'confirmed')) closeSuggestRound(key);
+    if(!suggestRounds.has(key)) suggestRounds.set(key, []);
+    suggestRounds.get(key).push(x);
+  });
+  [...suggestRounds.keys()].forEach(closeSuggestRound);
   const openSuggestGroupOf = (x) => {
+    if(resolvedSuggestGroups.has(x)) return resolvedSuggestGroups.get(x);
     if(withdrawnSuggestGroups.has(x)) return withdrawnSuggestGroups.get(x);
     if(!isOpenLocationSuggest(room, x)) return null;
     const list = openSuggestGroups.get(locationSuggestGroup(room, x).key);
@@ -31956,14 +31976,19 @@ function renderChatMessages(){
       // 투표 중인 후보 여러 곳을 한 카드에 - 줄마다 바로 투표
       const me = myLocationVoterId();
       const suggestTarget = m.pinId ? (room.pinnedSchedules || []).find(p => p.serverId === m.pinId) : null;
-      const headText = suggestTarget || !m.pinId ? `${escapeHtml(meetPlaceTargetText(room, suggestTarget))} 투표` : '장소 투표';
+      const voteWinner = voteGroup.find(x => x.status === 'confirmed'); // 투표로 정해진 판이면 확정된 곳
+      const winnerOutdated = !!voteWinner && isOutdatedLocationConfirm(room, voteWinner);
+      // 정해진 판은 몇 차인지가 지금 기준으로 바뀌어 보여서 약속 이름만
+      const headText = voteWinner
+        ? `${suggestTarget ? (suggestTarget.dateLabel ? `${escapeHtml(suggestTarget.dateLabel)} 약속 ` : '날짜 미정 약속 ') : ''}장소 투표`
+        : suggestTarget || !m.pinId ? `${escapeHtml(meetPlaceTargetText(room, suggestTarget))} 투표` : '장소 투표';
       const voters = new Set();
       voteGroup.forEach(x => (x.voterIds || []).forEach(id => voters.add(id)));
       const maxVotes = Math.max(1, ...voteGroup.map(x => (x.voterIds || []).length));
-      const voteDone = isWithdrawnLocationSuggest(m); // 취소된 투표 - 같은 모양 그대로, 버튼만 빼고 회색으로
+      const voteDone = isWithdrawnLocationSuggest(m) || !!voteWinner; // 취소됐거나 정해진 투표 - 같은 모양 그대로, 버튼만 빼고
       const hasMine = !voteDone && voteGroup.some(x => x.who === 'me');
       row.innerHTML = (m.who === 'me' ? metaHtml : '') + `
-        <div class="reservation-card ls-card ls-vote-card${voteDone ? ' is-done' : ''}">
+        <div class="reservation-card ls-card ls-vote-card${voteWinner && !winnerOutdated ? ' is-confirmed' : voteDone ? ' is-done' : ''}">
           <div class="reservation-card-header">${ICO.pin} ${headText}</div>
           <div class="reservation-card-note">후보 ${voteGroup.length}곳 · ${getTotalParticipants(room)}명 중 ${voters.size}명 투표</div>
           <div class="place-vote-list" style="margin-top:8px;">
@@ -31977,11 +32002,15 @@ function renderChatMessages(){
                   <div class="place-vote-sub">${x.who === 'me' ? '내 제안' : '친구 제안'}</div>
                   <div class="place-vote-bar"><span style="width:${Math.round(votes / maxVotes * 100)}%"></span></div>
                 </div>
-                <button type="button" class="place-vote-btn${mine ? ' voted' : ''}" data-idx="${i}"${voteDone ? ' disabled' : ''}>${mine ? '✓ ' : ''}${votes}표</button>
+                <button type="button" class="place-vote-btn${(voteWinner ? x === voteWinner : mine) ? ' voted' : ''}" data-idx="${i}"${voteDone ? ' disabled' : ''}>${voteWinner ? (x === voteWinner ? '✓ 확정' : '마감') : `${mine ? '✓ ' : ''}${votes}표`}</button>
               </div>`;
             }).join('')}
           </div>
-          ${voteDone ? `
+          ${voteWinner ? `
+          <div class="reservation-card-status ${winnerOutdated ? 'withdrawn' : 'confirmed'}">${winnerOutdated ? '장소 변경됨' : `${voteGroup.indexOf(voteWinner) + 1}번으로 확정됐어요`}</div>
+          <div class="reservation-card-actions">
+            <button class="reservation-btn decline ls-map-btn">${ICO.pin} 지도에서 보기</button>
+          </div>` : voteDone ? `
           <div class="reservation-card-status withdrawn">투표 취소됨</div>` : `
           <div class="reservation-card-actions">
             <button class="reservation-btn decline ls-map-btn">${ICO.pin} 지도에서 후보 보기</button>
@@ -31992,6 +32021,7 @@ function renderChatMessages(){
             </div>` : ''}
         </div>
       ` + (m.who === 'me' ? '' : metaHtml);
+      if(voteWinner) row.querySelector('.ls-map-btn').addEventListener('click', () => openPlaceSuggestionMap(activeChatRoomId, voteWinner.id));
       if(!voteDone){
         row.querySelectorAll('.place-vote-btn').forEach(btn => btn.addEventListener('click', () => {
           btn.disabled = true;
