@@ -241,7 +241,8 @@
   }
   .home-pending-row:first-of-type{ border-top:none; }
   /* 약속 탭 목록 - 홈 카드의 줄 모양을 그대로 쓰고 카드 한 장으로 감쌈 */
-  .appts-list{ margin-top:12px; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:6px 12px; }
+  .chat-mode-count{ display:inline-block; min-width:16px; padding:0 5px; margin-left:3px; border-radius:999px; background:var(--cta, #FF6B4A); color:#fff; font-size:11px; line-height:16px; }
+  .appts-list{ margin-top:4px; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:6px 12px; }
   .appts-list:empty{ display:none; }
   .appts-list .home-appt-name, .appts-list .home-appt-sub{ white-space:normal; }
   .appts-actions{ display:flex; gap:6px; flex-shrink:0; }
@@ -8979,7 +8980,7 @@
   #chatNextApptCard .cl-next-date b{ font-size:20px; }
   #chatNextApptCard .cl-next-info b{ font-size:14.5px; }
   #chatNextApptCard .cl-next-info small{ font-size:12.5px; }
-  #chatFilterChips .fl-chip{ height:32px; padding:0 13px; font-size:13px; }
+  #chatFilterChips .fl-chip, #apptsSegment .fl-chip{ height:32px; padding:0 13px; font-size:13px; }
   /* 친구 목록도 채팅 목록과 같은 크기로 한 단계 작게 - 줄 높이, 프로필 사진, 아이콘 */
   #friendsListContainer .placeholder-row{ gap:10px; padding:10px 14px; }
   #friendsListContainer .placeholder-avatar{ width:40px; height:40px; font-size:14px; }
@@ -10517,9 +10518,24 @@
           </div>
         </div>
       </div>
-      <div id="chatNextApptCard"></div>
-      <div class="fl-chips" id="chatFilterChips"></div>
-      <div id="chatListContainer"></div>
+      <!-- 채팅 / 약속 - 약속 요청·장소 투표·확정된 약속은 '약속'에서 한눈에 (채팅방 카드 사이에서 찾지 않아도 되게) -->
+      <div class="segment-control" id="chatModeSegment" style="margin:12px 0 10px;">
+        <button class="segment-btn active" data-chat-mode="chats">채팅</button>
+        <button class="segment-btn" data-chat-mode="appts">약속</button>
+      </div>
+      <div id="chatModeChats">
+        <div id="chatNextApptCard"></div>
+        <div class="fl-chips" id="chatFilterChips"></div>
+        <div id="chatListContainer"></div>
+      </div>
+      <div id="chatModeAppts" hidden>
+        <div class="fl-chips" id="apptsSegment">
+          <button type="button" class="fl-chip on" data-appts="todo">답할 차례</button>
+          <button type="button" class="fl-chip" data-appts="upcoming">다가오는</button>
+          <button type="button" class="fl-chip" data-appts="past">지난</button>
+        </div>
+        <div id="apptsList" class="appts-list"></div>
+      </div>
     </div>
 
     <div class="chat-room-view" id="chatRoomView">
@@ -10684,26 +10700,6 @@
   </div>
 
   <!-- 커뮤니티 패널 -->
-  <!-- 약속 탭 - 약속 요청·장소 투표·확정된 약속을 채팅방 대신 여기서 한눈에 (장소 추천은 위 버튼으로) -->
-  <div class="tab-panel" id="panel-appts">
-    <div class="community-header">
-      <div>
-        <h2>약속</h2>
-        <p class="desc">답할 약속 요청과 다가오는 약속을 모아 봐요.</p>
-      </div>
-      <button type="button" class="location-btn" id="apptsPlaceBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-        장소 추천
-      </button>
-    </div>
-    <div class="segment-control" id="apptsSegment" style="margin-top:14px;">
-      <button class="segment-btn active" data-appts="todo">답할 차례</button>
-      <button class="segment-btn" data-appts="upcoming">다가오는</button>
-      <button class="segment-btn" data-appts="past">지난</button>
-    </div>
-    <div id="apptsList" class="appts-list"></div>
-  </div>
-
   <div class="tab-panel" id="panel-community">
     <div class="community-header">
       <div>
@@ -11056,10 +11052,9 @@
       <span>채팅</span>
       <span class="nav-badge" id="chatNavBadge" style="display:none;"></span>
     </div>
-    <div class="nav-item" data-tab="appts" style="position:relative;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/><path d="m9 15.5 2 2 4-4"/></svg>
-      <span>약속</span>
-      <span class="nav-badge" id="apptsNavBadge" style="display:none;"></span>
+    <div class="nav-item" data-tab="community">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/></svg>
+      <span>장소</span>
     </div>
   </div>
 
@@ -12940,11 +12935,9 @@ const panels = {
   friends: document.getElementById('panel-friends'),
   chat: document.getElementById('panel-chat'),
   community: document.getElementById('panel-community'),
-  appts: document.getElementById('panel-appts'),
 };
-// 아래 탭 버튼 - 장소 추천(community)은 약속 탭 안에서 들어가서 약속 탭에 불이 들어옴
 function navItemForTab(tab){
-  return document.querySelector(`.nav-item[data-tab="${tab === null ? 'home' : tab === 'community' ? 'appts' : tab}"]`);
+  return document.querySelector(`.nav-item[data-tab="${tab === null ? 'home' : tab}"]`);
 }
 
 let currentTopTab = null; // 지금 보고 있는 아래 탭 (null = 메인 캘린더)
@@ -12982,10 +12975,6 @@ function showTab(tabKey){
   } else {
     panels[tabKey].classList.add('active');
     navItemForTab(tabKey).classList.add('active');
-    if(tabKey === 'appts'){
-      renderApptsTab();
-      loadHomePending();
-    }
     if(tabKey === 'schedule'){
       panels['schedule'].classList.remove('home-clean-mode');
       switchScheduleView(settingsState.default_schedule_view || 'month');
@@ -13018,7 +13007,7 @@ function showTab(tabKey){
 
 // 아래 탭을 바꿀 때 탭 순서대로 옆에서 밀려 들어옴 - 오른쪽 탭으로 가면 오른쪽에서, 왼쪽 탭으로 가면 왼쪽에서.
 // transform/translate로 움직이면 탭 안의 position:fixed 버튼(리뷰 쓰기 등)이 잠깐 엉뚱한 데로 튀어서, 좌우 여백을 움직임
-const TOP_TAB_ORDER = [null, 'schedule', 'friends', 'chat', 'appts', 'community'];
+const TOP_TAB_ORDER = [null, 'schedule', 'friends', 'chat', 'community'];
 function slideInTopTab(fromTab, toTab){
   if(fromTab === toTab || fromTab === undefined) return;
   if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -14103,7 +14092,7 @@ function closeHomeWidgetGallery(){
   document.getElementById('homeWidgetGallery').innerHTML = ''; // 미리보기 복사본(같은 id)을 남겨 두지 않음
 }
 
-// ---------- 약속 탭 ----------
+// ---------- 채팅 탭의 '약속' ----------
 // 채팅방 카드 사이에 섞여 있던 약속 일(요청 수락·거절, 장소 투표, 확정된 약속)을 한곳에서.
 // 목록은 이미 있는 데이터를 그대로 씀: 답할 차례 = /chats/pending + 내가 아직 투표 안 한 장소 후보, 다가오는 = 홈 다가오는 약속, 지난 = 지난 약속
 var apptsView = 'todo'; // var: 시작할 때 채팅 목록이 이 줄보다 먼저 그려져도 오류 안 나게
@@ -14129,13 +14118,25 @@ function apptsTodoItems(){
   });
   return items;
 }
-function updateApptsNavBadge(n){
-  const badge = document.getElementById('apptsNavBadge');
-  if(!badge) return;
-  badge.textContent = n > 9 ? '9+' : String(n);
-  badge.style.display = n ? '' : 'none';
+// 채팅 탭 위 [채팅 | 약속] - 고른 쪽만 보이게 (앱을 다시 켜기 전까진 고른 쪽을 기억)
+var chatMode = 'chats';
+function setChatMode(mode){
+  chatMode = mode;
+  document.querySelectorAll('#chatModeSegment .segment-btn').forEach(b => b.classList.toggle('active', b.dataset.chatMode === mode));
+  document.getElementById('chatModeChats').hidden = mode !== 'chats';
+  document.getElementById('chatModeAppts').hidden = mode !== 'appts';
+  if(mode === 'appts'){ renderApptsTab(); loadHomePending(); }
 }
-// 다른 탭 화면(채팅방·약속 상세)으로 가도 뒤로가기 한 번이면 약속 탭으로
+document.getElementById('chatModeSegment').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-chat-mode]');
+  if(b) setChatMode(b.dataset.chatMode);
+});
+// 답할 게 있으면 [약속] 옆에 숫자
+function updateApptsNavBadge(n){
+  const b = document.querySelector('#chatModeSegment [data-chat-mode="appts"]');
+  if(b) b.innerHTML = n ? `약속 <span class="chat-mode-count">${n > 9 ? '9+' : n}</span>` : '약속';
+}
+// 채팅방·약속 상세로 들어가도 뒤로가기 한 번이면 약속 목록으로
 function openApptInChat(roomId, pinId){
   jumpToView(() => {
     showTab('chat');
@@ -14166,7 +14167,7 @@ function renderApptsTab(){
   updateApptsNavBadge(todo.length);
   const todoBtn = document.querySelector('#apptsSegment [data-appts="todo"]');
   if(todoBtn) todoBtn.textContent = todo.length ? `답할 차례 ${todo.length}` : '답할 차례';
-  document.querySelectorAll('#apptsSegment .segment-btn').forEach(b => b.classList.toggle('active', b.dataset.appts === apptsView));
+  document.querySelectorAll('#apptsSegment [data-appts]').forEach(b => b.classList.toggle('on', b.dataset.appts === apptsView));
   const empty = (text) => { listEl.innerHTML = `<div class="home-empty" style="padding:18px 4px;text-align:center;">${text}</div>`; };
 
   if(apptsView === 'todo'){
@@ -14259,7 +14260,6 @@ document.getElementById('apptsSegment').addEventListener('click', (e) => {
   apptsView = b.dataset.appts;
   renderApptsTab();
 });
-document.getElementById('apptsPlaceBtn').addEventListener('click', () => switchTopTab('community'));
 
 function renderHomeDash(){
   const listEl = document.getElementById('homeUpcomingList');
@@ -40234,12 +40234,12 @@ const TUTORIAL_STEPS = [
     auto: 7000, // 해볼 게 없는 설명이라 읽을 시간만큼 두고 저절로 넘어감
   },
   {
-    title: '약속 모아 보기',
-    text: '약속 탭에선 받은 약속 요청과 다가오는 약속을 한눈에 봐요. 위의 "장소 추천"에선 맛집·카페도 볼 수 있어요. 눌러보세요.',
+    title: '어디서 만날지',
+    text: '장소 탭에선 다른 사람들이 추천한 맛집·카페를 볼 수 있어요. 눌러보세요.',
     // 채팅방 안에선 아래 탭이 숨어 있어서 채팅 목록으로 나와서 보여줌
     enter: () => { if(document.body.classList.contains('chat-open')) switchTopTab('chat'); },
-    targets: () => [navItemOf('appts')],
-    until: 'tab:appts',
+    targets: () => [navItemOf('community')],
+    until: 'tab:community',
   },
   {
     title: '장소 고르기',
