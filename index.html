@@ -11907,6 +11907,7 @@ function onAuthSuccess(token, user, skipSave, refreshToken) {
   // 앱 시작 때는 로고가 이 데이터를 기다리는 동안 떠 있어서, 일정이 0개면 홈이 잠깐 보이는 일 없이 캘린더로 바뀜
   startupDataPromise.then(() => {
     if(!startOnCalendar && onFirstScreen() && !viewCloseStack.length && !SCHEDULE_EVENTS.length) showTab('schedule');
+    refreshTravelBeforeDeparture(); // 앱을 켜자마자 출발 30분 전이면 이동시간 다시 계산
   });
   loadMeetupsFromServer();
   loadFeedPostsFromServer();
@@ -12690,6 +12691,45 @@ document.addEventListener('visibilitychange', () => {
   if(!refreshTodayIfDateChanged() && currentTopTab === null) renderHomeAvailCard();
 });
 setInterval(refreshTodayIfDateChanged, 60 * 1000); // 앱을 켜 둔 채 자정을 넘기는 경우
+
+// 이동시간은 일정을 저장할 때 한 번 계산한 값이라, 출발 30분 전에 그때 교통으로 딱 한 번 다시 계산해서 바꿈
+// (계속 다시 계산하면 길찾기 사용량이 늘어서 일정마다 하루 한 번만) - 바뀌면 일정에도 저장
+const TRAVEL_RECHECK_KEY = 'catchme_travel_rechecked';
+function refreshTravelBeforeDeparture(){
+  if(!authToken) return;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const todayKey = dateKeyOf(now);
+  let done;
+  try { done = JSON.parse(localStorage.getItem(TRAVEL_RECHECK_KEY) || '{}'); } catch(e){ done = {}; }
+  Object.keys(done).forEach(k => { if(!k.endsWith('|' + todayKey)) delete done[k]; }); // 지난 날 기록은 정리
+  getEventsForDate(now).forEach(ev => {
+    const t = ev.travel;
+    if(ev.type === 'available' || !t || !t.minutes || !t.from || !t.to) return;
+    const r = getEventDisplayRangeForDate(ev, now);
+    if(r.startMin !== ev.startMin) return; // 자정 넘긴 일정의 둘째 날 조각은 아님
+    const departMin = r.startMin - t.minutes;
+    if(nowMin < departMin - 30 || nowMin >= departMin) return;
+    const key = `${ev.serverId || ev.id}|${todayKey}`;
+    if(done[key]) return;
+    done[key] = 1;
+    const arrive = new Date(now); arrive.setHours(0, r.startMin, 0, 0);
+    const q = `fromLat=${t.from.lat}&fromLon=${t.from.lon}&toLat=${t.to.lat}&toLon=${t.to.lon}&mode=${t.mode || 'transit'}&arriveAt=${encodeURIComponent(arrive.toISOString())}`;
+    apiRequest(`/events/travel-time?${q}`).then(data => {
+      const minutes = Math.max(0, Math.round(data.minutes));
+      if(!minutes || minutes === ev.travel.minutes) return;
+      const before = ev.travel.minutes;
+      ev.travel = { ...ev.travel, minutes };
+      syncEventUpdateToServer(ev);
+      refreshActiveScheduleView();
+      refreshHomeDashIfVisible();
+      showToast(`'${ev.title}' 이동시간이 지금 교통으로 ${before}분 → ${minutes}분이 됐어요. ${minutesToLabel(Math.max(0, r.startMin - minutes))}에 출발하세요.`, 4000);
+    }).catch(() => {});
+  });
+  try { localStorage.setItem(TRAVEL_RECHECK_KEY, JSON.stringify(done)); } catch(e){}
+}
+setInterval(refreshTravelBeforeDeparture, 60 * 1000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') refreshTravelBeforeDeparture(); });
 
 // 앱을 켜 둔 채 약속이 끝나는 시각을 넘기면 (다가오는 약속, 채팅방 상단 약속, 지난 약속, 친구 만남 횟수) 바로 다시 그림
 let endedPinCountSeen = null;
