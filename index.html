@@ -14235,6 +14235,13 @@ function renderApptsTab(){
     rows.sort((a, b) => b.pin.dateObj - a.pin.dateObj);
     if(!rows.length) return empty('지난 약속이 없어요.');
   }
+  // 지난 약속엔 누구와 만났는지 상대 프로필 사진도 (채팅 목록과 같은 모양 - 사진 없으면 캐릭터, 단톡은 두 명 겹쳐서)
+  const roomAvatar = (room) => {
+    const stack = groupStackMembers(room);
+    const inner = room.avatar ? `<img loading="lazy" src="${room.avatar}" alt="${escapeHtml(room.name)}" />`
+      : stack.length === 2 ? groupStackFacesHtml(stack) : (room.isGroup ? escapeHtml(room.initial || '') : MASCOT_AVATAR_SVG);
+    return `<span class="placeholder-avatar${stack.length === 2 ? ' cl-stack' : ''}" style="${room.avatar || stack.length === 2 ? '' : `background:${room.color}`}">${inner}</span>`;
+  };
   listEl.innerHTML = rows.map((x, i) => {
     const places = roomMeetPlaces(x.room, x.pin).map(p => p.location);
     const sub = [x.pin.timeLabel, places.length ? places.join(' → ') : '장소 미정'].filter(Boolean).join(' · ');
@@ -14243,15 +14250,20 @@ function renderApptsTab(){
     return `
       <div class="home-appt-row" role="button" tabindex="0" data-idx="${i}">
         <span class="home-appt-when"><b>${escapeHtml(apptsView === 'upcoming' ? homeDdayLabel(d) : `${d.getMonth() + 1}/${d.getDate()}`)}</b><small>${apptsView === 'upcoming' ? `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAY_KO[d.getDay()]})` : `(${WEEKDAY_KO[d.getDay()]})`}</small></span>
+        ${apptsView === 'past' ? roomAvatar(x.room) : ''}
         <span class="home-appt-info">
           <div class="home-appt-name">${escapeHtml(x.room.name || '약속')}</div>
           <div class="home-appt-sub">${escapeHtml(sub)}${voting ? ' · 장소 투표 중' : ''}</div>
         </span>
       </div>`;
   }).join('');
-  listEl.querySelectorAll('.home-appt-row').forEach(row => row.addEventListener('click', () => {
+  listEl.querySelectorAll('.home-appt-row').forEach(row => row.addEventListener('click', (e) => {
     const x = rows[parseInt(row.dataset.idx, 10)];
-    if(x) openApptInChat(x.roomId, x.pin.id);
+    if(!x) return;
+    // 1:1 약속의 사진을 누르면 그 친구 프로필 (뒤로가기 한 번이면 이 목록으로)
+    const friend = e.target.closest('.placeholder-avatar') && !x.room.isGroup && FRIENDS.find(f => f.username && f.username === x.room.counterpartUsername);
+    if(friend){ jumpToView(() => { showTab('friends'); openFriendProfile(friend.id); }); return; }
+    openApptInChat(x.roomId, x.pin.id);
   }));
 }
 document.getElementById('apptsSegment').addEventListener('click', (e) => {
