@@ -27758,6 +27758,7 @@ let pinIdCounter = 1;
 function addReservationPin(roomId, room, pinData){
   if(!room.pinnedSchedules) room.pinnedSchedules = [];
   const pin = { id: 'pin' + (pinIdCounter++), ...pinData };
+  if(room.isTestRoom && !pin.serverId) pin.serverId = 'test-' + pin.id; // 테스트 방: 장소 후보를 이 약속에 묶을 이름
   room.pinnedSchedules.push(pin);
   syncPinCreateToServer(roomId, room, pin);
   return pin;
@@ -28164,6 +28165,7 @@ async function suggestHotplaceToChat(post){
     place: post.place, note: post.note, location: post.location,
     status: 'pending',
     time: new Date(),
+    pinId: suggestTargetBody(room, null).pinId || undefined,
   };
   room.messages.push(msg);
   touchRoom(roomId);
@@ -28173,7 +28175,8 @@ async function suggestHotplaceToChat(post){
   // 창을 닫지 않고 그대로 유지해서 다른 곳도 둘러보고 여러 개 더 제안할 수 있게 함
   showToast(`"${post.place}"을(를) 제안했어요. 계속 둘러보고 더 제안할 수 있어요.`);
 
-  // 상대방이 수락하는 것처럼 잠시 후 자동으로 확정 처리 (데모 방에서만 - 로컬 가짜 흐름)
+  // 상대방이 수락하는 것처럼 잠시 후 자동으로 확정 처리 (데모 방에서만 - 로컬 가짜 흐름, 테스트 방은 투표로 정함)
+  if(room.isTestRoom) return;
   msg._timeoutId = setTimeout(() => {
     if(msg.status !== 'pending') return; // 그 사이에 취소됐으면 무시
     msg.status = 'confirmed';
@@ -28235,7 +28238,8 @@ async function fixHotplaceLocation(post){
     time: new Date(),
   };
   room.messages.push(fixedMsg);
-  addLocationOnlyPin(roomId, room, post.place, null, null, post.note, fixedMsg.id);
+  if(room.isTestRoom) testAttachPlace(room, post.place, post.lat, post.lon, fixedMsg.id, suggestTargetPin(room, post.pinned, post.newMeet));
+  else addLocationOnlyPin(roomId, room, post.place, null, null, post.note, fixedMsg.id);
   addHotplaceNoticeMessage(roomId, post.place, null, null);
 
   touchRoom(roomId);
@@ -28561,6 +28565,8 @@ async function fixLocationSuggestMsg(roomId, m){
       showToast(err.message);
       return false;
     }
+  } else if(room.isTestRoom){
+    testConfirmLocation(room, m, true);
   } else {
     room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending' && x !== m) x.status = 'declined'; });
     m.status = 'confirmed';
@@ -29530,6 +29536,7 @@ document.getElementById('locationPickerSuggestSendBtn').addEventListener('click'
       room.messages.push({
         who: 'me', type: 'location-suggest', id: 'lsug' + (locationMsgIdCounter++),
         place, note: '', location, locationLat: c.lat, locationLon: c.lon, status: 'pending', time: new Date(), newRound,
+        pinId: suggestTargetBody(room, opts.pinned, opts.newMeet).pinId || undefined, // 어느 약속의 장소 후보인지 (서버 방과 같게)
       });
       newRound = false;
       sent++;
@@ -37403,19 +37410,23 @@ function testMockLocationVotes(roomId, m){
     refreshPlaceViewer();
   }, 1200 * (i + 1)));
 }
-function testConfirmLocation(room, m){
+function testConfirmLocation(room, m, quiet){
   const target = (room.pinnedSchedules || []).find(p => p.serverId && p.serverId === m.pinId);
   room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending' && x !== m && x.pinId === m.pinId) x.status = 'declined'; });
   m.status = 'confirmed';
-  if(target && !target.location){
-    // 첫 장소는 약속 카드에 바로
-    Object.assign(target, { location: m.place, locationLat: m.locationLat, locationLon: m.locationLon });
-  } else {
-    const p = addLocationOnlyPin(TEST_ROOM_ID, room, m.place, m.locationLat, m.locationLon, null, m.id);
-    if(target) p.forPinId = target.serverId; // 2차 장소
-  }
+  testAttachPlace(room, m.place, m.locationLat, m.locationLon, m.id, target);
+  if(quiet) return; // 바로 픽스는 원래 흐름이 화면 정리·알림을 함
   if(placeViewerState) goBackOrClose(closePlaceSuggestionMap);
   showToast(`"${m.place}"이(가) 약속 장소로 정해졌어요!`);
+}
+// 정해진 장소를 그 약속에 붙임 - 첫 장소는 약속 카드에 바로, 그다음부터는 2차·3차 장소로 (약속이 없으면 날짜 미정 약속)
+function testAttachPlace(room, place, lat, lon, msgId, target){
+  if(target && target.dateObj && !target.location){
+    Object.assign(target, { location: place, locationLat: lat, locationLon: lon });
+    return;
+  }
+  const p = addLocationOnlyPin(TEST_ROOM_ID, room, place, lat, lon, null, msgId);
+  if(target && target.serverId) p.forPinId = target.serverId;
 }
 // 시간 빨리 감기 - 다가오는 약속을 "방금 끝난 약속"(오늘, 1분 전에 끝남)으로 옮겨서 끝난 뒤 화면을 바로 확인
 function testFinishAppointment(){
