@@ -4009,6 +4009,8 @@
     box-shadow:0 2px 10px rgba(0,0,0,.12);
   }
   .chat-scroll-bottom-btn[hidden]{ display:none; }
+  .chat-test-btn{ position:absolute; left:16px; bottom:calc(100% + 10px); z-index:5; height:34px; padding:0 12px; border-radius:999px; border:1px dashed var(--accent); background:var(--surface); color:var(--accent); font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.1); }
+  .chat-test-btn[hidden]{ display:none; }
   /* 앱에서 키보드가 올라와 있을 때: 키보드 높이에 홈바 영역이 이미 포함돼 있어서 하단 여백을 카카오톡처럼 최소로 */
   .chat-room-view.keyboard-open .chat-bottom-fixed{ padding-bottom:6px; }
   /* 앱에서는 입력창이 키보드 애니메이션(약 0.25초)과 같이 부드럽게 올라오도록 */
@@ -10606,6 +10608,8 @@
       <div class="chat-messages" id="chatMessages"></div>
       <div class="chat-bottom-fixed">
         <!-- 위로 올려서 최신 메시지가 안 보일 때 뜨는 "맨 아래로" 버튼 (카톡처럼) -->
+        <!-- 테스트 모드 방에서만 - 가짜 친구 반응·시간 빨리 감기 메뉴 -->
+        <button type="button" class="chat-test-btn" id="chatTestBtn" hidden>🧪 테스트</button>
         <button type="button" class="chat-scroll-bottom-btn" id="chatScrollBottomBtn" aria-label="맨 아래로" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><path d="M6 9l6 6 6-6"/></svg></button>
         <!-- 대화 검색 중엔 메시지 입력칸 대신 이 줄이 뜸 (카톡처럼): 보낸 사람 / 날짜 + 위·아래 이동 -->
         <div class="chat-search-toolbar" id="chatSearchNav" hidden>
@@ -14504,6 +14508,8 @@ const SETTINGS_MENU = [
   { id: 'place', group: 1, label: '장소', icon: '<path d="M12 21s7-7.5 7-12a7 7 0 0 0-14 0c0 4.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>', action: () => openSettingsDetail('locations') },
   { id: 'notifications', group: 2, label: '알림', icon: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>' },
   { id: 'display', group: 2, label: '화면', icon: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>' },
+  // 혼자서 다인원 약속 흐름을 확인하는 가짜 모임방 (내 폰에만 있고 서버엔 아무것도 안 남음)
+  { id: 'testmode', group: 3, label: '테스트 모드 (혼자 확인용)', icon: '<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>', action: () => openTestRoom() },
   { id: 'help', group: 3, label: '도움말', icon: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.6"/><path d="M12 17h.01"/>' },
   // 상세 화면 없이 바로 오류 신고 팝업을 엶
   { id: 'bugreport', group: 3, label: '오류 신고하기', icon: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>', action: () => openBugReport('menu') },
@@ -16817,7 +16823,7 @@ function isPinPast(pin){
 // 이 방에서 후기를 물어볼 만한 지난 약속 하나 (가장 최근에 끝난 것)
 function findPlaceReviewCandidate(roomId){
   const room = CHAT_ROOMS[roomId];
-  if(!room || !room.isRealRoom || !room.pinnedSchedules) return null;
+  if(!room || !(room.isRealRoom || room.isTestRoom) || !room.pinnedSchedules) return null;
   const now = Date.now();
   const done = new Set(loadPlaceReviewDone());
   const myTitles = new Set(currentUser ? ['food', 'cafe', 'experience'].flatMap(c => FEED_POSTS[c] || [])
@@ -16989,6 +16995,11 @@ function closePlaceReviewSheet(how){
 async function submitPlaceReview(note, btn){
   const st = placeReviewState;
   if(!st || !st.tags.size) return;
+  if(CHAT_ROOMS[st.c.roomId] && CHAT_ROOMS[st.c.roomId].isTestRoom){
+    showToast('테스트 모드라 후기는 실제로 올리지 않아요.');
+    closePlaceReviewSheet('never');
+    return;
+  }
   const { c, info } = st;
   btn.disabled = true;
   const tags = PLACE_REVIEW_TAGS.map(t => t.key).filter(k => st.tags.has(k)); // 항상 같은 순서로 저장
@@ -19463,6 +19474,8 @@ function getScheduleBookable(key){
 
 // 예약이 확정되면 내 캘린더(월간)와 시간표(하루)에 실제 일정으로 등록
 function applyReservationToMyCalendar(dateObj, startMin, endMin, title, roomId, reservationMsgId){
+  // 테스트 모드 방의 가짜 약속은 내 캘린더(서버)에 넣지 않음
+  if(roomId && CHAT_ROOMS[roomId] && CHAT_ROOMS[roomId].isTestRoom) return;
   // 확정된 시간과 겹치는 "예약 가능" 일정을 정리 (겹치는 부분만 잘라내고, 남는 앞뒤 시간은 그대로 예약 가능으로 남겨둠)
   const dateKey = dateKeyOf(dateObj);
   const newStartMin = startMin, newEndMin = endMin;
@@ -28531,6 +28544,7 @@ async function voteLocationSuggestMsg(roomId, m){
     const had = (m.voterIds || []).includes(me);
     room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending') x.voterIds = (x.voterIds || []).filter(id => id !== me); });
     if(!had) m.voterIds = [...(m.voterIds || []), me];
+    if(!had && room.isTestRoom) testMockLocationVotes(roomId, m);
   }
   afterLocationSuggestChange(roomId, room, before);
 }
@@ -30788,6 +30802,8 @@ function pinnedLocationAddress(pin){
 
 function renderPinnedSchedule(){
   const room = CHAT_ROOMS[activeChatRoomId];
+  const testBtn = document.getElementById('chatTestBtn');
+  if(testBtn) testBtn.hidden = !(room && room.isTestRoom);
   const el = document.getElementById('chatPinnedSchedule');
   if(!room || !room.pinnedSchedules || room.pinnedSchedules.length === 0){
     el.style.display = 'none';
@@ -37319,6 +37335,123 @@ function getOtherParticipantNames(room){
 function getTotalParticipants(room){
   return room.members ? room.members.length : 2;
 }
+
+// ---------- 테스트 모드 ----------
+// 혼자서 다인원 약속(시간 투표 → 확정 → 장소 투표 → 약속 끝 → 지난 약속·후기)을 끝까지 눌러보는 가짜 모임방.
+// 내 폰 메모리에만 있고(앱을 다시 켜면 사라짐) 서버엔 아무것도 보내지 않음. 가짜 친구 테스트1·테스트2가 알아서 투표함
+const TEST_ROOM_ID = 'test-group';
+const TEST_MEMBERS = [{ name: '테스트1', color: '#C7D2FE' }, { name: '테스트2', color: '#FBCFE8' }];
+function ensureTestRoom(){
+  if(CHAT_ROOMS[TEST_ROOM_ID]) return CHAT_ROOMS[TEST_ROOM_ID];
+  CHAT_ROOMS[TEST_ROOM_ID] = {
+    id: TEST_ROOM_ID, name: '🧪 테스트 모임', initial: '테', color: '#FDE68A',
+    isGroup: true, isTestRoom: true, unreadCount: 0, lastActivity: Date.now(),
+    members: [{ name: '나', userId: currentUser ? currentUser.id : 'me' }, ...TEST_MEMBERS],
+    pinnedSchedules: [],
+    messages: [{ who: 'other', senderName: '테스트1', time: new Date(),
+      text: '테스트 모임방이에요! 아래 🧪 테스트 버튼으로 시간 후보 받기 → 투표 → 장소 후보 받기 → 투표 → 약속 끝내기 순서로 확인해 보세요. 이 방은 내 폰에만 있고 서버엔 안 남아요.' }],
+  };
+  renderChatList();
+  return CHAT_ROOMS[TEST_ROOM_ID];
+}
+function openTestRoom(){
+  ensureTestRoom();
+  jumpToView(() => { showTab('chat'); openChatRoom(TEST_ROOM_ID); });
+}
+function testRoomRefresh(){
+  touchRoom(TEST_ROOM_ID);
+  if(activeChatRoomId === TEST_ROOM_ID){ renderChatMessages(); renderPinnedSchedule(); scrollChatToBottom(); }
+  renderChatList();
+}
+function testUpcomingPin(room){
+  return (room.pinnedSchedules || []).filter(p => p.dateObj && !isPinPast(p)).sort((a, b) => pinEndDate(a) - pinEndDate(b))[0] || null;
+}
+// 가짜 친구가 시간 후보 2개를 보냄 - 내가 하나에 투표하면 둘도 같은 곳에 투표해서 확정됨 (기존 데모 투표 흐름)
+function testSendTimeOptions(){
+  const room = ensureTestRoom();
+  const mk = (days, s, e) => {
+    const d = new Date(TODAY); d.setDate(d.getDate() + days); d.setHours(0, 0, 0, 0);
+    return { dateLabel: `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_KO[d.getDay()]})`, timeLabel: `${minutesToLabel(s)}-${minutesToLabel(e)}`,
+      dateObj: d, startMin: s, endMin: e, startH: Math.floor(s / 60), endH: Math.floor(e / 60), votes: [] };
+  };
+  room.messages.push({ who: 'other', senderName: '테스트1', type: 'time-options-suggest', id: 'tsug' + (locationMsgIdCounter++),
+    options: [mk(1, 18 * 60, 20 * 60), mk(2, 19 * 60, 21 * 60)], status: 'voting', time: new Date() });
+  testRoomRefresh();
+}
+// 가짜 친구들이 다가오는 약속의 장소 후보 2곳을 올림
+function testSendPlaceOptions(){
+  const room = ensureTestRoom();
+  const target = testUpcomingPin(room);
+  if(!target){ showToast('먼저 "시간 후보 받기"로 약속 시간을 정해 주세요.'); return; }
+  if(!target.serverId) target.serverId = 'test-' + target.id; // 장소 후보가 이 약속 것인지 묶는 데 씀
+  [['테스트1', '스타벅스 홍대역점', '서울 마포구 양화로 165', 37.5566, 126.9237], ['테스트2', '다운타우너 한남', '서울 용산구 대사관로5길 12', 37.5374, 127.0011]].forEach(([who, place, addr, lat, lon]) => {
+    room.messages.push({ who: 'other', senderName: who, type: 'location-suggest', id: 'lsug' + (locationMsgIdCounter++),
+      place, note: '', location: addr, locationLat: lat, locationLon: lon, status: 'pending', pinId: target.serverId, voterIds: [], time: new Date() });
+  });
+  testRoomRefresh();
+}
+// 내가 장소 후보에 투표하면 가짜 친구들도 하나씩 같은 곳에 투표 - 다 같이 고르면 그 약속 장소로 확정
+function testMockLocationVotes(roomId, m){
+  const room = CHAT_ROOMS[roomId];
+  TEST_MEMBERS.forEach((tm, i) => setTimeout(() => {
+    if(m.status !== 'pending') return;
+    const id = 'test:' + tm.name;
+    room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending') x.voterIds = (x.voterIds || []).filter(v => v !== id); });
+    m.voterIds = [...(m.voterIds || []), id];
+    if(m.voterIds.length >= getTotalParticipants(room)) testConfirmLocation(room, m);
+    testRoomRefresh();
+    refreshPlaceViewer();
+  }, 1200 * (i + 1)));
+}
+function testConfirmLocation(room, m){
+  const target = (room.pinnedSchedules || []).find(p => p.serverId && p.serverId === m.pinId);
+  room.messages.forEach(x => { if(x.type === 'location-suggest' && x.status === 'pending' && x !== m && x.pinId === m.pinId) x.status = 'declined'; });
+  m.status = 'confirmed';
+  if(target && !target.location){
+    // 첫 장소는 약속 카드에 바로
+    Object.assign(target, { location: m.place, locationLat: m.locationLat, locationLon: m.locationLon });
+  } else {
+    const p = addLocationOnlyPin(TEST_ROOM_ID, room, m.place, m.locationLat, m.locationLon, null, m.id);
+    if(target) p.forPinId = target.serverId; // 2차 장소
+  }
+  if(placeViewerState) goBackOrClose(closePlaceSuggestionMap);
+  showToast(`"${m.place}"이(가) 약속 장소로 정해졌어요!`);
+}
+// 시간 빨리 감기 - 다가오는 약속을 "방금 끝난 약속"(오늘, 1분 전에 끝남)으로 옮겨서 끝난 뒤 화면을 바로 확인
+function testFinishAppointment(){
+  const room = ensureTestRoom();
+  const pins = (room.pinnedSchedules || []).filter(p => p.dateObj && !isPinPast(p));
+  if(!pins.length){ showToast('끝낼 약속이 없어요. 먼저 약속 시간을 정해 주세요.'); return; }
+  const now = new Date();
+  let endMin = now.getHours() * 60 + now.getMinutes() - 1;
+  const d = new Date(now); d.setHours(0, 0, 0, 0);
+  if(endMin < 60){ d.setDate(d.getDate() - 1); endMin = 23 * 60 + 59; } // 새벽이면 어제 밤 약속으로
+  pins.forEach(p => {
+    p.dateObj = new Date(d);
+    p.dateLabel = `${d.getMonth() + 1}/${d.getDate()}(${WEEKDAY_KO[d.getDay()]})`;
+    p.timeLabel = `${minutesToLabel(endMin - 60)}-${minutesToLabel(endMin)}`;
+  });
+  testRoomRefresh();
+  refreshIfAppointmentEnded();
+  renderApptsTab();
+  showToast('약속이 방금 끝난 걸로 바꿨어요. 지난 약속·후기를 확인해 보세요.');
+  setTimeout(() => maybePromptPlaceReview(TEST_ROOM_ID), 800);
+}
+function testResetRoom(){
+  delete CHAT_ROOMS[TEST_ROOM_ID];
+  if(activeChatRoomId === TEST_ROOM_ID) goBackOrClose(closeChatRoomView);
+  renderChatList();
+  renderApptsTab();
+  showToast('테스트 모임방을 지웠어요.');
+}
+document.getElementById('chatTestBtn').addEventListener('click', () => {
+  openWeekBlockSheet('🧪 테스트 모드', '가짜 친구 테스트1·테스트2와 해보는 방이에요 (서버엔 안 남아요)', [
+    { label: '① 시간 후보 받기', primary: true, onTap: testSendTimeOptions },
+    { label: '② 장소 후보 받기', primary: true, onTap: testSendPlaceOptions },
+    { label: '③ 약속 끝내기 (시간 빨리 감기)', primary: true, onTap: testFinishAppointment },
+    { label: '테스트 방 지우기', danger: true, confirmLabel: '정말 지울까요?', onTap: testResetRoom },
+  ]);
+});
 
 // 나머지 멤버들도 잠시 후 하나씩 (지정된 후보에) 투표하는 것처럼 시뮬레이션 (데모 전용, 한 메시지당 한 번만 실행)
 function triggerMockVotes(roomId, msg, optionIndex){
