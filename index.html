@@ -16801,14 +16801,6 @@ function isPlaceReviewSnoozed(key){
   const v = loadPlaceReviewSnooze()[key];
   return !!v && v.until > Date.now();
 }
-// "나중에"를 누르면 다른 약속·다른 장소(2차 등) 후기도 일주일 동안은 아예 안 물어봄 - 하나 넘기면 다음 장소가 바로 또 떴음
-const PLACE_REVIEW_PAUSE_KEY = 'catchme_place_review_pause_until';
-function pauseAllPlaceReviews(){
-  try { localStorage.setItem(PLACE_REVIEW_PAUSE_KEY, String(Date.now() + 7 * 86400e3)); } catch(e){}
-}
-function arePlaceReviewsPaused(){
-  try { return Number(localStorage.getItem(PLACE_REVIEW_PAUSE_KEY) || 0) > Date.now(); } catch(e){ return false; }
-}
 const placeReviewClassifyCache = {};
 let placeReviewState = null;
 
@@ -16906,7 +16898,7 @@ function classifyReviewPlace(c, cb){
 }
 
 function maybePromptPlaceReview(roomId){
-  if(!authToken || placeReviewState || restoreAvailPromptShowing || arePlaceReviewsPaused()) return;
+  if(!authToken || placeReviewState || restoreAvailPromptShowing) return;
   const c = findPlaceReviewCandidate(roomId);
   if(!c) return;
   classifyReviewPlace(c, (info) => {
@@ -17009,7 +17001,7 @@ function closePlaceReviewSheet(how){
   placeReviewState = null;
   if(!st) return;
   if(how === 'never') markPlaceReviewDone(st.c.key);
-  else if(how === 'later'){ placeReviewSkippedThisSession.add(st.c.key); snoozePlaceReview(st.c.key); pauseAllPlaceReviews(); }
+  else if(how === 'later'){ placeReviewSkippedThisSession.add(st.c.key); snoozePlaceReview(st.c.key); }
 }
 async function submitPlaceReview(note, btn){
   const st = placeReviewState;
