@@ -16784,23 +16784,6 @@ const PLACE_REVIEW_DONE_KEY = 'catchme_place_review_done';
 const NON_STORE_GROUPS = ['SW8', 'PK6', 'OL7', 'SC4', 'PS3', 'PO3', 'BK9', 'AG2', 'HP8', 'PM9', 'AT4', 'AC5'];
 const NON_STORE_CATEGORY_PREFIX = ['교통,수송', '지역', '부동산', '사회,공공기관', '의료,건강', '교육,학문', '금융,보험'];
 const placeReviewSkippedThisSession = new Set(); // "나중에"를 누른 건 앱을 다시 켤 때까지 안 물어봄
-// "나중에"(또는 그냥 닫기)는 앱을 다시 켜도 일주일 동안 안 물어보고, 두 번째 "나중에"면 그 약속은 다시 안 물어봄
-// (앱을 켤 때마다 같은 후기 창이 계속 떴음)
-const PLACE_REVIEW_SNOOZE_KEY = 'catchme_place_review_snooze';
-function loadPlaceReviewSnooze(){
-  try { return JSON.parse(localStorage.getItem(PLACE_REVIEW_SNOOZE_KEY) || '{}'); } catch(e){ return {}; }
-}
-function snoozePlaceReview(key){
-  const all = loadPlaceReviewSnooze();
-  const n = ((all[key] && all[key].n) || 0) + 1;
-  if(n >= 2){ markPlaceReviewDone(key); delete all[key]; }
-  else all[key] = { n, until: Date.now() + 7 * 86400e3 };
-  try { localStorage.setItem(PLACE_REVIEW_SNOOZE_KEY, JSON.stringify(all)); } catch(e){}
-}
-function isPlaceReviewSnoozed(key){
-  const v = loadPlaceReviewSnooze()[key];
-  return !!v && v.until > Date.now();
-}
 const placeReviewClassifyCache = {};
 let placeReviewState = null;
 
@@ -16848,7 +16831,7 @@ function findPlaceReviewCandidate(roomId){
     for(const placePin of roomMeetPlaces(room, pin)){
       const name = placePin.location.trim();
       const key = `${roomId}|${pin.serverId || (pin.dateLabel + ' ' + (pin.timeLabel || ''))}|${placeReviewNorm(name)}`;
-      if(done.has(key) || placeReviewSkippedThisSession.has(key) || isPlaceReviewSnoozed(key)) continue;
+      if(done.has(key) || placeReviewSkippedThisSession.has(key)) continue;
       if(myTitles.has(placeReviewNorm(name))) continue; // 이미 이 장소 후기를 올렸으면 안 물어봄
       return {
         key, roomId, pin, end, name,
@@ -16945,7 +16928,7 @@ function openPlaceReviewSheet(c, info){
       <button type="button" class="mini-confirm-btn" data-act="submit" disabled>추천 남기기</button>
       <button type="button" class="mini-confirm-btn danger" data-act="later">나중에</button>
     </div>
-    <button type="button" class="place-review-never" data-act="never">이 약속은 후기 안 남길래요</button>
+    <button type="button" class="place-review-never" data-act="never">다시 안 보기</button>
   `;
   const card = ov.querySelector('.mini-confirm-card');
   const submitBtn = card.querySelector('[data-act="submit"]');
@@ -17001,7 +16984,7 @@ function closePlaceReviewSheet(how){
   placeReviewState = null;
   if(!st) return;
   if(how === 'never') markPlaceReviewDone(st.c.key);
-  else if(how === 'later'){ placeReviewSkippedThisSession.add(st.c.key); snoozePlaceReview(st.c.key); }
+  else if(how === 'later') placeReviewSkippedThisSession.add(st.c.key);
 }
 async function submitPlaceReview(note, btn){
   const st = placeReviewState;
