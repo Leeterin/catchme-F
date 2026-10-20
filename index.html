@@ -3660,6 +3660,15 @@
     color:var(--text-dim);
     margin-top:1px;
   }
+  /* 약속 메모 = 약속의 주제 - 날짜보다 먼저, 크고 진하게 */
+  .chat-pinned-schedule .pin-topic{
+    font-size:15px;
+    font-weight:800;
+    color:var(--text);
+    line-height:1.35;
+    margin-bottom:2px;
+    word-break:keep-all;
+  }
   .chat-pinned-schedule .pin-actions{
     display:flex;
     flex-wrap:wrap;
@@ -3925,6 +3934,7 @@
     font-size:11.5px;
     color:var(--text-dim);
   }
+  .appt-detail-topic{ font-size:24px; font-weight:800; color:var(--text); line-height:1.35; margin-bottom:12px; word-break:keep-all; }
   .appt-detail-place-meta{
     font-size:10.5px;
     color:var(--text-dim);
@@ -4442,6 +4452,7 @@
     color:var(--text-dim);
     margin-bottom:8px;
   }
+  .reservation-card-note.is-topic{ font-size:15px; font-weight:700; color:var(--text); word-break:keep-all; }
   .reservation-card-status{
     display:inline-block;
     font-size:11px;
@@ -14252,8 +14263,8 @@ function renderApptsTab(){
         <span class="home-appt-when"><b>${escapeHtml(apptsView === 'upcoming' ? homeDdayLabel(d) : `${d.getMonth() + 1}/${d.getDate()}`)}</b><small>${apptsView === 'upcoming' ? `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAY_KO[d.getDay()]})` : `(${WEEKDAY_KO[d.getDay()]})`}</small></span>
         ${apptsView === 'past' ? roomAvatar(x.room) : ''}
         <span class="home-appt-info">
-          <div class="home-appt-name">${escapeHtml(x.room.name || '약속')}</div>
-          <div class="home-appt-sub">${escapeHtml(sub)}${voting ? ' · 장소 투표 중' : ''}</div>
+          <div class="home-appt-name">${escapeHtml(x.pin.note || x.room.name || '약속')}</div>
+          <div class="home-appt-sub">${escapeHtml(x.pin.note ? `${x.room.name || ''} · ${sub}` : sub)}${voting ? ' · 장소 투표 중' : ''}</div>
         </span>
       </div>`;
   }).join('');
@@ -30831,9 +30842,9 @@ function renderPinnedSchedule(){
       <div class="pin-top-row">
         <span class="pin-icon">${ICO.pushpin}</span>
         <div class="pin-info">
+          ${note ? `<div class="pin-topic">${escapeHtml(note)}</div>` : ''}
           ${dateLabel ? `<div class="pin-time">${dateLabel} ${timeLabel}</div>` : ''}
           ${undated ? `<div class="pin-time">${undatedStale ? '2주 넘게 날짜를 못 정했어요. 이 약속 아직 할까요?' : askedDateKey ? `${dateAskLabel(askedDateKey)}에 만나요. 시간만 정하면 돼요` : '장소는 정했어요. 날짜만 정하면 돼요'}</div>` : ''}
-          ${note ? `<div class="pin-note">${escapeHtml(note)}</div>` : ''}
           ${places.length ? `<div class="pin-note">${ICO.pin} ${places.map(p => escapeHtml(p.location)).join(' → ')}</div>` : ''}
         </div>
       </div>
@@ -31052,10 +31063,10 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
 
   const body = document.getElementById('appointmentDetailBody');
   body.innerHTML = `
+    ${pin.note ? `<div class="appt-detail-topic">${escapeHtml(pin.note)}</div>` : ''}
     <div class="appt-detail-section">
       <div class="appt-detail-label">함께하는 사람</div>
       <div class="appt-detail-datetime">${escapeHtml(room.name || '')}</div>
-      ${pin.note ? `<div class="appt-detail-place-sub">${escapeHtml(pin.note)}</div>` : ''}
     </div>
     <div class="appt-detail-section">
       <div class="appt-detail-label">${ICO.calendar} 날짜 · 시간</div>
@@ -32127,7 +32138,7 @@ function renderChatMessages(){
         <div class="reservation-card${m.status === 'confirmed' ? ' is-confirmed' : (m.status !== 'pending' || expired) ? ' is-done' : ''}">
           <div class="reservation-card-header">${ICO.calendar} ${m.status === 'confirmed' ? '약속이 확정됐어요' : '약속 요청'}</div>
           <div class="reservation-card-time chat-date-link">${m.dateLabel} ${m.timeLabel}</div>
-          ${m.note ? `<div class="reservation-card-note">${escapeHtml(m.note)}</div>` : ''}
+          ${m.note ? `<div class="reservation-card-note is-topic">${escapeHtml(m.note)}</div>` : ''}
           <div class="reservation-card-note">${ICO.pin} ${m.location ? escapeHtml(m.location) : reservationMeetPlacesLabel(room, m) || '장소 미정 (만나서 정해요)'}</div>
           <div class="reservation-card-status ${expired ? 'expired' : m.status}">${statusLabel}</div>
           ${showActions ? `
