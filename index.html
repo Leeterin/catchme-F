@@ -4006,8 +4006,7 @@
     scroll-padding-top:calc(72px + env(safe-area-inset-top));
   }
   .chat-search-bar.open ~ .chat-messages{ margin-top:0; padding-top:4px; scroll-padding-top:0; }
-  /* 메시지가 적어도 위가 아니라 입력창 바로 위(맨 아래)부터 쌓이게 - 카카오톡처럼 (justify-content:flex-end는 스크롤이 깨져서 margin-top:auto로) */
-  .chat-messages > :first-child{ margin-top:auto; }
+  /* 메시지가 적을 땐 위에서부터 쌓임 (예전엔 입력창 바로 위부터 쌓여서 첫 메시지가 맨 밑에 떠 있었음) */
 
   .chat-bottom-fixed{
     position:relative;
