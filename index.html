@@ -3480,6 +3480,16 @@
   }
   .match-range-row.checked{ border-color:var(--accent); background:var(--accent-soft); }
   .match-range-wide{ margin-bottom:8px; }
+  .match-range-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:11px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--surface); font-size:14px; color:var(--text); }
+  .match-range-head b{ color:var(--accent); margin-right:4px; }
+  .match-range-wide.has-picks .match-range-head{ border-color:var(--accent); }
+  .match-range-add{ flex-shrink:0; border:none; background:var(--accent); color:var(--on-accent); border-radius:999px; padding:6px 12px; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
+  .match-range-wide.has-picks .match-range-add{ background:var(--accent-soft); color:var(--accent); }
+  .match-fine-list{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  .match-fine-list:empty{ display:none; }
+  .match-range-bar{ position:relative; height:8px; border-radius:999px; background:var(--surface); border:1px solid var(--line); overflow:hidden; margin:2px 0 3px; }
+  .match-range-bar span{ position:absolute; top:0; bottom:0; background:var(--accent); border-radius:999px; }
+  .match-range-bar-labels{ display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-dim); margin-bottom:6px; }
   .match-range-wide-label{
     font-size:12px;
     color:var(--text-dim);
@@ -37149,25 +37159,21 @@ async function runCalendarMatch(){
           </div>
         `;
       }
-      // 겹치는 시간이 원하는 만날 시간보다 길면, "몇 시부터 만날지" 시작 시간을 여러 개로 쪼개서 골라 고를 수 있게 함
-      // 첫 칩은 겹치는 시간의 시작(정각이 아니어도 그대로, 예: 06:50), 그다음부터는 정각마다
-      const startOptions = [r.startMin];
-      for(let s = (Math.floor(r.startMin / 60) + 1) * 60; s + dur <= r.endMin; s += 60) startOptions.push(s);
-      const chipsHtml = startOptions.map(s => `
-        <div class="match-start-chip" data-date="${day.date.toISOString()}" data-start-min="${s}" data-end-min="${s + dur}" data-range-start-min="${r.startMin}" data-range-end-min="${r.endMin}">
-          ${matchHm(s)} 시작
-        </div>
-      `).join('');
+      // 겹치는 시간이 원하는 만날 시간보다 길면 '모두 돼요 10:35 ~ 15:20' 한 줄 - 누르면 그 안에서 시작·종료 시간을 휠로 고름
+      // (예전엔 '10:35 시작 · 11:00 시작 …' 칩을 고른 뒤 또 분을 고쳐야 해서 애매했음)
       return `
-        <div class="match-range-wide">
-          <div class="match-range-wide-label">${matchHm(r.startMin)} - ${matchHm(r.endMin)} 중 ${minHours}시간 골라주세요</div>
-          <div class="match-start-chip-row">${chipsHtml}</div>
+        <div class="match-range-wide" data-date="${day.date.toISOString()}" data-range-start-min="${r.startMin}" data-range-end-min="${r.endMin}">
+          <div class="match-range-head">
+            <span><b>모두 돼요</b> ${matchHm(r.startMin)} ~ ${matchHm(r.endMin)}</span>
+            <button type="button" class="match-range-add">후보로 고르기</button>
+          </div>
           <div class="match-fine-list"></div>
         </div>
       `;
     }).join('');
     return `<div class="match-day-group"><div class="match-day-label">${dateLabel}</div>${rangesHtml}</div>`;
   }).join('');
+  body.querySelectorAll('.match-range-wide').forEach(renderMatchFineRows);
 
   renderProposeSelectedBtn();
 }
@@ -37224,6 +37230,25 @@ document.getElementById('matchCondToggle').addEventListener('click', () => {
 document.getElementById('matchPanelBody').addEventListener('click', (e) => {
   if(!activeMatchGroupRoomId && !activeMatchFriendId) return;
 
+  const addBtn = e.target.closest('.match-range-add');
+  if(addBtn){
+    const wide = addBtn.closest('.match-range-wide');
+    const rangeStartMin = parseInt(wide.dataset.rangeStartMin, 10), rangeEndMin = parseInt(wide.dataset.rangeEndMin, 10);
+    const rangeKey = `${wide.dataset.date}|${rangeStartMin}`;
+    const mine = selectedGroupMatchSlots.filter(x => x.rangeKey === rangeKey);
+    const dur = (parseInt(document.getElementById('matchMinHours').value, 10) || 1) * 60;
+    // 첫 후보는 그 시간대 처음부터, 하나 더 넣으면 마지막 후보가 끝난 뒤부터 (자리가 없으면 처음부터)
+    let st = mine.length ? Math.max(...mine.map(x => x.endMin)) : rangeStartMin;
+    if(st + Math.min(dur, 5) > rangeEndMin) st = rangeStartMin;
+    const dateObj = new Date(wide.dataset.date);
+    const slot = { key: `${rangeKey}|${Date.now()}`, rangeKey, dateObj, dateLabel: `${dateObj.getMonth()+1}/${dateObj.getDate()}(${WEEKDAY_KO[dateObj.getDay()]})`,
+      baseH: Math.floor(st / 60), startMin: st, endMin: Math.min(st + dur, rangeEndMin), rangeStartMin, rangeEndMin };
+    syncMatchSlotLabel(slot);
+    selectedGroupMatchSlots.push(slot);
+    renderMatchFineRows(wide);
+    renderProposeSelectedBtn();
+    return;
+  }
   const pickBtn = e.target.closest('.match-fine-pick');
   if(pickBtn){
     const slot = selectedGroupMatchSlots.find(s => s.key === pickBtn.dataset.key);
@@ -37298,18 +37323,19 @@ document.getElementById('matchPanelBody').addEventListener('click', (e) => {
 function renderMatchFineRows(wide){
   if(!wide) return;
   const list = wide.querySelector('.match-fine-list');
-  const chips = [...wide.querySelectorAll('.match-start-chip')];
-  const slots = [];
-  chips.forEach(chip => {
-    const key = `${chip.dataset.date}|${chip.dataset.startMin}`;
-    const slot = selectedGroupMatchSlots.find(s => s.key === key);
-    chip.classList.toggle('checked', !!slot);
-    chip.textContent = `${matchHm(slot ? slot.startMin : parseInt(chip.dataset.startMin, 10))} 시작`;
-    if(slot) slots.push(slot);
-  });
+  const rangeStartMin = parseInt(wide.dataset.rangeStartMin, 10), rangeEndMin = parseInt(wide.dataset.rangeEndMin, 10);
+  const rangeKey = `${wide.dataset.date}|${rangeStartMin}`;
+  const slots = selectedGroupMatchSlots.filter(x => x.rangeKey === rangeKey);
+  const addBtn = wide.querySelector('.match-range-add');
+  if(addBtn) addBtn.textContent = slots.length ? '+ 이 날 후보 하나 더' : '후보로 고르기';
+  wide.classList.toggle('has-picks', slots.length > 0);
+  const span = Math.max(1, rangeEndMin - rangeStartMin);
+  const pct = (m) => ((m - rangeStartMin) / span * 100).toFixed(2);
   // 1:1 약속 요청처럼 시작 시간 / 종료 시간 칸을 누르면 휠로 고름 (겹치는 시간 안에서 5분 단위)
   list.innerHTML = slots.map(slot => `<div class="match-fine-row">
         <div class="match-fine-head"><span>${matchHm(slot.startMin)} ~ ${matchHm(slot.endMin)}</span><button type="button" class="match-fine-remove" data-key="${slot.key}">빼기</button></div>
+        <div class="match-range-bar"><span style="left:${pct(slot.startMin)}%;width:${(pct(slot.endMin) - pct(slot.startMin)).toFixed(2)}%"></span></div>
+        <div class="match-range-bar-labels"><span>${matchHm(rangeStartMin)}</span><span>${matchHm(rangeEndMin)}</span></div>
         <div class="match-fine-sub">시작 시간</div>
         <button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="start">${matchHm(slot.startMin)}</button>
         <div class="match-fine-sub">종료 시간</div>
