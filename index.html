@@ -3601,6 +3601,20 @@
     background:var(--accent);
     color:var(--on-accent);
   }
+  /* 투표 후보 하나만 빼기 - 내가 올린 후보에만 보임 */
+  .vote-remove-btn{
+    flex-shrink:0;
+    width:24px; height:24px;
+    padding:0;
+    border:none;
+    border-radius:50%;
+    background:var(--surface-2);
+    color:var(--text-dim);
+    font-size:15px;
+    line-height:24px;
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+  }
   .time-option-vote-count{
     flex-shrink:0;
     font-size:11px;
@@ -28552,9 +28566,11 @@ function renderPlaceViewerList(){
     const mine = (m.voterIds || []).includes(me);
     const who = m.who === 'me' ? '내 제안' : '친구 제안';
     const sub = [m.location, who].filter(Boolean).join(' · ');
-    const right = m.status === 'pending'
+    const removeBtn = m.status === 'pending' && m.who === 'me' && pending.length > 1
+      ? `<button type="button" class="vote-remove-btn" data-remove="${escapeHtml(String(m.id))}" aria-label="후보 삭제">&times;</button>` : '';
+    const right = removeBtn + (m.status === 'pending'
       ? `<button type="button" class="place-vote-btn${mine ? ' voted' : ''}" data-vote="${escapeHtml(String(m.id))}">${mine ? '✓ ' : ''}${votes}표</button>`
-      : `<span class="place-vote-status ${m.status}">${m.status === 'confirmed' ? '확정' : (m.status === 'declined' ? '마감' : '취소됨')}</span>`;
+      : `<span class="place-vote-status ${m.status}">${m.status === 'confirmed' ? '확정' : (m.status === 'declined' ? '마감' : '취소됨')}</span>`);
     return `
       <div class="place-vote-row${m.id === selectedId ? ' on' : ''}${m.status !== 'pending' && m.status !== 'confirmed' ? ' closed' : ''}" data-id="${escapeHtml(String(m.id))}">
         <div class="place-vote-info">
@@ -28691,6 +28707,12 @@ document.getElementById('placeViewerList').addEventListener('click', (e) => {
   if(!placeViewerState) return;
   const voteBtn = e.target.closest('[data-vote]');
   const items = placeViewerItems();
+  const removeBtn = e.target.closest('[data-remove]');
+  if(removeBtn){
+    const m = items.find(x => String(x.id) === removeBtn.dataset.remove);
+    if(m) removeLocationSuggestCandidate(m);
+    return;
+  }
   if(voteBtn){
     const m = items.find(x => String(x.id) === voteBtn.dataset.vote);
     if(m){
@@ -28763,6 +28785,19 @@ function cancelLocationSuggest(msg){
   renderChatMessages();
   renderChatList();
   refreshHotplaceListsIfOpen();
+}
+
+// 투표 중인 장소 후보 중 내가 올린 것 하나만 뺌 - 기존 '제안 취소'(하나씩 취소)를 그대로 씀.
+// 뺀 후보는 채팅에 따로 '제안 취소됨' 카드로 남기지 않음 (renderChatMessages에서 숨김)
+async function removeLocationSuggestCandidate(m){
+  if(!m || m.status !== 'pending' || m.who !== 'me') return;
+  const ok = await appConfirm({ title: '이 후보를 뺄까요?', html: escapeHtml(m.place || ''), yesText: '빼기', noText: '아니요' });
+  if(!ok) return;
+  if(placeViewerState && placeViewerState.ids.has(m.id)){
+    placeViewerState.ids.delete(m.id); // 장소 정하기 화면 목록에서도 바로 빠지게
+    if(placeViewerState.selectedId === m.id) placeViewerState.selectedId = null;
+  }
+  cancelLocationSuggest(m);
 }
 
 // 투표 중인 후보들을 한꺼번에 취소 (투표 카드의 '제안 취소') - 서버는 같은 약속에 대기 중인 후보를 전부 닫아줌
@@ -32185,6 +32220,24 @@ function renderChatMessages(){
     suggestRounds.get(key).push(x);
   });
   [...suggestRounds.keys()].forEach(closeSuggestRound);
+  // 투표 중에 후보 하나만 뺀 것(하나씩 취소한 것)은 같은 판에 다른 후보가 있었으면 채팅에 따로 '제안 취소됨' 카드로 안 남김
+  const removedFromVote = new Set();
+  const voteRounds = new Map(); // 약속(key) -> 지금 판의 후보들
+  const flushVoteRound = (key) => {
+    const round = voteRounds.get(key) || [];
+    const lone = round.filter(x => isWithdrawnLocationSuggest(x) && !withdrawnSuggestGroups.has(x));
+    if(lone.length && lone.length < round.length) lone.forEach(x => removedFromVote.add(x));
+    voteRounds.delete(key);
+  };
+  (room.messages || []).forEach(x => {
+    if(x.type !== 'location-suggest') return;
+    const key = locationSuggestGroup(room, x).key;
+    const round = voteRounds.get(key) || [];
+    if(round.some(y => y.status === 'confirmed') && (x.status === 'pending' || x.status === 'confirmed')) flushVoteRound(key);
+    if(!voteRounds.has(key)) voteRounds.set(key, []);
+    voteRounds.get(key).push(x);
+  });
+  [...voteRounds.keys()].forEach(flushVoteRound);
   const openSuggestGroupOf = (x) => {
     if(resolvedSuggestGroups.has(x)) return resolvedSuggestGroups.get(x);
     if(withdrawnSuggestGroups.has(x)) return withdrawnSuggestGroups.get(x);
@@ -32196,6 +32249,7 @@ function renderChatMessages(){
   visibleMessages.forEach(m => {
     const voteGroup = openSuggestGroupOf(m);
     if(voteGroup && m !== voteGroup[voteGroup.length - 1]) return; // 모은 카드는 마지막 후보 자리에 한 번만
+    if(removedFromVote.has(m)) return; // 투표에서 뺀 후보
     let isSearchHit = searching && (!chatSearchSender || chatSenderKey(m) === chatSearchSender);
     if(q && isSearchHit){
       const haystack = (m.type === 'reservation' || m.type === 'time-suggest'
@@ -32374,6 +32428,7 @@ function renderChatMessages(){
                   <div class="place-vote-sub">${x.who === 'me' ? '내 제안' : '친구 제안'}</div>
                   <div class="place-vote-bar"><span style="width:${Math.round(votes / maxVotes * 100)}%"></span></div>
                 </div>
+                ${!voteDone && x.who === 'me' ? `<button type="button" class="vote-remove-btn" data-remove-idx="${i}" aria-label="후보 삭제">&times;</button>` : ''}
                 <button type="button" class="place-vote-btn${(voteWinner ? x === voteWinner : mine) ? ' voted' : ''}" data-idx="${i}"${voteDone ? ' disabled' : ''}>${voteWinner ? (x === voteWinner ? '✓ 확정' : '마감') : `${mine ? '✓ ' : ''}${votes}표`}</button>
               </div>`;
             }).join('')}
@@ -32402,6 +32457,8 @@ function renderChatMessages(){
         // 제안 취소 버튼은 카드에 하나만 - 누르면 친구가 올린 후보까지 이번 투표 전체를 취소
         const cancelBtn = row.querySelector('.ls-cancel-btn');
         if(cancelBtn) cancelBtn.addEventListener('click', () => { cancelBtn.disabled = true; cancelLocationSuggestVote(voteGroup); });
+        // 내가 올린 후보 하나만 빼기
+        row.querySelectorAll('[data-remove-idx]').forEach(btn => btn.addEventListener('click', () => removeLocationSuggestCandidate(voteGroup[parseInt(btn.dataset.removeIdx, 10)])));
         row.querySelectorAll('.place-vote-row').forEach(r => r.addEventListener('click', (e) => {
           if(e.target.closest('button')) return;
           openPlaceSuggestionMap(activeChatRoomId, voteGroup[parseInt(r.dataset.idx, 10)].id);
@@ -32618,6 +32675,7 @@ function renderChatMessages(){
         // 후보 중 하나를 또 "선택"할 필요가 없음 - 상대방 화면에만 선택 버튼을 보여주고, 보낸 사람 화면에는
         // 버튼 없이 날짜/시간만 보여줌 (그룹 채팅은 전원 동의 방식이라 보낸 사람도 투표해야 하므로 그대로 둠)
         const hideVoteBtn = isDirectPick && m.who === 'me';
+        const canRemoveOption = m.who === 'me'; // 내가 보낸 제안이면 후보를 하나씩 뺄 수 있음 (2개 이상일 때만 이 화면)
         const optionsHtml = m.options.map((o, idx) => {
           const iVoted = o.votes.includes('나');
           const btnLabel = isDirectPick ? (iVoted ? '✓ 선택함' : '이 시간 선택') : (iVoted ? '✓ 투표함' : '투표하기');
@@ -32626,6 +32684,7 @@ function renderChatMessages(){
               <span class="chat-date-link" data-idx="${idx}">${o.dateLabel} ${o.timeLabel}</span>
               ${hideVoteBtn ? '' : `<button type="button" class="time-option-vote-btn${iVoted ? ' voted' : ''}" data-idx="${idx}">${btnLabel}</button>`}
               ${isDirectPick ? '' : `<span class="time-option-vote-count">${o.votes.length}/${totalMembers}명</span>`}
+              ${canRemoveOption ? `<button type="button" class="vote-remove-btn" data-remove-idx="${idx}" aria-label="후보 삭제">&times;</button>` : ''}
             </div>
           `;
         }).join('');
@@ -32650,6 +32709,9 @@ function renderChatMessages(){
           } else {
             btn.addEventListener('click', () => voteTimeOption(activeChatRoomId, m, idx));
           }
+        });
+        row.querySelectorAll('[data-remove-idx]').forEach(btn => {
+          btn.addEventListener('click', () => removeTimeOption(activeChatRoomId, m, parseInt(btn.dataset.removeIdx, 10)));
         });
       }
     } else if(m.type === 'system-notice'){
@@ -37733,6 +37795,40 @@ function triggerFriendDirectPick(roomId, msg){
     const idx = Math.floor(Math.random() * msg.options.length);
     selectTimeOptionDirect(roomId, msg, idx);
   }, 1800);
+}
+
+// 내가 보낸 시간 제안에서 후보 하나만 뺌 (그 후보에 한 투표도 같이 지워짐) - 하나만 남으면 그 시간에 동의한 걸로 바뀜
+async function removeTimeOption(roomId, msg, optionIndex){
+  const room = CHAT_ROOMS[roomId];
+  const option = msg.options[optionIndex];
+  if(!room || !option || msg.status !== 'voting' || msg.options.length <= 1) return;
+  const ok = await appConfirm({
+    title: '이 후보를 뺄까요?',
+    html: `${escapeHtml(option.dateLabel)} ${escapeHtml(option.timeLabel)}`,
+    yesText: '빼기', noText: '아니요',
+  });
+  if(!ok) return;
+  if(msg._serverId){
+    try {
+      const data = await apiRequest(`/chats/time-proposals/${msg._serverId}/options/${option._optionId}/remove`, { method: 'POST' });
+      Object.assign(msg, mapServerTimeProposalMessage(data.message, room));
+      if(data.message.proposal.status === 'CONFIRMED'){
+        await loadPinsFromServer(roomId, room);
+        loadScheduleFromServer();
+      }
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+  } else {
+    msg.options.splice(optionIndex, 1);
+  }
+  touchRoom(roomId);
+  if(activeChatRoomId === roomId){
+    renderChatMessages();
+    renderPinnedSchedule();
+  }
+  renderChatList();
 }
 
 async function voteTimeOption(roomId, msg, optionIndex){
