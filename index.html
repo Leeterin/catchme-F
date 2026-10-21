@@ -3482,7 +3482,12 @@
   .match-range-wide{ margin-bottom:8px; }
   .match-range-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:11px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--surface); font-size:14px; color:var(--text); }
   .match-range-head b{ color:var(--accent); margin-right:4px; }
-  .match-range-wide.has-picks .match-range-head{ border-color:var(--accent); }
+  .match-fine-head-btns{ display:flex; gap:8px; align-items:center; }
+  .match-fine-head .match-fine-toggle{ border:1.5px solid var(--accent); color:var(--accent); background:var(--surface); border-radius:999px; padding:4px 10px; font-weight:700; }
+  .match-fine-head .match-fine-toggle.on{ background:var(--accent); color:var(--on-accent); }
+  .match-fine-picks{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .match-fine-picks .custom-select-btn.match-fine-pick{ margin-bottom:0; }
+  .match-range-add{ align-self:flex-start; }
   .match-range-add{ flex-shrink:0; border:none; background:var(--accent); color:var(--on-accent); border-radius:999px; padding:6px 12px; font:inherit; font-size:12.5px; font-weight:700; cursor:pointer; }
   .match-range-wide.has-picks .match-range-add{ background:var(--accent-soft); color:var(--accent); }
   .match-fine-list{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
@@ -3518,7 +3523,8 @@
   /* 고른 시작 시간을 5분 단위로 조절 */
   .match-fine-list{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
   .match-fine-list:empty{ display:none; }
-  .match-fine-row{ border:1px solid var(--accent); background:var(--accent-soft); border-radius:10px; padding:8px 10px; }
+  .match-fine-row{ border:1px solid var(--line); background:var(--surface); border-radius:10px; padding:8px 10px; }
+  .match-fine-row.on{ border-color:var(--accent); background:var(--accent-soft); } /* 후보로 넣은 칸 */
   .match-fine-row .custom-select-btn.match-fine-pick{ background:var(--surface); margin-bottom:8px; }
   .match-fine-row .custom-select-btn.match-fine-pick:last-child{ margin-bottom:0; }
   .match-fine-head{ display:flex; align-items:center; justify-content:space-between; font-size:12.5px; font-weight:700; color:var(--accent); margin-bottom:6px; }
@@ -35387,6 +35393,7 @@ function closeCalendarMatchView(){
 document.getElementById('matchBackBtn').addEventListener('click', () => goBackOrClose(closeCalendarMatchView));
 
 let selectedGroupMatchSlots = []; // 그룹 매칭에서 체크로 골라둔 시간들 [{key, dateObj, startMin, endMin, startH, endH, dateLabel, timeLabel}]
+let matchRangeSlots = {}; // 모두 되는 시간대마다 보여주는 후보 칸들 (넣은 것만 selectedGroupMatchSlots에도 들어감)
 function matchHm(min){ return `${String(Math.floor(min / 60)).padStart(2,'0')}:${String(min % 60).padStart(2,'0')}`; }
 function syncMatchSlotLabel(slot){
   slot.startH = Math.floor(slot.startMin / 60);
@@ -37090,6 +37097,7 @@ async function runCalendarMatch(){
   if(memberNames.length === 0 || !startVal || !endVal) return;
 
   selectedGroupMatchSlots = [];
+  matchRangeSlots = {};
 
   const startDate = parseDateInputValue(startVal);
   const endDate = parseDateInputValue(endVal);
@@ -37159,14 +37167,10 @@ async function runCalendarMatch(){
           </div>
         `;
       }
-      // 겹치는 시간이 원하는 만날 시간보다 길면 '모두 돼요 10:35 ~ 15:20' 한 줄 - 누르면 그 안에서 시작·종료 시간을 휠로 고름
+      // 겹치는 시간이 원하는 만날 시간보다 길면 처음부터 시작·종료 시간 칸을 바로 보여줌 - 시작을 바꾸면 종료가 따라오고 종료도 따로 고침
       // (예전엔 '10:35 시작 · 11:00 시작 …' 칩을 고른 뒤 또 분을 고쳐야 해서 애매했음)
       return `
         <div class="match-range-wide" data-date="${day.date.toISOString()}" data-range-start-min="${r.startMin}" data-range-end-min="${r.endMin}">
-          <div class="match-range-head">
-            <span><b>모두 돼요</b> ${matchHm(r.startMin)} ~ ${matchHm(r.endMin)}</span>
-            <button type="button" class="match-range-add">후보로 고르기</button>
-          </div>
           <div class="match-fine-list"></div>
         </div>
       `;
@@ -37230,28 +37234,33 @@ document.getElementById('matchCondToggle').addEventListener('click', () => {
 document.getElementById('matchPanelBody').addEventListener('click', (e) => {
   if(!activeMatchGroupRoomId && !activeMatchFriendId) return;
 
+  const findRangeSlot = (key) => Object.values(matchRangeSlots).flat().find(x => x.key === key);
   const addBtn = e.target.closest('.match-range-add');
   if(addBtn){
+    // 같은 날 후보 하나 더 - 마지막 후보가 끝난 뒤부터 이어서, 바로 후보로 넣음
     const wide = addBtn.closest('.match-range-wide');
-    const rangeStartMin = parseInt(wide.dataset.rangeStartMin, 10), rangeEndMin = parseInt(wide.dataset.rangeEndMin, 10);
-    const rangeKey = `${wide.dataset.date}|${rangeStartMin}`;
-    const mine = selectedGroupMatchSlots.filter(x => x.rangeKey === rangeKey);
-    const dur = (parseInt(document.getElementById('matchMinHours').value, 10) || 1) * 60;
-    // 첫 후보는 그 시간대 처음부터, 하나 더 넣으면 마지막 후보가 끝난 뒤부터 (자리가 없으면 처음부터)
-    let st = mine.length ? Math.max(...mine.map(x => x.endMin)) : rangeStartMin;
-    if(st + Math.min(dur, 5) > rangeEndMin) st = rangeStartMin;
-    const dateObj = new Date(wide.dataset.date);
-    const slot = { key: `${rangeKey}|${Date.now()}`, rangeKey, dateObj, dateLabel: `${dateObj.getMonth()+1}/${dateObj.getDate()}(${WEEKDAY_KO[dateObj.getDay()]})`,
-      baseH: Math.floor(st / 60), startMin: st, endMin: Math.min(st + dur, rangeEndMin), rangeStartMin, rangeEndMin };
-    syncMatchSlotLabel(slot);
+    const rangeKey = `${wide.dataset.date}|${wide.dataset.rangeStartMin}`;
+    const slots = matchRangeSlots[rangeKey] || [];
+    const slot = newMatchRangeSlot(wide, slots.length ? Math.max(...slots.map(x => x.endMin)) : parseInt(wide.dataset.rangeStartMin, 10));
+    slots.push(slot);
     selectedGroupMatchSlots.push(slot);
     renderMatchFineRows(wide);
     renderProposeSelectedBtn();
     return;
   }
+  const toggleBtn = e.target.closest('.match-fine-toggle');
+  if(toggleBtn){
+    const slot = findRangeSlot(toggleBtn.dataset.key);
+    if(!slot) return;
+    if(selectedGroupMatchSlots.includes(slot)) selectedGroupMatchSlots = selectedGroupMatchSlots.filter(x => x !== slot);
+    else selectedGroupMatchSlots.push(slot);
+    renderMatchFineRows(toggleBtn.closest('.match-range-wide'));
+    renderProposeSelectedBtn();
+    return;
+  }
   const pickBtn = e.target.closest('.match-fine-pick');
   if(pickBtn){
-    const slot = selectedGroupMatchSlots.find(s => s.key === pickBtn.dataset.key);
+    const slot = findRangeSlot(pickBtn.dataset.key);
     if(!slot) return;
     const wide = pickBtn.closest('.match-range-wide');
     const isStart = pickBtn.dataset.which === 'start';
@@ -37259,8 +37268,11 @@ document.getElementById('matchPanelBody').addEventListener('click', (e) => {
     if(isStart) for(let m = slot.rangeStartMin; m + 5 <= slot.rangeEndMin; m += 5) values.push(m);
     else for(let m = slot.startMin + 5; m <= slot.rangeEndMin; m += 5) values.push(m);
     openWheelPicker({ title: isStart ? '시작 시간' : '종료 시간', values, value: isStart ? slot.startMin : slot.endMin, onPick: v => {
+      // 시작을 바꾸면 종료는 만날 시간 길이만큼 따라감, 종료는 따로 조정 - 시간을 고르면 후보로 들어감
       if(isStart) setMatchSlotStart(slot, v); else setMatchSlotEnd(slot, v);
+      if(!selectedGroupMatchSlots.includes(slot)) selectedGroupMatchSlots.push(slot);
       renderMatchFineRows(wide);
+      renderProposeSelectedBtn();
     } });
     return;
   }
@@ -37287,6 +37299,7 @@ document.getElementById('matchPanelBody').addEventListener('click', (e) => {
   if(removeBtn){
     const wide = removeBtn.closest('.match-range-wide');
     selectedGroupMatchSlots = selectedGroupMatchSlots.filter(s => s.key !== removeBtn.dataset.key);
+    Object.keys(matchRangeSlots).forEach(k => { matchRangeSlots[k] = matchRangeSlots[k].filter(s => s.key !== removeBtn.dataset.key); });
     renderMatchFineRows(wide);
     renderProposeSelectedBtn();
     return;
@@ -37320,27 +37333,38 @@ document.getElementById('matchPanelBody').addEventListener('click', (e) => {
 });
 
 // 한 겹치는 시간대(칩 묶음) 아래에, 거기서 고른 시작 시간마다 5분 단위 조절 줄을 그림 + 칩 글자도 고른 분으로 바꿈
+function newMatchRangeSlot(wide, startMin){
+  const rangeStartMin = parseInt(wide.dataset.rangeStartMin, 10), rangeEndMin = parseInt(wide.dataset.rangeEndMin, 10);
+  const dur = (parseInt(document.getElementById('matchMinHours').value, 10) || 1) * 60;
+  const st = Math.min(startMin, rangeEndMin - 5);
+  const dateObj = new Date(wide.dataset.date);
+  const slot = { key: `${wide.dataset.date}|${rangeStartMin}|${Date.now()}${Math.random().toString(36).slice(2, 5)}`, rangeKey: `${wide.dataset.date}|${rangeStartMin}`, dateObj,
+    dateLabel: `${dateObj.getMonth()+1}/${dateObj.getDate()}(${WEEKDAY_KO[dateObj.getDay()]})`,
+    baseH: Math.floor(st / 60), startMin: st, endMin: Math.min(st + dur, rangeEndMin), rangeStartMin, rangeEndMin };
+  syncMatchSlotLabel(slot);
+  return slot;
+}
+// 모두 되는 시간대 하나 - 처음부터 후보 칸(시작·종료 시간)이 떠 있음. [후보에 넣기]를 누르거나 시간을 바꾸면 제안할 후보로 들어감
 function renderMatchFineRows(wide){
   if(!wide) return;
   const list = wide.querySelector('.match-fine-list');
   const rangeStartMin = parseInt(wide.dataset.rangeStartMin, 10), rangeEndMin = parseInt(wide.dataset.rangeEndMin, 10);
   const rangeKey = `${wide.dataset.date}|${rangeStartMin}`;
-  const slots = selectedGroupMatchSlots.filter(x => x.rangeKey === rangeKey);
-  const addBtn = wide.querySelector('.match-range-add');
-  if(addBtn) addBtn.textContent = slots.length ? '+ 이 날 후보 하나 더' : '후보로 고르기';
-  wide.classList.toggle('has-picks', slots.length > 0);
+  if(!matchRangeSlots[rangeKey]) matchRangeSlots[rangeKey] = [newMatchRangeSlot(wide, rangeStartMin)];
+  const slots = matchRangeSlots[rangeKey];
+  const isOn = (slot) => selectedGroupMatchSlots.includes(slot);
   const span = Math.max(1, rangeEndMin - rangeStartMin);
   const pct = (m) => ((m - rangeStartMin) / span * 100).toFixed(2);
-  // 1:1 약속 요청처럼 시작 시간 / 종료 시간 칸을 누르면 휠로 고름 (겹치는 시간 안에서 5분 단위)
-  list.innerHTML = slots.map(slot => `<div class="match-fine-row">
-        <div class="match-fine-head"><span>${matchHm(slot.startMin)} ~ ${matchHm(slot.endMin)}</span><button type="button" class="match-fine-remove" data-key="${slot.key}">빼기</button></div>
+  list.innerHTML = slots.map((slot, i) => `<div class="match-fine-row${isOn(slot) ? ' on' : ''}">
+        <div class="match-fine-head"><span>${matchHm(slot.startMin)} ~ ${matchHm(slot.endMin)}</span>
+          <span class="match-fine-head-btns">${i > 0 ? `<button type="button" class="match-fine-remove" data-key="${slot.key}">빼기</button>` : ''}<button type="button" class="match-fine-toggle${isOn(slot) ? ' on' : ''}" data-key="${slot.key}">${isOn(slot) ? '✓ 후보' : '후보에 넣기'}</button></span></div>
         <div class="match-range-bar"><span style="left:${pct(slot.startMin)}%;width:${(pct(slot.endMin) - pct(slot.startMin)).toFixed(2)}%"></span></div>
-        <div class="match-range-bar-labels"><span>${matchHm(rangeStartMin)}</span><span>${matchHm(rangeEndMin)}</span></div>
-        <div class="match-fine-sub">시작 시간</div>
-        <button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="start">${matchHm(slot.startMin)}</button>
-        <div class="match-fine-sub">종료 시간</div>
-        <button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="end">${matchHm(slot.endMin)}</button>
-      </div>`).join('');
+        <div class="match-range-bar-labels"><span>${matchHm(rangeStartMin)}</span><span>모두 되는 시간</span><span>${matchHm(rangeEndMin)}</span></div>
+        <div class="match-fine-picks">
+          <div><div class="match-fine-sub">시작 시간</div><button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="start">${matchHm(slot.startMin)}</button></div>
+          <div><div class="match-fine-sub">종료 시간</div><button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="end">${matchHm(slot.endMin)}</button></div>
+        </div>
+      </div>`).join('') + (slots.some(isOn) && slots[slots.length - 1].endMin + 5 <= rangeEndMin ? `<button type="button" class="match-range-add">+ 이 날 후보 하나 더</button>` : '');
 }
 
 // 체크해둔 여러 시간을 한 번에 그룹 채팅에 제안 (그룹원들이 그중에서 골라볼 수 있도록)
