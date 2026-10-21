@@ -3483,6 +3483,18 @@
   .match-range-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:11px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--surface); font-size:14px; color:var(--text); }
   .match-range-head b{ color:var(--accent); margin-right:4px; }
   .match-fine-head-btns{ display:flex; gap:8px; align-items:center; }
+  /* 모두 되는 시간 한 줄 - 왼쪽 동그라미로 후보에 넣고, 오른쪽에서 시작~종료 */
+  .match-simple-row{ display:flex; align-items:center; gap:10px; padding:10px 12px; border:1.5px solid var(--line); border-radius:12px; background:var(--surface); }
+  .match-simple-row.on{ border-color:var(--accent); background:var(--accent-soft); }
+  .match-simple-check{ flex-shrink:0; width:26px; height:26px; border-radius:50%; border:2px solid var(--line); background:var(--surface); color:var(--on-accent); font-size:14px; font-weight:800; padding:0; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .match-simple-check.on{ background:var(--accent); border-color:var(--accent); }
+  .match-simple-mid{ flex:1; min-width:0; }
+  .match-simple-avail{ font-size:12px; color:var(--text-dim); margin-bottom:6px; }
+  .match-simple-avail b{ color:var(--text); font-weight:700; }
+  .match-simple-picks{ display:flex; align-items:center; gap:6px; }
+  .match-simple-picks .custom-select-btn{ flex:1; padding:9px 12px; }
+  .match-simple-picks span{ color:var(--text-dim); }
+  .match-simple-row.on .match-simple-picks .custom-select-btn{ background:var(--surface); }
   .match-fine-head .match-fine-toggle{ border:1.5px solid var(--accent); color:var(--accent); background:var(--surface); border-radius:999px; padding:4px 10px; font-weight:700; }
   .match-fine-head .match-fine-toggle.on{ background:var(--accent); color:var(--on-accent); }
   .match-fine-picks{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
@@ -37344,27 +37356,28 @@ function newMatchRangeSlot(wide, startMin){
   syncMatchSlotLabel(slot);
   return slot;
 }
-// 모두 되는 시간대 하나 - 처음부터 후보 칸(시작·종료 시간)이 떠 있음. [후보에 넣기]를 누르거나 시간을 바꾸면 제안할 후보로 들어감
+// 모두 되는 시간대 하나 = 한 줄: 위에 "N시간 이상 겹치는 시간 10:35 ~ 15:20", 아래 [시작] ~ [종료] 휠 칸, 왼쪽 동그라미로 후보에 넣기.
+// 시작을 바꾸면 종료가 만날 시간만큼 따라가고, 종료는 따로 조정 (시간을 고르면 바로 후보로 들어감)
 function renderMatchFineRows(wide){
   if(!wide) return;
   const list = wide.querySelector('.match-fine-list');
   const rangeStartMin = parseInt(wide.dataset.rangeStartMin, 10), rangeEndMin = parseInt(wide.dataset.rangeEndMin, 10);
   const rangeKey = `${wide.dataset.date}|${rangeStartMin}`;
   if(!matchRangeSlots[rangeKey]) matchRangeSlots[rangeKey] = [newMatchRangeSlot(wide, rangeStartMin)];
-  const slots = matchRangeSlots[rangeKey];
-  const isOn = (slot) => selectedGroupMatchSlots.includes(slot);
-  const span = Math.max(1, rangeEndMin - rangeStartMin);
-  const pct = (m) => ((m - rangeStartMin) / span * 100).toFixed(2);
-  list.innerHTML = slots.map((slot, i) => `<div class="match-fine-row${isOn(slot) ? ' on' : ''}">
-        <div class="match-fine-head"><span>${matchHm(slot.startMin)} ~ ${matchHm(slot.endMin)}</span>
-          <span class="match-fine-head-btns">${i > 0 ? `<button type="button" class="match-fine-remove" data-key="${slot.key}">빼기</button>` : ''}<button type="button" class="match-fine-toggle${isOn(slot) ? ' on' : ''}" data-key="${slot.key}">${isOn(slot) ? '✓ 후보' : '후보에 넣기'}</button></span></div>
-        <div class="match-range-bar"><span style="left:${pct(slot.startMin)}%;width:${(pct(slot.endMin) - pct(slot.startMin)).toFixed(2)}%"></span></div>
-        <div class="match-range-bar-labels"><span>${matchHm(rangeStartMin)}</span><span>모두 되는 시간</span><span>${matchHm(rangeEndMin)}</span></div>
-        <div class="match-fine-picks">
-          <div><div class="match-fine-sub">시작 시간</div><button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="start">${matchHm(slot.startMin)}</button></div>
-          <div><div class="match-fine-sub">종료 시간</div><button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="end">${matchHm(slot.endMin)}</button></div>
+  const slot = matchRangeSlots[rangeKey][0];
+  const on = selectedGroupMatchSlots.includes(slot);
+  const minHours = parseInt(document.getElementById('matchMinHours').value, 10) || 1;
+  list.innerHTML = `<div class="match-simple-row${on ? ' on' : ''}">
+      <button type="button" class="match-fine-toggle match-simple-check${on ? ' on' : ''}" data-key="${slot.key}" aria-label="${on ? '후보에서 빼기' : '후보에 넣기'}">${on ? '✓' : ''}</button>
+      <div class="match-simple-mid">
+        <div class="match-simple-avail">${minHours}시간 이상 겹치는 시간 <b>${matchHm(rangeStartMin)} ~ ${matchHm(rangeEndMin)}</b></div>
+        <div class="match-simple-picks">
+          <button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="start">${matchHm(slot.startMin)}</button>
+          <span>~</span>
+          <button type="button" class="custom-select-btn match-fine-pick" data-key="${slot.key}" data-which="end">${matchHm(slot.endMin)}</button>
         </div>
-      </div>`).join('') + (slots.some(isOn) && slots[slots.length - 1].endMin + 5 <= rangeEndMin ? `<button type="button" class="match-range-add">+ 이 날 후보 하나 더</button>` : '');
+      </div>
+    </div>`;
 }
 
 // 체크해둔 여러 시간을 한 번에 그룹 채팅에 제안 (그룹원들이 그중에서 골라볼 수 있도록)
