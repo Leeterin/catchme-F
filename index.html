@@ -33344,6 +33344,57 @@ function openMsgSelectCopy(text){
 // 메시지를 왼쪽으로 밀면 답장 (카톡처럼). 오른쪽으로 미는 건 채팅방 나가기라 방향을 반대로 둠.
 // 행이 다시 그려져도 계속 동작하게 메시지 목록에 한 번만 걸어둠 - 답장 가능한 행에는 row._replyMsg가 있음
 let chatSwipeReplyAt = 0;
+// 대화 맨 위/맨 아래에서 더 당기면 카톡처럼 고무줄처럼 살짝 끌려왔다가 손을 떼면 튕겨 돌아감
+// (앱 전체에서 끝에서 튕기는 걸 꺼둬서 끝에 닿으면 딱 멈춰 답답했음) - 위아래로 당길 때만, 옆으로 밀어 답장할 땐 안 함
+(function setupChatRubberBand(){
+  const box = document.getElementById('chatMessages');
+  if(!box) return;
+  let startX = 0, lastY = 0, edgeY = null, edgeDir = 0, off = 0, active = false, decided = false;
+  const atTop = () => box.scrollTop <= 0;
+  const atBottom = () => box.scrollTop + box.clientHeight >= box.scrollHeight - 1;
+  const release = () => {
+    if(off){
+      box.style.transition = 'transform .38s cubic-bezier(.22,1,.36,1)';
+      box.style.transform = '';
+      setTimeout(() => { if(!active) box.style.transition = ''; }, 400);
+    }
+    off = 0; edgeY = null; edgeDir = 0; active = false; decided = false;
+  };
+  box.addEventListener('touchstart', (e) => {
+    if(e.touches.length !== 1) return;
+    box.style.transition = '';
+    startX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+    edgeY = null; edgeDir = 0; off = 0; active = true; decided = false;
+  }, { passive: true });
+  box.addEventListener('touchmove', (e) => {
+    if(!active || e.touches.length !== 1) return;
+    const x = e.touches[0].clientX, y = e.touches[0].clientY;
+    if(!decided){
+      if(Math.abs(x - startX) < 8 && Math.abs(y - lastY) < 8) return;
+      decided = true;
+      if(Math.abs(x - startX) > Math.abs(y - lastY)){ active = false; return; } // 옆으로 밀기(답장)는 그대로
+    }
+    const dir = y < lastY ? -1 : y > lastY ? 1 : 0; // -1: 위로 밀기(아래 끝), 1: 아래로 당기기(위 끝)
+    lastY = y;
+    if(edgeY === null){
+      if((dir < 0 && atBottom()) || (dir > 0 && atTop())){ edgeY = y; edgeDir = dir; }
+      else return;
+    }
+    const d = (y - edgeY) * edgeDir; // 끝을 넘어 당긴 거리 (양수)
+    if(d === 0) return;
+    if(d < 0){ // 다시 반대로 밀면 원래 스크롤로
+      if(off){ box.style.transform = ''; off = 0; }
+      edgeY = null;
+      return;
+    }
+    e.preventDefault();
+    const pull = Math.min(140, d * 0.45 / (1 + d / 600)); // 멀리 당길수록 덜 따라옴
+    off = pull * edgeDir;
+    box.style.transform = `translateY(${off}px)`;
+  }, { passive: false });
+  box.addEventListener('touchend', release);
+  box.addEventListener('touchcancel', release);
+})();
 (function setupChatSwipeReply(){
   const box = document.getElementById('chatMessages');
   if(!box) return;
