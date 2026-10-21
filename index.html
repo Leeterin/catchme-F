@@ -3965,6 +3965,11 @@
     color:var(--text-dim);
   }
   .appt-detail-actions{ display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+  /* 약속 상세 맨 아래 "약속 취소하기" */
+  .appt-detail-cancel-btn{
+    width:100%; margin-top:16px; padding:12px; border:1px solid var(--line); border-radius:12px;
+    background:transparent; color:var(--cta); font-size:13px; font-weight:700; cursor:pointer;
+  }
   .appt-detail-chat-btn{
     width:100%; padding:14px; border:none; border-radius:12px;
     background:var(--accent-soft); color:var(--accent); font-size:14px; font-weight:700; cursor:pointer;
@@ -5633,6 +5638,22 @@
     font-size:14.5px;
     text-align:center;
     margin:2px 0 16px;
+  }
+  /* 약속 취소 사유 적는 칸 */
+  .mini-confirm-reason{
+    display:block;
+    width:100%;
+    box-sizing:border-box;
+    min-height:64px;
+    margin:-6px 0 14px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:12px;
+    background:var(--surface-2);
+    color:var(--text);
+    font-family:inherit;
+    font-size:16px;
+    resize:none;
   }
   .mini-confirm-actions{
     display:flex;
@@ -10325,6 +10346,7 @@
   <div class="mini-confirm-overlay" id="reservationCancelConfirmOverlay">
     <div class="mini-confirm-card">
       <div class="mini-confirm-title" id="reservationCancelConfirmTitle">약속을 취소할까요?</div>
+      <textarea class="mini-confirm-reason" id="reservationCancelReason" rows="2" maxlength="200" placeholder="취소 사유 (선택) - 적으면 채팅으로 같이 보내져요"></textarea>
       <div class="mini-confirm-actions">
         <button type="button" id="reservationCancelConfirmKeepBtn" class="mini-confirm-btn">예약 가능 일정 남겨두기</button>
         <button type="button" id="reservationCancelConfirmDeleteBtn" class="mini-confirm-btn danger">그냥 삭제하기</button>
@@ -28914,8 +28936,7 @@ function withdrawReservation(m){
   showToast('약속 요청을 취소했어요.');
 }
 
-function cancelReservation(m, restoreAvailability){
-  const roomId = activeChatRoomId;
+function cancelReservation(m, restoreAvailability, reason, roomId = activeChatRoomId){
   const room = CHAT_ROOMS[roomId];
   if(!room) return;
 
@@ -28930,6 +28951,7 @@ function cancelReservation(m, restoreAvailability){
         renderChatMessages();
         renderChatList();
         showToast('약속을 취소했어요.');
+        sendCancelReason(roomId, reason);
       })
       .catch(err => showToast(err.message));
     return;
@@ -28959,10 +28981,23 @@ function cancelReservation(m, restoreAvailability){
   renderPinnedSchedule();
   renderChatList();
   showToast('약속을 취소했어요.');
+  sendCancelReason(roomId, reason);
+}
+
+// 약속을 취소하면서 적은 사유는 내 채팅 메시지로 보냄 - 상대가 왜 취소됐는지 바로 알 수 있게
+function sendCancelReason(roomId, reason){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !reason) return;
+  const msg = { who: 'me', text: `취소 사유: ${reason}`, time: new Date(), read: false, id: 'msg' + (locationMsgIdCounter++), _animate: true };
+  room.messages.push(msg);
+  touchRoom(roomId);
+  if(activeChatRoomId === roomId) renderChatMessages();
+  renderChatList();
+  if(room.isRealRoom) postRealChatText(roomId, msg, null);
 }
 
 // 그룹 투표로 확정된 시간을 취소
-function cancelGroupTimeOption(roomId, msg, restoreAvailability){
+function cancelGroupTimeOption(roomId, msg, restoreAvailability, reason){
   const room = CHAT_ROOMS[roomId];
   if(!room || msg.status !== 'confirmed') return;
 
@@ -28976,6 +29011,7 @@ function cancelGroupTimeOption(roomId, msg, restoreAvailability){
         renderPinnedSchedule();
         renderChatList();
         showToast('약속을 취소했어요.');
+        sendCancelReason(roomId, reason);
       })
       .catch(err => showToast(err.message));
     return;
@@ -29005,6 +29041,7 @@ function cancelGroupTimeOption(roomId, msg, restoreAvailability){
   renderPinnedSchedule();
   renderChatList();
   showToast('약속을 취소했어요.');
+  sendCancelReason(roomId, reason);
 }
 
 // 취소/나가기 확인 팝업 - 콜백만 넘겨서 여러 상황에서 재사용
@@ -29298,8 +29335,12 @@ document.addEventListener('click', (e) => {
 
 // opts.keepAvail: 약속 취소일 때만 "예약 가능 일정 남겨두기"를 보여줌 (이미 지난 약속이면 false로 넘겨서 숨김)
 // opts.okLabel: 확인 버튼 글자 (나가기/초대처럼 약속 취소가 아닌 확인창에서 씀)
+// opts.reason: 약속 취소일 때 취소 사유 적는 칸을 보여줌 - 적은 사유는 action의 두 번째 값으로 넘어감
 function openCancelConfirm(action, title, opts = {}){
   pendingCancelAction = action;
+  const reasonEl = document.getElementById('reservationCancelReason');
+  reasonEl.value = '';
+  reasonEl.style.display = opts.reason ? '' : 'none';
   document.getElementById('reservationCancelConfirmTitle').textContent = title || '약속을 취소할까요?';
   document.getElementById('reservationCancelConfirmKeepBtn').style.display = opts.keepAvail ? '' : 'none';
   const okBtn = document.getElementById('reservationCancelConfirmDeleteBtn');
@@ -29329,7 +29370,9 @@ document.getElementById('reservationCancelConfirmOverlay').addEventListener('cli
 // 사용자가 직접 고르게 함 - 꽉 채워서 예약했다가 취소해도 예약 가능이 안 돌아오던 문제를 사용자 선택으로 해결
 function runPendingCancel(keepAvailable){
   const action = pendingCancelAction;
-  closeViewThen(closeReservationCancelConfirm, () => { if(action) action(keepAvailable); });
+  const reasonEl = document.getElementById('reservationCancelReason');
+  const reason = reasonEl.style.display === 'none' ? '' : reasonEl.value.trim();
+  closeViewThen(closeReservationCancelConfirm, () => { if(action) action(keepAvailable, reason); });
 }
 document.getElementById('reservationCancelConfirmKeepBtn').addEventListener('click', () => runPendingCancel(true));
 document.getElementById('reservationCancelConfirmDeleteBtn').addEventListener('click', () => runPendingCancel(false));
@@ -31261,7 +31304,27 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
       <button type="button" class="appt-detail-chat-btn" id="apptDetailChatBtn">${escapeHtml(room.name || '')} 채팅으로 가기</button>
       ${pin.dateObj ? `<button type="button" class="appt-detail-sub-btn" id="apptDetailDayBtn">이 날 내 캘린더 보기</button>` : ''}
     </div>` : ''}
+    ${pin.dateObj && !pinPast ? `<button type="button" class="appt-detail-cancel-btn" id="apptDetailCancelBtn">약속 취소하기</button>` : ''}
   `;
+
+  // 약속 취소하기 - 이 약속을 확정한 채팅 카드(1:1 약속 요청 / 단톡방 시간 투표)의 취소와 똑같이 처리함
+  const cancelApptBtn = document.getElementById('apptDetailCancelBtn');
+  if(cancelApptBtn){
+    cancelApptBtn.addEventListener('click', () => {
+      const src = (room.messages || []).find(m => (m.type === 'reservation' || m.type === 'time-options-suggest')
+        && ((pin.sourceMsgId && m._serverId === pin.sourceMsgId) || m.id === pin.reservationMsgId));
+      if(!src || src.status !== 'confirmed'){
+        showToast('이 약속은 채팅방의 약속 카드에서 취소해주세요.');
+        return;
+      }
+      openCancelConfirm((keepAvailable, reason) => {
+        apptDetailFromHome = false;
+        dismissView(closeAppointmentDetailView);
+        if(src.type === 'reservation') cancelReservation(src, keepAvailable, reason, roomId);
+        else cancelGroupTimeOption(roomId, src, keepAvailable, reason);
+      }, '', { reason: true, keepAvail: !isLabelTimePast(pin.dateLabel, pin.timeLabel) });
+    });
+  }
 
   const chatBtn = document.getElementById('apptDetailChatBtn');
   if(chatBtn){
@@ -32396,7 +32459,7 @@ function renderChatMessages(){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => withdrawReservation(m));
       }
       if(showConfirmedExtras){
-        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable) => cancelReservation(m, keepAvailable), '', { keepAvail: !(m.startMs ? m.startMs <= Date.now() : isLabelTimePast(m.dateLabel, m.timeLabel)) }));
+        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable, reason) => cancelReservation(m, keepAvailable, reason), '', { reason: true, keepAvail: !(m.startMs ? m.startMs <= Date.now() : isLabelTimePast(m.dateLabel, m.timeLabel)) }));
       }
     } else if(m.type === 'location-suggest' && voteGroup){
       // 투표 중인 후보 여러 곳을 한 카드에 - 줄마다 바로 투표
@@ -32626,6 +32689,8 @@ function renderChatMessages(){
         viewDayFromChat(parseDateLabelToDate(m.dateLabel));
       });
     } else if(m.type === 'time-options-suggest'){
+      // 방 목록으로 받은 "마지막 메시지"는 시간 후보 없이 와서, 대화를 다 받아오면 그때 그림 (없는 후보를 그리다 화면이 멈췄음)
+      if(!m.options || !m.options.length) return;
       row.className = 'msg-row hotplace-notice-row';
       const totalMembers = getTotalParticipants(room);
 
@@ -32644,7 +32709,7 @@ function renderChatMessages(){
           viewDayFromChat(parseDateLabelToDate(winning.dateLabel));
         });
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => {
-          openCancelConfirm((keepAvailable) => cancelGroupTimeOption(activeChatRoomId, m, keepAvailable), '', { keepAvail: !(winning.dateObj ? new Date(winning.dateObj).getTime() <= Date.now() : isLabelTimePast(winning.dateLabel, winning.timeLabel)) });
+          openCancelConfirm((keepAvailable, reason) => cancelGroupTimeOption(activeChatRoomId, m, keepAvailable, reason), '', { reason: true, keepAvail: !(winning.dateObj ? new Date(winning.dateObj).getTime() <= Date.now() : isLabelTimePast(winning.dateLabel, winning.timeLabel)) });
         });
       } else if(m.status === 'cancelled'){
         row.innerHTML = `
