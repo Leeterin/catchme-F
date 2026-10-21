@@ -889,6 +889,19 @@
   .place-viewer-label.on{ background:var(--accent); color:var(--on-accent); }
   .place-viewer-label.closed{ opacity:0.55; }
   .place-vote-add-btn{ flex-shrink:0; height:32px; }
+  /* 후보 목록 아래 "다른 장소 후보 추가" - 위쪽 작은 버튼만으론 찾기 어려워서 목록 바로 아래에도 크게 둠 */
+  .place-vote-add-row{
+    flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:12px;
+    border-radius:12px;
+    border:1.5px dashed var(--accent);
+    background:transparent;
+    color:var(--accent);
+    font-size:13.5px; font-weight:700;
+    cursor:pointer;
+  }
+  .place-vote-add-row[hidden]{ display:none; }
   /* 장소 투표 - 지도 아래 후보 목록 */
   .place-vote-sheet{
     flex-shrink:0;
@@ -9997,6 +10010,7 @@
     <div class="place-vote-sheet">
       <div class="place-vote-head" id="placeViewerHead"></div>
       <div class="place-vote-list" id="placeViewerList"></div>
+      <button type="button" class="place-vote-add-row" id="placeViewerAddRow">+ 다른 장소 후보 추가하기</button>
       <div class="place-vote-foot">
         <button type="button" class="place-vote-fix-btn" id="placeViewerFixBtn"></button>
       </div>
@@ -28551,6 +28565,7 @@ function renderPlaceViewerList(){
         ${right}
       </div>`;
   }).join('');
+  document.getElementById('placeViewerAddRow').hidden = !!confirmed;
   const sel = items.find(m => m.id === selectedId);
   const fixBtn = document.getElementById('placeViewerFixBtn');
   fixBtn.hidden = !(sel && sel.status === 'pending');
@@ -28692,6 +28707,8 @@ document.getElementById('placeViewerList').addEventListener('click', (e) => {
   }
 });
 document.getElementById('placeViewerCloseBtn').addEventListener('click', () => goBackOrClose(closePlaceSuggestionMap));
+// 후보 목록 아래 "다른 장소 후보 추가하기" - 위쪽 "+ 장소 제안"과 똑같이 동작
+document.getElementById('placeViewerAddRow').addEventListener('click', () => document.getElementById('placeViewerAddBtn').click());
 // "+ 장소 제안" - 지도에서 장소를 골라 후보로 더 올림 (선택완료를 누르면 지금처럼 바로 그 장소로 정해짐)
 document.getElementById('placeViewerAddBtn').addEventListener('click', () => {
   if(!placeViewerState) return;
