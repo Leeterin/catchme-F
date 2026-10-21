@@ -12224,6 +12224,7 @@ document.addEventListener('visibilitychange', () => {
   if(activeChatRoomId && CHAT_ROOMS[activeChatRoomId] && CHAT_ROOMS[activeChatRoomId].isRealRoom){
     markRoomRead(activeChatRoomId); // 내려둔 사이 와 있던 메시지를 이제 화면에서 봤으니 읽음 처리
     loadRoomMessagesFromServer(activeChatRoomId, CHAT_ROOMS[activeChatRoomId], false);
+    loadPinsFromServer(activeChatRoomId, CHAT_ROOMS[activeChatRoomId]); // 내려둔 사이 확정된 약속도 방을 나갔다 오지 않아도 고정 영역에 뜨게 함
   }
   loadScheduleFromServer();
   if(activeChatRoomId) renderPinnedSchedule();
@@ -12256,6 +12257,7 @@ function connectRealtimeSocket(){
     loadChatRoomsFromServer();
     if(activeChatRoomId && CHAT_ROOMS[activeChatRoomId] && CHAT_ROOMS[activeChatRoomId].isRealRoom){
       loadRoomMessagesFromServer(activeChatRoomId, CHAT_ROOMS[activeChatRoomId], false);
+      loadPinsFromServer(activeChatRoomId, CHAT_ROOMS[activeChatRoomId]); // 끊긴 사이 확정된 약속도 고정 영역에 바로 뜨게 함
     }
   });
 
