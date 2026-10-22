@@ -37385,6 +37385,7 @@ async function runCalendarMatch(){
 
   selectedGroupMatchSlots = [];
   matchRangeSlots = {};
+  matchResultState = null; // 새로 찾는 동안(또는 실패하면) 예전 결과를 다시 그리지 않게
 
   const startDate = parseDateInputValue(startVal);
   const endDate = parseDateInputValue(endVal);
@@ -37433,6 +37434,49 @@ async function runCalendarMatch(){
     }
   }
 
+  matchResultState = { days: dayResults, minHours, startDate, endDate };
+  renderMatchResults();
+}
+
+// ---------- 모두 되는 시간: 지난 시간은 후보로 안 보이게 (화면을 켜 둔 동안에도 실시간으로) ----------
+let matchResultState = null; // { days(서버에서 받은 그대로), minHours, startDate, endDate, shownKey }
+// 오늘 겹치는 시간은 지금(5분 단위로 올림)부터만 - 그러고 나서 만날 시간보다 짧아지면 뺌. 지난 날은 통째로 뺌
+function clipPastMatchRanges(days, minHours){
+  const now = new Date();
+  const todayKey = toDateInputValue(now);
+  const nowMin = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 5) * 5;
+  return days.filter(d => toDateInputValue(d.date) >= todayKey).map(d => toDateInputValue(d.date) !== todayKey ? d : {
+    date: d.date,
+    ranges: d.ranges.map(r => ({ startMin: Math.max(r.startMin, nowMin), endMin: r.endMin })).filter(r => r.endMin - r.startMin >= minHours * 60),
+  }).filter(d => d.ranges.length > 0);
+}
+function matchResultsKey(days){
+  return days.map(d => toDateInputValue(d.date) + ':' + d.ranges.map(r => `${r.startMin}-${r.endMin}`).join(',')).join('|');
+}
+function isMatchSlotPast(slot){
+  const start = new Date(slot.dateObj);
+  start.setHours(0, slot.startMin, 0, 0);
+  return start.getTime() <= Date.now();
+}
+// 화면을 켜 둔 채 시간이 지나 후보가 지난 시간이 되면 다시 그림 - 고른 후보 중 지난 것만 빼고 나머지는 그대로 둠
+function refreshMatchResultsIfPast(){
+  const st = matchResultState;
+  if(!st || !document.getElementById('calendarMatchView').classList.contains('active')) return;
+  if(matchResultsKey(clipPastMatchRanges(st.days, st.minHours)) === st.shownKey) return;
+  selectedGroupMatchSlots = selectedGroupMatchSlots.filter(s => !isMatchSlotPast(s));
+  renderMatchResults();
+}
+setInterval(refreshMatchResultsIfPast, 30 * 1000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') refreshMatchResultsIfPast(); });
+
+function renderMatchResults(){
+  const st = matchResultState;
+  if(!st) return;
+  const { minHours, startDate, endDate } = st;
+  const body = document.getElementById('matchPanelBody');
+  const dayResults = clipPastMatchRanges(st.days, minHours);
+  st.shownKey = matchResultsKey(dayResults);
+
   if(dayResults.length === 0){
     body.innerHTML = `<div class="search-empty">이 기간엔 ${minHours}시간 동안 만날 수 있는 시간이 없어요.</div>`;
     renderProposeSelectedBtn();
@@ -37448,7 +37492,7 @@ async function runCalendarMatch(){
       if(span <= dur){
         // 겹치는 시간이 원하는 만날 시간이랑 딱 맞거나 더 짧으면(이론상 필터 때문에 더 짧을 일은 없음) 그대로 한 칸으로
         return `
-          <div class="match-range-row checkable" data-date="${day.date.toISOString()}" data-start-min="${r.startMin}" data-end-min="${r.endMin}">
+          <div class="match-range-row checkable${selectedGroupMatchSlots.some(s => s.key === `${day.date.toISOString()}|${r.startMin}`) ? ' checked' : ''}" data-date="${day.date.toISOString()}" data-start-min="${r.startMin}" data-end-min="${r.endMin}">
             <span class="match-range-check"></span>
             <span>${matchHm(r.startMin)} - ${matchHm(r.endMin)}</span>
           </div>
@@ -37638,7 +37682,16 @@ function renderMatchFineRows(wide){
   const list = wide.querySelector('.match-fine-list');
   const rangeStartMin = parseInt(wide.dataset.rangeStartMin, 10), rangeEndMin = parseInt(wide.dataset.rangeEndMin, 10);
   const rangeKey = `${wide.dataset.date}|${rangeStartMin}`;
-  if(!matchRangeSlots[rangeKey]) matchRangeSlots[rangeKey] = [newMatchRangeSlot(wide, rangeStartMin)];
+  if(!matchRangeSlots[rangeKey]){
+    // 시간이 지나 겹치는 시간의 시작이 당겨졌으면, 그 안에 이미 골라둔 후보를 그대로 이어서 씀
+    const kept = selectedGroupMatchSlots.find(s => s.rangeKey && s.dateObj.toISOString() === wide.dataset.date
+      && s.startMin >= rangeStartMin && s.endMin <= rangeEndMin);
+    if(kept){
+      kept.rangeStartMin = rangeStartMin;
+      kept.rangeKey = rangeKey;
+    }
+    matchRangeSlots[rangeKey] = [kept || newMatchRangeSlot(wide, rangeStartMin)];
+  }
   const slot = matchRangeSlots[rangeKey][0];
   const on = selectedGroupMatchSlots.includes(slot);
   const minHours = parseInt(document.getElementById('matchMinHours').value, 10) || 1;
