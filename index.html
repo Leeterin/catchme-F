@@ -12498,6 +12498,19 @@ function connectRealtimeSocket(){
     }
     if(message.type !== 'TEXT') return;
 
+    // 약속 취소 요청에 답했으면(수락/거절/요청 취소) 새 메시지가 아니라 그 카드만 바꿈
+    const cancelCard = message.cancelRequest && room.messages.find(m => m._serverId === message.id);
+    if(cancelCard){
+      const wasStatus = cancelCard.cancelRequest && cancelCard.cancelRequest.status;
+      cancelCard.cancelRequest = message.cancelRequest;
+      scheduleChatCacheSave(roomId);
+      if(activeChatRoomId === roomId) renderChatMessages();
+      if(wasStatus !== message.cancelRequest.status && message.cancelRequest.status === 'DECLINED' && settingsState.notif_message && !room.muted){
+        showToast(`${room.name}: 약속 취소 요청을 거절했어요. 약속은 그대로예요`);
+      }
+      return;
+    }
+
     // 날짜 물어보기 카드에 누가 답했으면(좋아요/다른 날/취소) 새 메시지가 아니라 그 카드만 바꿈
     const askCard = message.dateAsk && room.messages.find(m => m._serverId === message.id);
     if(askCard){
@@ -12521,6 +12534,7 @@ function connectRealtimeSocket(){
       read: false,
       replyTo: message.replyTo ? { msgId: message.replyTo.msgId, preview: message.replyTo.preview } : null,
       dateAsk: message.dateAsk || null,
+      cancelRequest: message.cancelRequest || null,
     };
     // 이미 내가 보내서 화면에 반영된 메시지(같은 id)라면 중복으로 또 넣지 않음
     if(room.messages.some(m => m._serverId === message.id)) return;
@@ -31317,12 +31331,17 @@ function openAppointmentDetailView(roomId, pinId, returnViewId){
         showToast('이 약속은 채팅방의 약속 카드에서 취소해주세요.');
         return;
       }
+      // 1:1 실제 방은 바로 취소하지 않고 상대에게 취소 요청 (상대가 수락하면 취소됨)
+      const asRequest = src.type === 'reservation' && src._serverId && !room.isGroup;
       openCancelConfirm((keepAvailable, reason) => {
         apptDetailFromHome = false;
         dismissView(closeAppointmentDetailView);
-        if(src.type === 'reservation') cancelReservation(src, keepAvailable, reason, roomId);
+        if(asRequest) requestReservationCancel(src, reason, roomId);
+        else if(src.type === 'reservation') cancelReservation(src, keepAvailable, reason, roomId);
         else cancelGroupTimeOption(roomId, src, keepAvailable, reason);
-      }, '', { reason: true, keepAvail: !isLabelTimePast(pin.dateLabel, pin.timeLabel) });
+      }, asRequest ? '약속 취소를 요청할까요?' : '', asRequest
+        ? { reason: true, okLabel: '취소 요청 보내기' }
+        : { reason: true, keepAvail: !isLabelTimePast(pin.dateLabel, pin.timeLabel) });
     });
   }
 
@@ -31918,6 +31937,7 @@ function mapServerMessageToLocal(m, room){
     _serverId: m.id,
     replyTo: m.replyTo ? { msgId: m.replyTo.msgId, preview: m.replyTo.preview } : null,
     dateAsk: m.dateAsk || null,
+    cancelRequest: m.cancelRequest || null,
   };
 }
 
@@ -32459,7 +32479,14 @@ function renderChatMessages(){
         row.querySelector('.reservation-btn.cancel').addEventListener('click', () => withdrawReservation(m));
       }
       if(showConfirmedExtras){
-        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => openCancelConfirm((keepAvailable, reason) => cancelReservation(m, keepAvailable, reason), '', { reason: true, keepAvail: !(m.startMs ? m.startMs <= Date.now() : isLabelTimePast(m.dateLabel, m.timeLabel)) }));
+        row.querySelector('.reservation-btn.cancel').addEventListener('click', () => {
+          // 1:1 실제 방은 바로 취소하지 않고 상대에게 취소 요청 (상대가 수락하면 취소됨)
+          if(m._serverId && !room.isGroup){
+            openCancelConfirm((_, reason) => requestReservationCancel(m, reason), '약속 취소를 요청할까요?', { reason: true, okLabel: '취소 요청 보내기' });
+            return;
+          }
+          openCancelConfirm((keepAvailable, reason) => cancelReservation(m, keepAvailable, reason), '', { reason: true, keepAvail: !(m.startMs ? m.startMs <= Date.now() : isLabelTimePast(m.dateLabel, m.timeLabel)) });
+        });
       }
     } else if(m.type === 'location-suggest' && voteGroup){
       // 투표 중인 후보 여러 곳을 한 카드에 - 줄마다 바로 투표
@@ -32809,7 +32836,12 @@ function renderChatMessages(){
       const calShare = parseCalShare(m.text);
       const postShare = parsePostShare(m.text);
       const textEl = row.querySelector('.msg-bubble-text');
-      if(m.dateAsk && m.dateAsk.date){
+      if(m.cancelRequest){
+        // 약속 취소 요청도 날짜 물어보기처럼 말풍선 대신 카드로
+        textEl.parentNode.classList.add('msg-bubble-post');
+        textEl.parentNode.insertBefore(buildCancelRequestCardEl(m, room), textEl);
+        textEl.remove();
+      } else if(m.dateAsk && m.dateAsk.date){
         // 주황/회색 말풍선으로 덮지 않고 약속 요청 카드처럼 카드만 보이게
         textEl.parentNode.classList.add('msg-bubble-post');
         textEl.parentNode.insertBefore(buildDateAskCardEl(m, room), textEl);
@@ -35264,6 +35296,103 @@ function buildDateAskCardEl(m, room){
     else respondDateAsk(roomId, m, act);
   }));
   return card;
+}
+
+// ---------- 1:1 약속 취소 요청 ----------
+// 확정된 1:1 약속은 바로 지우지 않고 상대에게 취소 요청을 보내고, 상대가 수락하면 그때 취소됨 (단톡방은 지금처럼 바로 취소)
+function buildCancelRequestCardEl(m, room){
+  const cr = m.cancelRequest;
+  const target = (room.messages || []).find(x => x.type === 'reservation' && x._serverId === cr.targetId);
+  const label = target ? `${target.dateLabel} ${target.timeLabel}` : String(m.text || '').split('\n')[0].replace(/^🚫\s*/, '').replace(/\s*약속 취소 요청$/, '');
+  const mine = m.who === 'me';
+  let cls = '', head = '약속 취소 요청', desc = '', btns = [];
+  if(cr.status === 'CONFIRMED'){
+    cls = 'off';
+    head = '✓ 약속 취소됨';
+    desc = mine ? '상대가 수락해서 약속이 취소됐어요.' : '수락해서 약속이 취소됐어요.';
+  } else if(cr.status === 'DECLINED'){
+    cls = 'done';
+    desc = mine ? '상대가 거절해서 약속은 그대로예요.' : '거절했어요. 약속은 그대로예요.';
+  } else if(cr.status === 'WITHDRAWN'){
+    cls = 'done';
+    desc = '취소 요청을 거뒀어요. 약속은 그대로예요.';
+  } else if(mine){
+    desc = '상대가 수락하면 약속이 취소돼요.';
+    btns = [['withdraw', '요청 거두기', false]];
+  } else {
+    desc = '수락하면 약속이 취소되고, 거절하면 그대로 유지돼요.';
+    btns = [['accept', '취소 수락', true], ['decline', '거절', false]];
+  }
+  const card = document.createElement('div');
+  card.className = `date-ask-card${cls ? ' ' + cls : ''}`;
+  card.innerHTML = `
+    <div class="dac-head">${cls === 'off' ? '' : ICO.x + ' '}${head}</div>
+    <div class="dac-date"></div>
+    ${cr.reason ? '<div class="dac-desc dac-reason"></div>' : ''}
+    <div class="dac-desc"></div>
+    ${btns.length ? `<div class="dac-actions">${btns.map(([k, t, primary]) => `<button type="button" class="dac-btn${primary ? ' primary' : ''}" data-act="${k}">${t}</button>`).join('')}</div>` : ''}`;
+  card.querySelector('.dac-date').textContent = `${label} 약속`;
+  if(cr.reason) card.querySelector('.dac-reason').textContent = `사유: ${cr.reason}`;
+  card.querySelector('.dac-desc:not(.dac-reason)').textContent = desc;
+  card.querySelectorAll('[data-act]').forEach(btn => btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if(Date.now() - chatSwipeReplyAt < 400) return;
+    respondCancelRequest(activeChatRoomId, m, btn.dataset.act);
+  }));
+  return card;
+}
+// 확정된 1:1 약속에 취소 요청 보내기 (사유는 선택)
+async function requestReservationCancel(m, reason, roomId = activeChatRoomId){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !m._serverId) return;
+  try {
+    const data = await apiRequest(`/chats/messages/${m._serverId}/cancel-request`, { method: 'POST', body: JSON.stringify({ reason }) });
+    if(!room.messages.some(x => x._serverId === data.message.id)){
+      const mapped = mapServerMessageToLocal(data.message, room);
+      mapped._animate = true;
+      room.messages.push(mapped);
+    }
+    scheduleChatCacheSave(roomId);
+    touchRoom(roomId);
+    if(activeChatRoomId === roomId) renderChatMessages();
+    renderChatList();
+    showToast('취소 요청을 보냈어요. 상대가 수락하면 약속이 취소돼요.');
+  } catch(err){
+    showToast(err.message);
+  }
+}
+// 받은 취소 요청에 답하기 (수락/거절) 또는 내가 보낸 요청 거두기
+function respondCancelRequest(roomId, msg, action){
+  const room = CHAT_ROOMS[roomId];
+  if(!room || !msg.cancelRequest || msg.cancelRequest.status !== 'PENDING' || !msg._serverId) return;
+  const send = async (restoreAvailability) => {
+    try {
+      const data = await apiRequest(`/chats/cancel-requests/${msg._serverId}/respond`, { method: 'POST', body: JSON.stringify({ action, restoreAvailability }) });
+      if(data.message && data.message.cancelRequest) msg.cancelRequest = data.message.cancelRequest;
+    } catch(err){
+      showToast(err.message);
+      return;
+    }
+    if(action === 'accept'){
+      // 취소하면서 이미 "예약 가능으로 남길지"를 골랐으니, 방에 다시 들어와도 또 묻지 않게
+      if(typeof restoreAvailability === 'boolean') markRestorePromptResolved(msg.cancelRequest.targetId);
+      await loadPinsFromServer(roomId, room);
+      loadScheduleFromServer(); // 취소되면서 서버에서 지워진 "약속" 일정을 내 캘린더에도 바로 반영
+      loadRoomMessagesFromServer(roomId, room, false); // 약속 카드도 "취소됨"으로
+      showToast('약속을 취소했어요.');
+    }
+    scheduleChatCacheSave(roomId);
+    touchRoom(roomId);
+    if(activeChatRoomId === roomId){
+      renderChatMessages();
+      renderPinnedSchedule();
+    }
+    renderChatList();
+  };
+  if(action !== 'accept'){ send(); return; }
+  const target = (room.messages || []).find(x => x.type === 'reservation' && x._serverId === msg.cancelRequest.targetId);
+  const past = target ? (target.startMs ? target.startMs <= Date.now() : isLabelTimePast(target.dateLabel, target.timeLabel)) : false;
+  openCancelConfirm((keepAvailable) => send(keepAvailable), '약속 취소를 수락할까요?', { keepAvail: !past });
 }
 
 // 상단 고정 카드의 "장소 정하기"를 누르면, 항상 "모임 장소 추천받기"를 먼저 추천하고 직접 고르기도 고를 수 있게 함
